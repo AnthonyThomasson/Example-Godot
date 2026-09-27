@@ -28,9 +28,14 @@ section). To have its own `_draw()`, a "draw" file is attached to its own child
   ```
 - `scenes/player/` — `player.gd`, `player_animator.gd`, `player_visuals.gd`.
 - `scenes/room/` — `room.gd`, `room_visuals.gd`.
-- `scenes/objects/` — `environment_object.gd` (+ `_visuals`), `object_definitions.gd`.
+- `scenes/objects/` — `environment_object.gd` (+ `_visuals`), the runtime object node.
 - `scenes/builder/` — data (`*_definitions.gd`) and static spawners that build rooms,
   objects and the house at runtime (`class_name`d, see "House generation").
+- `scenes/builder/categories/` — the furniture catalogue split one file per room
+  category (`living_room.gd`, `kitchen.gd`, …), each `class_name`d `<Name>Catalog`
+  and holding that category's `OBJECTS` / `ARRANGEMENTS` / `RECIPES`. `general.gd`
+  (`GeneralCatalog`) holds anything used by 2+ categories, the shared `WOOD`/`FABRIC`
+  palettes, and the combined room recipes (`kitchen_living`, `studio`).
 - `scenes/keybinds.gd` — autoloaded as **`Keybinds`** (see `project.godot`
   `[autoload]`). The single source of truth for input. (Shared, so not in a
   per-entity folder.)
@@ -156,6 +161,12 @@ ArrangementDefinitions ────────┼─> HouseSpawner ─> RoomSpa
 ObjectDefinitions (catalogue) ─┘                └> RoomFurnisher ─> ObjectSpawner
 ```
 
+`ObjectDefinitions` and `ArrangementDefinitions` are now thin **aggregators**: they
+merge the per-category catalogs in `scenes/builder/categories/` (see file layout)
+into cached lookups and expose the same `get_definition` / `get_arrangement` /
+`get_recipe` API, so callers are unchanged. The actual object/arrangement/recipe data
+lives in the category files, with cross-category entries in `GeneralCatalog`.
+
 - **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a
   `type`; doors are points on wall lines. `HouseSpawner` cuts each door into every
   room wall passing through it (so shared walls get the gap on both sides), keeps a
@@ -163,18 +174,22 @@ ObjectDefinitions (catalogue) ─┘                └> RoomFurnisher ─> Obje
   left/right 50% of the time. Exactly one door must be `front`. `HouseSpawner._validate`
   `push_warning`s (author aid, warnings only) on overlapping rooms, a door not on a
   shared wall, and any room unreachable from the front door.
-- **Arrangements** (`arrangement_definitions.gd`): pre-designed furniture groups
-  (TV wall, dining set, bed + nightstands…). Author each **as if against the top
-  wall**: `x` along the wall, `y` depth into the room, item `pos` = item center,
-  `rotated` = 90° turn. `placement` is `"wall"` or `"center"`; `prefer_corner`
-  tries wall ends first; `tags` stop duplicates (e.g. one `"fridge"` per room).
-- **Recipes** (`RECIPES` in the same file): one per room type — `living_room`,
+- **Arrangements** (`ARRANGEMENTS` const in each `categories/*.gd`): pre-designed
+  furniture groups (TV wall, dining set, bed + nightstands…). Author each **as if
+  against the top wall**: `x` along the wall, `y` depth into the room, item `pos` =
+  item center, `rotated` = 90° turn. `placement` is `"wall"` or `"center"`;
+  `prefer_corner` tries wall ends first; `tags` stop duplicates (e.g. one `"fridge"`
+  per room). An arrangement used by 2+ categories lives in `GeneralCatalog`.
+- **Recipes** (`RECIPES` const in each `categories/*.gd`): one per room type — `living_room`,
   `kitchen`, `bedroom`, `bathroom`, `kitchen_living` (combined great room), plus
   `dining_room`, `home_office`, `kids_room`, `entry_hall`, `laundry_room`, `garage`,
   and `studio` (a self-contained flat: lounge + kitchenette + bed). Each is ordered
   `zones`, every zone picking `count` arrangements from `options`, plus a list of
-  `palettes`. One palette is picked per room and recolors every `"wood"` / `"fabric"`
-  object, so zones in a room match while rooms and runs differ. A zone may set
+  `palettes` (colors drawn from `GeneralCatalog.WOOD` / `.FABRIC`). One palette is
+  picked per room and recolors every `"wood"` / `"fabric"` object, so zones in a room
+  match while rooms and runs differ. The combined `kitchen_living` and `studio`
+  recipes live in `GeneralCatalog`; each single-category recipe lives in its own
+  catalog file. A zone may set
   `"required": true` (warns if nothing fits) and `"fallback": "<arrangement>"` — a
   guaranteed-small arrangement placed only when none of the normal (larger) options
   fit, so essentials still appear in tight rooms.
@@ -183,11 +198,14 @@ ObjectDefinitions (catalogue) ─┘                └> RoomFurnisher ─> Obje
   rotated onto that wall and randomly mirrored, without overlapping other
   arrangements or door clearances. A required zone that places nothing tries its
   `fallback`, then `push_warning`s if that also fails.
-- **Objects** (`object_definitions.gd`): `material` and `solid` are optional.
-  Label color is picked automatically for contrast.
+- **Objects** (`OBJECTS` const in each `categories/*.gd`): `material` and `solid` are
+  optional. Label color is picked automatically for contrast. An object used by 2+
+  categories lives in `GeneralCatalog`.
 
-To add an arrangement, add it to `ARRANGEMENTS` and list it in a recipe zone. To add
-a room type, add a recipe and use its key as a room `type` in a floorplan. New
+To add an arrangement or object, add it to the matching `categories/*.gd` catalog
+(or `general.gd` if 2+ categories use it) and list arrangements in a recipe zone. To
+add a room type, add a `categories/<type>.gd` catalog with its recipe (or add the
+recipe to an existing catalog) and use its key as a room `type` in a floorplan. New
 `class_name` scripts only resolve after Godot rescans the project (open the editor,
 or run `godot --headless --path . --import`).
 

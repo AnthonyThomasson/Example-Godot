@@ -1,0 +1,48 @@
+class_name DiningRoomCatalog
+
+## Dining-room objects, arrangements, and recipe. Shared items (chair, plant,
+## side_table_lamp) live in GeneralCatalog.
+
+const OBJECTS := {
+	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood" },
+	"buffet": { "name": "Buffet", "shape": "rect", "size": Vector2(120, 40), "color": Color(0.5, 0.32, 0.18), "material": "wood" },
+	"china_cabinet": { "name": "China", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.48, 0.3, 0.16), "material": "wood" },
+}
+
+const ARRANGEMENTS := {
+	"dining_formal": {
+		"placement": "center", "footprint": Vector2(190, 150),
+		"items": [
+			{ "key": "formal_table", "pos": Vector2(95, 75) },
+			{ "key": "chair", "pos": Vector2(65, 22) },
+			{ "key": "chair", "pos": Vector2(125, 22) },
+			{ "key": "chair", "pos": Vector2(65, 128) },
+			{ "key": "chair", "pos": Vector2(125, 128) },
+			{ "key": "chair", "pos": Vector2(18, 75) },
+			{ "key": "chair", "pos": Vector2(172, 75) },
+		],
+	},
+	"buffet_wall": {
+		"placement": "wall", "footprint": Vector2(120, 40),
+		"items": [{ "key": "buffet", "pos": Vector2(60, 20) }],
+	},
+	"china_corner": {
+		"placement": "wall", "footprint": Vector2(70, 40), "prefer_corner": true,
+		"items": [{ "key": "china_cabinet", "pos": Vector2(35, 20) }],
+	},
+}
+
+const RECIPES := {
+	"dining_room": {
+		"palettes": [
+			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.cream },
+			{ "wood": GeneralCatalog.WOOD.cherry, "fabric": GeneralCatalog.FABRIC.navy },
+			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.sage },
+		],
+		"zones": [
+			{ "options": ["dining_formal"], "count": Vector2i(1, 1), "required": true, "fallback": "dining_compact" },
+			{ "options": ["buffet_wall", "china_corner"], "count": Vector2i(1, 2) },
+			{ "options": ["plant_corner", "side_table_lamp"], "count": Vector2i(0, 2) },
+		],
+	},
+}
