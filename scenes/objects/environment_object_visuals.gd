@@ -6,14 +6,14 @@ func _process(_delta: float) -> void:
 	queue_redraw()
 
 func _draw() -> void:
-	var shape := _obj.shape_type
-	var size := _obj.size
-	var color := _obj.color
-	var text_color := _obj.text_color
+	var shape: String = _obj.shape_type
+	var size: Vector2 = _obj.size
+	var color: Color = _obj.color
+	var text_color: Color = _obj.text_color
 
 	match shape:
 		"circle":
-			var radius := size.x / 2.0
+			var radius: float = size.x / 2.0
 			draw_circle(Vector2.ZERO, radius, color)
 			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, text_color, 1.5, true)
 
