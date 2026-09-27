@@ -10,11 +10,11 @@ func _spawn_world() -> void:
 	var room: StaticBody2D = RoomSpawner.spawn("main_room", self)
 
 	var objects_container: Node2D = $ObjectsContainer
-	var room_right: float = room.position.x + 300 + 50
-	var start_pos: Vector2 = Vector2(room_right, 150)
-	var cols: int = 4
-	var spacing_x: float = 140.0
-	var spacing_y: float = 140.0
+	var room_right: float = room.position.x + 300 + 20
+	var start_pos: Vector2 = Vector2(room_right, room.position.y - 150)
+	var cols: int = 6
+	var spacing_x: float = 100.0
+	var spacing_y: float = 110.0
 
 	var keys: Array = ObjectDefinitions.get_all()
 	for i in range(keys.size()):
