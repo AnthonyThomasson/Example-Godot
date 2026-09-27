@@ -4,11 +4,14 @@ extends Node2D
 ## with the square Room. See player.gd and room.gd for the details.
 
 func _ready() -> void:
-	_spawn_objects()
+	_spawn_world()
 
-func _spawn_objects() -> void:
+func _spawn_world() -> void:
+	RoomSpawner.spawn("main_room", self)
+
 	var objects_container := $ObjectsContainer
-	var room_right := $Room.position.x + 300 + 50
+	var room := $MainRoom
+	var room_right := room.position.x + 300 + 50
 	var start_pos := Vector2(room_right, 150)
 	var cols := 4
 	var spacing_x := 140.0

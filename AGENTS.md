@@ -71,6 +71,7 @@ rebindable exactly like the movement keys. The matching entries in
 Consumers today:
 - `player.gd` movement → `Keybinds.get_move_vector()`
 - `player.gd` punch → `Keybinds.is_punch_just_pressed()`
+- `player.gd` item selection → `Keybinds.get_selected_item()` (keys 1-9)
 
 ## Runtime-shape convention
 
@@ -103,9 +104,33 @@ runtime. Don't "fix" them by adding scene shapes; they'd just be overwritten.
   prints the hit, and emits `signal punched(hand_index, body)`. Default collision
   layer 1 means it detects the room's static walls out of the box.
 
+## Item system
+
+Items are selectable via number keys (1–9) and define what the player can do.
+
+- **Item data:** `player.gd._items` is a dict of item definitions. Each entry has
+  properties like `name`, `reach` (punch distance), and `has_attack` (whether F
+  triggers an action). Example:
+  ```gdscript
+  _items[1] = { name="Unarmed", reach=28.0, has_attack=false }
+  _items[2] = { name="Pistol", reach=32.0, has_attack=true }
+  ```
+- **Item 1 (unarmed):** No hands shown, F does nothing.
+- **Item 2 (pistol):** Hands visible, a pistol shape drawn in the right hand, F
+  triggers a melee punch with extended reach (32px vs. 28px unarmed).
+- **Adding items:** Add an entry to `_items` in `player.gd._ready()`, optionally
+  add a custom draw function in `player_visuals.gd._draw()`. The animator
+  automatically uses the item's `reach` for punch extension. Each item can have a
+  different attack reach without needing separate punch logic.
+
 ## Running & verifying
 
 - Main scene: `res://scenes/main.tscn`.
-- Move with WASD; the hands orbit to stay between the player and the cursor.
-- Press F to jab (alternating hands) toward the cursor.
-- Punch into a wall → a `Punch ... hit:` line prints and `punched` fires.
+- **Movement:** WASD moves; the hands orbit toward the mouse.
+- **Item switching:**
+  - Press **1** → unarmed (hands disappear, F does nothing).
+  - Press **2** → pistol (hands appear, pistol drawn in right hand, F jabs).
+  - Press **1** again → back to unarmed.
+- **Attacks:** While equipped with an item that has `has_attack=true`, press F to
+  jab toward the cursor. Punch into a wall → `Punch (hand N) hit: Room` prints and
+  `punched` fires. Unarmed (item 1) has no attack, so F does nothing.

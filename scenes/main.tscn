@@ -27,13 +27,6 @@ offset_right = 800.0
 offset_bottom = 60.0
 text = "Top-down demo — use WASD to move the circle"
 
-[node name="Room" type="StaticBody2D" parent="."]
-position = Vector2(140, 120)
-script = ExtResource("2_room")
-
-[node name="RoomVisuals" type="Node2D" parent="Room"]
-script = ExtResource("3_room_visuals")
-
 [node name="Player" type="CharacterBody2D" parent="."]
 position = Vector2(440, 420)
 script = ExtResource("4_player")

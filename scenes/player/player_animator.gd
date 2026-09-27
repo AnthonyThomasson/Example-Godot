@@ -16,10 +16,14 @@ signal punched(hand_index: int, body: Node)
 
 ## Facing unit vector, set by the control node each frame.
 var facing := Vector2.RIGHT
+## Current item, set by the control node each frame (determines reach, etc.).
+var current_item := 1
 ## Which hand throws the next punch: 0 = left, 1 = right.
 var _next_hand := 0
 ## Per-hand extension, 0 (resting) .. 1 (fully punched), driven by tweens.
 var _punch := [0.0, 0.0]
+## Current punch reach (from the item's reach property), updated in _physics_process.
+var _current_reach := 28.0
 
 ## Hit-detection state for the current swing.
 var _fist: Area2D
@@ -43,6 +47,9 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	# Update the current reach based on the equipped item.
+	_current_reach = _control._items[current_item].get("reach", 28.0)
+
 	# Track the fist on the punching hand and report anything it overlaps.
 	_fist.position = hand_position(_active_hand)
 	if _attack_active:
@@ -55,7 +62,7 @@ func hand_position(hand: int) -> Vector2:
 	var perp := facing.orthogonal()
 	var side := -1.0 if hand == 0 else 1.0
 	var rest := facing * (body_radius + hand_radius + hand_gap) + perp * (hand_lateral * side)
-	return rest + facing * (punch_reach * _punch[hand])
+	return rest + facing * (_current_reach * _punch[hand])
 
 
 ## Throw the next hand forward, then retract it. Rapid presses alternate hands.
