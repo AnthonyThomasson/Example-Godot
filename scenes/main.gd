@@ -7,10 +7,9 @@ func _ready() -> void:
 	_spawn_world()
 
 func _spawn_world() -> void:
-	RoomSpawner.spawn("main_room", self)
+	var room: StaticBody2D = RoomSpawner.spawn("main_room", self)
 
 	var objects_container: Node2D = $ObjectsContainer
-	var room: StaticBody2D = $MainRoom
 	var room_right: float = room.position.x + 300 + 50
 	var start_pos: Vector2 = Vector2(room_right, 150)
 	var cols: int = 4
