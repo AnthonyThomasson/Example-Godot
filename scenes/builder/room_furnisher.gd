@@ -44,6 +44,15 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 				used_tags[tag] = true
 			_spawn_items(arrangement, spot, palette, parent)
 			placed += 1
+		# A required zone that couldn't place any of its (large) options falls back to a
+		# guaranteed-small arrangement, so essentials always appear even in tight rooms.
+		if placed == 0 and wanted > 0 and zone.has("fallback"):
+			var fb := ArrangementDefinitions.get_arrangement(zone["fallback"])
+			var fb_spot := _find_spot(fb, interior, occupied, rng)
+			if not fb_spot.is_empty():
+				occupied.append(fb_spot["rect"])
+				_spawn_items(fb, fb_spot, palette, parent)
+				placed = 1
 		if zone.get("required", false) and placed == 0 and wanted > 0:
 			push_warning("RoomFurnisher: no room for required zone %s in %s" % [zone["options"], room_type])
 

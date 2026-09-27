@@ -6,6 +6,8 @@ extends Node2D
 ## Seed for the house layout; 0 = a new random house every run. The seed used is
 ## printed at startup so a layout you like can be pinned here.
 @export var house_seed: int = 0
+## Force a specific floorplan (a key in HouseDefinitions); "" = pick one at random.
+@export var force_plan: String = ""
 ## Distance from the player to the front door's center, straight up the screen.
 @export var door_distance: float = 70.0
 
@@ -19,9 +21,12 @@ func _ready() -> void:
 func _spawn_world() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed if house_seed != 0 else randi()
-	print("House seed: ", rng.seed)
+	var all_plans: Array = HouseDefinitions.get_all()
+	var pick: String = all_plans[rng.randi() % all_plans.size()]
+	var plan_key: String = force_plan if force_plan != "" else pick
+	print("House: ", plan_key, "  seed: ", rng.seed)
 
 	var front_door := _player.global_position + Vector2(0, -door_distance)
-	var house := HouseSpawner.spawn("starter_home", front_door, rng, self)
+	var house := HouseSpawner.spawn(plan_key, front_door, rng, self)
 	# Keep the house beneath the player in draw order.
 	move_child(house, _player.get_index())

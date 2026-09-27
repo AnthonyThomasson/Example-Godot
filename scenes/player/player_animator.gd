@@ -27,7 +27,7 @@ var _current_reach := 28.0
 
 ## Hit-detection state for the current swing.
 var _fist: Area2D
-var _attack_active := false   ## True only during a punch's forward thrust.
+var _attack_active := false   ## True for the whole swing (extend + retract); gates hit polling.
 var _active_hand := 0         ## Hand the fist is tracking this swing.
 var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
 
@@ -37,7 +37,11 @@ var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
 func _ready() -> void:
 	# Build the fist hitbox at runtime, matching the room/body shape convention.
 	_fist = Area2D.new()
-	_fist.monitorable = false  # Only this area senses others, not the reverse.
+	# monitoring = true (default) is what lets get_overlapping_bodies() see the
+	# walls/furniture. Do NOT set monitorable = false here: in this Godot build that
+	# also suppresses this area's own get_overlapping_bodies() results, so the fist
+	# would detect nothing. Nothing else monitors the fist, so leaving it monitorable
+	# is harmless.
 	var fist_shape := CollisionShape2D.new()
 	var fist_circle := CircleShape2D.new()
 	fist_circle.radius = hand_radius
@@ -88,10 +92,16 @@ func try_punch() -> void:
 	_attack_active = true
 	_hit_bodies.clear()
 
+	# Run on the physics step so _punch / _attack_active stay in sync with the
+	# _report_hits() poll in _physics_process.
 	var tween := create_tween()
+	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
 	tween.tween_method(_set_punch.bind(hand), 0.0, 1.0, 0.07)  # Extend.
-	tween.tween_callback(func() -> void: _attack_active = false)
 	tween.tween_method(_set_punch.bind(hand), 1.0, 0.0, 0.11)  # Retract.
+	# Stay active across the whole swing: the fist reaches the target at full
+	# extension, and get_overlapping_bodies() lags a physics frame, so a window that
+	# closed at the apex would miss the hit. Per-swing dedup keeps it to one report.
+	tween.tween_callback(func() -> void: _attack_active = false)
 
 
 ## Tween setter for a single hand's extension.

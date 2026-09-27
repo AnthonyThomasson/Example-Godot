@@ -137,10 +137,16 @@ Items are selectable via number keys (1–9) and define what the player can do.
 
 ## House generation
 
-At startup `main.gd` spawns a house so its front door sits `door_distance` px
-straight above the player. Each run uses a new random seed (printed as
-`House seed: N`); set `house_seed` on `Main` to reproduce a layout. All randomness
-flows through that one `RandomNumberGenerator`.
+At startup `main.gd` picks one of the `HouseDefinitions` floorplans at random
+(`HouseDefinitions.get_all()`) and spawns it so its front door sits `door_distance` px
+straight above the player. There are 12 plans ranging from a `studio_flat` up to an
+8-room `luxury_home` (`starter_home`, `open_plan_home`, `studio_flat`, `one_bed_flat`,
+`two_bed_flat`, `family_home`, `office_loft`, `dining_house`, `bungalow`,
+`garage_home`, `cottage`, `luxury_home`). The chosen plan and seed are printed
+(`House: <plan>  seed: N`); set `house_seed` on `Main` to reproduce a layout, or
+`force_plan` to pin a specific floorplan. All randomness flows through that one
+`RandomNumberGenerator` (the plan pick is its first draw), so a seed reproduces the
+whole run.
 
 Pipeline (all in `scenes/builder/`, static `class_name` helpers, data kept separate):
 
@@ -154,20 +160,29 @@ ObjectDefinitions (catalogue) ─┘                └> RoomFurnisher ─> Obje
   `type`; doors are points on wall lines. `HouseSpawner` cuts each door into every
   room wall passing through it (so shared walls get the gap on both sides), keeps a
   clearance box around each doorway free of furniture, and mirrors the plan
-  left/right 50% of the time. Exactly one door must be `front`.
+  left/right 50% of the time. Exactly one door must be `front`. `HouseSpawner._validate`
+  `push_warning`s (author aid, warnings only) on overlapping rooms, a door not on a
+  shared wall, and any room unreachable from the front door.
 - **Arrangements** (`arrangement_definitions.gd`): pre-designed furniture groups
   (TV wall, dining set, bed + nightstands…). Author each **as if against the top
   wall**: `x` along the wall, `y` depth into the room, item `pos` = item center,
   `rotated` = 90° turn. `placement` is `"wall"` or `"center"`; `prefer_corner`
   tries wall ends first; `tags` stop duplicates (e.g. one `"fridge"` per room).
-- **Recipes** (`RECIPES` in the same file): per room type, ordered `zones`, each
-  picking `count` arrangements from `options`, and a list of `palettes`. One palette
-  is picked per room and recolors every `"wood"` / `"fabric"` object, so zones in a
-  room match while rooms and runs differ.
+- **Recipes** (`RECIPES` in the same file): one per room type — `living_room`,
+  `kitchen`, `bedroom`, `bathroom`, `kitchen_living` (combined great room), plus
+  `dining_room`, `home_office`, `kids_room`, `entry_hall`, `laundry_room`, `garage`,
+  and `studio` (a self-contained flat: lounge + kitchenette + bed). Each is ordered
+  `zones`, every zone picking `count` arrangements from `options`, plus a list of
+  `palettes`. One palette is picked per room and recolors every `"wood"` / `"fabric"`
+  object, so zones in a room match while rooms and runs differ. A zone may set
+  `"required": true` (warns if nothing fits) and `"fallback": "<arrangement>"` — a
+  guaranteed-small arrangement placed only when none of the normal (larger) options
+  fit, so essentials still appear in tight rooms.
 - **Placement** (`room_furnisher.gd`): each arrangement's footprint is fitted
   against a random wall at a random offset (or free-standing for `"center"`),
   rotated onto that wall and randomly mirrored, without overlapping other
-  arrangements or door clearances. Required zones `push_warning` if they can't fit.
+  arrangements or door clearances. A required zone that places nothing tries its
+  `fallback`, then `push_warning`s if that also fails.
 - **Objects** (`object_definitions.gd`): `material` and `solid` are optional.
   Label color is picked automatically for contrast.
 

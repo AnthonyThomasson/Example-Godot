@@ -6,7 +6,7 @@ class_name HouseSpawner
 
 const Room = preload("res://scenes/room/room.gd")
 
-const DOOR_CLEARANCE := 70.0   ## Kept free of furniture on each side of a doorway.
+const DOOR_CLEARANCE := 50.0   ## Kept free of furniture on each side of a doorway.
 const INTERIOR_MARGIN := 6.0   ## Gap between wall faces and furniture.
 
 
@@ -25,6 +25,8 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 	if front.size() != 1:
 		push_error("House plan needs exactly one front door: ", plan_key)
 		return null
+
+	_validate(rooms, doors, plan_key)
 
 	var house := Node2D.new()
 	house.name = "House"
@@ -51,6 +53,53 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 		RoomFurnisher.furnish(room["type"], interior, blocked, rng, furniture)
 
 	return house
+
+
+## Author-error checks (warnings only): overlapping rooms, a door not on a shared
+## wall, and rooms unreachable from the front door.
+static func _validate(rooms: Array, doors: Array, plan_key: String) -> void:
+	for i in range(rooms.size()):
+		for j in range(i + 1, rooms.size()):
+			var a: Rect2 = rooms[i]["rect"]
+			var b: Rect2 = rooms[j]["rect"]
+			if a.grow(-1.0).intersects(b.grow(-1.0)):
+				push_warning("House %s: rooms %s and %s overlap" % [plan_key, rooms[i]["key"], rooms[j]["key"]])
+
+	var adj: Array = []
+	for i in range(rooms.size()):
+		adj.append([])
+	var front_idx := -1
+	for door in doors:
+		var touching: Array = []
+		for i in range(rooms.size()):
+			if not _openings_for(rooms[i]["rect"], [door]).is_empty():
+				touching.append(i)
+		if door.get("front", false):
+			if touching.size() != 1:
+				push_warning("House %s: front door at %s is not on exactly one room wall" % [plan_key, door["pos"]])
+			elif front_idx == -1:
+				front_idx = touching[0]
+		elif touching.size() < 2:
+			push_warning("House %s: interior door at %s is not on a shared wall" % [plan_key, door["pos"]])
+		else:
+			for a in touching:
+				for b in touching:
+					if a != b:
+						adj[a].append(b)
+
+	if front_idx < 0:
+		return
+	var seen := { front_idx: true }
+	var stack := [front_idx]
+	while not stack.is_empty():
+		var n: int = stack.pop_back()
+		for m in adj[n]:
+			if not seen.has(m):
+				seen[m] = true
+				stack.append(m)
+	for i in range(rooms.size()):
+		if not seen.has(i):
+			push_warning("House %s: room %s is unreachable from the front door" % [plan_key, rooms[i]["key"]])
 
 
 ## Flip the floorplan left-to-right for extra layout variety.

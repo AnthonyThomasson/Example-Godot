@@ -46,6 +46,32 @@ const OBJECTS := {
 	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "solid": false },
 	"washing_machine": { "name": "Wash", "shape": "square", "size": Vector2(60, 60), "color": Color(0.9, 0.9, 0.9) },
 	"dryer": { "name": "Dryer", "shape": "square", "size": Vector2(60, 60), "color": Color(0.7, 0.7, 0.7) },
+	"laundry_sink": { "name": "Sink", "shape": "square", "size": Vector2(45, 45), "color": Color(0.72, 0.8, 0.88) },
+
+	# --- Dining room ---
+	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood" },
+	"buffet": { "name": "Buffet", "shape": "rect", "size": Vector2(120, 40), "color": Color(0.5, 0.32, 0.18), "material": "wood" },
+	"china_cabinet": { "name": "China", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.48, 0.3, 0.16), "material": "wood" },
+
+	# --- Home office ---
+	"office_chair": { "name": "Chair", "shape": "square", "size": Vector2(30, 30), "color": Color(0.2, 0.2, 0.24) },
+	"filing_cabinet": { "name": "Files", "shape": "rect", "size": Vector2(40, 50), "color": Color(0.55, 0.57, 0.6) },
+
+	# --- Kids room ---
+	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric" },
+	"toy_chest": { "name": "Toys", "shape": "rect", "size": Vector2(55, 38), "color": Color(0.9, 0.55, 0.25), "material": "wood" },
+	"small_desk": { "name": "Desk", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.45, 0.3, 0.15), "material": "wood" },
+
+	# --- Entry hall ---
+	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood" },
+	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood" },
+	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85) },
+
+	# --- Garage ---
+	"car": { "name": "Car", "shape": "rect", "size": Vector2(130, 220), "color": Color(0.55, 0.12, 0.12) },
+	"workbench": { "name": "Bench", "shape": "rect", "size": Vector2(110, 45), "color": Color(0.5, 0.38, 0.25), "material": "wood" },
+	"shelving": { "name": "Shelves", "shape": "rect", "size": Vector2(95, 30), "color": Color(0.55, 0.55, 0.58) },
+	"tool_chest": { "name": "Tools", "shape": "rect", "size": Vector2(45, 40), "color": Color(0.7, 0.15, 0.15) },
 }
 
 static func get_all() -> Array:
