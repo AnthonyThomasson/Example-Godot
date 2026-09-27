@@ -16,6 +16,11 @@ func _ready() -> void:
 
 
 func _draw() -> void:
+	var t: float = _room.wall_thickness
 	for seg in _room.wall_segments():
-		if not seg[0].is_equal_approx(seg[1]):
-			draw_line(seg[0], seg[1], line_color, _room.wall_thickness)
+		if seg[0].is_equal_approx(seg[1]):
+			continue
+		# Extend the ends by half the thickness, exactly like the colliders in room.gd,
+		# so corners close up and doorways look as wide as they really are.
+		var dir: Vector2 = (seg[1] - seg[0]).normalized()
+		draw_line(seg[0] - dir * t * 0.5, seg[1] + dir * t * 0.5, line_color, t)

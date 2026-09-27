@@ -5,9 +5,14 @@ extends StaticBody2D
 @export var size: Vector2 = Vector2(60, 60)
 @export var color: Color = Color.GRAY
 @export var text_color: Color = Color.WHITE
+## Non-solid objects (rugs, mats) get no collider and draw beneath everything else.
+@export var solid: bool = true
 
 func _ready() -> void:
-	_build_collider()
+	if solid:
+		_build_collider()
+	else:
+		z_index = -1
 
 func _build_collider() -> void:
 	var col := CollisionShape2D.new()
@@ -18,12 +23,7 @@ func _build_collider() -> void:
 			circle.radius = size.x / 2.0
 			col.shape = circle
 
-		"square":
-			var rect := RectangleShape2D.new()
-			rect.size = size
-			col.shape = rect
-
-		"rect":
+		"square", "rect":
 			var rect := RectangleShape2D.new()
 			rect.size = size
 			col.shape = rect

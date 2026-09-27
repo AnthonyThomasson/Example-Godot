@@ -1,45 +1,54 @@
 extends StaticBody2D
 
-## Room CONTROL layer. Computes the wall centerline segments (with an optional
-## doorway) and builds the static collision walls. Drawing lives in room_visuals.gd,
+## Room CONTROL layer. Computes the wall centerline segments (with any doorways cut
+## out) and builds the static collision walls. Drawing lives in room_visuals.gd,
 ## which reads `wall_segments()` and `wall_thickness` from this node.
 
 enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
 
-@export var size: float = 600.0        ## Side length of the square (centerline of the walls).
+@export var size: Vector2 = Vector2(600.0, 600.0)  ## Room extents (centerline of the walls).
 @export var wall_thickness: float = 24.0  ## Half the character's width.
-## Which wall has the doorway (None = closed room). Values line up with `Side`.
-@export_enum("None", "Top", "Bottom", "Left", "Right") var opening_side: int = Side.BOTTOM
-@export var opening_width: float = 120.0      ## Width of the centered gap on that wall.
+## Doorways: `{ side: Side, offset: float, width: float }`. `offset` is the gap center
+## measured along the wall from its start corner (top/bottom walls start at the left,
+## left/right walls start at the top).
+@export var openings: Array = []
 
 
 func _ready() -> void:
 	_build_walls()
 
 
-## Centerline segments (start/end points) for every wall, with the opening removed.
+## Centerline segments (start/end points) for every wall, with the openings removed.
 func wall_segments() -> Array[PackedVector2Array]:
-	var s := size
+	var w := size.x
+	var h := size.y
 	# Each edge as an ordered pair of corner points.
 	var edges := {
-		Side.TOP: [Vector2(0.0, 0.0), Vector2(s, 0.0)],
-		Side.RIGHT: [Vector2(s, 0.0), Vector2(s, s)],
-		Side.BOTTOM: [Vector2(0.0, s), Vector2(s, s)],
-		Side.LEFT: [Vector2(0.0, 0.0), Vector2(0.0, s)],
+		Side.TOP: [Vector2(0.0, 0.0), Vector2(w, 0.0)],
+		Side.RIGHT: [Vector2(w, 0.0), Vector2(w, h)],
+		Side.BOTTOM: [Vector2(0.0, h), Vector2(w, h)],
+		Side.LEFT: [Vector2(0.0, 0.0), Vector2(0.0, h)],
 	}
 	var segments: Array[PackedVector2Array] = []
 	for side in edges:
 		var a: Vector2 = edges[side][0]
 		var b: Vector2 = edges[side][1]
-		if side == opening_side and opening_width > 0.0:
-			# Split into two segments, leaving a centered gap.
-			var mid := (a + b) * 0.5
-			var dir := (b - a).normalized()
-			var half_gap := opening_width * 0.5
-			segments.append(PackedVector2Array([a, mid - dir * half_gap]))
-			segments.append(PackedVector2Array([mid + dir * half_gap, b]))
-		else:
-			segments.append(PackedVector2Array([a, b]))
+		var length := a.distance_to(b)
+		var dir := (b - a) / length
+
+		var gaps: Array = openings.filter(func(o: Dictionary) -> bool: return o.side == side)
+		gaps.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return x.offset < y.offset)
+
+		# Walk along the wall, emitting the solid pieces between gaps.
+		var cursor := 0.0
+		for gap in gaps:
+			var gap_start := clampf(gap.offset - gap.width * 0.5, 0.0, length)
+			var gap_end := clampf(gap.offset + gap.width * 0.5, 0.0, length)
+			if gap_start > cursor:
+				segments.append(PackedVector2Array([a + dir * cursor, a + dir * gap_start]))
+			cursor = maxf(cursor, gap_end)
+		if cursor < length:
+			segments.append(PackedVector2Array([a + dir * cursor, b]))
 	return segments
 
 

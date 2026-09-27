@@ -1,8 +1,8 @@
 # AGENTS.md — Example_Godot architecture
 
-A small top-down Godot 4.4 demo: a circle you drive with WASD inside a square
-room, with two "hands" that aim at the mouse and a punch on **F**. This file
-explains the conventions so future changes stay consistent.
+A small top-down Godot 4.4 demo: a circle you drive with WASD around a
+procedurally furnished house, with two "hands" that aim at the mouse and a punch
+on **F**. This file explains the conventions so future changes stay consistent.
 
 ## Scene / file layout
 
@@ -14,9 +14,13 @@ section). To have its own `_draw()`, a "draw" file is attached to its own child
 - `scenes/main.tscn` — root `Node2D` (`main.gd`). Tree:
   ```
   Main
-	Label                                   on-screen hint text
-	Room (StaticBody2D, room/room.gd)       CONTROL: segments + colliders
-	  RoomVisuals (Node2D, room/room_visuals.gd)   DRAW: wall lines
+	MainCamera (Camera2D, camera_controller.gd)    follows player, leads toward mouse
+	DebugUI (CanvasLayer, debug_ui.gd)             screen HUD: state + last hit
+	  Label                                 on-screen hint text
+	House (Node2D)                          spawned at runtime by main.gd, see below
+	  <Room> (StaticBody2D, room/room.gd)   CONTROL: segments + colliders
+		RoomVisuals (Node2D, room/room_visuals.gd) DRAW: wall lines
+	  <Room> Furniture (Node2D)             environment objects for that room
 	Player (CharacterBody2D, player/player.gd)     CONTROL: input, movement, facing
 	  CollisionShape2D                      body collider (shape set at runtime)
 	  PlayerAnimator (Node2D, player/player_animator.gd)  ANIMATE: punch + fist hits
@@ -24,6 +28,9 @@ section). To have its own `_draw()`, a "draw" file is attached to its own child
   ```
 - `scenes/player/` — `player.gd`, `player_animator.gd`, `player_visuals.gd`.
 - `scenes/room/` — `room.gd`, `room_visuals.gd`.
+- `scenes/objects/` — `environment_object.gd` (+ `_visuals`), `object_definitions.gd`.
+- `scenes/builder/` — data (`*_definitions.gd`) and static spawners that build rooms,
+  objects and the house at runtime (`class_name`d, see "House generation").
 - `scenes/keybinds.gd` — autoloaded as **`Keybinds`** (see `project.godot`
   `[autoload]`). The single source of truth for input. (Shared, so not in a
   per-entity folder.)
@@ -78,7 +85,12 @@ Consumers today:
 Collision shapes are built **in code in `_ready()`**, not assigned in the scene:
 
 - `room.gd._build_walls()` creates a `RectangleShape2D` collider per wall segment
-  (layout depends on `size` / `opening_side`, so it must be data-driven).
+  (layout depends on `size` (Vector2) / `openings`, so it must be data-driven).
+  `openings` is an array of `{ side, offset, width }`; `offset` is the gap center
+  along the wall from its start corner (top/bottom from the left, left/right from
+  the top). `room_visuals.gd` draws the segments extended exactly like the colliders.
+- `environment_object.gd` builds its collider only when `solid` is true; non-solid
+  decor (rugs, mats) gets `z_index = -1` so it draws under furniture and the player.
 - `player.gd` creates its body `CircleShape2D`; `player_animator.gd` creates the
   fist `Area2D` hitbox — both in `_ready()`.
 
@@ -108,29 +120,70 @@ runtime. Don't "fix" them by adding scene shapes; they'd just be overwritten.
 
 Items are selectable via number keys (1–9) and define what the player can do.
 
-- **Item data:** `player.gd._items` is a dict of item definitions. Each entry has
-  properties like `name`, `reach` (punch distance), and `has_attack` (whether F
-  triggers an action). Example:
+- **Item data:** `player.gd._items` is a dict of item definitions:
   ```gdscript
   _items[1] = { name="Unarmed", reach=28.0, has_attack=false }
-  _items[2] = { name="Pistol", reach=32.0, has_attack=true }
+  _items[2] = { name="Fists", reach=28.0, has_attack=true, punch_hand=[0, 1] }
+  _items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1 }
   ```
-- **Item 1 (unarmed):** No hands shown, F does nothing.
-- **Item 2 (pistol):** Hands visible, a pistol shape drawn in the right hand, F
-  triggers a melee punch with extended reach (32px vs. 28px unarmed).
-- **Adding items:** Add an entry to `_items` in `player.gd._ready()`, optionally
-  add a custom draw function in `player_visuals.gd._draw()`. The animator
-  automatically uses the item's `reach` for punch extension. Each item can have a
-  different attack reach without needing separate punch logic.
+  - `has_attack` — whether F does anything.
+  - `punch_hand` — an array alternates between those hands; an int always uses that
+	hand. Read by `player_animator.try_punch()`.
+  - `weapon_hand` — draw only that hand plus the item's weapon
+	(`player_visuals._draw_weapon_for_item()`); without it, an item with an array
+	`punch_hand` draws both hands, and anything else draws no hands.
+- **Adding items:** Add an entry to `_items` in `player.gd._ready()`, and a draw
+  case in `player_visuals._draw_weapon_for_item()` if it has a weapon.
+
+## House generation
+
+At startup `main.gd` spawns a house so its front door sits `door_distance` px
+straight above the player. Each run uses a new random seed (printed as
+`House seed: N`); set `house_seed` on `Main` to reproduce a layout. All randomness
+flows through that one `RandomNumberGenerator`.
+
+Pipeline (all in `scenes/builder/`, static `class_name` helpers, data kept separate):
+
+```
+HouseDefinitions (floorplans) ─┐
+ArrangementDefinitions ────────┼─> HouseSpawner ─> RoomSpawner.spawn_from (walls)
+ObjectDefinitions (catalogue) ─┘                └> RoomFurnisher ─> ObjectSpawner
+```
+
+- **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a
+  `type`; doors are points on wall lines. `HouseSpawner` cuts each door into every
+  room wall passing through it (so shared walls get the gap on both sides), keeps a
+  clearance box around each doorway free of furniture, and mirrors the plan
+  left/right 50% of the time. Exactly one door must be `front`.
+- **Arrangements** (`arrangement_definitions.gd`): pre-designed furniture groups
+  (TV wall, dining set, bed + nightstands…). Author each **as if against the top
+  wall**: `x` along the wall, `y` depth into the room, item `pos` = item center,
+  `rotated` = 90° turn. `placement` is `"wall"` or `"center"`; `prefer_corner`
+  tries wall ends first; `tags` stop duplicates (e.g. one `"fridge"` per room).
+- **Recipes** (`RECIPES` in the same file): per room type, ordered `zones`, each
+  picking `count` arrangements from `options`, and a list of `palettes`. One palette
+  is picked per room and recolors every `"wood"` / `"fabric"` object, so zones in a
+  room match while rooms and runs differ.
+- **Placement** (`room_furnisher.gd`): each arrangement's footprint is fitted
+  against a random wall at a random offset (or free-standing for `"center"`),
+  rotated onto that wall and randomly mirrored, without overlapping other
+  arrangements or door clearances. Required zones `push_warning` if they can't fit.
+- **Objects** (`object_definitions.gd`): `material` and `solid` are optional.
+  Label color is picked automatically for contrast.
+
+To add an arrangement, add it to `ARRANGEMENTS` and list it in a recipe zone. To add
+a room type, add a recipe and use its key as a room `type` in a floorplan. New
+`class_name` scripts only resolve after Godot rescans the project (open the editor,
+or run `godot --headless --path . --import`).
 
 ## Running & verifying
 
-- Main scene: `res://scenes/main.tscn`.
+- Main scene: `res://scenes/main.tscn`. Use the `godot-debug` skill
+  (`.claude/skills/godot-debug/`) for a headless error check.
+- **House:** on start the house is directly ahead (up) of the player with the front
+  door beside them; every doorway is walkable. Relaunch for a different layout.
 - **Movement:** WASD moves; the hands orbit toward the mouse.
-- **Item switching:**
-  - Press **1** → unarmed (hands disappear, F does nothing).
-  - Press **2** → pistol (hands appear, pistol drawn in right hand, F jabs).
-  - Press **1** again → back to unarmed.
-- **Attacks:** While equipped with an item that has `has_attack=true`, press F to
-  jab toward the cursor. Punch into a wall → `Punch (hand N) hit: Room` prints and
-  `punched` fires. Unarmed (item 1) has no attack, so F does nothing.
+- **Item switching:** **1** unarmed (no hands, F does nothing) · **2** fists (both
+  hands, F alternates) · **3** pistol (right hand + pistol, F jabs with that hand).
+- **Attacks:** punch a wall or piece of furniture → `Punch (hand N) hit: <name>`
+  prints, `punched` fires and the debug HUD shows the hit.

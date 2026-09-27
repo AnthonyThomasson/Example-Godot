@@ -26,18 +26,20 @@ func _draw() -> void:
 	draw_circle(Vector2.ZERO, r, body_color)
 	draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color.WHITE, 2.0, true)
 
-	# Draw hands based on the equipped item's weapon_hand property.
+	# Draw hands based on item's properties.
 	var item_def: Dictionary = _control._items.get(_current_item, {})
 	var weapon_hand: int = item_def.get("weapon_hand", -1)
+	var punch_hand = item_def.get("punch_hand", null)
 
 	if weapon_hand >= 0:
-		# Item has a weapon: draw only the weapon-holding hand, then the weapon.
+		# Item has a weapon (pistol): draw only the weapon-holding hand with weapon.
 		_draw_hand(weapon_hand)
 		_draw_weapon_for_item(_current_item, weapon_hand)
-	else:
-		# Unarmed: draw both hands.
+	elif punch_hand is Array:
+		# Fists: draw both hands.
 		for hand in [0, 1]:
 			_draw_hand(hand)
+	# else: Unarmed - don't draw anything.
 
 
 ## Draw a single hand circle at the given index (0=left, 1=right).
@@ -49,7 +51,7 @@ func _draw_hand(hand: int) -> void:
 
 ## Draw the weapon for a given item at the specified hand position.
 func _draw_weapon_for_item(item: int, hand: int) -> void:
-	if item == 2:  # Pistol
+	if item == 3:  # Pistol
 		_draw_pistol(_animator.hand_position(hand))
 	# Add more item-specific weapon drawing here as needed.
 

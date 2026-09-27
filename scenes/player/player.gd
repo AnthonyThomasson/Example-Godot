@@ -32,7 +32,8 @@ func _ready() -> void:
 
 	# Initialize item definitions.
 	_items[1] = { name="Unarmed", reach=28.0, has_attack=false }
-	_items[2] = { name="Pistol", reach=32.0, has_attack=true, weapon_hand=1 }
+	_items[2] = { name="Fists", reach=28.0, has_attack=true, punch_hand=[0, 1] }
+	_items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1 }
 
 
 func _physics_process(_delta: float) -> void:

@@ -3,10 +3,9 @@ class_name RoomDefinitions
 const ROOMS := {
 	"main_room": {
 		"position": Vector2(140, 120),
-		"size": 600.0,
+		"size": Vector2(600, 600),
 		"wall_thickness": 24.0,
-		"opening_side": 3,
-		"opening_width": 120.0,
+		"openings": [{ "side": 3, "offset": 300.0, "width": 120.0 }],  # 3 = Side.LEFT
 	},
 }
 

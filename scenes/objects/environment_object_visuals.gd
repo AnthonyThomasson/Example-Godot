@@ -20,3 +20,11 @@ func _draw() -> void:
 		"square", "rect":
 			draw_rect(Rect2(-size / 2.0, size), color)
 			draw_rect(Rect2(-size / 2.0, size), text_color, false, 1.5)
+
+	# Draw the object's name centered on it.
+	var name_text: String = _obj.object_name
+	var font: Font = ThemeDB.fallback_font
+	var font_size := 14
+	var text_size := font.get_string_size(name_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size)
+	var pos := Vector2(-text_size.x / 2.0, font_size / 2.0)
+	draw_string(font, pos, name_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, text_color)

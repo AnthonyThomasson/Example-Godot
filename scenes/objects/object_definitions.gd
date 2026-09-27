@@ -1,108 +1,51 @@
 class_name ObjectDefinitions
 
+## Object catalogue. Fields:
+##   name, shape ("circle" | "square" | "rect"), size, color — required.
+##   material — optional; "wood" or "fabric" objects take the room palette's tone.
+##   solid    — optional (default true); false = walk-over decor drawn under everything.
+
 const OBJECTS := {
-	"table": {
-		"name": "Table",
-		"shape": "square",
-		"size": Vector2(60, 60),
-		"color": Color(0.6, 0.4, 0.2, 1),
-	},
-	"tv": {
-		"name": "TV",
-		"shape": "rect",
-		"size": Vector2(80, 40),
-		"color": Color(0.1, 0.1, 0.1, 1),
-	},
-	"sofa": {
-		"name": "Sofa",
-		"shape": "rect",
-		"size": Vector2(120, 50),
-		"color": Color(0.8, 0.4, 0.2, 1),
-	},
-	"lamp": {
-		"name": "Lamp",
-		"shape": "circle",
-		"size": Vector2(20, 20),
-		"color": Color(1, 1, 0.6, 1),
-	},
-	"bookshelf": {
-		"name": "Books",
-		"shape": "rect",
-		"size": Vector2(40, 80),
-		"color": Color(0.4, 0.2, 0, 1),
-	},
-	"sink": {
-		"name": "Sink",
-		"shape": "square",
-		"size": Vector2(50, 50),
-		"color": Color(0.7, 0.8, 0.9, 1),
-	},
-	"fridge": {
-		"name": "Fridge",
-		"shape": "rect",
-		"size": Vector2(60, 100),
-		"color": Color(0.9, 0.9, 0.95, 1),
-	},
-	"microwave": {
-		"name": "Microwave",
-		"shape": "square",
-		"size": Vector2(40, 40),
-		"color": Color(0.5, 0.5, 0.5, 1),
-	},
-	"toilet": {
-		"name": "Toilet",
-		"shape": "circle",
-		"size": Vector2(30, 30),
-		"color": Color(0.95, 0.95, 0.95, 1),
-	},
-	"bed": {
-		"name": "Bed",
-		"shape": "rect",
-		"size": Vector2(120, 180),
-		"color": Color(0.7, 0.3, 0.3, 1),
-	},
-	"nightstand": {
-		"name": "Nightstand",
-		"shape": "square",
-		"size": Vector2(50, 50),
-		"color": Color(0.6, 0.4, 0.2, 1),
-	},
-	"dresser": {
-		"name": "Dresser",
-		"shape": "rect",
-		"size": Vector2(80, 40),
-		"color": Color(0.5, 0.3, 0.1, 1),
-	},
-	"desk": {
-		"name": "Desk",
-		"shape": "rect",
-		"size": Vector2(120, 50),
-		"color": Color(0.4, 0.25, 0.1, 1),
-	},
-	"washing_machine": {
-		"name": "Wash",
-		"shape": "square",
-		"size": Vector2(60, 60),
-		"color": Color(0.9, 0.9, 0.9, 1),
-	},
-	"dryer": {
-		"name": "Dryer",
-		"shape": "square",
-		"size": Vector2(60, 60),
-		"color": Color(0.7, 0.7, 0.7, 1),
-	},
-	"bathtub": {
-		"name": "Tub",
-		"shape": "rect",
-		"size": Vector2(100, 150),
-		"color": Color(0.8, 0.8, 1.0, 1),
-	},
-	"kitchen_counter": {
-		"name": "Counter",
-		"shape": "rect",
-		"size": Vector2(100, 50),
-		"color": Color(0.8, 0.7, 0.6, 1),
-	},
+	# --- Living room ---
+	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1) },
+	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric" },
+	"armchair": { "name": "Armchair", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.45, 0.3), "material": "fabric" },
+	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood" },
+	"side_table": { "name": "Side", "shape": "square", "size": Vector2(30, 30), "color": Color(0.55, 0.35, 0.2), "material": "wood" },
+	"bookshelf": { "name": "Books", "shape": "rect", "size": Vector2(40, 80), "color": Color(0.4, 0.2, 0.0), "material": "wood" },
+	"lamp": { "name": "Lamp", "shape": "circle", "size": Vector2(20, 20), "color": Color(1.0, 1.0, 0.6) },
+	"plant": { "name": "Plant", "shape": "circle", "size": Vector2(26, 26), "color": Color(0.25, 0.6, 0.3) },
+	"coat_rack": { "name": "Coats", "shape": "circle", "size": Vector2(24, 24), "color": Color(0.45, 0.3, 0.15), "material": "wood" },
+	"shoe_rack": { "name": "Shoes", "shape": "rect", "size": Vector2(60, 25), "color": Color(0.45, 0.3, 0.15), "material": "wood" },
+	"rug": { "name": "Rug", "shape": "rect", "size": Vector2(170, 110), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "solid": false },
+
+	# --- Kitchen / dining ---
+	"table": { "name": "Table", "shape": "square", "size": Vector2(60, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood" },
+	"dining_table": { "name": "Dining", "shape": "rect", "size": Vector2(90, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood" },
+	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood" },
+	"kitchen_counter": { "name": "Counter", "shape": "rect", "size": Vector2(100, 50), "color": Color(0.8, 0.7, 0.6) },
+	"island": { "name": "Island", "shape": "rect", "size": Vector2(110, 55), "color": Color(0.8, 0.7, 0.6) },
+	"stove": { "name": "Stove", "shape": "square", "size": Vector2(50, 50), "color": Color(0.2, 0.2, 0.22) },
+	"sink": { "name": "Sink", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.8, 0.9) },
+	"fridge": { "name": "Fridge", "shape": "rect", "size": Vector2(60, 70), "color": Color(0.9, 0.9, 0.95) },
+	"microwave": { "name": "Micro", "shape": "square", "size": Vector2(40, 40), "color": Color(0.5, 0.5, 0.5) },
+	"cabinet": { "name": "Cabinet", "shape": "rect", "size": Vector2(50, 35), "color": Color(0.55, 0.35, 0.2), "material": "wood" },
+
+	# --- Bedroom ---
+	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric" },
+	"nightstand": { "name": "Night", "shape": "square", "size": Vector2(40, 40), "color": Color(0.6, 0.4, 0.2), "material": "wood" },
+	"dresser": { "name": "Dresser", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.5, 0.3, 0.1), "material": "wood" },
+	"wardrobe": { "name": "Wardrobe", "shape": "rect", "size": Vector2(90, 45), "color": Color(0.45, 0.28, 0.12), "material": "wood" },
+	"desk": { "name": "Desk", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.4, 0.25, 0.1), "material": "wood" },
+
+	# --- Bathroom / laundry ---
+	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95) },
+	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0) },
+	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95) },
+	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65) },
+	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "solid": false },
+	"washing_machine": { "name": "Wash", "shape": "square", "size": Vector2(60, 60), "color": Color(0.9, 0.9, 0.9) },
+	"dryer": { "name": "Dryer", "shape": "square", "size": Vector2(60, 60), "color": Color(0.7, 0.7, 0.7) },
 }
 
 static func get_all() -> Array:

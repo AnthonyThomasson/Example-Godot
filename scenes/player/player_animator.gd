@@ -65,10 +65,22 @@ func hand_position(hand: int) -> Vector2:
 	return rest + facing * (_current_reach * _punch[hand])
 
 
-## Throw the next hand forward, then retract it. Rapid presses alternate hands.
+## Throw the next hand forward, then retract it. Punch behavior depends on item's punch_hand property.
 func try_punch() -> void:
-	var hand := _next_hand
-	_next_hand = 1 - _next_hand
+	var punch_hand = _control._items[current_item].get("punch_hand", null)
+	var hand: int
+
+	if punch_hand is Array:
+		# Alternating hands (fists): use _next_hand and toggle for next call.
+		hand = _next_hand
+		_next_hand = 1 - _next_hand
+	elif punch_hand is int:
+		# Single hand (pistol): always use the specified hand, no alternation.
+		hand = punch_hand
+	else:
+		# No punching defined for this item.
+		return
+
 	if _punch[hand] > 0.0:
 		return  # That hand is still mid-swing; skip.
 
