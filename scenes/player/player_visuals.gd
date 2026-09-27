@@ -11,7 +11,7 @@ extends Node2D
 @onready var _control := get_parent()              ## Player — body radius, current_item.
 @onready var _animator := $"../PlayerAnimator"     ## Sibling — hand positions / size.
 
-var _current_item := 1  ## Track the equipped item to decide what to draw.
+var _current_item: int = 1  ## Track the equipped item to decide what to draw.
 
 
 func _process(_delta: float) -> void:
@@ -27,7 +27,7 @@ func _draw() -> void:
 	draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color.WHITE, 2.0, true)
 
 	# Draw hands based on the equipped item's weapon_hand property.
-	var item_def := _control._items.get(_current_item, {})
+	var item_def: Dictionary = _control._items.get(_current_item, {})
 	var weapon_hand: int = item_def.get("weapon_hand", -1)
 
 	if weapon_hand >= 0:
