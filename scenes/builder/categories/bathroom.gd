@@ -4,11 +4,11 @@ class_name BathroomCatalog
 ## laundry_pair arrangement with its washing_machine/dryer) live in GeneralCatalog.
 
 const OBJECTS := {
-	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95) },
-	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0) },
-	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95) },
-	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65) },
-	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "solid": false },
+	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95), "material": "ceramic", "coverage": 40, "penetration": 55 },
+	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0), "material": "ceramic", "coverage": 45, "penetration": 60 },
+	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95), "material": "glass", "coverage": 95, "penetration": 25 },
+	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65), "material": "metal", "coverage": 25, "penetration": 30 },
+	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "solid": false, "coverage": 0, "penetration": 5 },
 }
 
 const ARRANGEMENTS := {

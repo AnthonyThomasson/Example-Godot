@@ -33,7 +33,7 @@ func _ready() -> void:
 	# Initialize item definitions.
 	_items[1] = { name="Unarmed", reach=28.0, has_attack=false }
 	_items[2] = { name="Fists", reach=28.0, has_attack=true, punch_hand=[0, 1] }
-	_items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1 }
+	_items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1, fires=true, damage=15.0 }
 
 
 func _physics_process(_delta: float) -> void:
@@ -59,3 +59,7 @@ func _physics_process(_delta: float) -> void:
 	# Only trigger attacks if the current item has an attack.
 	if Keybinds.is_punch_just_pressed() and _items[current_item].get("has_attack", false):
 		_animator.try_punch()
+
+	# Guns fire a projectile on left-click (the pistol keeps its F melee jab too).
+	if Keybinds.is_fire_just_pressed() and _items[current_item].get("fires", false):
+		_animator.try_fire()

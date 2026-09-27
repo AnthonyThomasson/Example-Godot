@@ -4,9 +4,9 @@ class_name BedroomCatalog
 ## lamp, armchair via reading_chair) live in GeneralCatalog.
 
 const OBJECTS := {
-	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric" },
-	"wardrobe": { "name": "Wardrobe", "shape": "rect", "size": Vector2(90, 45), "color": Color(0.45, 0.28, 0.12), "material": "wood" },
-	"dresser": { "name": "Dresser", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.5, 0.3, 0.1), "material": "wood" },
+	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric", "coverage": 35, "penetration": 30 },
+	"wardrobe": { "name": "Wardrobe", "shape": "rect", "size": Vector2(90, 45), "color": Color(0.45, 0.28, 0.12), "material": "wood", "coverage": 95, "penetration": 55 },
+	"dresser": { "name": "Dresser", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.5, 0.3, 0.1), "material": "wood", "coverage": 45, "penetration": 55 },
 }
 
 const ARRANGEMENTS := {

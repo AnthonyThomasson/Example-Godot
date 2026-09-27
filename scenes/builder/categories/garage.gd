@@ -3,10 +3,10 @@ class_name GarageCatalog
 ## Garage objects, arrangements, and recipe. All single-category; no shared items.
 
 const OBJECTS := {
-	"car": { "name": "Car", "shape": "rect", "size": Vector2(130, 220), "color": Color(0.55, 0.12, 0.12) },
-	"workbench": { "name": "Bench", "shape": "rect", "size": Vector2(110, 45), "color": Color(0.5, 0.38, 0.25), "material": "wood" },
-	"shelving": { "name": "Shelves", "shape": "rect", "size": Vector2(95, 30), "color": Color(0.55, 0.55, 0.58) },
-	"tool_chest": { "name": "Tools", "shape": "rect", "size": Vector2(45, 40), "color": Color(0.7, 0.15, 0.15) },
+	"car": { "name": "Car", "shape": "rect", "size": Vector2(130, 220), "color": Color(0.55, 0.12, 0.12), "material": "metal", "coverage": 65, "penetration": 90 },
+	"workbench": { "name": "Bench", "shape": "rect", "size": Vector2(110, 45), "color": Color(0.5, 0.38, 0.25), "material": "wood", "coverage": 45, "penetration": 60 },
+	"shelving": { "name": "Shelves", "shape": "rect", "size": Vector2(95, 30), "color": Color(0.55, 0.55, 0.58), "material": "metal", "coverage": 80, "penetration": 70 },
+	"tool_chest": { "name": "Tools", "shape": "rect", "size": Vector2(45, 40), "color": Color(0.7, 0.15, 0.15), "material": "metal", "coverage": 40, "penetration": 80 },
 }
 
 const ARRANGEMENTS := {

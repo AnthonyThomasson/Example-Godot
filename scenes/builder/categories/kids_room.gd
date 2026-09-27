@@ -4,9 +4,9 @@ class_name KidsRoomCatalog
 ## bookshelf, plant) live in GeneralCatalog.
 
 const OBJECTS := {
-	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric" },
-	"toy_chest": { "name": "Toys", "shape": "rect", "size": Vector2(55, 38), "color": Color(0.9, 0.55, 0.25), "material": "wood" },
-	"small_desk": { "name": "Desk", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.45, 0.3, 0.15), "material": "wood" },
+	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric", "coverage": 30, "penetration": 30 },
+	"toy_chest": { "name": "Toys", "shape": "rect", "size": Vector2(55, 38), "color": Color(0.9, 0.55, 0.25), "material": "wood", "coverage": 35, "penetration": 45 },
+	"small_desk": { "name": "Desk", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.45, 0.3, 0.15), "material": "wood", "coverage": 40, "penetration": 45 },
 }
 
 const ARRANGEMENTS := {

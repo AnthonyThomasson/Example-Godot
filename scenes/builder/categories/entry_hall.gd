@@ -4,9 +4,9 @@ class_name EntryHallCatalog
 ## bench_coats, plant, and the entry_area arrangement) live in GeneralCatalog.
 
 const OBJECTS := {
-	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood" },
-	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood" },
-	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85) },
+	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood", "coverage": 30, "penetration": 45 },
+	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood", "coverage": 30, "penetration": 50 },
+	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85), "material": "glass", "coverage": 40, "penetration": 20 },
 }
 
 const ARRANGEMENTS := {

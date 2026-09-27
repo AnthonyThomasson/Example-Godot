@@ -7,7 +7,9 @@ class_name ObjectDefinitions
 ## it in the matching catalog (or GeneralCatalog if used by 2+ categories).
 ##
 ## Object fields: name, shape ("circle"|"square"|"rect"), size, color (required);
-##   material ("wood"|"fabric", optional — takes the room palette's tone);
+##   material (descriptive tag — "wood"/"fabric" also take the room palette's tone,
+##     others like "metal"/"glass"/"ceramic" are descriptive only);
+##   coverage (0–100 height/cover proxy); penetration (0–100 shoot-through resistance);
 ##   solid (optional, default true; false = walk-over decor drawn under everything).
 
 static var _catalog: Dictionary = {}

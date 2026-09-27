@@ -13,6 +13,7 @@ const MOVE_RIGHT := "move_right"
 const MOVE_UP := "move_up"
 const MOVE_DOWN := "move_down"
 const PUNCH := "punch"
+const FIRE := "fire"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -51,6 +52,10 @@ func _ready() -> void:
 			InputMap.add_action(action)
 		rebind(action, DEFAULTS[action])
 
+	# FIRE is bound to a mouse button, which isn't a Key value, so it lives
+	# outside the keyboard DEFAULTS dict and is registered separately here.
+	rebind_mouse(FIRE, MOUSE_BUTTON_LEFT)
+
 
 ## Point the given action at a single physical key, replacing any existing events.
 ## `action` is one of the constants above; `keycode` is a Key value (e.g. KEY_A).
@@ -63,6 +68,17 @@ func rebind(action: StringName, keycode: Key) -> void:
 	InputMap.action_add_event(action, event)
 
 
+## Point the given action at a single mouse button, replacing any existing events.
+## Mirrors rebind() for pointer input (e.g. left-click to fire).
+func rebind_mouse(action: StringName, button: MouseButton) -> void:
+	if not InputMap.has_action(action):
+		InputMap.add_action(action)
+	InputMap.action_erase_events(action)
+	var event := InputEventMouseButton.new()
+	event.button_index = button
+	InputMap.action_add_event(action, event)
+
+
 ## Movement direction from the four move actions, ready to multiply by speed.
 func get_move_vector() -> Vector2:
 	return Input.get_vector(MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN)
@@ -72,6 +88,12 @@ func get_move_vector() -> Vector2:
 ## action as movement, so remapping `PUNCH` via `rebind()` just works.
 func is_punch_just_pressed() -> bool:
 	return Input.is_action_just_pressed(PUNCH)
+
+
+## True on the frame the fire button (left-click) is pressed. Rebindable via
+## rebind_mouse(FIRE, ...) exactly like the keyboard actions.
+func is_fire_just_pressed() -> bool:
+	return Input.is_action_just_pressed(FIRE)
 
 
 ## Item selection (1-9). Returns the item number (1-9) if an item key was pressed

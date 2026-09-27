@@ -13,6 +13,9 @@ extends Node2D
 
 @onready var _player: Node2D = $Player
 
+## Data on every object spawned in the house (material, coverage, penetration, ...).
+var _inventory: BuildingInventory
+
 
 func _ready() -> void:
 	_spawn_world()
@@ -30,3 +33,9 @@ func _spawn_world() -> void:
 	var house := HouseSpawner.spawn(plan_key, front_door, rng, self)
 	# Keep the house beneath the player in draw order.
 	move_child(house, _player.get_index())
+
+	# Record every spawned object's data (material/coverage/penetration) for the
+	# penetration & coverage system. Stored on the house too, for other systems.
+	_inventory = BuildingInventory.from_house(house)
+	house.set_meta("inventory", _inventory)
+	print("Building inventory: %d objects" % _inventory.size())

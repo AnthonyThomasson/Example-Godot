@@ -14,12 +14,12 @@ section). To have its own `_draw()`, a "draw" file is attached to its own child
 - `scenes/main.tscn` — root `Node2D` (`main.gd`). Tree:
   ```
   Main
-	MainCamera (Camera2D, camera_controller.gd)    follows player, leads toward mouse
-	DebugUI (CanvasLayer, debug_ui.gd)             screen HUD: state + last hit
+	MainCamera (Camera2D, world/camera_controller.gd)  follows player, leads toward mouse
+	DebugUI (CanvasLayer, world/debug_ui.gd)           screen HUD: state + last hit
 	  Label                                 on-screen hint text
 	House (Node2D)                          spawned at runtime by main.gd, see below
-	  <Room> (StaticBody2D, room/room.gd)   CONTROL: segments + colliders
-		RoomVisuals (Node2D, room/room_visuals.gd) DRAW: wall lines
+	  <Room> (StaticBody2D, builder/room/room.gd)   CONTROL: segments + colliders
+		RoomVisuals (Node2D, builder/room/room_visuals.gd) DRAW: wall lines
 	  <Room> Furniture (Node2D)             environment objects for that room
 	Player (CharacterBody2D, player/player.gd)     CONTROL: input, movement, facing
 	  CollisionShape2D                      body collider (shape set at runtime)
@@ -27,10 +27,17 @@ section). To have its own `_draw()`, a "draw" file is attached to its own child
 	  PlayerVisuals  (Node2D, player/player_visuals.gd)   DRAW: body + hands
   ```
 - `scenes/player/` — `player.gd`, `player_animator.gd`, `player_visuals.gd`.
-- `scenes/room/` — `room.gd`, `room_visuals.gd`.
 - `scenes/objects/` — `environment_object.gd` (+ `_visuals`), the runtime object node.
-- `scenes/builder/` — data (`*_definitions.gd`) and static spawners that build rooms,
-  objects and the house at runtime (`class_name`d, see "House generation").
+- `scenes/projectile/` — game logic: the projectile & casing entities (`projectile.gd`,
+  `casing.gd`, + `_visuals`) and their runtime spawners (`ProjectileSpawner`,
+  `CasingSpawner`).
+- `scenes/world/` — general game-logic systems: the `Config` and `Despawner` autoloads
+  (see `project.godot`), the camera controller, and the debug HUD.
+- `scenes/builder/` — **world creation only**: data (`*_definitions.gd`) and static
+  spawners that build rooms, objects and the house at runtime (`class_name`d, see
+  "House generation"). Kept isolated from game logic.
+- `scenes/builder/room/` — `room.gd` (+ `room_visuals.gd`), the runtime room entity
+  (CONTROL + DRAW) that `RoomSpawner` attaches to each spawned room's `StaticBody2D`.
 - `scenes/builder/categories/` — the furniture catalogue split one file per room
   category (`living_room.gd`, `kitchen.gd`, …), each `class_name`d `<Name>Catalog`
   and holding that category's `OBJECTS` / `ARRANGEMENTS` / `RECIPES`. `general.gd`
@@ -129,7 +136,7 @@ Items are selectable via number keys (1–9) and define what the player can do.
   ```gdscript
   _items[1] = { name="Unarmed", reach=28.0, has_attack=false }
   _items[2] = { name="Fists", reach=28.0, has_attack=true, punch_hand=[0, 1] }
-  _items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1 }
+  _items[3] = { name="Pistol", reach=32.0, has_attack=true, punch_hand=1, weapon_hand=1, fires=true, damage=15.0 }
   ```
   - `has_attack` — whether F does anything.
   - `punch_hand` — an array alternates between those hands; an int always uses that
@@ -137,6 +144,13 @@ Items are selectable via number keys (1–9) and define what the player can do.
   - `weapon_hand` — draw only that hand plus the item's weapon
 	(`player_visuals._draw_weapon_for_item()`); without it, an item with an array
 	`punch_hand` draws both hands, and anything else draws no hands.
+  - `fires` — left-click fires a projectile (`player_animator.try_fire()`).
+  - `damage` — the item's damage, added on top of the projectile's own base `damage`
+	at fire time (`ProjectileSpawner.spawn`). The value dealt on impact is that total
+	scaled by how square the hit was (`|direction · surface_normal|`), so a head-on
+	shot deals full damage and a glancing one deals less. Reported in the `Shot hit:`
+	console line, the projectile's `hit` / animator's `shot` signals, and the debug
+	HUD Hit log.
 - **Adding items:** Add an entry to `_items` in `player.gd._ready()`, and a draw
   case in `player_visuals._draw_weapon_for_item()` if it has a weapon.
 

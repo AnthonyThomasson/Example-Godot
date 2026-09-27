@@ -4,8 +4,8 @@
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/player/player.gd" id="4_player"]
 [ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/player/player_animator.gd" id="5_player_animator"]
 [ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/player/player_visuals.gd" id="6_player_visuals"]
-[ext_resource type="Script" uid="uid://duwls7ja25j7a" path="res://scenes/camera_controller.gd" id="9_camera"]
-[ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/debug_ui.gd" id="10_debug"]
+[ext_resource type="Script" uid="uid://duwls7ja25j7a" path="res://scenes/world/camera_controller.gd" id="9_camera"]
+[ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/world/debug_ui.gd" id="10_debug"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")

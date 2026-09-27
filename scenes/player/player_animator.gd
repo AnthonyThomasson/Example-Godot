@@ -13,6 +13,9 @@ extends Node2D
 
 ## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right).
 signal punched(hand_index: int, body: Node)
+## Emitted when a fired projectile hits a body (re-emitted from the bullet's own
+## signal). `damage` is the value dealt (projectile base + item, scaled by squareness).
+signal shot(body: Node, damage: float)
 
 ## Facing unit vector, set by the control node each frame.
 var facing := Vector2.RIGHT
@@ -102,6 +105,24 @@ func try_punch() -> void:
 	# extension, and get_overlapping_bodies() lags a physics frame, so a window that
 	# closed at the apex would miss the hit. Per-swing dedup keeps it to one report.
 	tween.tween_callback(func() -> void: _attack_active = false)
+
+
+## Fire a projectile from the weapon hand's muzzle and eject a casing. The bullet
+## and casing are world-space debris, so they spawn into the player's parent (Main),
+## not under the player. Re-emits the bullet's `hit` as `shot` for the HUD.
+func try_fire() -> void:
+	var hand: int = _control._items[current_item].get("weapon_hand", 1)
+	# hand_position() is local; the player is never rotated, so world = origin + local.
+	var hand_local := hand_position(hand)
+	# Muzzle sits at the drawn barrel tip (barrel_offset 8 + barrel_len 16 = 24; +2 clear).
+	var muzzle_world: Vector2 = _control.global_position + hand_local + facing * 26.0
+	var hand_world: Vector2 = _control.global_position + hand_local
+	var world := _control.get_parent()
+
+	var item_damage: float = _control._items[current_item].get("damage", 0.0)
+	var proj := ProjectileSpawner.spawn(muzzle_world, facing, world, _control, item_damage)
+	proj.hit.connect(func(body: Node, dmg: float) -> void: shot.emit(body, dmg))
+	CasingSpawner.spawn(hand_world, facing, world)
 
 
 ## Tween setter for a single hand's extension.

@@ -28,6 +28,10 @@ static func spawn(object_key: String, position: Vector2, parent: Node, opts: Dic
 	obj.color = color
 	obj.text_color = Color.BLACK if color.get_luminance() > 0.6 else Color.WHITE
 	obj.solid = definition.get("solid", true)
+	obj.object_material = definition.get("material", "")
+	obj.coverage = definition.get("coverage", 0.0)
+	obj.penetration = definition.get("penetration", 0.0)
+	obj.add_to_group("environment_object")  # so BuildingInventory can find it
 
 	var visuals := Node2D.new()
 	visuals.name = "EnvironmentObjectVisuals"

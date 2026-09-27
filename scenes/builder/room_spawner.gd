@@ -1,7 +1,7 @@
 class_name RoomSpawner
 
-const RoomScript = preload("res://scenes/room/room.gd")
-const RoomVisualsScript = preload("res://scenes/room/room_visuals.gd")
+const RoomScript = preload("res://scenes/builder/room/room.gd")
+const RoomVisualsScript = preload("res://scenes/builder/room/room_visuals.gd")
 
 ## Build a room from a definition dict: `position`, `size` (Vector2), `wall_thickness`,
 ## `openings` (see room.gd).

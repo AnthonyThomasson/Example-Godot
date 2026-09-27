@@ -4,7 +4,7 @@ class_name HouseSpawner
 ## with every door cut into each wall it lies on) and furniture per room (via
 ## RoomFurnisher). The house is positioned so its front door lands on a given point.
 
-const Room = preload("res://scenes/room/room.gd")
+const Room = preload("res://scenes/builder/room/room.gd")
 
 const DOOR_CLEARANCE := 50.0   ## Kept free of furniture on each side of a doorway.
 const INTERIOR_MARGIN := 6.0   ## Gap between wall faces and furniture.
