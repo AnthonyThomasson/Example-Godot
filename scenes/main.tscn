@@ -55,7 +55,7 @@ shape_type = "square"
 object_name = "Table"
 size = Vector2(60, 60)
 color = Color(0.6, 0.4, 0.2, 1)
-text_color = Color.WHITE
+text_color = Color(1, 1, 1, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/CoffeeTable"]
 script = ExtResource("8_env_visuals")
@@ -67,7 +67,7 @@ shape_type = "rect"
 object_name = "TV"
 size = Vector2(80, 40)
 color = Color(0.1, 0.1, 0.1, 1)
-text_color = Color.WHITE
+text_color = Color(1, 1, 1, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/TV"]
 script = ExtResource("8_env_visuals")
@@ -79,7 +79,7 @@ shape_type = "rect"
 object_name = "Sofa"
 size = Vector2(120, 50)
 color = Color(0.8, 0.4, 0.2, 1)
-text_color = Color.WHITE
+text_color = Color(1, 1, 1, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Sofa"]
 script = ExtResource("8_env_visuals")
@@ -91,7 +91,7 @@ shape_type = "circle"
 object_name = "Lamp"
 size = Vector2(20, 20)
 color = Color(1, 1, 0.6, 1)
-text_color = Color.BLACK
+text_color = Color(0, 0, 0, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/FloorLamp"]
 script = ExtResource("8_env_visuals")
@@ -103,7 +103,7 @@ shape_type = "rect"
 object_name = "Books"
 size = Vector2(40, 80)
 color = Color(0.4, 0.2, 0, 1)
-text_color = Color.WHITE
+text_color = Color(1, 1, 1, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Bookshelf"]
 script = ExtResource("8_env_visuals")
@@ -115,7 +115,7 @@ shape_type = "square"
 object_name = "Sink"
 size = Vector2(50, 50)
 color = Color(0.7, 0.8, 0.9, 1)
-text_color = Color.BLACK
+text_color = Color(0, 0, 0, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/KitchenSink"]
 script = ExtResource("8_env_visuals")
@@ -127,7 +127,7 @@ shape_type = "rect"
 object_name = "Fridge"
 size = Vector2(60, 100)
 color = Color(0.9, 0.9, 0.95, 1)
-text_color = Color.BLACK
+text_color = Color(0, 0, 0, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Refrigerator"]
 script = ExtResource("8_env_visuals")
@@ -139,7 +139,7 @@ shape_type = "square"
 object_name = "Microwave"
 size = Vector2(40, 40)
 color = Color(0.5, 0.5, 0.5, 1)
-text_color = Color.WHITE
+text_color = Color(1, 1, 1, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Microwave"]
 script = ExtResource("8_env_visuals")
@@ -151,7 +151,7 @@ shape_type = "circle"
 object_name = "Toilet"
 size = Vector2(30, 30)
 color = Color(0.95, 0.95, 0.95, 1)
-text_color = Color.BLACK
+text_color = Color(0, 0, 0, 1)
 
 [node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Toilet"]
 script = ExtResource("8_env_visuals")
