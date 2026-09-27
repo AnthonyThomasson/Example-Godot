@@ -1,8 +1,11 @@
-[gd_scene load_steps=4 format=3 uid="uid://6ws06w1cxad1"]
+[gd_scene load_steps=7 format=3 uid="uid://6ws06w1cxad1"]
 
 [ext_resource type="Script" uid="uid://qn373ge4rrj2" path="res://scenes/main.gd" id="1_main"]
-[ext_resource type="Script" uid="uid://dscaopyofbn4s" path="res://scenes/room.gd" id="2_room"]
-[ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/player.gd" id="3_player"]
+[ext_resource type="Script" uid="uid://dscaopyofbn4s" path="res://scenes/room/room.gd" id="2_room"]
+[ext_resource type="Script" path="res://scenes/room/room_visuals.gd" id="3_room_visuals"]
+[ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/player/player.gd" id="4_player"]
+[ext_resource type="Script" path="res://scenes/player/player_animator.gd" id="5_player_animator"]
+[ext_resource type="Script" path="res://scenes/player/player_visuals.gd" id="6_player_visuals"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -18,8 +21,17 @@ text = "Top-down demo — use WASD to move the circle"
 position = Vector2(140, 120)
 script = ExtResource("2_room")
 
+[node name="RoomVisuals" type="Node2D" parent="Room"]
+script = ExtResource("3_room_visuals")
+
 [node name="Player" type="CharacterBody2D" parent="."]
 position = Vector2(440, 420)
-script = ExtResource("3_player")
+script = ExtResource("4_player")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
+
+[node name="PlayerAnimator" type="Node2D" parent="Player"]
+script = ExtResource("5_player_animator")
+
+[node name="PlayerVisuals" type="Node2D" parent="Player"]
+script = ExtResource("6_player_visuals")

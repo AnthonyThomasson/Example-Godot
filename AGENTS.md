@@ -6,13 +6,50 @@ explains the conventions so future changes stay consistent.
 
 ## Scene / file layout
 
-- `scenes/main.tscn` — root `Node2D` (`main.gd`). Contains:
-  - `Room` — `StaticBody2D` (`room.gd`), the square walls.
-  - `Player` — `CharacterBody2D` (`player.gd`), with a child `CollisionShape2D`.
-  - `Label` — on-screen hint text.
+Scripts are grouped by entity into folders, and each entity is split into
+separate files by **responsibility — control / animate / draw** (see next
+section). To have its own `_draw()`, a "draw" file is attached to its own child
+`Node2D` (Godot only draws from `CanvasItem` nodes).
+
+- `scenes/main.tscn` — root `Node2D` (`main.gd`). Tree:
+  ```
+  Main
+	Label                                   on-screen hint text
+	Room (StaticBody2D, room/room.gd)       CONTROL: segments + colliders
+	  RoomVisuals (Node2D, room/room_visuals.gd)   DRAW: wall lines
+	Player (CharacterBody2D, player/player.gd)     CONTROL: input, movement, facing
+	  CollisionShape2D                      body collider (shape set at runtime)
+	  PlayerAnimator (Node2D, player/player_animator.gd)  ANIMATE: punch + fist hits
+	  PlayerVisuals  (Node2D, player/player_visuals.gd)   DRAW: body + hands
+  ```
+- `scenes/player/` — `player.gd`, `player_animator.gd`, `player_visuals.gd`.
+- `scenes/room/` — `room.gd`, `room_visuals.gd`.
 - `scenes/keybinds.gd` — autoloaded as **`Keybinds`** (see `project.godot`
-  `[autoload]`). The single source of truth for input.
+  `[autoload]`). The single source of truth for input. (Shared, so not in a
+  per-entity folder.)
 - `project.godot` — project config; the `[input]` map mirrors `Keybinds`.
+
+## Layered structure — control / animate / draw
+
+Each entity separates the three verbs into their own file, wired via the scene
+tree (no `class_name`; cross-file calls resolve through `$` / `get_parent()`):
+
+- **Control** (root body node) owns state + input + physics and orchestrates. It
+  never draws. `player.gd` computes `facing` from the mouse, moves the body, sets
+  its collision shape, and each frame pushes `facing` to the animator and forwards
+  punch presses (`_animator.try_punch()`). `room.gd` owns the wall-segment math
+  (public `wall_segments()`) and builds colliders.
+- **Animate** (`player_animator.gd`, a child `Node2D`) owns hand geometry, the
+  per-hand punch tweens, and the runtime `Fist` `Area2D` + hit detection. It reads
+  the body `radius` from its parent and exposes `hand_position(i)` + the `punched`
+  signal. (The room has no animation layer — its walls are static.)
+- **Draw** (`*_visuals.gd`, child `Node2D`s) own appearance only: colors + `_draw()`.
+  `player_visuals.gd` reads `radius` from the control parent and hand
+  positions/size from the sibling animator; `room_visuals.gd` reads
+  `wall_segments()` + `wall_thickness` from its parent.
+
+Ordering note: Godot runs a parent's `_physics_process` before its children's, so
+the animator sees the control node's fresh `facing` on the same frame.
 
 ## Input architecture — the key pattern
 
@@ -41,29 +78,30 @@ Collision shapes are built **in code in `_ready()`**, not assigned in the scene:
 
 - `room.gd._build_walls()` creates a `RectangleShape2D` collider per wall segment
   (layout depends on `size` / `opening_side`, so it must be data-driven).
-- `player.gd` creates its body `CircleShape2D` and the fist `Area2D` hitbox in
-  `_ready()`.
+- `player.gd` creates its body `CircleShape2D`; `player_animator.gd` creates the
+  fist `Area2D` hitbox — both in `_ready()`.
 
 **Because of this, the Godot editor shows "no shape" warnings on `Room` and
 `Player/CollisionShape2D`. Those warnings are expected** — the shapes exist at
 runtime. Don't "fix" them by adding scene shapes; they'd just be overwritten.
 
-## Hands & punch feature (`player.gd`)
+## Hands & punch feature
 
-- **Facing:** `_facing` is updated each `_physics_process` to point from the
-  player to the mouse. The player node is never rotated, so `_draw()` uses
-  `_facing` directly in local space and movement/velocity are unaffected.
-- **Hands:** two circles positioned via `_hand_position(hand)` from `_facing` and
-  its perpendicular — offset forward (past the body edge) and to each side.
-  Tunable via the `hand_*` / `punch_reach` `@export` vars.
-- **Punch:** `is_punch_just_pressed()` triggers `_start_punch()`, which tweens
-  the chosen hand's extension `0 → 1 → 0` (extend, then retract). `_next_hand`
-  toggles each press so hands **alternate**.
-- **Hit detection:** a runtime `Fist` `Area2D` tracks the punching hand. During
-  the forward thrust (`_attack_active`), `_report_hits()` polls
-  `get_overlapping_bodies()`, ignores `self`, dedupes per swing, prints the hit,
-  and emits `signal punched(hand_index, body)`. Default collision layer 1 means
-  it detects the room's static walls out of the box.
+- **Facing:** `player.gd` updates `facing` each `_physics_process` to point from
+  the player to the mouse, and sets `_animator.facing`. The player node is never
+  rotated, so hand math stays in local space and movement/velocity are unaffected.
+- **Hands:** two circles positioned via `player_animator.hand_position(hand)` from
+  `facing` and its perpendicular — offset forward (past the body edge) and to each
+  side. Tunable via the animator's `hand_*` / `punch_reach` `@export` vars;
+  `player_visuals.gd` draws them with `hand_color`.
+- **Punch:** `Keybinds.is_punch_just_pressed()` (in `player.gd`) calls
+  `_animator.try_punch()`, which tweens the chosen hand's extension `0 → 1 → 0`
+  (extend, then retract). `_next_hand` toggles each press so hands **alternate**.
+- **Hit detection:** a runtime `Fist` `Area2D` (in the animator) tracks the
+  punching hand. During the forward thrust (`_attack_active`), `_report_hits()`
+  polls `get_overlapping_bodies()`, ignores the player body, dedupes per swing,
+  prints the hit, and emits `signal punched(hand_index, body)`. Default collision
+  layer 1 means it detects the room's static walls out of the box.
 
 ## Running & verifying
 

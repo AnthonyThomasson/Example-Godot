@@ -1,14 +1,13 @@
 extends StaticBody2D
 
-## A basic square room drawn as placeholder lines. Wall thickness matches half the
-## character's width (the character radius), and static collision walls sit on the lines.
-## One side can carry a centered opening (a doorway) via `opening_side`.
+## Room CONTROL layer. Computes the wall centerline segments (with an optional
+## doorway) and builds the static collision walls. Drawing lives in room_visuals.gd,
+## which reads `wall_segments()` and `wall_thickness` from this node.
 
 enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
 
 @export var size: float = 600.0        ## Side length of the square (centerline of the walls).
 @export var wall_thickness: float = 24.0  ## Half the character's width.
-@export var line_color: Color = Color(0.7, 0.7, 0.7)
 ## Which wall has the doorway (None = closed room). Values line up with `Side`.
 @export_enum("None", "Top", "Bottom", "Left", "Right") var opening_side: int = Side.BOTTOM
 @export var opening_width: float = 120.0      ## Width of the centered gap on that wall.
@@ -19,7 +18,7 @@ func _ready() -> void:
 
 
 ## Centerline segments (start/end points) for every wall, with the opening removed.
-func _wall_segments() -> Array[PackedVector2Array]:
+func wall_segments() -> Array[PackedVector2Array]:
 	var s := size
 	# Each edge as an ordered pair of corner points.
 	var edges := {
@@ -46,7 +45,7 @@ func _wall_segments() -> Array[PackedVector2Array]:
 
 func _build_walls() -> void:
 	var t := wall_thickness
-	for seg in _wall_segments():
+	for seg in wall_segments():
 		var a := seg[0]
 		var b := seg[1]
 		if a.is_equal_approx(b):
@@ -69,10 +68,3 @@ func _build_walls() -> void:
 		col.shape = rect
 		col.position = mid
 		add_child(col)
-
-
-func _draw() -> void:
-	# Placeholder walls drawn with the wall thickness, matching the colliders.
-	for seg in _wall_segments():
-		if not seg[0].is_equal_approx(seg[1]):
-			draw_line(seg[0], seg[1], line_color, wall_thickness)
