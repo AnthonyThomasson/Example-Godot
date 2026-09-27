@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://6ws06w1cxad1"]
+[gd_scene load_steps=10 format=3 uid="uid://6ws06w1cxad1"]
 
 [ext_resource type="Script" uid="uid://qn373ge4rrj2" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://dscaopyofbn4s" path="res://scenes/room/room.gd" id="2_room"]
@@ -6,9 +6,19 @@
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/player/player.gd" id="4_player"]
 [ext_resource type="Script" path="res://scenes/player/player_animator.gd" id="5_player_animator"]
 [ext_resource type="Script" path="res://scenes/player/player_visuals.gd" id="6_player_visuals"]
+[ext_resource type="Script" path="res://scenes/objects/environment_object.gd" id="7_env_obj"]
+[ext_resource type="Script" path="res://scenes/objects/environment_object_visuals.gd" id="8_env_visuals"]
+[ext_resource type="Script" path="res://scenes/camera_controller.gd" id="9_camera"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="MainCamera" type="Camera2D" parent="."]
+current = true
+script = ExtResource("9_camera")
+follow_speed = 8.0
+look_ahead_distance = 60.0
+look_ahead_threshold = 0.6
 
 [node name="Label" type="Label" parent="."]
 offset_left = 32.0
@@ -35,3 +45,113 @@ script = ExtResource("5_player_animator")
 
 [node name="PlayerVisuals" type="Node2D" parent="Player"]
 script = ExtResource("6_player_visuals")
+
+[node name="ObjectsContainer" type="Node2D" parent="."]
+
+[node name="CoffeeTable" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(250, 300)
+script = ExtResource("7_env_obj")
+shape_type = "square"
+object_name = "Table"
+size = Vector2(60, 60)
+color = Color(0.6, 0.4, 0.2, 1)
+text_color = Color.WHITE
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/CoffeeTable"]
+script = ExtResource("8_env_visuals")
+
+[node name="TV" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(150, 200)
+script = ExtResource("7_env_obj")
+shape_type = "rect"
+object_name = "TV"
+size = Vector2(80, 40)
+color = Color(0.1, 0.1, 0.1, 1)
+text_color = Color.WHITE
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/TV"]
+script = ExtResource("8_env_visuals")
+
+[node name="Sofa" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(350, 180)
+script = ExtResource("7_env_obj")
+shape_type = "rect"
+object_name = "Sofa"
+size = Vector2(120, 50)
+color = Color(0.8, 0.4, 0.2, 1)
+text_color = Color.WHITE
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Sofa"]
+script = ExtResource("8_env_visuals")
+
+[node name="FloorLamp" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(500, 250)
+script = ExtResource("7_env_obj")
+shape_type = "circle"
+object_name = "Lamp"
+size = Vector2(20, 20)
+color = Color(1, 1, 0.6, 1)
+text_color = Color.BLACK
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/FloorLamp"]
+script = ExtResource("8_env_visuals")
+
+[node name="Bookshelf" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(550, 350)
+script = ExtResource("7_env_obj")
+shape_type = "rect"
+object_name = "Books"
+size = Vector2(40, 80)
+color = Color(0.4, 0.2, 0, 1)
+text_color = Color.WHITE
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Bookshelf"]
+script = ExtResource("8_env_visuals")
+
+[node name="KitchenSink" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(200, 450)
+script = ExtResource("7_env_obj")
+shape_type = "square"
+object_name = "Sink"
+size = Vector2(50, 50)
+color = Color(0.7, 0.8, 0.9, 1)
+text_color = Color.BLACK
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/KitchenSink"]
+script = ExtResource("8_env_visuals")
+
+[node name="Refrigerator" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(100, 380)
+script = ExtResource("7_env_obj")
+shape_type = "rect"
+object_name = "Fridge"
+size = Vector2(60, 100)
+color = Color(0.9, 0.9, 0.95, 1)
+text_color = Color.BLACK
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Refrigerator"]
+script = ExtResource("8_env_visuals")
+
+[node name="Microwave" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(280, 500)
+script = ExtResource("7_env_obj")
+shape_type = "square"
+object_name = "Microwave"
+size = Vector2(40, 40)
+color = Color(0.5, 0.5, 0.5, 1)
+text_color = Color.WHITE
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Microwave"]
+script = ExtResource("8_env_visuals")
+
+[node name="Toilet" type="StaticBody2D" parent="ObjectsContainer"]
+position = Vector2(600, 450)
+script = ExtResource("7_env_obj")
+shape_type = "circle"
+object_name = "Toilet"
+size = Vector2(30, 30)
+color = Color(0.95, 0.95, 0.95, 1)
+text_color = Color.BLACK
+
+[node name="EnvironmentObjectVisuals" type="Node2D" parent="ObjectsContainer/Toilet"]
+script = ExtResource("8_env_visuals")
