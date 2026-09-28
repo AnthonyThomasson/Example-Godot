@@ -147,10 +147,12 @@ Items are selectable via number keys (1–9) and define what the player can do.
   - `fires` — left-click fires a projectile (`player_animator.try_fire()`).
   - `damage` — the item's damage, added on top of the projectile's own base `damage`
 	at fire time (`ProjectileSpawner.spawn`). The value dealt on each impact is that
-	total scaled by how square the hit was (`|direction · surface_normal|`), so a
-	head-on shot deals full damage and a glancing one deals less (a ricochet less
-	still). A bullet is a multi-hit traveler (see "Projectile impact model"), so it
-	may deal damage several times before it stops. Each damaging interaction is
+	total scaled by how square the hit was (`|direction · surface_normal|`) **and** how
+	fast the bullet was travelling (`speed / Config.projectile_speed`), so a fast
+	head-on shot deals full damage while a glancing or slowed one deals less (a
+	ricochet less still). A bullet is a multi-hit traveler (see "Projectile impact
+	model"), so it may deal damage several times before it stops. Each damaging
+	interaction is
 	reported in a `Shot …` console line, the projectile's `hit` / animator's `shot`
 	signals, and the debug HUD Hit log (which shows the latest).
 - **Adding items:** Add an entry to `_items` in `player.gd._ready()`, and a draw
@@ -166,18 +168,20 @@ back to `Config.wall_coverage` / `wall_penetration`). It keeps flying until its
 `speed` drops below `Config.projectile_min_speed` or it passes `max_distance`.
 Non-solid decor (rugs) has no collider, so it's never even raycast.
 
-Per hit, with squareness `s = |direction · normal|` (1 = head-on), coverage `C` and
-penetration `P`, `_resolve()` picks one outcome in order:
+Per hit, with squareness `s = |direction · normal|` (1 = head-on), speed factor
+`v = speed / Config.projectile_speed` (incoming speed relative to the muzzle top
+speed, so a fast shot hits harder), coverage `C` and penetration `P`, `_resolve()`
+picks one outcome in order:
 
 1. **Fly over** (coverage) — `flyover_chance = clamp((1 − C/100) × Config.cover_flyover_scale, 0, 1)`.
    On success: no damage, no deflection; the collider is excluded from further sweeps
    and the bullet flies on. Walls (C=100) are never flown over; low cover usually is.
 2. **Ricochet** (hard + glancing) — when `P ≥ Config.penetration_bounce_min` **and**
-   `s < Config.bounce_square_max`: deal `damage × s × Config.bounce_damage_retention`,
+   `s < Config.bounce_square_max`: deal `damage × s × v × Config.bounce_damage_retention`,
    reflect `direction` off the normal, `speed ×= Config.bounce_speed_retention`. The
    collider is **not** excluded (a bounced bullet may strike it again).
 3. **Penetrate** (everything else) — only while `speed ≥ Config.penetration_min_speed`;
-   deal `damage × s`, bleed speed by
+   deal `damage × s × v`, bleed speed by
    `loss = clamp((P/100) × Config.penetrate_loss_scale × (2 − s), 0, 1)` (more when
    glancing or when the material is hard) and deflect randomly up to
    `±Config.penetrate_deflect_max_deg × P/100`. The collider is excluded and the
@@ -185,7 +189,7 @@ penetration `P`, `_resolve()` picks one outcome in order:
    hit or two, so walls naturally stop bullets.
    - **Blocked** — if the bullet reaches the penetrate case but is moving slower than
      `Config.penetration_min_speed`, it can't punch through: it deals the impact
-     `damage × s` and then stops (speed zeroed → the loop frees it). This is why the
+     `damage × s × v` and then stops (speed zeroed → the loop frees it). This is why the
      muzzle speed is set to double the penetration floor — penetration only happens in
      the upper half of the speed range, and a slowed bullet embeds instead of passing
      through.

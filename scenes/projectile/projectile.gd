@@ -107,6 +107,10 @@ func _resolve(result: Dictionary) -> void:
 	# 1 = head-on. A zero-length normal (point-blank hit_from_inside) counts as square.
 	var n: Vector2 = result.normal
 	var squareness := 1.0 if n.length() < 0.001 else absf(direction.dot(n))
+	# Speed factor: the bullet's incoming speed relative to the muzzle (top) speed,
+	# so a fast shot hits hard and a slowed one deals proportionally less. Computed
+	# from the pre-hit speed (the branches below bleed it after the impact).
+	var speed_factor := speed / Config.projectile_speed if Config.projectile_speed > 0.0 else 1.0
 
 	var ratings := _ratings_for(body)
 	var coverage: float = ratings.x
@@ -123,7 +127,7 @@ func _resolve(result: Dictionary) -> void:
 	# 2. Ricochet (hard material + glancing angle): reduced damage, reflect and keep
 	# going at reduced speed. Not excluded — a bounced bullet can hit things again.
 	if penetration >= Config.penetration_bounce_min and squareness < Config.bounce_square_max:
-		var bounce_dmg := damage * squareness * Config.bounce_damage_retention
+		var bounce_dmg := damage * squareness * speed_factor * Config.bounce_damage_retention
 		direction = direction.bounce(n).normalized()
 		rotation = direction.angle()
 		speed *= Config.bounce_speed_retention
@@ -131,9 +135,9 @@ func _resolve(result: Dictionary) -> void:
 		hit.emit(body, bounce_dmg)
 		return
 
-	# 3. Penetrate (everything else): deal squareness-scaled damage, bleed speed
-	# (more when glancing or when the material is hard) and deflect slightly.
-	var dealt := damage * squareness
+	# 3. Penetrate (everything else): deal squareness- and speed-scaled damage, bleed
+	# speed (more when glancing or when the material is hard) and deflect slightly.
+	var dealt := damage * squareness * speed_factor
 	# Too slow to punch through: the object blocks the bullet — it takes the impact
 	# and then stops (embeds). Speed is zeroed so the physics loop frees it.
 	if speed < Config.penetration_min_speed:
