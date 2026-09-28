@@ -78,10 +78,35 @@ var impact_no_penetration_scale: float = 1.0
 var impact_penetration_scale: float = 0.5
 ## Deceleration (px/s²) that brings a shoved object back to rest.
 var impact_friction: float = 1400.0
-## Cap on how far an object can be displaced from its origin (px); keeps shoved
-## furniture from sliding through walls.
-var impact_max_slide: float = 48.0
+## Cap on how far an object can be displaced from its origin (px). `<= 0` means no
+## cap — objects settle via friction wherever they stop, so they can be pushed clear
+## across a room. A positive value re-caps displacement (objects snap back if exceeded).
+## Shared by the projectile impact and the walking-push systems.
+var impact_max_slide: float = 0.0
 ## Fraction of the shoving object's momentum (velocity × weight) handed to whatever
 ## it collides with (another EnvironmentObject) on a shove. <1 so cascades lose energy
 ## and settle rather than propagating forever. Walls have no apply_impact and get none.
 var impact_transfer_scale: float = 0.6
+
+# --- Push (walking into objects) ---
+## Read by scenes/player/player.gd. Walking the player body into a pushable object
+## (anything with apply_impact — i.e. furniture, not walls) shoves it via the same
+## apply_impact pipeline the projectile uses, so a push is divided by the object's
+## `weight`: light objects slide easily, heavy ones barely move. Pushing also slows
+## the player (heavier = slower), and a fast object sliding into the player shoves the
+## player back (they're pushable too, via player.apply_impact).
+
+## Base impulse the player imparts to an object per physics frame of contact, scaled by
+## how hard the player is moving into it (input strength 0–1).
+var push_impulse: float = 900.0
+## How much each unit of the pushed object's `weight` reduces the player's speed while
+## pushing (speed_mult = 1 − heaviest_weight × this, floored by `push_slow_min`).
+var push_slow_per_weight: float = 0.02
+## Floor on the player's speed multiplier while pushing, so heavy objects nearly stop
+## the player but never fully lock movement.
+var push_slow_min: float = 0.15
+## The player's mass for *incoming* knockback: an object sliding into the player shoves
+## them by impulse / this. Higher = the player shrugs off hits unless struck hard.
+var player_mass: float = 40.0
+## Deceleration (px/s²) that bleeds the player's knockback velocity back to zero.
+var push_knockback_friction: float = 1600.0

@@ -54,7 +54,7 @@ func _physics_process(delta: float) -> void:
 
 	rotation += _angular * delta
 	var offset := position - _origin
-	if offset.length() > Config.impact_max_slide:
+	if Config.impact_max_slide > 0.0 and offset.length() > Config.impact_max_slide:
 		position = _origin + offset.normalized() * Config.impact_max_slide
 		_velocity = Vector2.ZERO
 	_velocity = _velocity.move_toward(Vector2.ZERO, Config.impact_friction * delta)
