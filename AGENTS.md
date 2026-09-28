@@ -188,11 +188,11 @@ picks one outcome in order:
    bullet flies on. Head-on hits on hard material collapse speed past the floor in a
    hit or two, so walls naturally stop bullets.
    - **Blocked** — if the bullet reaches the penetrate case but is moving slower than
-     `Config.penetration_min_speed`, it can't punch through: it deals the impact
-     `damage × s × v` and then stops (speed zeroed → the loop frees it). This is why the
-     muzzle speed is set to double the penetration floor — penetration only happens in
-     the upper half of the speed range, and a slowed bullet embeds instead of passing
-     through.
+	 `Config.penetration_min_speed`, it can't punch through: it deals the impact
+	 `damage × s × v` and then stops (speed zeroed → the loop frees it). This is why the
+	 muzzle speed is set to double the penetration floor — penetration only happens in
+	 the upper half of the speed range, and a slowed bullet embeds instead of passing
+	 through.
 
 Console logs stay in the `Shot …` family: `flew over`, `ricocheted off … for N
 damage (M% square)`, `penetrated … for N damage (M% square)`, `blocked by … for N

@@ -26,7 +26,7 @@ var projectile_speed: float = 3200.0
 
 ## Below this speed (px/s) a bullet is spent and frees itself. Head-on hits on hard
 ## material collapse speed past this in a hit or two, so walls naturally stop bullets.
-var projectile_min_speed: float = 200.0
+var projectile_min_speed: float = 800.0
 
 ## Minimum speed (px/s) required to penetrate. A bullet moving slower than this can
 ## no longer punch through a solid object: it's blocked — it deals the impact and
