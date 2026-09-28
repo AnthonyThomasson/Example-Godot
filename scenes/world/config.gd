@@ -12,9 +12,9 @@ extends Node
 ## once. Spawning past this frees the oldest — see scenes/world/despawner.gd.
 var max_scene_objects: int = 100
 
-## Default projectile travel speed in px/s. Copied onto each bullet's own `speed`
-## at spawn (the projectile can still be overridden per-instance there).
-var projectile_speed: float = 1600.0
+## Default projectile muzzle (top) speed in px/s. Copied onto each bullet's own
+## `speed` at spawn (the projectile can still be overridden per-instance there).
+var projectile_speed: float = 3200.0
 
 # --- Projectile impact (coverage / penetration) ---
 ## Read by scenes/projectile/projectile.gd. A bullet is now a multi-hit traveler:
@@ -27,6 +27,13 @@ var projectile_speed: float = 1600.0
 ## Below this speed (px/s) a bullet is spent and frees itself. Head-on hits on hard
 ## material collapse speed past this in a hit or two, so walls naturally stop bullets.
 var projectile_min_speed: float = 200.0
+
+## Minimum speed (px/s) required to penetrate. A bullet moving slower than this can
+## no longer punch through a solid object: it's blocked — it deals the impact and
+## then stops (embeds), rather than passing through. Fly-over and ricochet are
+## unaffected (they don't depend on punch-through). Set to the un-doubled muzzle
+## speed, so penetration only happens in the upper half of the speed range.
+var penetration_min_speed: float = 1600.0
 
 ## Coverage/penetration used for colliders that expose neither (e.g. room walls):
 ## full cover (never flown over) and high penetration (glancing shots ricochet,

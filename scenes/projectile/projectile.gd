@@ -134,6 +134,13 @@ func _resolve(result: Dictionary) -> void:
 	# 3. Penetrate (everything else): deal squareness-scaled damage, bleed speed
 	# (more when glancing or when the material is hard) and deflect slightly.
 	var dealt := damage * squareness
+	# Too slow to punch through: the object blocks the bullet — it takes the impact
+	# and then stops (embeds). Speed is zeroed so the physics loop frees it.
+	if speed < Config.penetration_min_speed:
+		print("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
+		speed = 0.0
+		hit.emit(body, dealt)
+		return
 	var loss := clampf((penetration / 100.0) * Config.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
 	speed *= (1.0 - loss)
 	var j := deg_to_rad(Config.penetrate_deflect_max_deg * penetration / 100.0)

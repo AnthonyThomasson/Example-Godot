@@ -176,15 +176,23 @@ penetration `P`, `_resolve()` picks one outcome in order:
    `s < Config.bounce_square_max`: deal `damage × s × Config.bounce_damage_retention`,
    reflect `direction` off the normal, `speed ×= Config.bounce_speed_retention`. The
    collider is **not** excluded (a bounced bullet may strike it again).
-3. **Penetrate** (everything else) — deal `damage × s`, bleed speed by
+3. **Penetrate** (everything else) — only while `speed ≥ Config.penetration_min_speed`;
+   deal `damage × s`, bleed speed by
    `loss = clamp((P/100) × Config.penetrate_loss_scale × (2 − s), 0, 1)` (more when
    glancing or when the material is hard) and deflect randomly up to
    `±Config.penetrate_deflect_max_deg × P/100`. The collider is excluded and the
    bullet flies on. Head-on hits on hard material collapse speed past the floor in a
-   hit or two, so walls naturally stop bullets without a special "blocked" case.
+   hit or two, so walls naturally stop bullets.
+   - **Blocked** — if the bullet reaches the penetrate case but is moving slower than
+     `Config.penetration_min_speed`, it can't punch through: it deals the impact
+     `damage × s` and then stops (speed zeroed → the loop frees it). This is why the
+     muzzle speed is set to double the penetration floor — penetration only happens in
+     the upper half of the speed range, and a slowed bullet embeds instead of passing
+     through.
 
 Console logs stay in the `Shot …` family: `flew over`, `ricocheted off … for N
-damage (M% square)`, `penetrated … for N damage (M% square)`. All the tuning knobs
+damage (M% square)`, `penetrated … for N damage (M% square)`, `blocked by … for N
+damage (M% square)`. All the tuning knobs
 above live in the `Config` autoload (`scenes/world/config.gd`); the `hit(body, damage)`
 signal contract is unchanged — the projectile just emits it once per damaging
 interaction now, so downstream (`player_animator`, `debug_ui`) needs no change.
