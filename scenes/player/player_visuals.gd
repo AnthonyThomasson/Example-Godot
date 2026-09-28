@@ -59,9 +59,9 @@ func _draw_weapon_for_item(item: int, hand: int) -> void:
 ## Draw a simple pistol shape at the given position, rotated toward facing.
 func _draw_pistol(hand_pos: Vector2) -> void:
 	# Pistol: a barrel line and a grip circle, aligned with the facing direction.
-	var barrel_len: float = 16.0
-	var barrel_width: float = 4.0
-	var barrel_offset: float = 8.0  # How far forward from the hand.
+	var barrel_len: float = 9.0
+	var barrel_width: float = 2.0
+	var barrel_offset: float = 5.0  # How far forward from the hand.
 
 	# Barrel: a thick line from hand forward.
 	var barrel_start: Vector2 = hand_pos + _animator.facing * barrel_offset
@@ -69,6 +69,6 @@ func _draw_pistol(hand_pos: Vector2) -> void:
 	draw_line(barrel_start, barrel_end, pistol_color, barrel_width)
 
 	# Grip: a small circle at the hand position.
-	var grip_radius: float = 5.0
+	var grip_radius: float = 3.0
 	draw_circle(hand_pos, grip_radius, pistol_color)
 	draw_arc(hand_pos, grip_radius, 0.0, TAU, 12, Color.WHITE, 1.0, true)

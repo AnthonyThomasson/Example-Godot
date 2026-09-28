@@ -10,7 +10,7 @@ extends Node2D
 ## Brass color (read by casing_visuals.gd).
 @export var color: Color = Color(0.85, 0.7, 0.3)
 ## How far the casing travels as it is ejected (px).
-@export var eject_distance: float = 26.0
+@export var eject_distance: float = 15.0
 ## Seconds spent flying out before it comes to rest.
 @export var eject_time: float = 0.3
 

@@ -9,5 +9,5 @@ extends Node2D
 func _draw() -> void:
 	var color: Color = _control.color
 	# A small shell: a rounded-ish brass rect centered on the origin.
-	draw_rect(Rect2(-4.0, -2.0, 8.0, 4.0), color)
-	draw_rect(Rect2(-4.0, -2.0, 8.0, 4.0), Color(0.5, 0.4, 0.15), false, 1.0)
+	draw_rect(Rect2(-2.25, -1.0, 4.5, 2.0), color)
+	draw_rect(Rect2(-2.25, -1.0, 4.5, 2.0), Color(0.5, 0.4, 0.15), false, 1.0)

@@ -6,9 +6,9 @@ extends Node2D
 ## reads `hand_position()` / `hand_radius` to draw the hands.
 
 ## Hand geometry (all in pixels, in the player's local space).
-@export var hand_radius: float = 10.0     ## Size of each hand circle.
-@export var hand_gap: float = 6.0         ## Gap between the body edge and a resting hand.
-@export var hand_lateral: float = 14.0    ## How far each hand sits to its side of center.
+@export var hand_radius: float = 6.0      ## Size of each hand circle.
+@export var hand_gap: float = 3.5         ## Gap between the body edge and a resting hand.
+@export var hand_lateral: float = 8.0     ## How far each hand sits to its side of center.
 
 ## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right).
 signal punched(hand_index: int, body: Node)
@@ -26,6 +26,12 @@ var _next_hand := 0
 var _punch := [0.0, 0.0]
 ## Current punch reach (from the item's reach property), updated in _physics_process.
 var _current_reach := 28.0
+## Per-hand collision-resolved local positions, recomputed each physics frame so the
+## hands rest against walls/objects instead of clipping through. Read via hand_position().
+var _hand_pos := [Vector2.ZERO, Vector2.ZERO]
+
+## Physics layers the hands collide with (walls + solid furniture default to layer 1).
+const HAND_MASK := 1
 
 ## Hit-detection state for the current swing.
 var _fist: Area2D
@@ -51,10 +57,19 @@ func _ready() -> void:
 	_fist.add_child(fist_shape)
 	add_child(_fist)
 
+	# Seed the resolved-hand cache so the first drawn frame isn't at the body center.
+	for hand in [0, 1]:
+		_hand_pos[hand] = _raw_hand_position(hand)
+
 
 func _physics_process(_delta: float) -> void:
 	# Update the current reach based on the equipped item.
 	_current_reach = _control._items[current_item].get("reach", 28.0)
+
+	# Resolve each hand against walls/objects so it rests on the surface (pushed back
+	# toward the body and slid to the side) instead of clipping through.
+	for hand in [0, 1]:
+		_hand_pos[hand] = _resolve_hand(hand)
 
 	# Track the fist on the punching hand and report anything it overlaps.
 	_fist.position = hand_position(_active_hand)
@@ -62,13 +77,62 @@ func _physics_process(_delta: float) -> void:
 		_report_hits()
 
 
-## Local-space center of a hand (0 = left, 1 = right), including its punch extension.
+## Local-space center of a hand (0 = left, 1 = right): the collision-resolved position,
+## cached each physics frame. Read by player_visuals (hand + weapon) and the fist.
 func hand_position(hand: int) -> Vector2:
+	return _hand_pos[hand]
+
+
+## The hand's ideal local position from facing/lateral offset + punch extension, before
+## any wall/object collision is applied.
+func _raw_hand_position(hand: int) -> Vector2:
 	var body_radius: float = _control.radius
 	var perp := facing.orthogonal()
 	var side := -1.0 if hand == 0 else 1.0
 	var rest := facing * (body_radius + hand_radius + hand_gap) + perp * (hand_lateral * side)
 	return rest + facing * (_current_reach * _punch[hand])
+
+
+## Collide-and-slide the hand from the body center toward its raw target: stop at the
+## first wall/solid object (pushing the hand back toward the body), then slide the
+## leftover motion along the surface (nudging it to the side). Returns a local offset.
+func _resolve_hand(hand: int) -> Vector2:
+	var center: Vector2 = _control.global_position
+	var raw_world := center + _raw_hand_position(hand)
+	var motion := raw_world - center
+	if motion.length_squared() < 0.0001:
+		return _raw_hand_position(hand)
+
+	var space := get_world_2d().direct_space_state
+	var circle := CircleShape2D.new()
+	circle.radius = hand_radius
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = circle
+	params.collision_mask = HAND_MASK
+	params.exclude = [_control.get_rid()]
+	params.transform = Transform2D(0.0, center)
+	params.motion = motion
+
+	var res := space.cast_motion(params)  # [safe, unsafe] fractions of motion.
+	var safe: float = res[0]
+	if safe >= 1.0:
+		return motion  # Clear path — full extension.
+
+	# Pushed back toward the body: rest where the hand first touches the surface.
+	var rest := center + motion * safe
+
+	# Surface normal from a ray along the approach (mirrors projectile._sweep).
+	var ray := PhysicsRayQueryParameters2D.create(center, raw_world, HAND_MASK)
+	ray.exclude = [_control.get_rid()]
+	var hit := space.intersect_ray(ray)
+	var normal: Vector2 = hit.normal if hit and hit.normal.length() > 0.001 else (center - raw_world).normalized()
+
+	# Slide the leftover motion along the surface — the "to the side a bit".
+	var slide := (motion * (1.0 - safe)).slide(normal)
+	params.transform = Transform2D(0.0, rest)
+	params.motion = slide
+	var res2 := space.cast_motion(params)
+	return (rest + slide * res2[0]) - center
 
 
 ## Throw the next hand forward, then retract it. Punch behavior depends on item's punch_hand property.

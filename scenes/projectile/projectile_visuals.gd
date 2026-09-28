@@ -11,5 +11,5 @@ func _draw() -> void:
 	var length: float = _control.length
 	var color: Color = _control.color
 	# Trail behind the leading point (which sits at the parent's origin).
-	draw_line(Vector2(-length, 0.0), Vector2.ZERO, color, 3.0)
-	draw_circle(Vector2.ZERO, 2.0, color)
+	draw_line(Vector2(-length, 0.0), Vector2.ZERO, color, 1.8)
+	draw_circle(Vector2.ZERO, 1.2, color)

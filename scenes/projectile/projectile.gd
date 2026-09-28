@@ -24,7 +24,7 @@ extends Node2D
 ## Streak color (read by projectile_visuals.gd).
 @export var color: Color = Color(1.0, 0.9, 0.4)
 ## Streak length in px (read by projectile_visuals.gd).
-@export var length: float = 12.0
+@export var length: float = 7.0
 
 ## Unit travel vector, set by the spawner before add_child. Mutated on ricochet /
 ## penetration deflection as the bullet travels.

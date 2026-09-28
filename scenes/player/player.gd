@@ -4,9 +4,9 @@ extends CharacterBody2D
 ## and tracks the mouse-facing direction. Drawing lives in player_visuals.gd and the
 ## punch animation / hit detection in player_animator.gd; this node orchestrates them.
 
-## Radius of the placeholder circle. The room's wall lines are drawn at half the
-## character's *width* (i.e. half the diameter = the radius) thick.
-@export var radius: float = 24.0
+## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
+## The room's wall lines are drawn at half the character's *width* thick.
+@export var radius: float = 14.0
 @export var speed: float = 300.0
 
 ## Unit vector from the player toward the mouse; read by the animator and visuals.
