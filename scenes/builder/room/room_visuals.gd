@@ -17,10 +17,11 @@ func _ready() -> void:
 
 func _draw() -> void:
 	var t: float = _room.wall_thickness
-	for seg in _room.wall_segments():
+	var segs: Array = _room.wall_segments()
+	for i in segs.size():
+		var seg: PackedVector2Array = segs[i]
 		if seg[0].is_equal_approx(seg[1]):
 			continue
-		# Extend the ends by half the thickness, exactly like the colliders in room.gd,
-		# so corners close up and doorways look as wide as they really are.
-		var dir: Vector2 = (seg[1] - seg[0]).normalized()
-		draw_line(seg[0] - dir * t * 0.5, seg[1] + dir * t * 0.5, line_color, t)
+		# Deformed segment (dents / missing pieces where damaged) + crack/hole marks.
+		# The helper extends the ends by half-thickness, matching the colliders in room.gd.
+		Deformation.draw_wall(self, seg[0], seg[1], t, line_color, _room._seg_impacts.get(i, []))

@@ -137,6 +137,7 @@ func _resolve(result: Dictionary) -> void:
 		print("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
 		_apply_force(body, incoming, speed_factor, false)
 		_spawn_debris(body, result)
+		_record_damage(body, result, bounce_dmg)
 		hit.emit(body, bounce_dmg)
 		return
 
@@ -150,6 +151,7 @@ func _resolve(result: Dictionary) -> void:
 		speed = 0.0
 		_apply_force(body, incoming, speed_factor, false)
 		_spawn_debris(body, result)
+		_record_damage(body, result, dealt)
 		hit.emit(body, dealt)
 		return
 	var loss := clampf((penetration / 100.0) * Config.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
@@ -161,6 +163,7 @@ func _resolve(result: Dictionary) -> void:
 	print("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 	_apply_force(body, incoming, speed_factor, true)
 	_spawn_debris(body, result)
+	_record_damage(body, result, dealt)
 	hit.emit(body, dealt)
 
 
@@ -196,3 +199,10 @@ func _spawn_debris(body: Node, result: Dictionary) -> void:
 	var n: Vector2 = result.normal
 	var spray := n if n.length() > 0.001 else -direction
 	DebrisSpawner.spawn(result.position, spray, get_parent(), base_color, material)
+
+
+## Record the damage on the struck body so it deforms visually (dents, cracks, missing
+## pieces). Bodies without record_damage (anything not deformable) are simply ignored.
+func _record_damage(body: Node, result: Dictionary, amount: float) -> void:
+	if body.has_method("record_damage"):
+		body.record_damage(result.position, result.normal, amount)

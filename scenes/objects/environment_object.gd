@@ -26,6 +26,11 @@ var _velocity := Vector2.ZERO
 var _angular := 0.0
 var _origin: Vector2
 
+## Recorded damage impacts (local space) that deform the drawn silhouette, and the total
+## damage taken (drives fill darkening). Read by environment_object_visuals.gd.
+var _impacts: Array = []
+var _damage_total := 0.0
+
 func _ready() -> void:
 	if solid:
 		_build_collider()
@@ -43,6 +48,45 @@ func apply_impact(impulse: Vector2) -> void:
 	var mass := _mass()
 	_velocity += impulse / mass
 	_angular += (impulse.length() / mass) * 0.002 * (1.0 if randf() > 0.5 else -1.0)
+
+## Record a damage impact for visual deformation: a dent (and, for a hard hit, a carved
+## missing piece) plus crack/hole marks at the contact. Stored in local space so it
+## rides along as the object is shoved/spun. `world_pos`/`world_normal` come from the
+## projectile's raycast; `amount` is the dealt damage.
+func record_damage(world_pos: Vector2, world_normal: Vector2, amount: float) -> void:
+	var xf := global_transform.affine_inverse()
+	var local_pos := xf * world_pos
+	var inward := xf.basis_xform(-world_normal).normalized()  # into the surface
+	if inward.length() < 0.01:
+		inward = -local_pos.normalized() if local_pos.length() > 0.01 else Vector2.DOWN
+	var depth := minf(amount * Config.deform_depth_per_damage, Config.deform_max_depth)
+	_impacts.append({
+		"pos": local_pos, "inward": inward, "depth": depth,
+		"chunk": amount >= Config.deform_chunk_damage, "seed": randi(),
+	})
+	if _impacts.size() > Config.deform_max_impacts:
+		_impacts.pop_front()
+	_damage_total += amount
+
+	# Make the collider follow the new (deformed) silhouette. Deferred: record_damage is
+	# called mid-physics (from the projectile), and swapping shapes then is disallowed.
+	if solid and Config.deform_update_collider:
+		call_deferred("_rebuild_collider")
+
+## Rebuild the collider from the current deformed silhouette (convex-decomposed), so the
+## object collides with what's drawn. Keeps the old collider if decomposition fails.
+func _rebuild_collider() -> void:
+	var poly := Deformation.shape_polygon(shape_type, size, _impacts)
+	var shapes := Deformation.convex_shapes(poly)
+	if shapes.is_empty():
+		return
+	for child in get_children():
+		if child is CollisionShape2D:
+			child.queue_free()
+	for shape in shapes:
+		var col := CollisionShape2D.new()
+		col.shape = shape
+		add_child(col)
 
 func _physics_process(delta: float) -> void:
 	if _velocity.length_squared() < 1.0 and absf(_angular) < 0.01:

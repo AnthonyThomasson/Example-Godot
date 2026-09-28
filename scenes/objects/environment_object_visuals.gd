@@ -11,15 +11,8 @@ func _draw() -> void:
 	var color: Color = _obj.color
 	var text_color: Color = _obj.text_color
 
-	match shape:
-		"circle":
-			var radius: float = size.x / 2.0
-			draw_circle(Vector2.ZERO, radius, color)
-			draw_arc(Vector2.ZERO, radius, 0.0, TAU, 24, text_color, 1.5, true)
-
-		"square", "rect":
-			draw_rect(Rect2(-size / 2.0, size), color)
-			draw_rect(Rect2(-size / 2.0, size), text_color, false, 1.5)
+	# Damage-deformed silhouette (dents, missing pieces) + crack/hole marks.
+	Deformation.draw_shape(self, shape, size, color, text_color, _obj._impacts, _obj._damage_total)
 
 	# Draw the object's name centered on it.
 	var name_text: String = _obj.object_name
