@@ -31,7 +31,7 @@ static func spawn(object_key: String, position: Vector2, parent: Node, opts: Dic
 	obj.object_material = definition.get("material", "")
 	obj.coverage = definition.get("coverage", 0.0)
 	obj.penetration = definition.get("penetration", 0.0)
-	obj.add_to_group("environment_object")  # so BuildingInventory can find it
+	obj.weight = definition.get("weight", 10.0)
 
 	var visuals := Node2D.new()
 	visuals.name = "EnvironmentObjectVisuals"

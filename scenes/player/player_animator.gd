@@ -9,7 +9,6 @@ extends Node2D
 @export var hand_radius: float = 10.0     ## Size of each hand circle.
 @export var hand_gap: float = 6.0         ## Gap between the body edge and a resting hand.
 @export var hand_lateral: float = 14.0    ## How far each hand sits to its side of center.
-@export var punch_reach: float = 28.0     ## Extra forward travel at full extension.
 
 ## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right).
 signal punched(hand_index: int, body: Node)

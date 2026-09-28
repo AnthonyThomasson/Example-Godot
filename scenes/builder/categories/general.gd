@@ -9,24 +9,25 @@ class_name GeneralCatalog
 ##     "metal"/"ceramic"/"glass"/"plastic"/"stone"/"electronics"/"foliage" are
 ##     descriptive only, never recolored);
 ##   coverage (0–100, a height/cover proxy); penetration (0–100, resistance to being
-##     shot through); solid (optional, default true; false = walk-over decor under all).
+##     shot through); weight (mass for knockback — heavier = thrown back less);
+##     solid (optional, default true; false = walk-over decor under all).
 ## Arrangements/recipes: see ArrangementDefinitions for the authoring conventions.
 
 const OBJECTS := {
-	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "coverage": 45, "penetration": 50 },
-	"lamp": { "name": "Lamp", "shape": "circle", "size": Vector2(20, 20), "color": Color(1.0, 1.0, 0.6), "material": "metal", "coverage": 55, "penetration": 30 },
-	"plant": { "name": "Plant", "shape": "circle", "size": Vector2(26, 26), "color": Color(0.25, 0.6, 0.3), "material": "foliage", "coverage": 50, "penetration": 10 },
-	"armchair": { "name": "Armchair", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.45, 0.3), "material": "fabric", "coverage": 50, "penetration": 25 },
-	"side_table": { "name": "Side", "shape": "square", "size": Vector2(30, 30), "color": Color(0.55, 0.35, 0.2), "material": "wood", "coverage": 40, "penetration": 45 },
-	"bookshelf": { "name": "Books", "shape": "rect", "size": Vector2(40, 80), "color": Color(0.4, 0.2, 0.0), "material": "wood", "coverage": 90, "penetration": 60 },
-	"coat_rack": { "name": "Coats", "shape": "circle", "size": Vector2(24, 24), "color": Color(0.45, 0.3, 0.15), "material": "wood", "coverage": 60, "penetration": 25 },
-	"shoe_rack": { "name": "Shoes", "shape": "rect", "size": Vector2(60, 25), "color": Color(0.45, 0.3, 0.15), "material": "wood", "coverage": 20, "penetration": 35 },
-	"sink": { "name": "Sink", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.8, 0.9), "material": "ceramic", "coverage": 45, "penetration": 45 },
-	"cabinet": { "name": "Cabinet", "shape": "rect", "size": Vector2(50, 35), "color": Color(0.55, 0.35, 0.2), "material": "wood", "coverage": 55, "penetration": 50 },
-	"nightstand": { "name": "Night", "shape": "square", "size": Vector2(40, 40), "color": Color(0.6, 0.4, 0.2), "material": "wood", "coverage": 40, "penetration": 45 },
-	"desk": { "name": "Desk", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.4, 0.25, 0.1), "material": "wood", "coverage": 45, "penetration": 50 },
-	"washing_machine": { "name": "Wash", "shape": "square", "size": Vector2(60, 60), "color": Color(0.9, 0.9, 0.9), "material": "metal", "coverage": 55, "penetration": 80 },
-	"dryer": { "name": "Dryer", "shape": "square", "size": Vector2(60, 60), "color": Color(0.7, 0.7, 0.7), "material": "metal", "coverage": 55, "penetration": 80 },
+	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "weight": 6, "coverage": 45, "penetration": 50 },
+	"lamp": { "name": "Lamp", "shape": "circle", "size": Vector2(20, 20), "color": Color(1.0, 1.0, 0.6), "material": "metal", "weight": 3, "coverage": 55, "penetration": 30 },
+	"plant": { "name": "Plant", "shape": "circle", "size": Vector2(26, 26), "color": Color(0.25, 0.6, 0.3), "material": "foliage", "weight": 5, "coverage": 50, "penetration": 10 },
+	"armchair": { "name": "Armchair", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.45, 0.3), "material": "fabric", "weight": 22, "coverage": 50, "penetration": 25 },
+	"side_table": { "name": "Side", "shape": "square", "size": Vector2(30, 30), "color": Color(0.55, 0.35, 0.2), "material": "wood", "weight": 8, "coverage": 40, "penetration": 45 },
+	"bookshelf": { "name": "Books", "shape": "rect", "size": Vector2(40, 80), "color": Color(0.4, 0.2, 0.0), "material": "wood", "weight": 30, "coverage": 90, "penetration": 60 },
+	"coat_rack": { "name": "Coats", "shape": "circle", "size": Vector2(24, 24), "color": Color(0.45, 0.3, 0.15), "material": "wood", "weight": 6, "coverage": 60, "penetration": 25 },
+	"shoe_rack": { "name": "Shoes", "shape": "rect", "size": Vector2(60, 25), "color": Color(0.45, 0.3, 0.15), "material": "wood", "weight": 7, "coverage": 20, "penetration": 35 },
+	"sink": { "name": "Sink", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.8, 0.9), "material": "ceramic", "weight": 20, "coverage": 45, "penetration": 45 },
+	"cabinet": { "name": "Cabinet", "shape": "rect", "size": Vector2(50, 35), "color": Color(0.55, 0.35, 0.2), "material": "wood", "weight": 22, "coverage": 55, "penetration": 50 },
+	"nightstand": { "name": "Night", "shape": "square", "size": Vector2(40, 40), "color": Color(0.6, 0.4, 0.2), "material": "wood", "weight": 10, "coverage": 40, "penetration": 45 },
+	"desk": { "name": "Desk", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.4, 0.25, 0.1), "material": "wood", "weight": 24, "coverage": 45, "penetration": 50 },
+	"washing_machine": { "name": "Wash", "shape": "square", "size": Vector2(60, 60), "color": Color(0.9, 0.9, 0.9), "material": "metal", "weight": 70, "coverage": 55, "penetration": 80 },
+	"dryer": { "name": "Dryer", "shape": "square", "size": Vector2(60, 60), "color": Color(0.7, 0.7, 0.7), "material": "metal", "weight": 55, "coverage": 55, "penetration": 80 },
 }
 
 const ARRANGEMENTS := {

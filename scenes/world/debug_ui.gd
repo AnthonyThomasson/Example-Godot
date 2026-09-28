@@ -30,7 +30,6 @@ func _ready() -> void:
 	_label.text = ""
 
 	# Make text larger and readable.
-	var font: Font = ThemeDB.fallback_font
 	_label.add_theme_font_size_override("font_size", 24)
 
 	# Create a label for hit display (top-left, below hint).

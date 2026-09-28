@@ -111,6 +111,9 @@ func _resolve(result: Dictionary) -> void:
 	# so a fast shot hits hard and a slowed one deals proportionally less. Computed
 	# from the pre-hit speed (the branches below bleed it after the impact).
 	var speed_factor := speed / Config.projectile_speed if Config.projectile_speed > 0.0 else 1.0
+	# The travel direction at contact; the ricochet branch below reassigns `direction`,
+	# so capture it now for the momentum shove (the force follows the incoming shot).
+	var incoming := direction
 
 	var ratings := _ratings_for(body)
 	var coverage: float = ratings.x
@@ -132,6 +135,8 @@ func _resolve(result: Dictionary) -> void:
 		rotation = direction.angle()
 		speed *= Config.bounce_speed_retention
 		print("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
+		_apply_force(body, incoming, speed_factor, false)
+		_spawn_debris(body, result)
 		hit.emit(body, bounce_dmg)
 		return
 
@@ -143,6 +148,8 @@ func _resolve(result: Dictionary) -> void:
 	if speed < Config.penetration_min_speed:
 		print("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
+		_apply_force(body, incoming, speed_factor, false)
+		_spawn_debris(body, result)
 		hit.emit(body, dealt)
 		return
 	var loss := clampf((penetration / 100.0) * Config.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
@@ -152,6 +159,8 @@ func _resolve(result: Dictionary) -> void:
 	rotation = direction.angle()
 	_exclude.append(rid)
 	print("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
+	_apply_force(body, incoming, speed_factor, true)
+	_spawn_debris(body, result)
 	hit.emit(body, dealt)
 
 
@@ -163,3 +172,27 @@ func _ratings_for(body: Node) -> Vector2:
 	if cov == null or pen == null:
 		return Vector2(Config.wall_coverage, Config.wall_penetration)
 	return Vector2(cov, pen)
+
+
+## Shove the struck object along `dir` (the incoming travel direction). Scaled by the
+## bullet's speed factor and by whether it penetrated — a pass-through transfers less
+## momentum than a ricochet/blocked hit, so `penetrated` gets the smaller multiplier.
+## Bodies without apply_impact (room walls) are immovable and simply ignored.
+func _apply_force(body: Node, dir: Vector2, speed_factor: float, penetrated: bool) -> void:
+	if not body.has_method("apply_impact"):
+		return
+	var force_scale := Config.impact_penetration_scale if penetrated else Config.impact_no_penetration_scale
+	body.apply_impact(dir * Config.impact_impulse * speed_factor * force_scale)
+
+
+## Spray material-styled chips out of the contact point. Color/material are read off
+## the struck object (walls expose neither → gray dust fallback); chips fly out along
+## the surface normal (or back along the shot when the normal is degenerate).
+func _spawn_debris(body: Node, result: Dictionary) -> void:
+	var col: Variant = body.get("color")
+	var mat: Variant = body.get("object_material")
+	var base_color: Color = col if col != null else Color(0.6, 0.6, 0.6)
+	var material: String = mat if mat != null else ""
+	var n: Vector2 = result.normal
+	var spray := n if n.length() > 0.001 else -direction
+	DebrisSpawner.spawn(result.position, spray, get_parent(), base_color, material)

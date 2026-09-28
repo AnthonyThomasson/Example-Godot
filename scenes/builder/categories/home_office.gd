@@ -4,8 +4,8 @@ class_name HomeOfficeCatalog
 ## plant, and the reading_chair arrangement) live in GeneralCatalog.
 
 const OBJECTS := {
-	"office_chair": { "name": "Chair", "shape": "square", "size": Vector2(30, 30), "color": Color(0.2, 0.2, 0.24), "material": "plastic", "coverage": 45, "penetration": 30 },
-	"filing_cabinet": { "name": "Files", "shape": "rect", "size": Vector2(40, 50), "color": Color(0.55, 0.57, 0.6), "material": "metal", "coverage": 55, "penetration": 75 },
+	"office_chair": { "name": "Chair", "shape": "square", "size": Vector2(30, 30), "color": Color(0.2, 0.2, 0.24), "material": "plastic", "weight": 8, "coverage": 45, "penetration": 30 },
+	"filing_cabinet": { "name": "Files", "shape": "rect", "size": Vector2(40, 50), "color": Color(0.55, 0.57, 0.6), "material": "metal", "weight": 30, "coverage": 55, "penetration": 75 },
 }
 
 const ARRANGEMENTS := {

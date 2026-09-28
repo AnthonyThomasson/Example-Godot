@@ -5,7 +5,8 @@ const CasingVisuals = preload("res://scenes/projectile/casing_visuals.gd")
 
 ## Spawn a spent casing at `position`, ejected out to a random side of the firing
 ## `direction` (with a slight backward kick), parented to `parent` (the world /
-## Main). The casing tweens itself out, lingers, fades, and frees.
+## Main). The casing tweens itself out and rests there — it is NOT time-limited;
+## it persists until the general Despawner frees the oldest past Config.max_scene_objects.
 static func spawn(position: Vector2, direction: Vector2, parent: Node) -> Node:
 	var casing := Node2D.new()
 	casing.name = "Casing"

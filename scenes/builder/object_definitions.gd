@@ -24,8 +24,5 @@ static func _all() -> Dictionary:
 			_catalog.merge(src)
 	return _catalog
 
-static func get_all() -> Array:
-	return _all().keys()
-
 static func get_definition(key: String) -> Dictionary:
 	return _all().get(key, {})

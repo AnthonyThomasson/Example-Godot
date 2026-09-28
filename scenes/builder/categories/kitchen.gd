@@ -4,13 +4,13 @@ class_name KitchenCatalog
 ## live in GeneralCatalog.
 
 const OBJECTS := {
-	"kitchen_counter": { "name": "Counter", "shape": "rect", "size": Vector2(100, 50), "color": Color(0.8, 0.7, 0.6), "material": "stone", "coverage": 55, "penetration": 70 },
-	"stove": { "name": "Stove", "shape": "square", "size": Vector2(50, 50), "color": Color(0.2, 0.2, 0.22), "material": "metal", "coverage": 50, "penetration": 80 },
-	"fridge": { "name": "Fridge", "shape": "rect", "size": Vector2(60, 70), "color": Color(0.9, 0.9, 0.95), "material": "metal", "coverage": 90, "penetration": 85 },
-	"dining_table": { "name": "Dining", "shape": "rect", "size": Vector2(90, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood", "coverage": 45, "penetration": 50 },
-	"table": { "name": "Table", "shape": "square", "size": Vector2(60, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood", "coverage": 45, "penetration": 50 },
-	"island": { "name": "Island", "shape": "rect", "size": Vector2(110, 55), "color": Color(0.8, 0.7, 0.6), "material": "stone", "coverage": 55, "penetration": 70 },
-	"microwave": { "name": "Micro", "shape": "square", "size": Vector2(40, 40), "color": Color(0.5, 0.5, 0.5), "material": "metal", "coverage": 45, "penetration": 60 },
+	"kitchen_counter": { "name": "Counter", "shape": "rect", "size": Vector2(100, 50), "color": Color(0.8, 0.7, 0.6), "material": "stone", "weight": 80, "coverage": 55, "penetration": 70 },
+	"stove": { "name": "Stove", "shape": "square", "size": Vector2(50, 50), "color": Color(0.2, 0.2, 0.22), "material": "metal", "weight": 60, "coverage": 50, "penetration": 80 },
+	"fridge": { "name": "Fridge", "shape": "rect", "size": Vector2(60, 70), "color": Color(0.9, 0.9, 0.95), "material": "metal", "weight": 90, "coverage": 90, "penetration": 85 },
+	"dining_table": { "name": "Dining", "shape": "rect", "size": Vector2(90, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood", "weight": 30, "coverage": 45, "penetration": 50 },
+	"table": { "name": "Table", "shape": "square", "size": Vector2(60, 60), "color": Color(0.6, 0.4, 0.2), "material": "wood", "weight": 20, "coverage": 45, "penetration": 50 },
+	"island": { "name": "Island", "shape": "rect", "size": Vector2(110, 55), "color": Color(0.8, 0.7, 0.6), "material": "stone", "weight": 140, "coverage": 55, "penetration": 70 },
+	"microwave": { "name": "Micro", "shape": "square", "size": Vector2(40, 40), "color": Color(0.5, 0.5, 0.5), "material": "metal", "weight": 14, "coverage": 45, "penetration": 60 },
 }
 
 const ARRANGEMENTS := {

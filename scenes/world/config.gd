@@ -62,3 +62,26 @@ var penetrate_loss_scale: float = 0.9
 ## Max random deflection on penetration, scaled by penetration/100 (harder material
 ## deflects the bullet more). Degrees; the bullet turns by ±(this × penetration/100).
 var penetrate_deflect_max_deg: float = 12.0
+
+# --- Projectile impact force ---
+## Read by scenes/projectile/projectile.gd: on a damaging hit the bullet shoves the
+## struck object (environment_object.gd) along its travel direction, harder when it
+## did not penetrate (a ricochet or a blocked/embedded shot dumps more momentum than
+## a pass-through). Objects slide and settle; walls (no apply_impact) never move.
+
+## Base impulse magnitude at full speed and a head-on hit. Scaled by the bullet's
+## speed factor (speed / projectile_speed) and by the penetration multipliers below.
+var impact_impulse: float = 2200.0
+## Impulse multiplier when the bullet did NOT penetrate (ricochet or blocked/embedded).
+var impact_no_penetration_scale: float = 1.0
+## Impulse multiplier when the bullet penetrated (passed through) — less force.
+var impact_penetration_scale: float = 0.5
+## Deceleration (px/s²) that brings a shoved object back to rest.
+var impact_friction: float = 1400.0
+## Cap on how far an object can be displaced from its origin (px); keeps shoved
+## furniture from sliding through walls.
+var impact_max_slide: float = 48.0
+## Fraction of the shoving object's momentum (velocity × weight) handed to whatever
+## it collides with (another EnvironmentObject) on a shove. <1 so cascades lose energy
+## and settle rather than propagating forever. Walls have no apply_impact and get none.
+var impact_transfer_scale: float = 0.6
