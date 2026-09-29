@@ -17,10 +17,16 @@ func _process(_delta: float) -> void:
 
 
 func _draw() -> void:
-	# Placeholder body: filled circle with a thin outline so facing is obvious.
+	# Body: the flesh silhouette deformed by any shots (dents/chunks/cracks + damage
+	# darkening), drawn from the character's Deformable impacts like furniture is.
 	var r: float = _character.radius
-	draw_circle(Vector2.ZERO, r, body_color)
-	draw_arc(Vector2.ZERO, r, 0.0, TAU, 48, Color.WHITE, 2.0, true)
+	var deformable = _character._deformable
+	var impacts: Array = deformable.impacts if deformable else []
+	var damage_total: float = deformable.damage_total if deformable else 0.0
+	# Dark-red crack/hole/scorch marks so bullet wounds read as bloody gashes (config-driven).
+	Deformation.draw_shape(self, "circle", Vector2(r * 2.0, r * 2.0), body_color, Color.WHITE,
+		impacts, damage_total, CharacterConfig.flesh_crack_color, CharacterConfig.flesh_hole_color,
+		CharacterConfig.flesh_scorch_color)
 
 	var item: Item = _character.current_item()
 	if item == null:

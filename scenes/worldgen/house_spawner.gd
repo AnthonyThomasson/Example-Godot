@@ -38,6 +38,10 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 	var wall_thickness: float = plan["wall_thickness"]
 	var blocked := _door_clearances(rooms, doors)
 
+	# Room rects in WORLD space (captured after mirroring), for callers that spawn entities
+	# into rooms. Exposed via WorldGen.get_rooms(house).
+	var rooms_world: Array = []
+
 	for room in rooms:
 		var rect: Rect2 = room["rect"]
 		var room_name := (room["key"] as String).capitalize()
@@ -49,6 +53,12 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 		var interior := rect.grow(-(wall_thickness * 0.5 + INTERIOR_MARGIN))
 		RoomFurnisher.furnish(room["type"], interior, blocked, rng, furniture)
 
+		rooms_world.append({
+			"key": room["key"], "type": room["type"],
+			"rect": Rect2(house.position + rect.position, rect.size),
+		})
+
+	house.set_meta("rooms", rooms_world)
 	return house
 
 

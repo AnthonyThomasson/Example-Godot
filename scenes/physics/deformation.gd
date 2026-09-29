@@ -1,8 +1,9 @@
 class_name Deformation
 
-## Stateless damage-deformation geometry + rendering, shared by furniture and walls (their
-## visuals and collider rebuilds), so the drawn silhouette and the collider come from the
-## same deformed polygon. The caller owns the impact list. Tuning lives in PhysicsConfig.deform_*.
+## Stateless damage-deformation geometry + rendering, shared by furniture, walls and
+## characters (their visuals and, for furniture/walls, collider rebuilds), so the drawn
+## silhouette and any collider come from the same deformed polygon. The caller owns the
+## impact list. Tuning lives in PhysicsConfig.deform_* (and, for a character, CharacterConfig).
 ##
 ## An "impact" is a Dictionary in the drawer's local space:
 ##   pos:    Vector2  contact point
@@ -10,6 +11,12 @@ class_name Deformation
 ##   depth:  float    dent depth in px (from dealt damage)
 ##   chunk:  bool     true = carve a jagged missing piece instead of a shallow dent
 ##   seed:   int      stable RNG seed so a hit's jitter/cracks don't shimmer each frame
+
+## Sentinel for an unset color argument: callers pass it to accept the default derived from
+## the shape's own colors (an intentional mark color always has non-zero alpha).
+const NO_COLOR := Color(0.0, 0.0, 0.0, 0.0)
+## Default near-black bullet-hole color when a caller supplies no override.
+const HOLE_COLOR := Color(0.05, 0.05, 0.06)
 
 
 ## Closed perimeter sample ring for a primitive shape, centered on the origin.
@@ -40,9 +47,11 @@ static func base_ring(shape: String, size: Vector2) -> PackedVector2Array:
 ## Displace ring points near each impact: shallow smooth dents, or a deep jagged notch
 ## for `chunk` impacts (a "missing piece"). Points are clamped so they can't cross the
 ## shape center (which would fold the polygon inside out).
-static func deform(ring: PackedVector2Array, impacts: Array, radius: float) -> PackedVector2Array:
+static func deform(ring: PackedVector2Array, impacts: Array, radius: float,
+		core: float = PhysicsConfig.deform_back_margin) -> PackedVector2Array:
 	if impacts.is_empty():
 		return ring
+	var center := _centroid(ring)
 	var out := PackedVector2Array()
 	out.resize(ring.size())
 	for i in ring.size():
@@ -64,15 +73,28 @@ static func deform(ring: PackedVector2Array, impacts: Array, radius: float) -> P
 				offset += impact["inward"] * impact["depth"] * (t * t)
 		# Clamp the displacement so a dent can't push the point past the object's opposite
 		# face (which would grow the silhouette out the back on repeated hits).
-		out[i] = _clamp_inside(ring, p, offset)
+		out[i] = _clamp_inside(ring, center, p, offset, core)
 	return out
+
+
+## Centroid (average) of a ring of points, used as the interior limit a dent can't pass.
+static func _centroid(ring: PackedVector2Array) -> Vector2:
+	if ring.is_empty():
+		return Vector2.ZERO
+	var sum := Vector2.ZERO
+	for pt in ring:
+		sum += pt
+	return sum / float(ring.size())
 
 
 ## A displaced boundary point kept inside the base outline. A dent may only cave the point
 ## INWARD: an offset that points out of the solid (e.g. an impact reaching a far-face point)
 ## leaves it put, and an inward offset is capped so it can't travel past the opposite face
-## minus a thin margin. Returns `p` unmoved or `p + offset` when it stays inside.
-static func _clamp_inside(ring: PackedVector2Array, p: Vector2, offset: Vector2) -> Vector2:
+## minus a thin margin, nor into the solid `core` around the shape's center (so opposite
+## dents can't meet and fold a small silhouette inside out). Returns `p` unmoved or a point
+## that stays inside.
+static func _clamp_inside(ring: PackedVector2Array, center: Vector2, p: Vector2, offset: Vector2,
+		core: float) -> Vector2:
 	if offset == Vector2.ZERO:
 		return p
 	var dir := offset.normalized()
@@ -81,6 +103,11 @@ static func _clamp_inside(ring: PackedVector2Array, p: Vector2, offset: Vector2)
 		return p
 	var span := _exit_distance(ring, p, dir)
 	var limit := maxf(span - PhysicsConfig.deform_back_margin, 0.0)
+	# Stop the point at the edge of the central core, so it keeps its distance from the
+	# center. On big furniture this is slack (dents are far shallower); on a small body (a
+	# character) it is what lets dents go deep without opposite edges crossing.
+	var to_center := maxf(p.distance_to(center) - core, 0.0)
+	limit = minf(limit, to_center)
 	return p + dir * minf(offset.length(), limit)
 
 
@@ -102,9 +129,11 @@ static func _exit_distance(ring: PackedVector2Array, p: Vector2, dir: Vector2) -
 
 
 ## Deformed perimeter polygon for a furniture shape — the single source both the visuals
-## and the collider use.
+## and the collider use. The central core scales with the shape, so a small body dents
+## deeply without folding while big furniture (whose dents never reach the core) is unchanged.
 static func shape_polygon(shape: String, size: Vector2, impacts: Array) -> PackedVector2Array:
-	return deform(base_ring(shape, size), impacts, PhysicsConfig.deform_radius)
+	var core := minf(size.x, size.y) * 0.5 * PhysicsConfig.deform_core_fraction
+	return deform(base_ring(shape, size), impacts, PhysicsConfig.deform_radius, core)
 
 
 ## Deformed polygon for one wall segment: a thick rectangle (quad) along the centerline
@@ -124,11 +153,20 @@ static func wall_polygon(a: Vector2, b: Vector2, thickness: float, impacts: Arra
 	return deform(ring, impacts, PhysicsConfig.deform_radius)
 
 
+## True when `poly` is a valid simple polygon the engine can triangulate. A silhouette
+## deformed by many overlapping dents on a small body can pinch itself into a degenerate
+## (self-touching) polygon; both `draw_colored_polygon` and `decompose_polygon_in_convex`
+## reject those, so callers check this first and skip the deformed polygon that frame.
+static func is_valid_polygon(poly: PackedVector2Array) -> bool:
+	return poly.size() >= 3 and not Geometry2D.triangulate_polygon(poly).is_empty()
+
+
 ## Decompose a (possibly concave) polygon into convex ConvexPolygonShape2D pieces for a
-## static collider. Returns [] if decomposition fails (caller keeps the old collider).
+## static collider. Returns [] for a degenerate polygon or if decomposition fails (caller
+## keeps the old collider).
 static func convex_shapes(polygon: PackedVector2Array) -> Array:
 	var shapes: Array = []
-	if polygon.size() < 3:
+	if not is_valid_polygon(polygon):
 		return shapes
 	for piece in Geometry2D.decompose_polygon_in_convex(polygon):
 		if piece.size() >= 3:
@@ -138,18 +176,27 @@ static func convex_shapes(polygon: PackedVector2Array) -> Array:
 	return shapes
 
 
-## Draw a deformed primitive shape (furniture): filled polygon (darkened by accumulated
-## damage), outline, then crack/hole marks.
+## Draw a deformed primitive shape (furniture, characters): filled polygon (darkened by
+## accumulated damage), outline, then crack/hole marks. `crack_color`/`hole_color` override
+## the mark colors (e.g. red cracks on flesh); left as NO_COLOR they derive from `outline`.
 static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: Color,
-		outline: Color, impacts: Array, damage_total: float) -> void:
+		outline: Color, impacts: Array, damage_total: float,
+		crack_color: Color = NO_COLOR, hole_color: Color = NO_COLOR, scorch_color: Color = NO_COLOR) -> void:
 	var poly := shape_polygon(shape, size, impacts)
+	# Fall back to the intact outline if the dents pinched the silhouette into a polygon the
+	# renderer can't triangulate; the hit marks below still show the damage.
+	if not is_valid_polygon(poly):
+		poly = base_ring(shape, size)
 	var body_color := fill
 	if damage_total > 0.0 and PhysicsConfig.deform_darken_full > 0.0:
 		var k := clampf(damage_total / PhysicsConfig.deform_darken_full, 0.0, 1.0) * PhysicsConfig.deform_darken_max
 		body_color = fill.darkened(k)
 	canvas.draw_colored_polygon(poly, body_color)
 	_draw_outline(canvas, poly, outline)
-	draw_marks(canvas, impacts, outline)
+	var cc := crack_color if crack_color.a > 0.0 else outline.darkened(0.3)
+	var hc := hole_color if hole_color.a > 0.0 else HOLE_COLOR
+	var sc := scorch_color if scorch_color.a > 0.0 else Color.BLACK
+	draw_marks(canvas, impacts, cc, hc, sc)
 
 
 ## Draw one deformed wall segment (fill + outline + marks).
@@ -158,7 +205,7 @@ static func draw_wall(canvas: CanvasItem, a: Vector2, b: Vector2, thickness: flo
 	var poly := wall_polygon(a, b, thickness, impacts)
 	canvas.draw_colored_polygon(poly, color)
 	_draw_outline(canvas, poly, color.darkened(0.25))
-	draw_marks(canvas, impacts, color.darkened(0.4))
+	draw_marks(canvas, impacts, color.darkened(0.4).darkened(0.3), HOLE_COLOR, Color.BLACK)
 
 
 ## Local position of an impact's dent apex: the contact point pushed inward by its dent
@@ -178,14 +225,17 @@ static func _impact_apex(impact: Dictionary) -> Vector2:
 
 
 ## Bullet holes + radiating cracks + faint scorch for each impact, seated in its dent.
-static func draw_marks(canvas: CanvasItem, impacts: Array, ink: Color) -> void:
-	var hole := Color(0.05, 0.05, 0.06)
-	var crack := ink.darkened(0.3)
+## `crack_color` tints the radiating cracks, `hole_color` the central hole, `scorch_color`
+## the faint halo (its alpha comes from PhysicsConfig, so only its RGB matters).
+static func draw_marks(canvas: CanvasItem, impacts: Array, crack_color: Color, hole_color: Color,
+		scorch_color: Color) -> void:
+	var scorch := scorch_color
+	scorch.a = PhysicsConfig.deform_scorch_alpha
 	for impact in impacts:
 		var p := _impact_apex(impact)
 		var depth: float = impact["depth"]
-		canvas.draw_circle(p, PhysicsConfig.deform_scorch_radius + depth, Color(0.0, 0.0, 0.0, PhysicsConfig.deform_scorch_alpha))
-		canvas.draw_circle(p, maxf(1.5, depth * PhysicsConfig.deform_hole_radius_scale), hole)
+		canvas.draw_circle(p, PhysicsConfig.deform_scorch_radius + depth, scorch)
+		canvas.draw_circle(p, maxf(1.5, depth * PhysicsConfig.deform_hole_radius_scale), hole_color)
 		var rng := RandomNumberGenerator.new()
 		rng.seed = int(impact["seed"])
 		var count := 2 + int(clampf(depth * PhysicsConfig.deform_crack_count, 0.0, 5.0))
@@ -193,7 +243,7 @@ static func draw_marks(canvas: CanvasItem, impacts: Array, ink: Color) -> void:
 			var ang := rng.randf_range(0.0, TAU)
 			var length := PhysicsConfig.deform_crack_length * rng.randf_range(0.5, 1.0) * (1.0 + depth * 0.15)
 			var jitter := Vector2(cos(ang), sin(ang)).orthogonal() * rng.randf_range(-2.0, 2.0)
-			canvas.draw_line(p, p + Vector2(cos(ang), sin(ang)) * length + jitter, crack, PhysicsConfig.deform_crack_width)
+			canvas.draw_line(p, p + Vector2(cos(ang), sin(ang)) * length + jitter, crack_color, PhysicsConfig.deform_crack_width)
 
 
 ## Closed outline around a ring of points.

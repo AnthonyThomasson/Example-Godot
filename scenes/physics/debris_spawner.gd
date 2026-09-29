@@ -18,6 +18,7 @@ const STYLES := {
 	"ceramic": { "count": Vector2i(4, 7),  "size": Vector2(3, 6), "aspect": 0.7,  "shape": "tri",    "spread": 1.3, "distance": Vector2(20, 38), "tint": "light" },
 	"fabric":  { "count": Vector2i(2, 4),  "size": Vector2(4, 7), "aspect": 1.0,  "shape": "rect",   "spread": 0.8, "distance": Vector2(10, 20), "tint": "soft" },
 	"foliage": { "count": Vector2i(4, 7),  "size": Vector2(3, 6), "aspect": 0.7,  "shape": "tri",    "spread": 1.4, "distance": Vector2(18, 34), "tint": "leaf" },
+	"flesh":   { "count": Vector2i(4, 7),  "size": Vector2(2, 4), "aspect": 0.8,  "shape": "circle", "spread": 1.2, "distance": Vector2(12, 26), "tint": "blood" },
 	"default": { "count": Vector2i(3, 5),  "size": Vector2(2, 5), "aspect": 1.0,  "shape": "circle", "spread": 1.2, "distance": Vector2(14, 28), "tint": "dust" },
 }
 
@@ -78,6 +79,9 @@ static func _tint(base: Color, mode: String) -> Color:
 			return base.lerp(Color(0.3, 0.5, 0.2), 0.4).lightened(randf_range(-0.05, 0.1))
 		"soft":
 			return base.darkened(randf_range(0.0, 0.12))
+		"blood":
+			# Fixed dark red (independent of the flesh base color) with lightness jitter.
+			return Color(0.55, 0.05, 0.06).lightened(randf_range(-0.1, 0.15))
 		"dust":
 			return Color(0.6, 0.6, 0.6).lightened(randf_range(-0.15, 0.15))
 		_:  # "wood" and anything else: keep the object color with lightness jitter

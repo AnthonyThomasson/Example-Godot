@@ -16,3 +16,11 @@ static func generate(seed: int, force_plan: String, front_door_world: Vector2, p
 	var plan_key: String = force_plan if force_plan != "" else pick
 	print("House: ", plan_key, "  seed: ", rng.seed)
 	return HouseSpawner.spawn(plan_key, front_door_world, rng, parent)
+
+
+## The generated house's rooms as an Array of { key, type, rect } with `rect` in WORLD
+## space. For callers (Main) that place entities into rooms; empty for a null house.
+static func get_rooms(house: Node2D) -> Array:
+	if house == null:
+		return []
+	return house.get_meta("rooms", [])

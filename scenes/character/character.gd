@@ -29,6 +29,10 @@ var _knockback := Vector2.ZERO
 ## Speed multiplier from pushing objects last frame (1.0 = unencumbered).
 var _push_slow := 1.0
 
+## Damage dents/chunks recorded when the character is shot; read by the visuals and the
+## collider rebuild. The character is flesh — a hittable surface like furniture.
+var _deformable: Deformable
+
 ## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
 ## is told apart by `hand`, not by the damage value.
@@ -51,6 +55,15 @@ func _ready() -> void:
 	_current_slot = start_slot
 	# Re-emit the hands' punch as a unified hit_landed (melee → hand 0/1, with its dealt damage).
 	_hands.punched.connect(func(hand: int, body: Node, damage: float) -> void: hit_landed.emit(body, damage, hand))
+
+	# Compose the flesh deformation component; its impacts dent the drawn silhouette (visual
+	# only — the body keeps its circular hitbox). No carved chunks, since a chunk's reach
+	# would span this small body and fold it.
+	_deformable = Deformable.new()
+	_deformable.max_depth = CharacterConfig.flesh_deform_max_depth
+	_deformable.allow_chunks = CharacterConfig.flesh_allow_chunks
+	_deformable.max_impacts = CharacterConfig.flesh_deform_max_impacts
+	add_child(_deformable)
 
 
 func _physics_process(delta: float) -> void:
@@ -136,6 +149,28 @@ func world_root() -> Node:
 ## An item forwards a projectile hit here so the character can surface it (HUD).
 func report_shot(body: Node, damage: float) -> void:
 	hit_landed.emit(body, damage, -1)
+
+
+# --- Hittable contract (struck by projectiles: flesh surface + deformation) -------------
+
+## The character's ballistic surface: partial cover, low penetration, flesh material and a
+## base color for debris styling. Read by the Projectile System.
+func get_surface() -> Dictionary:
+	return {
+		"coverage": CharacterConfig.flesh_coverage,
+		"penetration": CharacterConfig.flesh_penetration,
+		"material": CharacterConfig.flesh_material,
+		"color": CharacterConfig.flesh_color,
+	}
+
+
+## Take a hit: shove along the impact (folded into locomotion via the pushable path),
+## record the deformation (dents the drawn silhouette), and spray blood debris. The striker
+## fills in a HitInfo.
+func take_hit(hit: HitInfo) -> void:
+	apply_impulse(Physics.impact_impulse(hit))
+	_deformable.record(hit)
+	Physics.spawn_debris(get_parent(), hit, get_surface())
 
 
 # --- Pushable contract (shoved by Knockback transfers and other walking characters) -----

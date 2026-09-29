@@ -12,6 +12,9 @@ extends Node2D
 ## Distance from the player to the front door's center, straight up the screen.
 @export var door_distance: float = 70.0
 
+## Non-player character dropped into one of the generated rooms (idle for now).
+const NPC_SCENE := preload("res://scenes/character/npc.tscn")
+
 @onready var _player: Node2D = $Player
 
 
@@ -25,3 +28,19 @@ func _spawn_world() -> void:
 	var house := WorldGen.generate(house_seed, force_plan, front_door, self)
 	# Keep the house beneath the player in draw order.
 	move_child(house, _player.get_index())
+	_spawn_npc(house)
+
+
+## Drop one idle NPC at the center of a random room. Seeded from `house_seed` so a pinned
+## layout also pins the NPC's room. Added after the house, so it draws above it.
+func _spawn_npc(house: Node2D) -> void:
+	var rooms := WorldGen.get_rooms(house)
+	if rooms.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = house_seed if house_seed != 0 else randi()
+	var room: Dictionary = rooms[rng.randi() % rooms.size()]
+	var rect: Rect2 = room["rect"]
+	var npc := NPC_SCENE.instantiate()
+	add_child(npc)
+	npc.global_position = rect.position + rect.size * 0.5

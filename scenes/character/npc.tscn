@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3 uid="uid://bii1nsw87y5fu"]
+
+[ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_npc"]
+[ext_resource type="Script" path="res://scenes/character/idle_controller.gd" id="2_idle"]
+[ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/character/character_hands.gd" id="3_hands"]
+[ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/character_visuals.gd" id="4_visuals"]
+
+[node name="NPC" type="CharacterBody2D"]
+script = ExtResource("1_npc")
+start_slot = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+
+[node name="IdleController" type="Node" parent="."]
+script = ExtResource("2_idle")
+
+[node name="Hands" type="Node2D" parent="."]
+script = ExtResource("3_hands")
+
+[node name="Visuals" type="Node2D" parent="."]
+script = ExtResource("4_visuals")
+body_color = Color(0.5, 0.8, 0.4, 1)

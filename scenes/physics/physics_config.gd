@@ -46,6 +46,10 @@ static var deform_radius: float = 14.0
 ## Thickness of solid a dent must leave in front of the object's opposite face (px), so
 ## repeated hits cave inward but never punch through and grow out the back.
 static var deform_back_margin: float = 2.0
+## Solid core kept at the shape's center, as a fraction of its half-extent: no dented point
+## may enter it, so opposite dents can't meet and fold the silhouette inside out. Big
+## furniture never dents this deep, so it only binds on a small body (a character).
+static var deform_core_fraction: float = 0.3
 
 ## Missing pieces (chunks) ----------------------------------------------------
 ## Dealt damage at or above which an impact carves a "missing piece" instead of a dent.
