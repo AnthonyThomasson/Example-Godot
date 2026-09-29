@@ -227,10 +227,13 @@ Stateless helpers + reusable Node components, sharing no imports with other doma
   it all; the global cap lives on `Despawner`.
 - `BloodSpawner` / `BloodPool` / `BloodPoolVisuals` — a self-contained blood pooling system,
   separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude)` spills a
-  fixed burst of particles from a flesh wound; each particle pushes outward and slides around
+  burst of particles from a flesh wound; each particle pushes outward and slides around
   walls/furniture (`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-
-  tracked stain drawn beneath everything. Only the character's `take_hit` calls it (furniture
-  bleeds no blood). Tuned by `BloodConfig`.
+  tracked stain drawn beneath everything. Spread is accumulation-based: `BloodSpawner` sums the
+  volume of existing pools near the wound (all pools join the `blood_pools` group) and sizes the
+  new pool's radius from it, so a lone wound stays small and repeated bleeding in one spot spreads
+  a wide puddle. Only the character's `take_hit` calls it (furniture bleeds no blood). Tuned by
+  `BloodConfig`.
 
 ## House generation (World Gen pipeline)
 

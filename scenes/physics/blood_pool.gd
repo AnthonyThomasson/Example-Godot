@@ -1,17 +1,21 @@
 extends Node2D
 
 ## One blood pool that fills in over time: colliderless world-space drops released from a wound
-## a few at a time across BloodConfig.spill_duration. Each drop creeps outward to its spot in a
-## growing disc, slides around walls and furniture (never through them), and settles packed next
-## to the blood already there. Seeded by BloodSpawner, Despawner-tracked. Drawing lives in
-## blood_pool_visuals.gd; this control node owns the fill simulation only.
+## a few at a time across BloodConfig.spill_duration. Each drop emerges at the wounded body's
+## current position (so a moving character trails blood rather than leaving it all at the first
+## contact point), creeps outward from there, slides around walls and furniture (never through
+## them), and settles packed next to the blood already there. A drop's reach is measured from its
+## own emergence point, so a stationary wound fills a disc of radius `_spread` (chosen by
+## BloodSpawner from how much blood already surrounds the wound — a lone pool stays small, repeated
+## bleeding spreads wider). In the "blood_pools" group so later pools can measure this one.
+## Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
 
 ## Physics layer the drops avoid — walls and furniture (the default world layer).
 const COLLISION_MASK := 1
 
-## Live drops, each a Dictionary: pos (local, px), vel (px/s), target (px, distance from center
-## it settles at), radius (px), settled (bool). The visuals child reads this while the pool
-## fills. Public so the draw layer sees it.
+## Live drops, each a Dictionary: pos (local, px), origin (local, px — where it emerged), vel
+## (px/s), target (px, distance from origin it settles at), radius (px), settled (bool). The
+## visuals child reads this while the pool fills. Public so the draw layer sees it.
 var particles: Array[Dictionary] = []
 
 ## Collider RIDs the drop queries ignore — the wounded body, so its own collider never traps
@@ -21,6 +25,11 @@ var _exclude: Array = []
 var _aim := Vector2.RIGHT
 ## Total drops this pool will release.
 var _count := 0
+## Radius (px) of this pool's fill disc, set by BloodSpawner from nearby blood.
+var _spread := 0.0
+## The wounded body drops emerge from; sampled live so a moving body trails blood. May go invalid
+## if the body despawns, after which drops fall back to emerging at the pool's own origin.
+var _source: Node2D
 ## Drops released so far (emission runs across spill_duration).
 var _emitted := 0
 ## Seconds elapsed since seeding, driving the emission schedule.
@@ -35,15 +44,25 @@ var _probe: CircleShape2D
 func _ready() -> void:
 	_probe = CircleShape2D.new()
 	_probe.radius = BloodConfig.query_radius
+	add_to_group("blood_pools")
 
 
-## Begin a pool of `count` drops leaning along `direction` (the wound's exit side); `exclude` is
-## the wounded body's RID(s). Drops are not created here — they are released over time in
+## This pool's final drop count — how much blood it represents, read by later pools sizing their
+## own spread from nearby blood.
+func blood_volume() -> int:
+	return _count
+
+
+## Begin a pool of `count` drops filling a disc of radius `spread`, leaning along `direction` (the
+## wound's exit side); `exclude` is the wounded body's RID(s) and `source` the body itself, whose
+## live position each drop emerges from. Drops are not created here — they are released over time in
 ## _physics_process so the pool fills in across BloodConfig.spill_duration.
-func seed(direction: Vector2, count: int, exclude: Array) -> void:
+func seed(direction: Vector2, count: int, spread: float, exclude: Array, source: Node2D) -> void:
 	_exclude = exclude
 	_aim = direction.normalized() if direction.length() > 0.001 else Vector2.RIGHT
 	_count = count
+	_spread = spread
+	_source = source
 	set_physics_process(true)
 
 
@@ -77,16 +96,20 @@ func _release_due() -> void:
 		_emitted += 1
 
 
-## Create the drop with the given fill index and send it creeping toward its spot. Targets fill
-## the disc by area (radius ∝ √index), so early drops stay near the center and outer ones ring
-## the edge — the drops end up packed next to each other rather than piled up.
+## Create the drop with the given fill index and send it creeping outward from the wound's current
+## position. Targets fill the disc by area (radius ∝ √index), so early drops stay near the center
+## and outer ones ring the edge — the drops end up packed next to each other rather than piled up.
 func _add_drop(index: int) -> void:
 	var frac := (index + 0.5) / float(maxi(_count, 1))
-	var target := BloodConfig.pool_radius * sqrt(frac) * randf_range(BloodConfig.target_jitter_min, BloodConfig.target_jitter_max)
+	var target := _spread * sqrt(frac) * randf_range(BloodConfig.target_jitter_min, BloodConfig.target_jitter_max)
 	var dir := Vector2.RIGHT.rotated(randf() * TAU).slerp(_aim, BloodConfig.directional_bias).normalized()
 	var speed := randf_range(BloodConfig.speed_min, BloodConfig.speed_max)
+	# Emerge at the wounded body's current spot (local to this pool), so a moving body trails blood
+	# instead of piling it at the first contact point; fall back to the pool origin if it is gone.
+	var origin := (_source.global_position - global_position) if is_instance_valid(_source) else Vector2.ZERO
 	particles.append({
-		"pos": Vector2.ZERO,
+		"pos": origin,
+		"origin": origin,
 		"vel": dir * speed,
 		"target": target,
 		"radius": BloodConfig.drop_radius_min,
@@ -128,7 +151,9 @@ func _advance(p: Dictionary, delta: float, space: PhysicsDirectSpaceState2D) -> 
 			# Drop the into-surface component so its velocity now runs along the obstacle.
 			p["vel"] = (p["vel"] as Vector2).slide(normal)
 
-	var reach: float = (p["pos"] as Vector2).length()
+	# Reach is measured from where the drop emerged, so a drop that comes out far from the pool
+	# origin (the body having moved) still spreads only its own target distance and settles.
+	var reach: float = (p["pos"] as Vector2).distance_to(p["origin"])
 	var target: float = p["target"]
 	# Grow the blob toward full size as the drop closes on its spot.
 	var progress := reach / target if target > 0.001 else 1.0

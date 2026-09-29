@@ -224,7 +224,7 @@ func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
-	Physics.spawn_blood(get_parent(), hit, [get_rid()])
+	Physics.spawn_blood(get_parent(), hit, [get_rid()], self)
 
 
 # --- Pushable contract (shoved by Knockback transfers and other walking characters) -----
