@@ -229,11 +229,12 @@ Stateless helpers + reusable Node components, sharing no imports with other doma
   separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude)` spills a
   burst of particles from a flesh wound; each particle pushes outward and slides around
   walls/furniture (`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-
-  tracked stain drawn beneath everything. Spread is accumulation-based: `BloodSpawner` sums the
-  volume of existing pools near the wound (all pools join the `blood_pools` group) and sizes the
-  new pool's radius from it, so a lone wound stays small and repeated bleeding in one spot spreads
-  a wide puddle. Only the character's `take_hit` calls it (furniture bleeds no blood). Tuned by
-  `BloodConfig`.
+  tracked stain drawn beneath everything. Spread is accumulation-based per character: each character
+  bleeds into one active pool (`take_hit` keeps the returned pool in `_blood_pool`); a hit that lands
+  on that pool grows it — adding volume and widening its radius toward `pool_radius_max`, capped at
+  `max_pool_volume` — so a still victim shot repeatedly pools out wide, while moving off the pool
+  starts a new one and trails blood. Only the character's `take_hit` calls it (furniture bleeds no
+  blood). Tuned by `BloodConfig`.
 
 ## House generation (World Gen pipeline)
 

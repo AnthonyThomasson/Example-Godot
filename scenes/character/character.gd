@@ -32,6 +32,9 @@ var _push_slow := 1.0
 ## Damage dents/chunks recorded when the character is shot; read by the visuals and the
 ## collider rebuild. The character is flesh — a hittable surface like furniture.
 var _deformable: Deformable
+## The blood pool this character is currently bleeding into; hits accumulate here while it stands on
+## the pool, and a new one starts once it moves off. Goes invalid when the pool is despawned.
+var _blood_pool: Node
 
 ## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
@@ -217,14 +220,15 @@ func get_surface() -> Dictionary:
 
 
 ## Take a hit: shove along the impact (folded into locomotion via the pushable path),
-## record the deformation (dents the drawn silhouette), spray blood debris, and spill a blood
-## pool on the floor. The striker fills in a HitInfo. The pool excludes this body's collider so
-## the blood spreading out of the wound is not trapped inside it.
+## record the deformation (dents the drawn silhouette), spray blood debris, and feed a blood
+## pool on the floor. The striker fills in a HitInfo. Each hit accumulates into `_blood_pool` while
+## this body stands on it (pooling out wider), starting a new pool once it moves off. The pool
+## excludes this body's collider so the blood spreading out of the wound is not trapped inside it.
 func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
-	Physics.spawn_blood(get_parent(), hit, [get_rid()], self)
+	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
 
 
 # --- Pushable contract (shoved by Knockback transfers and other walking characters) -----
