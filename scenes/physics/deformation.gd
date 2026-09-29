@@ -130,12 +130,28 @@ static func draw_wall(canvas: CanvasItem, a: Vector2, b: Vector2, thickness: flo
 	draw_marks(canvas, impacts, color.darkened(0.4))
 
 
-## Bullet holes + radiating cracks + faint scorch for each impact.
+## Local position of an impact's dent apex: the contact point pushed inward by its dent
+## depth (deeper for a carved chunk), mirroring the t=1 displacement in deform(). Marks are
+## drawn here so they sit in the deformed notch instead of on the original surface line.
+static func _impact_apex(impact: Dictionary) -> Vector2:
+	var pos: Vector2 = impact["pos"]
+	var inward: Vector2 = impact["inward"]
+	var d: float = impact["depth"]
+	if impact["chunk"]:
+		d *= PhysicsConfig.deform_chunk_depth
+	var apex := pos + inward * d
+	# Same guard deform() uses: never let the point cross the shape center.
+	if apex.dot(pos) < 0.0:
+		return pos * 0.02
+	return apex
+
+
+## Bullet holes + radiating cracks + faint scorch for each impact, seated in its dent.
 static func draw_marks(canvas: CanvasItem, impacts: Array, ink: Color) -> void:
 	var hole := Color(0.05, 0.05, 0.06)
 	var crack := ink.darkened(0.3)
 	for impact in impacts:
-		var p: Vector2 = impact["pos"]
+		var p := _impact_apex(impact)
 		var depth: float = impact["depth"]
 		canvas.draw_circle(p, PhysicsConfig.deform_scorch_radius + depth, Color(0.0, 0.0, 0.0, PhysicsConfig.deform_scorch_alpha))
 		canvas.draw_circle(p, maxf(1.5, depth * PhysicsConfig.deform_hole_radius_scale), hole)
