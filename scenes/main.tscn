@@ -1,4 +1,4 @@
-[gd_scene load_steps=8 format=3 uid="uid://6ws06w1cxad1"]
+[gd_scene load_steps=9 format=3 uid="uid://6ws06w1cxad1"]
 
 [ext_resource type="Script" uid="uid://qn373ge4rrj2" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="4_player"]
@@ -7,9 +7,13 @@
 [ext_resource type="Script" uid="uid://cfsgcam8gj2md" path="res://scenes/character/player_controller.gd" id="7_controller"]
 [ext_resource type="Script" uid="uid://duwls7ja25j7a" path="res://scenes/general/camera_controller.gd" id="9_camera"]
 [ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/general/debug_ui.gd" id="10_debug"]
+[ext_resource type="Script" path="res://scenes/ai/decision_server_launcher.gd" id="11_launcher"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
+
+[node name="DecisionServerLauncher" type="Node" parent="."]
+script = ExtResource("11_launcher")
 
 [node name="MainCamera" type="Camera2D" parent="."]
 script = ExtResource("9_camera")

@@ -23,6 +23,7 @@ short description, and inline comments are reserved for genuinely tricky logic.
 | **Projectile System** | `projectile/` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
 | **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD. |
+| **AI** | `ai/` | Non-player brains: controllers that drive a character, plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows
 every domain. It asks World-Gen for a house and holds the player. `project.godot`
@@ -86,6 +87,12 @@ Everything not listed here is private to its domain.
    hand)` (hand 0/1 = melee punch, hand −1 = shot; `damage` is the amount dealt),
    `item_changed(item)` and `interaction_changed(active, label)`. Observers
    (debug HUD, camera) attach by exported node path and read only the public API/signals.
+   The NPC (`character/npc.tscn`) uses `ai/jev_controller.gd`: every second it POSTs a text
+   state + one `choice` question to a local Jev-style `/v1/systemone` server (Von), samples
+   approach/wander/wait from the returned probabilities, and writes only `move_input`/`aim_point`
+   (random fallback when the server is down). `ai/decision_server_launcher.gd` (a node in
+   `main.tscn`) starts `von serve` from its `von_path` when run from the editor, logs to
+   `user://von_server.log` + `[von]` Output lines, and kills it on exit.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`, built in
