@@ -1,63 +1,46 @@
 extends Node2D
 
-## Projectile CONTROL layer. A bullet fired by a gun: each physics frame it sweeps
-## forward along `direction` with a raycast (robust at high speed — an overlap
-## check would tunnel through walls between frames). On hitting a collider it does
-## not simply stop: it resolves the hit against the struck object's `coverage` /
-## `penetration` (see scenes/objects/environment_object.gd; walls fall back to
-## Config.wall_*), so the bullet may fly over low cover, ricochet off hard material
-## on a glancing angle, or penetrate — dealing damage and bleeding speed — and keep
-## travelling. It frees itself once its speed drops below Config.projectile_min_speed
-## or it passes `max_distance`. Drawing lives in projectile_visuals.gd. Spawned at
-## runtime by ProjectileSpawner into the world (Main), not under the player.
+## A bullet: the control layer of the Projectile System. Each physics frame it sweeps
+## forward along `direction` with a raycast and resolves every collider it crosses against
+## that object's surface, so it may fly over cover, ricochet, penetrate, or embed. It frees
+## itself once spent or past `max_distance`. Drawing lives in projectile_visuals.gd.
 
-## Travel speed in px/s. Set on the projectile itself; ProjectileSpawner seeds it
-## from Config.projectile_speed, and it can be overridden per-instance.
+## Travel speed in px/s.
 @export var speed: float = 1600.0
-## Max distance before the bullet gives up and frees itself (px).
+## Distance the bullet may travel before freeing itself (px).
 @export var max_distance: float = 2000.0
-## The projectile's own base damage. ProjectileSpawner adds the firing item's damage
-## on top at spawn; the value dealt on impact is further scaled by how square the hit is.
+## Base damage, before the firing item's damage and the per-hit squareness/speed scaling.
 @export var damage: float = 10.0
-## Physics layers the bullet can hit (walls + solid furniture default to layer 1).
+## Physics layers the bullet can hit.
 @export_flags_2d_physics var collision_mask: int = 1
-## Streak color (read by projectile_visuals.gd).
+## Streak color.
 @export var color: Color = Color(1.0, 0.9, 0.4)
-## Streak length in px (read by projectile_visuals.gd).
+## Streak length in px.
 @export var length: float = 7.0
 
-## Unit travel vector, set by the spawner before add_child. Mutated on ricochet /
-## penetration deflection as the bullet travels.
+## Unit travel vector; reassigned on ricochet / penetration deflection.
 var direction := Vector2.RIGHT
-## Body to skip in the sweep (the shooter) — everything is on layer 1.
+## Body to skip in the sweep (the shooter).
 var ignore: Node
 ## Distance travelled so far.
 var _traveled := 0.0
-## Colliders already flown over or penetrated: excluded from further sweeps so the
-## bullet doesn't re-hit the same body. (Ricochets are NOT added — a bounced bullet
-## may legitimately strike the same surface again.) Seeded with the shooter.
+## Colliders excluded from further sweeps (flown over or penetrated), so the bullet does not
+## re-hit them. Ricochets are not added — a bounced bullet may strike the same surface again.
 var _exclude: Array[RID] = []
 
-## Emitted on each damaging interaction (penetration or ricochet), just before the
-## bullet moves on or frees itself. `damage` is the value actually dealt (base + item,
-## scaled by how square the impact was, and further reduced for a ricochet). A bullet
-## may emit this more than once now; a fly-over emits nothing.
+## Emitted for each damaging interaction with the dealt damage. A fly-over emits nothing.
 signal hit(body: Node, damage: float)
 
 
 func _ready() -> void:
-	# The player is never rotated, so `direction` is already a world-space unit
-	# vector; orient the streak along it.
 	rotation = direction.angle()
 	if ignore is CollisionObject2D:
 		_exclude.append(ignore.get_rid())
 
 
+## Advance one frame's travel, resolving each collider crossed. Loops rather than casting
+## once because a hit can change direction/speed mid-frame; the guard caps a bounce loop.
 func _physics_process(delta: float) -> void:
-	# Consume this frame's travel distance, resolving each collider crossed. The
-	# bullet can change direction/speed mid-frame (ricochet/deflection), so we loop
-	# rather than casting once. A guard caps iterations against a pathological
-	# bounce loop.
 	var remaining := speed * delta
 	var guard := 0
 	while remaining > 0.0:
@@ -80,7 +63,7 @@ func _physics_process(delta: float) -> void:
 			# Nudge just past the contact (along the possibly-new direction) so the
 			# next sweep starts clear of this surface.
 			position += direction * 0.5
-			if speed < Config.projectile_min_speed:
+			if speed < BallisticsConfig.projectile_min_speed:
 				queue_free()
 				return
 
@@ -98,111 +81,82 @@ func _sweep(to: Vector2) -> Dictionary:
 	return space.intersect_ray(query)
 
 
-## Resolve one hit against the struck object's coverage/penetration, mutating
-## direction / speed / _exclude and emitting `hit` for damaging outcomes.
+## Pick one outcome for a hit and, when it deals damage, hand the object a HitInfo (the
+## object owns the shove/deform/debris). Mutates direction/speed/_exclude and re-emits `hit`.
 func _resolve(result: Dictionary) -> void:
 	var body: Node = result.collider
 	var rid: RID = result.rid
-	# Squareness: alignment of travel with the surface normal (both unit vectors),
-	# 1 = head-on. A zero-length normal (point-blank hit_from_inside) counts as square.
+	# Squareness: |travel · normal|, 1 = head-on. A degenerate normal counts as square.
 	var n: Vector2 = result.normal
 	var squareness := 1.0 if n.length() < 0.001 else absf(direction.dot(n))
-	# Speed factor: the bullet's incoming speed relative to the muzzle (top) speed,
-	# so a fast shot hits hard and a slowed one deals proportionally less. Computed
-	# from the pre-hit speed (the branches below bleed it after the impact).
-	var speed_factor := speed / Config.projectile_speed if Config.projectile_speed > 0.0 else 1.0
-	# The travel direction at contact; the ricochet branch below reassigns `direction`,
-	# so capture it now for the momentum shove (the force follows the incoming shot).
+	# Incoming speed relative to muzzle speed: a fast shot hits harder.
+	var speed_factor := speed / BallisticsConfig.projectile_speed if BallisticsConfig.projectile_speed > 0.0 else 1.0
+	# Captured before the ricochet branch reassigns `direction`; the shove follows the shot in.
 	var incoming := direction
 
-	var ratings := _ratings_for(body)
-	var coverage: float = ratings.x
-	var penetration: float = ratings.y
+	var surface := _surface_for(body)
+	var coverage: float = surface["coverage"]
+	var penetration: float = surface["penetration"]
 
-	# 1. Fly over (probabilistic, coverage-driven): no damage, no effect; skip this
-	# body from here on and keep flying. Walls (coverage 100) never fly over.
-	var flyover_chance := clampf((1.0 - coverage / 100.0) * Config.cover_flyover_scale, 0.0, 1.0)
+	# 1. Fly over cover: no damage, exclude the body, keep flying.
+	var flyover_chance := clampf((1.0 - coverage / 100.0) * BallisticsConfig.cover_flyover_scale, 0.0, 1.0)
 	if randf() < flyover_chance:
 		_exclude.append(rid)
 		print("Shot flew over %s" % body.name)
 		return
 
-	# 2. Ricochet (hard material + glancing angle): reduced damage, reflect and keep
-	# going at reduced speed. Not excluded — a bounced bullet can hit things again.
-	if penetration >= Config.penetration_bounce_min and squareness < Config.bounce_square_max:
-		var bounce_dmg := damage * squareness * speed_factor * Config.bounce_damage_retention
+	# 2. Ricochet off hard material at a glancing angle: reflect at reduced speed/damage.
+	# Not excluded — a bounced bullet can strike the same surface again.
+	if penetration >= BallisticsConfig.penetration_bounce_min and squareness < BallisticsConfig.bounce_square_max:
+		var bounce_dmg := damage * squareness * speed_factor * BallisticsConfig.bounce_damage_retention
 		direction = direction.bounce(n).normalized()
 		rotation = direction.angle()
-		speed *= Config.bounce_speed_retention
+		speed *= BallisticsConfig.bounce_speed_retention
 		print("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
-		_apply_force(body, incoming, speed_factor, false)
-		_spawn_debris(body, result)
-		_record_damage(body, result, bounce_dmg)
-		hit.emit(body, bounce_dmg)
+		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false))
 		return
 
-	# 3. Penetrate (everything else): deal squareness- and speed-scaled damage, bleed
-	# speed (more when glancing or when the material is hard) and deflect slightly.
 	var dealt := damage * squareness * speed_factor
-	# Too slow to punch through: the object blocks the bullet — it takes the impact
-	# and then stops (embeds). Speed is zeroed so the physics loop frees it.
-	if speed < Config.penetration_min_speed:
+	# 3a. Too slow to punch through: deal the impact and embed (zeroed speed frees the bullet).
+	if speed < BallisticsConfig.penetration_min_speed:
 		print("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
-		_apply_force(body, incoming, speed_factor, false)
-		_spawn_debris(body, result)
-		_record_damage(body, result, dealt)
-		hit.emit(body, dealt)
+		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false))
 		return
-	var loss := clampf((penetration / 100.0) * Config.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
+	# 3b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
+	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
 	speed *= (1.0 - loss)
-	var j := deg_to_rad(Config.penetrate_deflect_max_deg * penetration / 100.0)
+	var j := deg_to_rad(BallisticsConfig.penetrate_deflect_max_deg * penetration / 100.0)
 	direction = direction.rotated(randf_range(-j, j))
 	rotation = direction.angle()
 	_exclude.append(rid)
 	print("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
-	_apply_force(body, incoming, speed_factor, true)
-	_spawn_debris(body, result)
-	_record_damage(body, result, dealt)
-	hit.emit(body, dealt)
+	_deal(body, _hit_info(result, incoming, speed_factor, dealt, true))
 
 
-## (coverage, penetration) for a struck collider: from the object if it exposes them
-## (environment_object.gd), else the Config.wall_* fallback (room walls, etc.).
-func _ratings_for(body: Node) -> Vector2:
-	var cov: Variant = body.get("coverage")
-	var pen: Variant = body.get("penetration")
-	if cov == null or pen == null:
-		return Vector2(Config.wall_coverage, Config.wall_penetration)
-	return Vector2(cov, pen)
+## The struck object's surface via get_surface(), or the wall-rating fallback for a collider
+## that exposes none.
+func _surface_for(body: Node) -> Dictionary:
+	if body.has_method("get_surface"):
+		return body.get_surface()
+	return { "coverage": BallisticsConfig.wall_coverage, "penetration": BallisticsConfig.wall_penetration }
 
 
-## Shove the struck object along `dir` (the incoming travel direction). Scaled by the
-## bullet's speed factor and by whether it penetrated — a pass-through transfers less
-## momentum than a ricochet/blocked hit, so `penetrated` gets the smaller multiplier.
-## Bodies without apply_impact (room walls) are immovable and simply ignored.
-func _apply_force(body: Node, dir: Vector2, speed_factor: float, penetrated: bool) -> void:
-	if not body.has_method("apply_impact"):
-		return
-	var force_scale := Config.impact_penetration_scale if penetrated else Config.impact_no_penetration_scale
-	body.apply_impact(dir * Config.impact_impulse * speed_factor * force_scale)
+## Build the HitInfo handed to the struck object for one damaging interaction.
+func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt: float, penetrated: bool) -> HitInfo:
+	var info := HitInfo.new()
+	info.position = result.position
+	info.normal = result.normal
+	info.direction = incoming
+	info.damage = dealt
+	info.speed_factor = speed_factor
+	info.penetrated = penetrated
+	info.source = self
+	return info
 
 
-## Spray material-styled chips out of the contact point. Color/material are read off
-## the struck object (walls expose neither → gray dust fallback); chips fly out along
-## the surface normal (or back along the shot when the normal is degenerate).
-func _spawn_debris(body: Node, result: Dictionary) -> void:
-	var col: Variant = body.get("color")
-	var mat: Variant = body.get("object_material")
-	var base_color: Color = col if col != null else Color(0.6, 0.6, 0.6)
-	var material: String = mat if mat != null else ""
-	var n: Vector2 = result.normal
-	var spray := n if n.length() > 0.001 else -direction
-	DebrisSpawner.spawn(result.position, spray, get_parent(), base_color, material)
-
-
-## Record the damage on the struck body so it deforms visually (dents, cracks, missing
-## pieces). Bodies without record_damage (anything not deformable) are simply ignored.
-func _record_damage(body: Node, result: Dictionary, amount: float) -> void:
-	if body.has_method("record_damage"):
-		body.record_damage(result.position, result.normal, amount)
+## Hand the hit to the object (if hittable) and re-emit `hit`.
+func _deal(body: Node, info: HitInfo) -> void:
+	if body.has_method("take_hit"):
+		body.take_hit(info)
+	hit.emit(body, info.damage)

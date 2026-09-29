@@ -11,8 +11,12 @@ func _draw() -> void:
 	var color: Color = _obj.color
 	var text_color: Color = _obj.text_color
 
-	# Damage-deformed silhouette (dents, missing pieces) + crack/hole marks.
-	Deformation.draw_shape(self, shape, size, color, text_color, _obj._impacts, _obj._damage_total)
+	# Damage-deformed silhouette (dents, missing pieces) + crack/hole marks. Impact
+	# state lives on the Deformable physics component the object composes.
+	var deformable = _obj._deformable
+	var impacts: Array = deformable.impacts if deformable else []
+	var damage_total: float = deformable.damage_total if deformable else 0.0
+	Deformation.draw_shape(self, shape, size, color, text_color, impacts, damage_total)
 
 	# Draw the object's name centered on it.
 	var name_text: String = _obj.object_name

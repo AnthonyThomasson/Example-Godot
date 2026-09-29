@@ -1,0 +1,182 @@
+extends CharacterBody2D
+
+## A generic top-down character. It owns the body, movement, aim-based "facing", the item
+## inventory, and the knockback it takes from shoves. It reads its intent from a pluggable
+## controller child (any node with a `control(character, delta)` method): the controller
+## writes `move_input` / `aim_point` and calls `use_primary/secondary/select_slot`. Drawing
+## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd.
+
+## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
+@export var radius: float = 14.0  ## Body circle radius (px).
+@export var speed: float = 300.0  ## Move speed (px/s).
+## Slot the character starts holding.
+@export var start_slot: int = 1
+
+## Unit vector from the character toward its aim point; read by the hands and visuals.
+var facing := Vector2.RIGHT
+
+## Intent, written each frame by the controller.
+var move_input := Vector2.ZERO   ## Desired move direction (already 0–1 length).
+var aim_point := Vector2.ZERO    ## World point to face.
+
+## Inventory (slot id -> Item) and the currently held slot.
+var _items := {}
+var _current_slot := 1  ## Held inventory slot.
+
+## Knockback velocity from objects shoved into the character; decays each frame. Added on
+## top of controller-driven movement.
+var _knockback := Vector2.ZERO
+## Speed multiplier from pushing objects last frame (1.0 = unencumbered).
+var _push_slow := 1.0
+
+## Emitted when a held item lands damage on a body. `hand` is 0/1 for a melee hit, -1 for
+## a shot; `damage` < 0 means "no damage value" (a melee punch).
+signal hit_landed(body: Node, damage: float, hand: int)
+## Emitted when the held item changes (slot switch), for the HUD.
+signal item_changed(item: Item)
+
+@onready var _shape: CollisionShape2D = $CollisionShape2D
+@onready var _hands := $Hands
+@onready var _controller := _find_controller()
+
+
+func _ready() -> void:
+	# Build the body's collision circle to match `radius`.
+	var circle := CircleShape2D.new()
+	circle.radius = radius
+	_shape.shape = circle
+
+	_items = ItemRegistry.default_inventory()
+	_current_slot = start_slot
+	# Re-emit the hands' punch overlap as a unified hit_landed (melee → damage -1).
+	_hands.punched.connect(func(hand: int, body: Node) -> void: hit_landed.emit(body, -1.0, hand))
+
+
+func _physics_process(delta: float) -> void:
+	# Pull intent from the controller first, so facing/movement use this frame's input.
+	if _controller:
+		_controller.control(self, delta)
+
+	# Aim toward the aim point. Guard the degenerate zero-length case.
+	var to_aim := aim_point - global_position
+	if to_aim.length() > 0.001:
+		facing = to_aim.normalized()
+	# A parent's _physics_process runs before its children's, so the hands see this fresh
+	# facing on the same frame.
+	_hands.facing = facing
+
+	velocity = move_input * speed * _push_slow + _knockback
+	move_and_slide()
+	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
+	_push_slow = _apply_pushes()
+
+
+# --- Controller-facing API -------------------------------------------------------------
+
+## Run the held item's primary action (F).
+func use_primary() -> void:
+	current_item().primary(self)
+
+
+## Run the held item's secondary action (left-click).
+func use_secondary() -> void:
+	current_item().secondary(self)
+
+
+## Switch to inventory slot `slot`, emitting item_changed if it changed.
+func select_slot(slot: int) -> void:
+	if slot in _items and slot != _current_slot:
+		_current_slot = slot
+		item_changed.emit(current_item())
+
+
+# --- Item-facing API (what an Item may call on its user) --------------------------------
+
+## The held item.
+func current_item() -> Item:
+	return _items.get(_current_slot)
+
+
+## The held slot id (1–9).
+func current_slot() -> int:
+	return _current_slot
+
+
+## True while a punch swing is in progress.
+func is_attacking() -> bool:
+	return _hands.is_attacking()
+
+
+## Throw a punch with the given hand (the item decides which).
+func punch(hand: int) -> void:
+	_hands.punch(hand)
+
+
+## Local-space center of a hand (0 left, 1 right).
+func hand_position(hand: int) -> Vector2:
+	return _hands.hand_position(hand)
+
+
+## World-space center of a hand (the character is never rotated, so world = origin + local).
+func hand_world(hand: int) -> Vector2:
+	return global_position + _hands.hand_position(hand)
+
+
+## World muzzle point for a weapon in `hand` (the drawn barrel tip, +clearance).
+func muzzle_origin(hand: int) -> Vector2:
+	return hand_world(hand) + facing * 26.0
+
+
+## The scene node transient projectiles/casings/debris spawn into (world space, not under us).
+func world_root() -> Node:
+	return get_parent()
+
+
+## An item forwards a projectile hit here so the character can surface it (HUD).
+func report_shot(body: Node, damage: float) -> void:
+	hit_landed.emit(body, damage, -1)
+
+
+# --- Pushable contract (shoved by Knockback transfers and other walking characters) -----
+
+## Take a shove; divided by mass and folded into locomotion.
+func apply_impulse(impulse: Vector2) -> void:
+	_knockback += impulse / maxf(CharacterConfig.player_mass, 0.5)
+
+
+## The character's mass, used by pushers to scale their shove.
+func get_mass() -> float:
+	return maxf(CharacterConfig.player_mass, 0.5)
+
+
+# --- Walking-push (shove furniture the body slid against; be slowed by it) --------------
+
+## Shove every pushable body the character slid into this frame; return the resulting speed
+## multiplier (heavier furniture slows the character more, floored so it never fully locks).
+func _apply_pushes() -> float:
+	var input_strength := move_input.length()
+	if input_strength <= 0.0:
+		return 1.0
+
+	var heaviest := 0.0
+	for i in get_slide_collision_count():
+		var collision := get_slide_collision(i)
+		var collider := collision.get_collider()
+		if collider == null or not collider.has_method("apply_impulse"):
+			continue
+		# The normal points back toward the character, so "into the object" is -normal.
+		collider.apply_impulse(-collision.get_normal() * CharacterConfig.push_impulse * input_strength)
+		if collider.has_method("get_mass"):
+			heaviest = maxf(heaviest, collider.get_mass())
+
+	if heaviest <= 0.0:
+		return 1.0
+	return clampf(1.0 - heaviest * CharacterConfig.push_slow_per_weight, CharacterConfig.push_slow_min, 1.0)
+
+
+## First child that can drive this character (has a `control` method).
+func _find_controller() -> Node:
+	for child in get_children():
+		if child.has_method("control"):
+			return child
+	return null

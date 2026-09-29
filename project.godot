@@ -17,9 +17,8 @@ config/icon="res://icon.svg"
 
 [autoload]
 
-Keybinds="*res://scenes/keybinds.gd"
-Config="*res://scenes/world/config.gd"
-Despawner="*res://scenes/world/despawner.gd"
+Keybinds="*res://scenes/general/keybinds.gd"
+Despawner="*res://scenes/general/despawner.gd"
 
 [dotnet]
 
