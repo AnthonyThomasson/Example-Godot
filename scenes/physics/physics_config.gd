@@ -16,14 +16,19 @@ static var impact_impulse: float = 2200.0
 static var impact_no_penetration_scale: float = 1.0
 ## Impulse multiplier when the bullet penetrated (passed through) — less force.
 static var impact_penetration_scale: float = 0.5
-## Deceleration (px/s²) that brings a shoved object back to rest.
-static var impact_friction: float = 1400.0
-## Cap on how far an object can be displaced from its origin (px). `<= 0` = no cap.
-## Shared by the projectile impact and the walking-push systems.
-static var impact_max_slide: float = 0.0
-## Fraction of a shoving object's momentum (velocity × mass) handed to whatever it
-## collides with (another object) on a shove. <1 so cascades lose energy and settle.
+## Fraction of a flying object's momentum (velocity × mass) handed to the kinematic
+## character it strikes. <1 so the shove loses energy. (Rigid-vs-rigid and rigid-vs-wall
+## momentum is resolved by the physics engine, not this.)
 static var impact_transfer_scale: float = 0.6
+
+# --- RigidBody2D behavior (the engine integrates the shoved objects) ---
+## Linear damping applied to furniture bodies — the drag that brings a shove to rest.
+static var body_linear_damp: float = 4.0
+## Angular damping applied to furniture bodies — the drag that brings a spin to rest.
+static var body_angular_damp: float = 4.0
+## Enable continuous collision detection on furniture bodies (prevents a fast, light
+## object from tunneling through a thin wall, at some CPU cost).
+static var body_continuous_cd: bool = false
 
 # --- Deformation (damage) ---
 ## Rebuild the struck object's / wall segment's collider to follow the deformed shape.

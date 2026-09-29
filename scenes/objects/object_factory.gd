@@ -26,7 +26,7 @@ static func spawn(definition: Dictionary, position: Vector2, parent: Node, opts:
 		size = Vector2(size.y, size.x)
 	var color: Color = opts.get("color", definition["color"])
 
-	var obj := StaticBody2D.new()
+	var obj := RigidBody2D.new()
 	obj.name = String(opts.get("name", definition.get("name", "Object"))).capitalize()
 	obj.position = position
 	obj.script = EnvironmentObject

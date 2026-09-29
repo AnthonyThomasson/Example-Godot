@@ -1,8 +1,9 @@
-extends StaticBody2D
+extends RigidBody2D
 
 ## An Objects-domain world object (furniture, decor). Owns its surface data (shape, size,
 ## color, cover/penetration ratings, material, mass) and composes two Physics components —
-## a Knockback child (shove & settle) and a Deformable child (damage dents/chunks). It
+## a Knockback child (RigidBody2D adapter + pushable contract) and a Deformable child (damage
+## dents/chunks). The engine integrates its motion, collisions and pivoting. It
 ## exposes the two contracts the rest of the game talks to it through, and nothing else:
 ##   • get_surface() / take_hit(HitInfo)  — the "hittable" contract (Projectile, melee)
 ##   • apply_impulse(Vector2) / get_mass() — the "pushable" contract (Knockback, character)
@@ -27,7 +28,7 @@ extends StaticBody2D
 @export var weight: float = 10.0
 
 ## Physics components, created in _ready() (runtime-shape convention).
-var _knockback: Knockback  ## Shove & settle.
+var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
 var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
 
 
@@ -43,6 +44,9 @@ func _ready() -> void:
 	if solid:
 		_build_collider()
 	else:
+		# Non-solid decor never moves or collides: freeze it (a shapeless RigidBody2D would
+		# be invalid) and draw it beneath everything else.
+		freeze = true
 		z_index = -1
 
 
@@ -54,24 +58,17 @@ func get_surface() -> Dictionary:
 	return { "coverage": coverage, "penetration": penetration, "material": object_material, "color": color }
 
 
-## Take a hit: shove along the impact (via the Physics impulse + our Knockback), record
-## the deformation, and spray debris. The striker just fills in a HitInfo and calls this.
+## Take a hit: shove along the impact at the contact point (so an off-center hit spins the
+## object), record the deformation, and spray debris. The striker fills in a HitInfo.
 func take_hit(hit: HitInfo) -> void:
-	_knockback.apply_impulse(Physics.impact_impulse(hit))
+	_knockback.apply_impulse(Physics.impact_impulse(hit), hit.position)
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
 
 
 # --- Pushable contract (shoved by Knockback transfers and the walking character) -------
-
-## Take a shove.
-func apply_impulse(impulse: Vector2) -> void:
-	_knockback.apply_impulse(impulse)
-
-
-## The object's mass, used by pushers to scale their shove.
-func get_mass() -> float:
-	return _knockback.effective_mass()
+# Both halves are served by RigidBody2D's native methods: apply_impulse() (a one-arg central
+# shove) and get_mass() (returns `mass`, which Knockback sets from `weight`). Nothing to add.
 
 
 # --- Collider (built in code; rebuilt to follow the deformed silhouette) ---------------

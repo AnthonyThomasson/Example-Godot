@@ -54,15 +54,19 @@ Everything not listed here is private to its domain.
    hands the object a HitInfo; the object decides what a hit *does to it*.
 
 4. **Objects → Physics** (objects compose physics; Physics is a leaf domain)
-   - `Knockback` (Node child): `apply_impulse(v)`, `mass`, sweeps + settles its parent.
+   - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
+     `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`,
+     which feeds the engine a central or off-center (spinning) impulse.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
    - `Deformation` (static): silhouette/collider polygons + drawing.
    - `Physics.impact_impulse(hit) -> Vector2` and `Physics.spawn_debris(world, hit, surface)`.
    Physics imports nothing from other domains.
 
-5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`
-   (furniture forwards to its Knockback; the character integrates knockback into
-   locomotion). Used by Knockback transfers, bullet impacts, and the walking character.
+5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
+   Furniture is a `RigidBody2D`, so its native methods serve the contract (the engine
+   integrates motion, collisions, pivoting and settling); the character integrates knockback
+   into locomotion. Used by furniture→character contact transfers, bullet impacts, and the
+   walking character.
 
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `primary(user)`
@@ -126,8 +130,8 @@ just keeps the editor's Input Map panel in sync.
 Collision shapes are built **in code in `_ready()`**, not in the scene:
 - `wall.gd._build_walls()` — a `RectangleShape2D` per wall segment (layout is data-driven
   from `size`/`openings`). `openings` are `{ side, offset, width }`.
-- `environment_object.gd` builds its collider only when `solid`; non-solid decor gets
-  `z_index = -1`.
+- `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
+  decor is `freeze`d (no shape) and gets `z_index = -1`.
 - `character.gd` builds its body `CircleShape2D`; `character_hands.gd` builds the fist
   `Area2D`. Physics components (`Knockback`, `Deformable`) are added as child Nodes in
   `environment_object._ready()`.
@@ -175,8 +179,10 @@ off / penetrated / blocked by …`. All knobs live in `BallisticsConfig`.
 Stateless helpers + reusable Node components, sharing no imports with other domains:
 - `HitInfo` — the one data packet a striker fills in.
 - `Physics.impact_impulse(hit)` / `Physics.spawn_debris(world, hit, surface)`.
-- `Knockback` — shove velocity/spin; sweeps its parent body (stopping at and transferring
-  momentum into what it hits) and damps to rest. All `PhysicsConfig.impact_*`.
+- `Knockback` — RigidBody2D adapter: configures its parent furniture body (no gravity, mass,
+  `PhysicsConfig.body_*` damping, origin-pinned center of mass, contact reporting) and feeds it
+  impulses via `apply_impulse(v, at_world)`. The engine does the sweeping, pivoting and settling;
+  the component only hands momentum to the kinematic character on contact (`impact_transfer_scale`).
 - `Deformable` — records local impacts (dents / carved "missing pieces") and emits
   `changed`; the owner redraws + rebuilds its collider from the same deformed polygon.
 - `Deformation` — the polygon math + drawing (shared by furniture and walls).
