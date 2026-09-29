@@ -62,12 +62,43 @@ static func deform(ring: PackedVector2Array, impacts: Array, radius: float) -> P
 				offset += impact["inward"] * impact["depth"] * PhysicsConfig.deform_chunk_depth * smoothstep(0.0, 1.0, t) * jag
 			else:
 				offset += impact["inward"] * impact["depth"] * (t * t)
-		# Clamp so the point cannot pass the center along its own radius.
-		var moved := p + offset
-		if moved.dot(p) < 0.0:
-			moved = p * 0.02
-		out[i] = moved
+		# Clamp the displacement so a dent can't push the point past the object's opposite
+		# face (which would grow the silhouette out the back on repeated hits).
+		out[i] = _clamp_inside(ring, p, offset)
 	return out
+
+
+## A displaced boundary point kept inside the base outline. A dent may only cave the point
+## INWARD: an offset that points out of the solid (e.g. an impact reaching a far-face point)
+## leaves it put, and an inward offset is capped so it can't travel past the opposite face
+## minus a thin margin. Returns `p` unmoved or `p + offset` when it stays inside.
+static func _clamp_inside(ring: PackedVector2Array, p: Vector2, offset: Vector2) -> Vector2:
+	if offset == Vector2.ZERO:
+		return p
+	var dir := offset.normalized()
+	# A step along the offset that leaves the outline means the dent would bulge outward.
+	if not Geometry2D.is_point_in_polygon(p + dir * 0.05, ring):
+		return p
+	var span := _exit_distance(ring, p, dir)
+	var limit := maxf(span - PhysicsConfig.deform_back_margin, 0.0)
+	return p + dir * minf(offset.length(), limit)
+
+
+## Distance from boundary point `p` along `dir` to where it exits `ring` again (the far
+## face), or INF if the ray leaves without re-crossing. `p` is a vertex of `ring`, so
+## intersections closer than a hair are its own adjacent edges and are ignored.
+static func _exit_distance(ring: PackedVector2Array, p: Vector2, dir: Vector2) -> float:
+	var start := p + dir * 0.05
+	var far := p + dir * 100000.0
+	var best := INF
+	var n := ring.size()
+	for i in n:
+		var hit = Geometry2D.segment_intersects_segment(start, far, ring[i], ring[(i + 1) % n])
+		if hit != null:
+			var dist: float = p.distance_to(hit)
+			if dist > 0.1 and dist < best:
+				best = dist
+	return best
 
 
 ## Deformed perimeter polygon for a furniture shape — the single source both the visuals

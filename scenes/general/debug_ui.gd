@@ -12,7 +12,7 @@ var _hit_display_label: Label        ## Top-left last-hit banner.
 var _last_hit_body: String = "—"     ## Name of the last body hit.
 var _last_hit_hand: int = -1         ## Hand of the last hit (−1 = a shot).
 var _last_hit_time: float = 0.0      ## When the last hit landed (seconds).
-var _last_hit_damage: float = -1.0   ## Damage dealt; < 0 means "no damage" (e.g. a punch).
+var _last_hit_damage: float = -1.0   ## Damage of the last hit; < 0 = none recorded yet.
 
 
 func _ready() -> void:
@@ -48,7 +48,7 @@ func _ready() -> void:
 	_hit_display_label.add_theme_font_size_override("font_size", 22)
 	_hit_display_label.add_theme_color_override("font_color", Color.YELLOW)
 
-	# One unified hit feed: melee (hand 0/1, damage < 0) and shots (hand -1, damage ≥ 0).
+	# One unified hit feed: melee punches (hand 0/1) and shots (hand -1), both with damage.
 	if _character.has_signal("hit_landed"):
 		_character.hit_landed.connect(_on_hit_landed)
 
@@ -98,6 +98,6 @@ func _process(_delta: float) -> void:
 ## Record the latest hit for display.
 func _on_hit_landed(body: Node, damage: float, hand: int) -> void:
 	_last_hit_body = body.name
-	_last_hit_hand = hand         # 0/1 for melee, -1 for a gunshot.
-	_last_hit_damage = damage     # < 0 for a melee punch (no damage value).
+	_last_hit_hand = hand         # 0/1 for a melee punch, -1 for a gunshot.
+	_last_hit_damage = damage     # Amount dealt (a punch scales it by its range of motion).
 	_last_hit_time = Time.get_ticks_msec() / 1000.0

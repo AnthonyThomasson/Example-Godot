@@ -45,13 +45,15 @@ Everything not listed here is private to its domain.
    owns the *field schema* and turns a plain definition dict into a node. World-Gen never
    touches an object's fields.
 
-3. **Objects ↔ strikers (Projectile, melee): the "hittable" contract**
+3. **Objects ↔ strikers: the "hittable" contract**
    Every world object (furniture **and** walls) implements:
    - `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }`
    - `take_hit(hit: HitInfo) -> void`
    `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage,
    speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then
-   hands the object a HitInfo; the object decides what a hit *does to it*.
+   hands the object a HitInfo; the object decides what a hit *does to it* (shove + deform +
+   debris). The projectile is the only striker that uses this; a melee punch shoves through
+   the "pushable" contract below and does **not** deform.
 
 4. **Objects → Physics** (objects compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
@@ -65,8 +67,8 @@ Everything not listed here is private to its domain.
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
    Furniture is a `RigidBody2D`, so its native methods serve the contract (the engine
    integrates motion, collisions, pivoting and settling); the character integrates knockback
-   into locomotion. Used by furniture→character contact transfers, bullet impacts, and the
-   walking character.
+   into locomotion. Used by furniture→character contact transfers, bullet impacts, melee
+   punches (a range-of-motion-scaled central shove), and the walking character.
 
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `primary(user)`
@@ -80,7 +82,8 @@ Everything not listed here is private to its domain.
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. `player_controller.gd` is the human one and is the ONLY
    file besides `keybinds.gd` that touches `Keybinds`. Signals: `hit_landed(body, damage,
-   hand)` (damage < 0 = melee, hand −1 = shot) and `item_changed(item)`. Observers
+   hand)` (hand 0/1 = melee punch, hand −1 = shot; `damage` is the amount dealt) and
+   `item_changed(item)`. Observers
    (debug HUD, camera) attach by exported node path and read only the public API/signals.
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
@@ -95,7 +98,7 @@ DebugUI / Camera ──(exported path + signals)──▶ Character
 Physics and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
 the two factories). Tuning is split into three `class_name` static holders:
 `BallisticsConfig` (projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig`
-(walking push). There is no `Config` autoload.
+(walking push + punch). There is no `Config` autoload.
 
 ## Layered structure — control / animate / draw
 
@@ -107,8 +110,8 @@ A "draw" file is attached to its own child `Node2D` (Godot only draws from `Canv
   `character.gd` computes `facing`, moves, and forwards intent from its controller.
   `wall.gd` owns the wall-segment math (`wall_segments()`) and colliders.
 - **Animate** (`character_hands.gd`, a child `Node2D`) owns hand geometry, the punch
-  tween, and the runtime `Fist` `Area2D` + hit detection; exposes `hand_position(i)` and
-  the `punched` signal.
+  tween, and punch hit detection (a shape query at the raw fist position); exposes
+  `hand_position(i)` and the `punched` signal.
 - **Draw** (`*_visuals.gd`) own appearance only. `character_visuals.gd` draws the body,
   the hands the held item wants shown, then `item.draw_weapon()`. `environment_object_visuals`
   / `wall_visuals` read the deformed geometry from their control node.
@@ -133,7 +136,7 @@ Collision shapes are built **in code in `_ready()`**, not in the scene:
 - `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
   decor is `freeze`d (no shape) and gets `z_index = -1`.
 - `character.gd` builds its body `CircleShape2D`; `character_hands.gd` builds the fist
-  `Area2D`. Physics components (`Knockback`, `Deformable`) are added as child Nodes in
+  query `CircleShape2D`. Physics components (`Knockback`, `Deformable`) are added as child Nodes in
   `environment_object._ready()`.
 
 **Because of this, the editor shows "no shape" warnings on `Player/CollisionShape2D` and
@@ -149,9 +152,14 @@ on each `Wall`. Those are expected** — the shapes exist at runtime; don't add 
   do nothing) · **2** fists (both hands, F alternates — alternation state lives in the item)
   · **3** pistol (right hand + pistol art; F jabs, LMB fires). Add an item by writing an
   `Item` subclass in `items/` and a case in `ItemRegistry`.
-- **Punch hit detection:** during a swing the fist `Area2D` polls `get_overlapping_bodies()`,
-  dedupes per swing, prints the hit and emits `punched(hand, body)` → the character re-emits
-  `hit_landed(body, -1, hand)`.
+- **Punch hit detection:** during a swing `character_hands.gd` runs a shape query
+  (`intersect_shape`) at the fist's *raw* punch position — which extends into what is hit,
+  unlike the drawn hand that rests on the surface — and dedupes per swing. Each new hit shoves
+  the body via the "pushable" contract (`apply_impulse`) and deals damage, both scaled by the
+  swing's range of motion — how fast the fist is moving this frame (1.0 = full-speed extend).
+  It emits `punched(hand, body, damage)` → the character re-emits `hit_landed(body, damage,
+  hand)`. A punch pushes but never deforms; walls (no `apply_impulse`) take damage without
+  moving. Tuned by `CharacterConfig.punch_impulse`/`punch_damage`.
 
 ## Projectile impact model
 

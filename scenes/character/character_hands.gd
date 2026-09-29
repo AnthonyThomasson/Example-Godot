@@ -1,23 +1,30 @@
 extends Node2D
 
 ## Character HANDS layer. Owns the hand geometry (collision-resolved so hands rest on
-## walls/objects), the punch animation (a tween per swing) and the fist hitbox + hit
-## detection. The character sets `facing` and calls `punch(hand)`; visuals read
-## `hand_position()` / `hand_radius`. WHICH hand punches and WHEN is decided by the held
-## Item + the controller — this layer only animates and detects the swing it is told to.
+## walls/objects), the punch animation (a tween per swing) and the punch hit detection
+## (a shape query at the fist's raw punch position). The character sets `facing` and calls
+## `punch(hand)`; visuals read `hand_position()` / `hand_radius`. WHICH hand punches and WHEN
+## is decided by the held Item + the controller — this layer only animates and detects the
+## swing it is told to.
 
 ## Hand geometry (all in pixels, in the character's local space).
 @export var hand_radius: float = 6.0      ## Size of each hand circle.
 @export var hand_gap: float = 3.5         ## Gap between the body edge and a resting hand.
 @export var hand_lateral: float = 8.0     ## How far each hand sits to its side of center.
 
-## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right).
-signal punched(hand_index: int, body: Node)
+## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right);
+## `damage` is the range-of-motion-scaled punch damage dealt (0 at point-blank, up at full reach).
+signal punched(hand_index: int, body: Node, damage: float)
 
 ## Facing unit vector, set by the character each frame.
 var facing := Vector2.RIGHT
 ## Per-hand extension, 0 (resting) .. 1 (fully punched), driven by tweens.
 var _punch := [0.0, 0.0]
+## Per-hand extension from the previous physics frame, for the swing-speed estimate.
+var _prev_punch := [0.0, 0.0]
+## Per-hand extension speed (units/s), recomputed each physics frame. Its magnitude, scaled
+## to 0..1 by PUNCH_EXTEND_TIME, is the swing's "range of motion" — how hard the fist is moving.
+var _punch_speed := [0.0, 0.0]
 ## Current punch reach (from the held item's reach), updated in _physics_process.
 var _current_reach := 28.0
 ## Per-hand collision-resolved local positions, recomputed each physics frame so the hands
@@ -27,8 +34,13 @@ var _hand_pos := [Vector2.ZERO, Vector2.ZERO]
 ## Physics layers the hands collide with (walls + solid furniture default to layer 1).
 const HAND_MASK := 1
 
+## Punch tween durations (s): the fist extends, then retracts. The extend time also
+## normalizes the swing-speed factor, so a full-speed extend counts as a full-power hit.
+const PUNCH_EXTEND_TIME := 0.07
+const PUNCH_RETRACT_TIME := 0.11
+
 ## Hit-detection state for the current swing.
-var _fist: Area2D
+var _fist_shape: CircleShape2D  ## Query shape for punch detection (fist radius).
 var _attack_active := false   ## True for the whole swing (extend + retract); gates hit polling.
 var _active_hand := 0         ## Hand the fist is tracking this swing.
 var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
@@ -37,35 +49,29 @@ var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
 
 
 func _ready() -> void:
-	# Build the fist hitbox at runtime, matching the wall/body shape convention.
-	_fist = Area2D.new()
-	# monitoring = true (default) is what lets get_overlapping_bodies() see the
-	# walls/furniture. Do NOT set monitorable = false: in this Godot build that also
-	# suppresses this area's own get_overlapping_bodies() results.
-	var fist_shape := CollisionShape2D.new()
-	var fist_circle := CircleShape2D.new()
-	fist_circle.radius = hand_radius
-	fist_shape.shape = fist_circle
-	_fist.add_child(fist_shape)
-	add_child(_fist)
+	# Build the fist query shape (punch detection is a shape query at the raw punch position).
+	_fist_shape = CircleShape2D.new()
+	_fist_shape.radius = hand_radius
 
 	# Seed the resolved-hand cache so the first drawn frame isn't at the body center.
 	for hand in [0, 1]:
 		_hand_pos[hand] = _raw_hand_position(hand)
 
 
-func _physics_process(_delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	# Track the current reach from the held item.
 	var item: Item = _character.current_item()
 	if item:
 		_current_reach = item.reach
 
-	# Resolve each hand against walls/objects so it rests on the surface instead of clipping.
+	# Estimate each hand's extension speed (units/s) for the range-of-motion punch factor,
+	# then resolve each hand against walls/objects so it rests on the surface, not clipping.
 	for hand in [0, 1]:
+		_punch_speed[hand] = (_punch[hand] - _prev_punch[hand]) / delta if delta > 0.0 else 0.0
+		_prev_punch[hand] = _punch[hand]
 		_hand_pos[hand] = _resolve_hand(hand)
 
-	# Track the fist on the punching hand and report anything it overlaps.
-	_fist.position = hand_position(_active_hand)
+	# Report anything the punching fist reaches this frame.
 	if _attack_active:
 		_report_hits()
 
@@ -144,8 +150,8 @@ func punch(hand: int) -> void:
 	# _report_hits() poll in _physics_process.
 	var tween := create_tween()
 	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	tween.tween_method(_set_punch.bind(hand), 0.0, 1.0, 0.07)  # Extend.
-	tween.tween_method(_set_punch.bind(hand), 1.0, 0.0, 0.11)  # Retract.
+	tween.tween_method(_set_punch.bind(hand), 0.0, 1.0, PUNCH_EXTEND_TIME)   # Extend.
+	tween.tween_method(_set_punch.bind(hand), 1.0, 0.0, PUNCH_RETRACT_TIME)  # Retract.
 	# Stay active across the whole swing: the fist reaches full extension a physics frame
 	# after get_overlapping_bodies() would see it, so a window closing at the apex would
 	# miss the hit. Per-swing dedup keeps it to one report.
@@ -157,11 +163,32 @@ func _set_punch(value: float, hand: int) -> void:
 	_punch[hand] = value
 
 
-## Report bodies the fist currently overlaps (once each per swing), ignoring self.
+## Push and report every body the fist reaches this frame (once each per swing), ignoring self.
+## Detection is a shape query at the fist's RAW (unclamped) punch position, which extends into
+## whatever is being hit — the drawn hand still rests on the surface via _resolve_hand. The
+## shove and damage scale with the swing's range of motion (how fast the fist is moving). A
+## punch pushes (via the pushable contract) but never deforms; walls have no `apply_impulse`,
+## so they take damage without moving.
 func _report_hits() -> void:
-	for body in _fist.get_overlapping_bodies():
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = _fist_shape
+	params.collision_mask = HAND_MASK
+	params.exclude = [_character.get_rid()]
+	params.transform = Transform2D(0.0, _character.global_position + _raw_hand_position(_active_hand))
+
+	# Range of motion: how fast the fist is swinging this frame (1.0 = full-speed extend).
+	var motion := clampf(absf(_punch_speed[_active_hand]) * PUNCH_EXTEND_TIME, 0.0, 1.0)
+	for result in get_world_2d().direct_space_state.intersect_shape(params, 8):
+		var body: Node = result.collider
 		if body == _character or _hit_bodies.has(body):
 			continue
 		_hit_bodies[body] = true
-		print("Punch (hand %d) hit: %s" % [_active_hand, body.name])
-		punched.emit(_active_hand, body)
+		var impulse := facing * CharacterConfig.punch_impulse * motion
+		var pushed := body.has_method("apply_impulse")
+		if pushed:
+			body.apply_impulse(impulse)
+		var damage := CharacterConfig.punch_damage * motion
+		print("Punch (hand %d) hit %s for %.1f damage, push %.0f (%s, %.0f%% swing)" % [
+			_active_hand, body.name, damage, impulse.length(),
+			"pushable" if pushed else "fixed", motion * 100.0])
+		punched.emit(_active_hand, body, damage)

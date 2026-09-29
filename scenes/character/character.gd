@@ -29,8 +29,9 @@ var _knockback := Vector2.ZERO
 ## Speed multiplier from pushing objects last frame (1.0 = unencumbered).
 var _push_slow := 1.0
 
-## Emitted when a held item lands damage on a body. `hand` is 0/1 for a melee hit, -1 for
-## a shot; `damage` < 0 means "no damage value" (a melee punch).
+## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
+## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
+## is told apart by `hand`, not by the damage value.
 signal hit_landed(body: Node, damage: float, hand: int)
 ## Emitted when the held item changes (slot switch), for the HUD.
 signal item_changed(item: Item)
@@ -48,8 +49,8 @@ func _ready() -> void:
 
 	_items = ItemRegistry.default_inventory()
 	_current_slot = start_slot
-	# Re-emit the hands' punch overlap as a unified hit_landed (melee → damage -1).
-	_hands.punched.connect(func(hand: int, body: Node) -> void: hit_landed.emit(body, -1.0, hand))
+	# Re-emit the hands' punch as a unified hit_landed (melee → hand 0/1, with its dealt damage).
+	_hands.punched.connect(func(hand: int, body: Node, damage: float) -> void: hit_landed.emit(body, damage, hand))
 
 
 func _physics_process(delta: float) -> void:

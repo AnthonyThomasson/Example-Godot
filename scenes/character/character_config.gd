@@ -22,3 +22,11 @@ static var push_slow_min: float = 0.15
 static var player_mass: float = 40.0
 ## Deceleration (px/s²) that bleeds the character's knockback velocity back to zero.
 static var push_knockback_friction: float = 1600.0
+
+## Base central impulse a full-extension punch imparts to a pushable object, scaled by the
+## swing's range of motion (0 point-blank .. 1 full reach). A shoved RigidBody slides
+## ≈ impulse / (mass × PhysicsConfig.body_linear_damp) before settling.
+static var punch_impulse: float = 900.0
+## Base damage a full-extension punch reports, scaled by the same range of motion. Surfaced
+## through hit_landed for the HUD; a punch does not deform what it hits.
+static var punch_damage: float = 8.0

@@ -43,6 +43,9 @@ static var deform_depth_per_damage: float = 0.6
 static var deform_max_depth: float = 10.0
 ## How far along the surface a dent/notch spreads from the impact point (px).
 static var deform_radius: float = 14.0
+## Thickness of solid a dent must leave in front of the object's opposite face (px), so
+## repeated hits cave inward but never punch through and grow out the back.
+static var deform_back_margin: float = 2.0
 
 ## Missing pieces (chunks) ----------------------------------------------------
 ## Dealt damage at or above which an impact carves a "missing piece" instead of a dent.
