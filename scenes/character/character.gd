@@ -165,12 +165,14 @@ func get_surface() -> Dictionary:
 
 
 ## Take a hit: shove along the impact (folded into locomotion via the pushable path),
-## record the deformation (dents the drawn silhouette), and spray blood debris. The striker
-## fills in a HitInfo.
+## record the deformation (dents the drawn silhouette), spray blood debris, and spill a blood
+## pool on the floor. The striker fills in a HitInfo. The pool excludes this body's collider so
+## the blood spreading out of the wound is not trapped inside it.
 func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
+	Physics.spawn_blood(get_parent(), hit, [get_rid()])
 
 
 # --- Pushable contract (shoved by Knockback transfers and other walking characters) -----

@@ -25,3 +25,13 @@ static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> voi
 	var material: String = surface.get("material", "")
 	var spray := hit.normal if hit.normal.length() > 0.001 else -hit.direction
 	DebrisSpawner.spawn(hit.position, spray, parent, base_color, material)
+
+
+## Spill a persistent blood pool from a flesh hit, added under `parent` (placed by world
+## position). Blood spreads out the wound face (the surface normal), or back along the shot when
+## the normal is degenerate. `exclude` is the wounded body's RID(s), so its own collider never
+## traps the blood. The pool color/amount are fixed in BloodConfig — this is a self-contained
+## reaction, independent of the debris and deformation a hit also produces.
+static func spawn_blood(parent: Node, hit: HitInfo, exclude: Array = []) -> void:
+	var spill := hit.normal if hit.normal.length() > 0.001 else -hit.direction
+	BloodSpawner.spawn(hit.position, spill, parent, exclude)

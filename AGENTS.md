@@ -96,9 +96,9 @@ Physics debris / casings ─▶ Despawner
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
 Physics and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
-the two factories). Tuning is split into three `class_name` static holders:
+the two factories). Tuning is split into four `class_name` static holders:
 `BallisticsConfig` (projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig`
-(walking push + punch). There is no `Config` autoload.
+(walking push + punch), and `BloodConfig` (blood pooling). There is no `Config` autoload.
 
 ## Layered structure — control / animate / draw
 
@@ -196,6 +196,12 @@ Stateless helpers + reusable Node components, sharing no imports with other doma
 - `Deformation` — the polygon math + drawing (shared by furniture and walls).
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). `PhysicsConfig` tunes
   it all; the global cap lives on `Despawner`.
+- `BloodSpawner` / `BloodPool` / `BloodPoolVisuals` — a self-contained blood pooling system,
+  separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude)` spills a
+  fixed burst of particles from a flesh wound; each particle pushes outward and slides around
+  walls/furniture (`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-
+  tracked stain drawn beneath everything. Only the character's `take_hit` calls it (furniture
+  bleeds no blood). Tuned by `BloodConfig`.
 
 ## House generation (World Gen pipeline)
 
