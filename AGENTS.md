@@ -1,17 +1,17 @@
 # AGENTS.md — Example_Godot architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
-furnished house, with two "hands" that aim at the mouse, a punch on **F**, and a
-pistol that fires on left-click. The code is organized into **seven isolated domains**
-so each can be changed on its own. This file explains the domains and the small set of
-interfaces that connect them — keep changes inside a domain, and cross a boundary only
-through the interfaces listed here.
+furnished house, with two "hands" that aim at the mouse, a punch on **F**, a
+pistol that fires on left-click, and object interactions on **Space** (sit, lie, …).
+The code is organized into **eight isolated domains** so each can be changed on its own.
+This file explains the domains and the small set of interfaces that connect them — keep
+changes inside a domain, and cross a boundary only through the interfaces listed here.
 
 **After any code edit, follow the `doc-comments` skill** (`.claude/skills/doc-comments/`):
 comments must describe the current state (no history), every method and property gets a
 short description, and inline comments are reserved for genuinely tricky logic.
 
-## The seven domains (one folder each under `scenes/`)
+## The eight domains (one folder each under `scenes/`)
 
 | Domain | Folder | Owns |
 |---|---|---|
@@ -19,6 +19,7 @@ short description, and inline comments are reserved for genuinely tricky logic.
 | **Objects** | `objects/` | The world's objects (furniture + walls): their data and how they're hit/pushed. |
 | **Items** | `items/` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | The player character (built so other character types can exist). |
+| **Interaction** | `interaction/` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
 | **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD. |
@@ -82,9 +83,20 @@ Everything not listed here is private to its domain.
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. `player_controller.gd` is the human one and is the ONLY
    file besides `keybinds.gd` that touches `Keybinds`. Signals: `hit_landed(body, damage,
-   hand)` (hand 0/1 = melee punch, hand −1 = shot; `damage` is the amount dealt) and
-   `item_changed(item)`. Observers
+   hand)` (hand 0/1 = melee punch, hand −1 = shot; `damage` is the amount dealt),
+   `item_changed(item)` and `interaction_changed(active, label)`. Observers
    (debug HUD, camera) attach by exported node path and read only the public API/signals.
+
+8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
+   The character composes a `CharacterInteraction` component (`interaction/`, built in
+   `_ready()` like the physics components) and exposes only opaque forwards: `try_interact()`
+   (from the controller on **Space**), `is_busy()` (movement/actions lock) and
+   `interaction_label()` (HUD). The component reads the character's existing `facing`,
+   `global_position`, `aim_point` and `has_item(id)`, and moves it. It discovers objects
+   through the **interactable contract** — every world object implements
+   `get_interactions() -> Array` (plain data dicts: `id`, `label`, optional `move_to` /
+   `requires_item`), advertised via the optional `interactions` object field. The character
+   never learns what an interaction *means*; add/retune actions in the catalogue data alone.
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
@@ -92,6 +104,7 @@ Everything not listed here is private to its domain.
 main ─▶ WorldGen ─▶ ObjectFactory / WallFactory ─▶ Objects ─▶ Physics
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
+Character ─▶ Interaction ──(get_interactions)──▶ Objects
 Physics debris / casings ─▶ Despawner
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
@@ -150,8 +163,17 @@ on each `Wall`. Those are expected** — the shapes exist at runtime; don't add 
   they rest on walls/objects. Tunable via `character_hands.gd`'s `hand_*` exports.
 - **Items:** number keys 1–9 select a slot (`ItemRegistry`). **1** unarmed (no hands, F/LMB
   do nothing) · **2** fists (both hands, F alternates — alternation state lives in the item)
-  · **3** pistol (right hand + pistol art; F jabs, LMB fires). Add an item by writing an
-  `Item` subclass in `items/` and a case in `ItemRegistry`.
+  · **3** pistol (right hand + pistol art; F jabs, LMB fires) · **4** key (inert carryable; it
+  exists so a `requires_item: 4` interaction has something to gate on). Add an item by writing
+  an `Item` subclass in `items/` and a case in `ItemRegistry`.
+- **Interactions:** **Space** starts/stops an object interaction. `CharacterInteraction`
+  (`interaction/`) shape-queries for reachable objects, keeps the actions whose `requires_item`
+  gate passes (`character.has_item`), targets the object nearest the mouse (`aim_point`), and
+  runs a random one of its valid actions — freezing the character (`is_busy()`), and for a
+  `move_to` action snapping it onto the object and letting the two bodies overlap (a temporary
+  `add_collision_exception_with`, so a seat/bed isn't shoved and the character isn't ejected),
+  moving it back on exit. Which objects offer which actions is pure catalogue data
+  (`get_interactions()` on the object).
 - **Punch hit detection:** during a swing `character_hands.gd` runs a shape query
   (`intersect_shape`) at the fist's *raw* punch position — which extends into what is hit,
   unlike the drawn hand that rests on the surface — and dedupes per swing. Each new hit shoves
@@ -240,6 +262,10 @@ room `type`. New `class_name` scripts resolve only after Godot rescans (open the
 - **House:** on start the house is directly ahead of the player, front door beside them; every
   doorway is walkable. `house_seed`/`force_plan` on `Main` pin a layout.
 - **Movement/pushing:** WASD moves; heavy furniture slows you and shoves you back.
-- **Items:** **1** unarmed · **2** fists (F alternates) · **3** pistol (F jabs, LMB fires).
+- **Items:** **1** unarmed · **2** fists (F alternates) · **3** pistol (F jabs, LMB fires) ·
+  **4** key (inert; gates the wardrobe's "Rummage" interaction).
+- **Interactions:** walk next to furniture, press **Space** → a random valid action of the
+  object nearest the mouse starts (HUD shows its label; `move_to` snaps you onto it); press
+  **Space** again to stop and step back. The wardrobe's "Rummage" only appears with the key.
 - **Combat:** punch or shoot furniture/walls → console lines print, debris sprays, objects
   dent + shove, and the debug HUD shows the last hit + damage.

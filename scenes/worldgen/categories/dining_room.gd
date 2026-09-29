@@ -4,9 +4,9 @@ class_name DiningRoomCatalog
 ## side_table_lamp) live in GeneralCatalog.
 
 const OBJECTS := {
-	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 45, "coverage": 45, "penetration": 55 },
-	"buffet": { "name": "Buffet", "shape": "rect", "size": Vector2(120, 40), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 50, "coverage": 40, "penetration": 55 },
-	"china_cabinet": { "name": "China", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.48, 0.3, 0.16), "material": "wood", "weight": 45, "coverage": 75, "penetration": 50 },
+	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 45, "coverage": 45, "penetration": 55, "interactions": [{ "id": "sit_at", "label": "Sit at table", "move_to": true }, { "id": "examine", "label": "Examine" }] },
+	"buffet": { "name": "Buffet", "shape": "rect", "size": Vector2(120, 40), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 50, "coverage": 40, "penetration": 55, "interactions": [{ "id": "open", "label": "Open buffet" }, { "id": "examine", "label": "Examine" }] },
+	"china_cabinet": { "name": "China", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.48, 0.3, 0.16), "material": "wood", "weight": 45, "coverage": 75, "penetration": 50, "interactions": [{ "id": "open", "label": "Open cabinet" }, { "id": "examine", "label": "Examine" }] },
 }
 
 const ARRANGEMENTS := {

@@ -4,9 +4,9 @@ class_name LivingRoomCatalog
 ## side_table, plant, bookshelf, coat_rack, shoe_rack) live in GeneralCatalog.
 
 const OBJECTS := {
-	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "weight": 12, "coverage": 40, "penetration": 35 },
-	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric", "weight": 45, "coverage": 45, "penetration": 30 },
-	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood", "weight": 12, "coverage": 30, "penetration": 45 },
+	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "weight": 12, "coverage": 40, "penetration": 35, "interactions": [{ "id": "watch", "label": "Watch TV" }, { "id": "toggle", "label": "Turn off" }] },
+	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric", "weight": 45, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "lie", "label": "Lie down", "move_to": true }] },
+	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood", "weight": 12, "coverage": 30, "penetration": 45, "interactions": [{ "id": "sit_on", "label": "Sit on it", "move_to": true }, { "id": "examine", "label": "Examine" }] },
 	"rug": { "name": "Rug", "shape": "rect", "size": Vector2(170, 110), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
 }
 

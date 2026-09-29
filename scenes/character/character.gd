@@ -39,10 +39,19 @@ var _deformable: Deformable
 signal hit_landed(body: Node, damage: float, hand: int)
 ## Emitted when the held item changes (slot switch), for the HUD.
 signal item_changed(item: Item)
+## Re-emitted from the interaction component: true + label when an interaction starts, false + ""
+## when it ends. For the HUD; the character itself stays unaware of what an interaction means.
+signal interaction_changed(active: bool, label: String)
+
+## Interaction component (Interaction domain): finds and runs object interactions. Composed in
+## code like the other components; the character only forwards `try_interact()` and reads
+## `is_busy()` / `interaction_label()`.
+const CharacterInteraction = preload("res://scenes/interaction/character_interaction.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
 @onready var _controller := _find_controller()
+var _interaction: Node  ## The CharacterInteraction child, built in _ready().
 
 
 func _ready() -> void:
@@ -65,11 +74,27 @@ func _ready() -> void:
 	_deformable.max_impacts = CharacterConfig.flesh_deform_max_impacts
 	add_child(_deformable)
 
+	# Compose the interaction component and surface its state change as our own signal.
+	_interaction = CharacterInteraction.new()
+	add_child(_interaction)
+	_interaction.interaction_changed.connect(func(active: bool, label: String) -> void: interaction_changed.emit(active, label))
+
 
 func _physics_process(delta: float) -> void:
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
+
+	# While in an interaction the character is fully frozen: it holds the exact spot the
+	# interaction placed it (possibly overlapping the object, via a collision exception the
+	# interaction sets) and runs no movement, aim, knockback or push. Skipping move_and_slide /
+	# _apply_pushes is what keeps a seated body from being ejected or shoving its neighbours.
+	if _interaction.is_busy():
+		move_input = Vector2.ZERO
+		velocity = Vector2.ZERO
+		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
+		_hands.facing = facing
+		return
 
 	# Aim toward the aim point. Guard the degenerate zero-length case.
 	var to_aim := aim_point - global_position
@@ -87,21 +112,42 @@ func _physics_process(delta: float) -> void:
 
 # --- Controller-facing API -------------------------------------------------------------
 
-## Run the held item's primary action (F).
+## Run the held item's primary action (F). Ignored while locked in an interaction.
 func use_primary() -> void:
+	if is_busy():
+		return
 	current_item().primary(self)
 
 
-## Run the held item's secondary action (left-click).
+## Run the held item's secondary action (left-click). Ignored while locked in an interaction.
 func use_secondary() -> void:
+	if is_busy():
+		return
 	current_item().secondary(self)
 
 
-## Switch to inventory slot `slot`, emitting item_changed if it changed.
+## Switch to inventory slot `slot`, emitting item_changed if it changed. Ignored while locked.
 func select_slot(slot: int) -> void:
+	if is_busy():
+		return
 	if slot in _items and slot != _current_slot:
 		_current_slot = slot
 		item_changed.emit(current_item())
+
+
+## Toggle an object interaction: start the best one in reach, or end the active one.
+func try_interact() -> void:
+	_interaction.try_interact()
+
+
+## True while locked in an object interaction (sitting, lying, …).
+func is_busy() -> bool:
+	return _interaction.is_busy()
+
+
+## The active interaction's HUD label, or "" when idle.
+func interaction_label() -> String:
+	return _interaction.active_label()
 
 
 # --- Item-facing API (what an Item may call on its user) --------------------------------
@@ -114,6 +160,12 @@ func current_item() -> Item:
 ## The held slot id (1–9).
 func current_slot() -> int:
 	return _current_slot
+
+
+## Whether inventory slot `id` is present (carried, not necessarily held). Gates interactions
+## that require an item.
+func has_item(id: int) -> bool:
+	return _items.has(id)
 
 
 ## True while a punch swing is in progress.

@@ -6,7 +6,7 @@ class_name ObjectFactory
 ## through a plain Dictionary, so neither reaches into the other's internals.
 ##
 ## Definition fields: name, shape ("circle"|"square"|"rect"), size, color (required);
-##   material, coverage, penetration, weight, solid (all optional).
+##   material, coverage, penetration, weight, solid, interactions (all optional).
 ## `opts`:
 ##   name:    String — node name (readable hit labels; defaults to the definition name).
 ##   rotated: bool   — swap the footprint's width/height (a 90° turn).
@@ -41,6 +41,7 @@ static func spawn(definition: Dictionary, position: Vector2, parent: Node, opts:
 	obj.coverage = definition.get("coverage", 0.0)
 	obj.penetration = definition.get("penetration", 0.0)
 	obj.weight = definition.get("weight", 10.0)
+	obj.interactions = definition.get("interactions", [])
 
 	var visuals := Node2D.new()
 	visuals.name = "EnvironmentObjectVisuals"

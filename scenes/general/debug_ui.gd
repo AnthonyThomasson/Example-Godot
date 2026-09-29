@@ -58,12 +58,14 @@ func _process(_delta: float) -> void:
 	var item_name: String = item.display_name if item else "Unknown"
 	var reach: float = item.reach if item else 0.0
 	var attack_active: bool = _character.is_attacking()
+	var interaction: String = _character.interaction_label()
 
 	# Build debug text (bottom-right).
 	var debug_lines := [
 		"=== DEBUG ===",
 		"Item: %d (%s)" % [_character.current_slot(), item_name],
 		"Punch Active: %s" % ("YES" if attack_active else "NO"),
+		"Interaction: %s" % (interaction if interaction != "" else "—"),
 		"Reach: %.1f" % reach,
 		"",
 		"Last Hit:",

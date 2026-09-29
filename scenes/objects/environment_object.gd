@@ -26,6 +26,9 @@ extends RigidBody2D
 @export var penetration: float = 0.0
 ## Mass used for knockback: a shove's impulse is divided by this. Set from the catalog.
 @export var weight: float = 10.0
+## Interactions this object offers, as plain data dicts (id, label, optional move_to /
+## requires_item). Read by the Interaction domain via get_interactions(); empty means none.
+@export var interactions: Array = []
 
 ## Physics components, created in _ready() (runtime-shape convention).
 var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
@@ -64,6 +67,14 @@ func take_hit(hit: HitInfo) -> void:
 	_knockback.apply_impulse(Physics.impact_impulse(hit), hit.position)
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
+
+
+# --- Interactable contract (read by the Interaction domain) ----------------------------
+
+## The interactions this object offers (plain data dicts; see the Interaction domain). The
+## object holds no interaction logic — it only advertises the actions. Empty if none.
+func get_interactions() -> Array:
+	return interactions
 
 
 # --- Pushable contract (shoved by Knockback transfers and the walking character) -------

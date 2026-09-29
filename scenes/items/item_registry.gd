@@ -10,6 +10,7 @@ static func create(id: int) -> Item:
 		1: return UnarmedItem.new()
 		2: return FistsItem.new()
 		3: return PistolItem.new()
+		4: return KeyItem.new()
 	return null
 
 
@@ -17,6 +18,6 @@ static func create(id: int) -> Item:
 ## per-item state, e.g. the fists' alternating hand).
 static func default_inventory() -> Dictionary:
 	var inv := {}
-	for id in [1, 2, 3]:
+	for id in [1, 2, 3, 4]:
 		inv[id] = create(id)
 	return inv

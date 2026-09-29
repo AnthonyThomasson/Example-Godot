@@ -19,3 +19,5 @@ func control(character, _delta: float) -> void:
 		character.use_primary()
 	if Keybinds.is_fire_just_pressed():
 		character.use_secondary()
+	if Keybinds.is_interact_just_pressed():
+		character.try_interact()

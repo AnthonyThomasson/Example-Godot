@@ -13,6 +13,7 @@ const MOVE_UP := "move_up"
 const MOVE_DOWN := "move_down"
 const PUNCH := "punch"
 const FIRE := "fire"
+const INTERACT := "interact"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -31,6 +32,7 @@ const DEFAULTS := {
 	MOVE_UP: KEY_W,
 	MOVE_DOWN: KEY_S,
 	PUNCH: KEY_F,
+	INTERACT: KEY_SPACE,
 	ITEM_1: KEY_1,
 	ITEM_2: KEY_2,
 	ITEM_3: KEY_3,
@@ -93,6 +95,12 @@ func is_punch_just_pressed() -> bool:
 ## rebind_mouse(FIRE, ...) exactly like the keyboard actions.
 func is_fire_just_pressed() -> bool:
 	return Input.is_action_just_pressed(FIRE)
+
+
+## True on the frame the interact key (space) is pressed. Goes through the same rebindable
+## action path as the others.
+func is_interact_just_pressed() -> bool:
+	return Input.is_action_just_pressed(INTERACT)
 
 
 ## Item selection (1-9). Returns the item number (1-9) if an item key was pressed
