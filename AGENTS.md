@@ -3,15 +3,17 @@
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a
 pistol that fires on left-click, and object interactions on **Space** (sit, lie, …).
-The code is organized into **eight isolated domains** so each can be changed on its own.
+The code is organized into **nine isolated domains** so each can be changed on its own.
 This file explains the domains and the small set of interfaces that connect them — keep
 changes inside a domain, and cross a boundary only through the interfaces listed here.
 
-**After any code edit, follow the `doc-comments` skill** (`.claude/skills/doc-comments/`):
-comments must describe the current state (no history), every method and property gets a
-short description, and inline comments are reserved for genuinely tricky logic.
+**Before committing a change, run the `change-verification` skill**
+(`.claude/skills/change-verification/`): it checks that domains stay isolated (cross-domain
+connections go only through the interfaces below), keeps this file in sync when they change, and
+enforces concise current-state comments (no history; every method and property documented; inline
+comments only for genuinely tricky logic).
 
-## The eight domains (one folder each under `scenes/`)
+## The nine domains (one folder each under `scenes/`)
 
 | Domain | Folder | Owns |
 |---|---|---|
@@ -22,7 +24,7 @@ short description, and inline comments are reserved for genuinely tricky logic.
 | **Interaction** | `interaction/` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
-| **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD. |
+| **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
 | **AI** | `ai/` | Non-player brains: controllers that drive a character, plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows
@@ -34,10 +36,13 @@ autoloads only `Keybinds` and `Despawner` (both General).
 Everything not listed here is private to its domain.
 
 1. **Main → World Generation**
-   `WorldGen.generate(seed, force_plan, front_door_world, parent) -> Node2D`
-   Seeds one RNG for the whole run (plan pick is its first draw), prints
-   `House: <plan>  seed: N`, builds the house. `main.gd` only positions the front door
-   and fixes draw order.
+   - `WorldGen.generate(seed, force_plan, front_door_world, parent) -> Node2D` — seeds one RNG
+	 for the whole run (plan pick is its first draw), prints `House: <plan>  seed: N`, builds
+	 the house.
+   - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
+	 (world-space `rect`), read from the house's `rooms` metadata.
+   `main.gd` positions the front door, fixes draw order, and drops the NPC into a random room
+   (via `get_rooms`); it never touches world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
@@ -59,8 +64,8 @@ Everything not listed here is private to its domain.
 
 4. **Objects → Physics** (objects compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
-     `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`,
-     which feeds the engine a central or off-center (spinning) impulse.
+	 `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`,
+	 which feeds the engine a central or off-center (spinning) impulse.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
    - `Deformation` (static): silhouette/collider polygons + drawing.
    - `Physics.impact_impulse(hit) -> Vector2` and `Physics.spawn_debris(world, hit, surface)`.
@@ -91,8 +96,9 @@ Everything not listed here is private to its domain.
    state + one `choice` question to a local Jev-style `/v1/systemone` server (Von), samples
    approach/wander/wait from the returned probabilities, and writes only `move_input`/`aim_point`
    (random fallback when the server is down). `ai/decision_server_launcher.gd` (a node in
-   `main.tscn`) starts `von serve` from its `von_path` when run from the editor, logs to
-   `user://von_server.log` + `[von]` Output lines, and kills it on exit.
+   `main.tscn`) starts `von serve` when run from the editor — using its `von_path`, which
+   defaults to the `application/von/server_path` project setting (blank = don't auto-start) —
+   logs to `user://von_server.log` + `[von]` Output lines, and kills it on exit.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`, built in
@@ -144,9 +150,26 @@ its own `_physics_process` (lag-free).
 
 All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings
 or `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`,
-and expose a typed helper. Only `player_controller.gd` consumes Keybinds. `rebind()` /
+and expose a typed helper. `player_controller.gd` is the one gameplay consumer of Keybinds;
+the only other is `command_server.gd` (dev-only), which reads the action *names* to inject
+real input when driving the game from outside (see "Dev command server"). `rebind()` /
 `rebind_mouse()` remap at runtime (basis for a future config UI). `project.godot [input]`
 just keeps the editor's Input Map panel in sync.
+
+### Dev command server
+
+`general/command_server.gd` (a node in `main.tscn`, editor-only, cleaned up on exit) lets an
+external tool control a running game with text commands. It is **off** unless
+`application/debug/command_port` > 0 and never exists in an exported build (`_ready()` bails
+when `OS.has_feature("editor")` is false). It listens on 127.0.0.1 with a line-delimited
+protocol: each line is a curated verb (`help`, `pos`, `tp X Y`, `slot N`,
+`move up|down|left|right [off]`, `stop`, `fire`, `punch`, `interact`, `aim X Y`) or, failing
+that, a GDScript `Expression` evaluated against the node (e.g. `scene().get_node("Player").speed`).
+Movement and actions are driven by injecting `Input` action presses through `Keybinds` names —
+the same path a human's keyboard/mouse uses — so no game domain is coupled to it. Drive it from
+`tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`); the Godot MCP can only launch/kill the
+game and read its stdout, so the socket client is the control channel and each command is echoed
+as a `[cmd] …` Output line.
 
 ## Runtime-shape convention
 
@@ -226,8 +249,9 @@ Stateless helpers + reusable Node components, sharing no imports with other doma
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). `PhysicsConfig` tunes
   it all; the global cap lives on `Despawner`.
 - `BloodSpawner` / `BloodPool` / `BloodPoolVisuals` — a self-contained blood pooling system,
-  separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude)` spills a
-  burst of particles from a flesh wound; each particle pushes outward and slides around
+  separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude, source, active)
+  -> Node` adds a flesh wound's blood to the body's pool and returns it; each drop emerges from
+  `source`'s live position, pushes outward and slides around
   walls/furniture (`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-
   tracked stain drawn beneath everything. Spread is accumulation-based per character: each character
   bleeds into one active pool (`take_hit` keeps the returned pool in `_blood_pool`); a hit that lands

@@ -14,6 +14,8 @@ config/name="Example_Godot"
 run/main_scene="res://scenes/main.tscn"
 config/features=PackedStringArray("4.4", "Forward Plus")
 config/icon="res://icon.svg"
+von/server_path="/Users/athomasson/.venvs/von/bin/von"
+debug/command_port=9080
 
 [autoload]
 

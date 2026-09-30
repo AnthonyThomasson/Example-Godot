@@ -74,7 +74,7 @@ func _process(_delta: float) -> void:
 	if _last_hit_time > 0:
 		var time_ago := Time.get_ticks_msec() / 1000.0 - _last_hit_time
 		var dmg_seg := "" if _last_hit_damage < 0.0 else " | Dmg: %.0f" % _last_hit_damage
-		debug_lines.append("  Body: %s | Hand: %d%s | [%.1fs ago]" % [_last_hit_body, _last_hit_hand, dmg_seg, time_ago])
+		debug_lines.append("  %s — %s%s | [%.1fs ago]" % [_last_hit_body, _method_label(_last_hit_hand), dmg_seg, time_ago])
 		# Clear old hits after 5 seconds.
 		if time_ago > 5.0:
 			_last_hit_time = 0.0
@@ -86,9 +86,8 @@ func _process(_delta: float) -> void:
 	# Update hit display (top-left).
 	if _last_hit_time > 0:
 		var time_ago := Time.get_ticks_msec() / 1000.0 - _last_hit_time
-		var hand_name: String = "LEFT" if _last_hit_hand == 0 else "RIGHT"
 		var dmg_seg := "" if _last_hit_damage < 0.0 else " — %.0f dmg" % _last_hit_damage
-		_hit_display_label.text = "HIT: %s (Hand: %s)%s" % [_last_hit_body, hand_name, dmg_seg]
+		_hit_display_label.text = "HIT: %s — %s%s" % [_last_hit_body, _method_label(_last_hit_hand), dmg_seg]
 		# Clear after 3 seconds.
 		if time_ago > 3.0:
 			_hit_display_label.text = ""
@@ -103,3 +102,12 @@ func _on_hit_landed(body: Node, damage: float, hand: int) -> void:
 	_last_hit_hand = hand         # 0/1 for a melee punch, -1 for a gunshot.
 	_last_hit_damage = damage     # Amount dealt (a punch scales it by its range of motion).
 	_last_hit_time = Time.get_ticks_msec() / 1000.0
+
+
+## Readable method of damage for a hit's hand code: -1 = gunshot, 0/1 = left/right-hand punch.
+func _method_label(hand: int) -> String:
+	match hand:
+		-1: return "Gunshot"
+		0: return "Punch (left)"
+		1: return "Punch (right)"
+	return "Unknown"

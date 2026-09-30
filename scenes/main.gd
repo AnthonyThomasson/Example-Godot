@@ -45,4 +45,15 @@ func _spawn_npc(house: Node2D) -> void:
 	var npc := NPC_SCENE.instantiate()
 	add_child(npc)
 	npc.global_position = rect.position + rect.size * 0.5
-	npc.get_node("JevController").target = _player
+	_aim_npc_at(npc, _player)
+
+
+## Point an NPC's controller at `target`, found by the same `control` duck-type the character
+## uses to pick its controller — so Main doesn't depend on the controller's node name. No-op if
+## the controller takes no target (e.g. a controller that ignores it).
+func _aim_npc_at(npc: Node, target: Node) -> void:
+	for child in npc.get_children():
+		if child.has_method("control"):
+			if "target" in child:
+				child.target = target
+			return
