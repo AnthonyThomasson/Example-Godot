@@ -13,6 +13,12 @@ start_slot = 1
 
 [node name="JevController" type="Node" parent="."]
 script = ExtResource("2_jev")
+nav_agent_path = NodePath("../NavigationAgent2D")
+
+[node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]
+radius = 14.0
+path_desired_distance = 16.0
+target_desired_distance = 16.0
 
 [node name="Hands" type="Node2D" parent="."]
 script = ExtResource("3_hands")

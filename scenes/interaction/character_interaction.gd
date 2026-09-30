@@ -7,8 +7,9 @@ extends Node2D
 ## it and returns the character to where it started. A `move_to` action additionally snaps the
 ## character onto the object and lets the two bodies overlap (a temporary collision exception, so
 ## sitting/lying puts the character ON the object without either ejecting or shoving the other);
-## actions without `move_to` act in place. The character only forwards `try_interact()` and reads
-## `is_busy()` / `active_label()`;
+## actions without `move_to` act in place. The character forwards `try_interact()` (the player's
+## random toggle) plus `interactions_in_reach()` / `interact_with(object, id)` / `end_interaction()`
+## (a controller picking a specific object + action), and reads `is_busy()` / `active_label()`;
 ## it never learns what an interaction means, so this system can be iterated on its own.
 
 ## How far from the body center (px) an object may be and still be reachable.
@@ -62,9 +63,54 @@ func active_label() -> String:
 	return _active.get("label", "")
 
 
+## The reachable objects and their valid actions, as `[{ object, specs }]` (empty when none in
+## range). Lets a controller (an AI) see its options and choose deliberately via `interact_with`.
+func interactions_in_reach() -> Array:
+	return _query_reachable()
+
+
+## Begin action `id` on `object` if it is reachable, valid and we are idle; true on success.
+## Unlike `try_interact()`, the caller picks both the object and the action (no nearest/random).
+func interact_with(object: Node, id: String) -> bool:
+	if is_busy():
+		return false
+	for entry in _query_reachable():
+		if entry["object"] != object:
+			continue
+		for spec in entry["specs"]:
+			if spec.get("id", "") == id:
+				_begin(spec, object)
+				return true
+	return false
+
+
+## End the active interaction, if any (explicit stop for a controller, vs try_interact's toggle).
+func end_interaction() -> void:
+	if is_busy():
+		_end()
+
+
 ## Find every reachable object advertising a valid action, target the one nearest the mouse, and
 ## begin a random one of its valid actions. Does nothing if nothing valid is in range.
 func _begin_best() -> void:
+	var target: Node = null
+	var target_specs: Array = []
+	var best_dist := INF
+	for entry in _query_reachable():
+		# Prefer whichever reachable object sits closest to the mouse cursor.
+		var dist: float = entry["object"].global_position.distance_squared_to(_character.aim_point)
+		if dist < best_dist:
+			best_dist = dist
+			target = entry["object"]
+			target_specs = entry["specs"]
+
+	if target:
+		_begin(target_specs.pick_random(), target)
+
+
+## Every object within reach that advertises at least one valid action, as `[{ object, specs }]`
+## (specs already item-gated). Shared by the player's `_begin_best` and the AI-facing queries.
+func _query_reachable() -> Array:
 	var center: Vector2 = _character.global_position + _character.facing * front_offset
 	var shape := CircleShape2D.new()
 	shape.radius = reach
@@ -74,25 +120,15 @@ func _begin_best() -> void:
 	params.exclude = [_character.get_rid()]
 	params.transform = Transform2D(0.0, center)
 
-	var target: Node = null
-	var target_specs: Array = []
-	var best_dist := INF
+	var out: Array = []
 	for result in get_world_2d().direct_space_state.intersect_shape(params, 32):
 		var obj: Node = result.collider
 		if obj == null or not obj.has_method("get_interactions"):
 			continue
 		var valid := _valid_specs(obj.get_interactions())
-		if valid.is_empty():
-			continue
-		# Prefer whichever reachable object sits closest to the mouse cursor.
-		var dist: float = obj.global_position.distance_squared_to(_character.aim_point)
-		if dist < best_dist:
-			best_dist = dist
-			target = obj
-			target_specs = valid
-
-	if target:
-		_begin(target_specs.pick_random(), target)
+		if not valid.is_empty():
+			out.append({ "object": obj, "specs": valid })
+	return out
 
 
 ## Keep only the actions whose item gate passes (no `requires_item`, or the character has it).

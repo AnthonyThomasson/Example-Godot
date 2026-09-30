@@ -3,7 +3,7 @@
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a
 pistol that fires on left-click, and object interactions on **Space** (sit, lie, …).
-The code is organized into **nine isolated domains** so each can be changed on its own.
+The code is organized into **ten isolated domains** so each can be changed on its own.
 This file explains the domains and the small set of interfaces that connect them — keep
 changes inside a domain, and cross a boundary only through the interfaces listed here.
 
@@ -13,7 +13,7 @@ connections go only through the interfaces below), keeps this file in sync when 
 enforces concise current-state comments (no history; every method and property documented; inline
 comments only for genuinely tricky logic).
 
-## The nine domains (one folder each under `scenes/`)
+## The ten domains (one folder each under `scenes/`)
 
 | Domain | Folder | Owns |
 |---|---|---|
@@ -24,6 +24,7 @@ comments only for genuinely tricky logic).
 | **Interaction** | `interaction/` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
+| **Navigation** | `navigation/` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
 | **AI** | `ai/` | Non-player brains: controllers that drive a character, plus the dev-only decision-server launcher. |
 
@@ -41,8 +42,9 @@ Everything not listed here is private to its domain.
 	 the house.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
-   `main.gd` positions the front door, fixes draw order, and drops the NPC into a random room
-   (via `get_rooms`); it never touches world-gen internals.
+   `main.gd` positions the front door, fixes draw order, builds the nav map from the rooms
+   (interface 9), and drops the NPC into a random room (all via `get_rooms`); it never touches
+   world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
@@ -87,15 +89,22 @@ Everything not listed here is private to its domain.
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
-   `control(character, delta)`. `player_controller.gd` is the human one and is the ONLY
-   file besides `keybinds.gd` that touches `Keybinds`. Signals: `hit_landed(body, damage,
-   hand)` (hand 0/1 = melee punch, hand −1 = shot; `damage` is the amount dealt),
-   `item_changed(item)` and `interaction_changed(active, label)`. Observers
-   (debug HUD, camera) attach by exported node path and read only the public API/signals.
-   The NPC (`character/npc.tscn`) uses `ai/jev_controller.gd`: every second it POSTs a text
-   state + one `choice` question to a local Jev-style `/v1/systemone` server (Von), samples
-   approach/wander/wait from the returned probabilities, and writes only `move_input`/`aim_point`
-   (random fallback when the server is down). `ai/decision_server_launcher.gd` (a node in
+   `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
+   character's action API: `melee()` (F — held item's primary), `shoot()` (LMB — held item's
+   secondary), `select_slot(id)`, `try_interact()` / `interact_with(object, id)` /
+   `end_interaction()`. `player_controller.gd` is the human one and is the ONLY file besides
+   `keybinds.gd` that touches `Keybinds`. Signals: `hit_landed(body, damage, hand)` (hand 0/1 =
+   melee punch, hand −1 = shot; `damage` is the amount dealt), `item_changed(item)` and
+   `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
+   path and read only the public API/signals.
+   The NPC (`character/npc.tscn`) uses `ai/jev_controller.gd`: every `decide_interval` it POSTs a
+   text state + one `choice` question to a local Jev-style `/v1/systemone` server (Von) and
+   samples its next action from the returned probabilities (random fallback when the server is
+   down). Its action set — `approach`, `wander`, `wait`, `flee`, `equip_pistol`, `equip_fists`,
+   `shoot`, `punch`, `interact` — is executed by composing the same public API above: it paths
+   with a `NavigationAgent2D` (interface 9; attached by the `nav_agent_path` export), aims via
+   `aim_point`, equips via `select_slot`, fires via `shoot()` / swings via `melee()`, and runs a
+   specific object action via `interact_with`. `ai/decision_server_launcher.gd` (a node in
    `main.tscn`) starts `von serve` when run from the editor — using its `von_path`, which
    defaults to the `application/von/server_path` project setting (blank = don't auto-start) —
    logs to `user://von_server.log` + `[von]` Output lines, and kills it on exit.
@@ -103,26 +112,42 @@ Everything not listed here is private to its domain.
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`, built in
    `_ready()` like the physics components) and exposes only opaque forwards: `try_interact()`
-   (from the controller on **Space**), `is_busy()` (movement/actions lock) and
-   `interaction_label()` (HUD). The component reads the character's existing `facing`,
-   `global_position`, `aim_point` and `has_item(id)`, and moves it. It discovers objects
-   through the **interactable contract** — every world object implements
+   (the player's **Space** toggle — nearest-to-cursor object, random valid action),
+   `interactions_in_reach()` and `interact_with(object, id)` / `end_interaction()` (for a
+   controller — an AI — to see its options and trigger a *specific* object's *specific* action),
+   `is_busy()` (movement/actions lock) and `interaction_label()` (HUD). The component reads the
+   character's existing `facing`, `global_position`, `aim_point` and `has_item(id)`, and moves it.
+   It discovers objects through the **interactable contract** — every world object implements
    `get_interactions() -> Array` (plain data dicts: `id`, `label`, optional `move_to` /
    `requires_item`), advertised via the optional `interactions` object field. The character
    never learns what an interaction *means*; add/retune actions in the catalogue data alone.
+
+9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
+   - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
+     one `NavigationRegion2D` whose walkable area is the house footprint (union of `rooms` rects)
+     minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways —
+     gaps in the walls — stay open and `RigidBody2D` furniture is ignored (it moves). `main.gd`
+     calls it once after `WorldGen.generate`. The bake runs in the house's local frame and the
+     region is offset by `house.position`, so the map lands in world space.
+   Navigation imports nothing from other domains (a plain `rooms` array + a Node). Any
+   `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically — the only
+   consumer wiring is the AI controller setting `target_position` and reading
+   `get_next_path_position()`.
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
 main ─▶ WorldGen ─▶ ObjectFactory / WallFactory ─▶ Objects ─▶ Physics
+main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
+AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
 Physics debris / casings ─▶ Despawner
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
-Physics and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
-the two factories). Tuning is split into four `class_name` static holders:
+Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
+the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into four `class_name` static holders:
 `BallisticsConfig` (projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig`
 (walking push + punch), and `BloodConfig` (blood pooling). There is no `Config` autoload.
 
@@ -203,7 +228,9 @@ on each `Wall`. Those are expected** — the shapes exist at runtime; don't add 
   `move_to` action snapping it onto the object and letting the two bodies overlap (a temporary
   `add_collision_exception_with`, so a seat/bed isn't shoved and the character isn't ejected),
   moving it back on exit. Which objects offer which actions is pure catalogue data
-  (`get_interactions()` on the object).
+  (`get_interactions()` on the object). A non-player controller instead uses
+  `interactions_in_reach()` + `interact_with(object, id)` to pick a specific object and action
+  (interface 8).
 - **Punch hit detection:** during a swing `character_hands.gd` runs a shape query
   (`intersect_shape`) at the fist's *raw* punch position — which extends into what is hit,
   unlike the drawn hand that rests on the surface — and dedupes per swing. Each new hit shoves

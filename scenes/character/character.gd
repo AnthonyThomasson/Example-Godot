@@ -3,7 +3,7 @@ extends CharacterBody2D
 ## A generic top-down character. It owns the body, movement, aim-based "facing", the item
 ## inventory, and the knockback it takes from shoves. It reads its intent from a pluggable
 ## controller child (any node with a `control(character, delta)` method): the controller
-## writes `move_input` / `aim_point` and calls `use_primary/secondary/select_slot`. Drawing
+## writes `move_input` / `aim_point` and calls `melee/shoot/select_slot`. Drawing
 ## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd.
 
 ## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
@@ -115,15 +115,15 @@ func _physics_process(delta: float) -> void:
 
 # --- Controller-facing API -------------------------------------------------------------
 
-## Run the held item's primary action (F). Ignored while locked in an interaction.
-func use_primary() -> void:
+## Melee with the held item (F): runs its primary action. Ignored while locked in an interaction.
+func melee() -> void:
 	if is_busy():
 		return
 	current_item().primary(self)
 
 
-## Run the held item's secondary action (left-click). Ignored while locked in an interaction.
-func use_secondary() -> void:
+## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction.
+func shoot() -> void:
 	if is_busy():
 		return
 	current_item().secondary(self)
@@ -141,6 +141,23 @@ func select_slot(slot: int) -> void:
 ## Toggle an object interaction: start the best one in reach, or end the active one.
 func try_interact() -> void:
 	_interaction.try_interact()
+
+
+## The reachable objects and their valid actions, for a controller that wants to choose
+## deliberately (an AI). Each entry is `{ object, specs }`; empty when nothing is in reach.
+func interactions_in_reach() -> Array:
+	return _interaction.interactions_in_reach()
+
+
+## Begin the action `id` on `object` if it is reachable and valid; true on success. Lets a
+## controller pick both the object and the action, unlike the random `try_interact()`.
+func interact_with(object: Node, id: String) -> bool:
+	return _interaction.interact_with(object, id)
+
+
+## End the active interaction, if any (explicit stop, vs the `try_interact()` toggle).
+func end_interaction() -> void:
+	_interaction.end_interaction()
 
 
 ## True while locked in an object interaction (sitting, lying, …).

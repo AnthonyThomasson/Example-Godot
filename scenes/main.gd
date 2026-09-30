@@ -28,14 +28,16 @@ func _spawn_world() -> void:
 	var house := WorldGen.generate(house_seed, force_plan, front_door, self)
 	# Keep the house beneath the player in draw order.
 	move_child(house, _player.get_index())
-	_spawn_npc(house)
+	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
+	var rooms := WorldGen.get_rooms(house)
+	NavBuilder.build(house, rooms, self)
+	_spawn_npc(rooms)
 
 
 ## Drop one AI-driven NPC at the center of a random room and point its controller at the
 ## player. Seeded from `house_seed` so a pinned layout also pins the NPC's room. Added after the
-## house, so it draws above it.
-func _spawn_npc(house: Node2D) -> void:
-	var rooms := WorldGen.get_rooms(house)
+## house, so it draws above it. `rooms` is WorldGen.get_rooms(house), already fetched by the caller.
+func _spawn_npc(rooms: Array) -> void:
 	if rooms.is_empty():
 		return
 	var rng := RandomNumberGenerator.new()

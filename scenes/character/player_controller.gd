@@ -16,8 +16,8 @@ func control(character, _delta: float) -> void:
 		character.select_slot(selected)
 
 	if Keybinds.is_punch_just_pressed():
-		character.use_primary()
+		character.melee()
 	if Keybinds.is_fire_just_pressed():
-		character.use_secondary()
+		character.shoot()
 	if Keybinds.is_interact_just_pressed():
 		character.try_interact()

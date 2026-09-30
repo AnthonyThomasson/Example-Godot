@@ -1,12 +1,16 @@
 extends Node
 
 ## AI domain: controller for a non-player character that asks a Jev-style "System One" decision model
-## what to do next. It satisfies the character's controller contract (`control(character,
-## delta)`) and writes only the intent fields the player controller writes (`move_input`,
-## `aim_point`). Every `decide_interval` seconds it POSTs a short text description of the
-## situation to a `/v1/systemone` server (e.g. a local Von) with one `choice` question, then
-## samples its next action from the returned probabilities. If the server can't be reached it
-## picks an action uniformly at random, so the NPC still acts without it.
+## what to do next. It satisfies the character's controller contract (`control(character, delta)`)
+## and writes only the intent the player controller writes (`move_input`, `aim_point`) plus the same
+## public actions (`select_slot`, `melee`, `shoot`, `interact_with`). Every `decide_interval` seconds
+## it POSTs a short text description of the situation to a `/v1/systemone` server (e.g. a local Von)
+## with one `choice` question, then samples its next action from the returned probabilities. If the
+## server can't be reached it picks an action uniformly at random, so the NPC still acts without it.
+##
+## Movement is real pathfinding: a NavigationAgent2D routes around walls through doorways (see the
+## Navigation domain). Actions compose the character's abilities — approach/flee path to a spot,
+## shoot/punch equip the right item then aim and fire, interact triggers a specific object action.
 
 ## The `/v1/systemone` endpoint to ask.
 @export var server_url: String = "http://127.0.0.1:8000/v1/systemone"
@@ -16,12 +20,28 @@ extends Node
 @export var decide_interval: float = 1.0
 ## Distance (px) at which "approach" stops closing in on the target.
 @export var approach_stop_distance: float = 40.0
+## Max distance (px) to open fire; farther than this, "shoot" paths closer first.
+@export var shoot_range: float = 420.0
+## Seconds between shots while in the "shoot" action.
+@export var fire_interval: float = 0.5
+## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
+@export var nav_agent_path: NodePath
+
+## Inventory slots (see ItemRegistry): fists melee, pistol shoots.
+const SLOT_FISTS := 2
+const SLOT_PISTOL := 3
 
 ## The actions the model chooses between, with the description the model reads for each.
 const ACTIONS := {
 	"approach": "Walk toward the player",
 	"wander": "Walk around aimlessly",
 	"wait": "Stand still",
+	"flee": "Run away from the player",
+	"equip_pistol": "Draw the pistol",
+	"equip_fists": "Raise your fists",
+	"shoot": "Shoot the player with the pistol",
+	"punch": "Punch the player",
+	"interact": "Use a nearby object (sit, hide, ...)",
 }
 
 ## The node this NPC reasons about (the player), set by Main.
@@ -30,16 +50,20 @@ var target: Node2D
 var _action := "wait"  ## The action currently being carried out.
 var _wander_dir := Vector2.ZERO  ## Direction held while wandering.
 var _timer := 0.0  ## Seconds until the next decision.
+var _fire_timer := 0.0  ## Seconds until the next shot may fire.
 var _pending := false  ## True while a request is in flight.
 var _http: HTTPRequest  ## Client for decision requests.
+var _agent: NavigationAgent2D  ## Pathfinding agent, or null (falls back to straight-line).
 
 
-## Build the HTTP client used for decision requests.
+## Build the HTTP client and resolve the navigation agent.
 func _ready() -> void:
 	_http = HTTPRequest.new()
 	_http.timeout = 3.0
 	add_child(_http)
 	_http.request_completed.connect(_on_request_completed)
+	if nav_agent_path != NodePath():
+		_agent = get_node_or_null(nav_agent_path) as NavigationAgent2D
 
 
 ## Called each physics frame by the character: ask for a new decision when due, then carry out
@@ -49,22 +73,109 @@ func control(character, delta: float) -> void:
 		return
 
 	_timer -= delta
+	_fire_timer -= delta
 	if _timer <= 0.0 and not _pending:
 		_timer = decide_interval
 		_request_decision(character)
 
-	var to_target: Vector2 = target.global_position - character.global_position
+	# Leaving an interaction: release the object before doing anything else.
+	if _action != "interact" and character.is_busy():
+		character.end_interaction()
+
 	match _action:
 		"approach":
-			var close := to_target.length() <= approach_stop_distance
-			character.move_input = Vector2.ZERO if close else to_target.normalized()
 			character.aim_point = target.global_position
+			if character.global_position.distance_to(target.global_position) <= approach_stop_distance:
+				character.move_input = Vector2.ZERO
+			else:
+				_path_move(character, target.global_position)
+		"flee":
+			var away: Vector2 = character.global_position - target.global_position
+			character.aim_point = target.global_position
+			_path_move(character, character.global_position + away.normalized() * 200.0)
+		"equip_pistol":
+			character.select_slot(SLOT_PISTOL)
+			character.move_input = Vector2.ZERO
+			character.aim_point = target.global_position
+		"equip_fists":
+			character.select_slot(SLOT_FISTS)
+			character.move_input = Vector2.ZERO
+			character.aim_point = target.global_position
+		"shoot":
+			_do_shoot(character)
+		"punch":
+			_do_punch(character)
+		"interact":
+			_do_interact(character)
 		"wander":
-			character.move_input = _wander_dir
 			character.aim_point = character.global_position + _wander_dir * 50.0
+			_path_move(character, character.global_position + _wander_dir * 120.0)
 		_:
 			character.move_input = Vector2.ZERO
 			character.aim_point = target.global_position
+
+
+## Equip the pistol, aim at the target, and fire on the cooldown once within range and aligned;
+## path closer while out of range.
+func _do_shoot(character) -> void:
+	character.select_slot(SLOT_PISTOL)
+	character.aim_point = target.global_position
+	var to_target: Vector2 = target.global_position - character.global_position
+	if to_target.length() > shoot_range:
+		_path_move(character, target.global_position)
+		return
+	character.move_input = Vector2.ZERO
+	# The character derives `facing` from `aim_point` after this call within the same frame, so fire
+	# only once `facing` already points at the target (it converges one frame after aiming).
+	if _fire_timer <= 0.0 and character.facing.dot(to_target.normalized()) > 0.98:
+		character.shoot()
+		_fire_timer = fire_interval
+
+
+## Equip fists, close to melee range, and swing when in reach and not already mid-swing.
+func _do_punch(character) -> void:
+	character.select_slot(SLOT_FISTS)
+	character.aim_point = target.global_position
+	var to_target: Vector2 = target.global_position - character.global_position
+	if to_target.length() > approach_stop_distance:
+		_path_move(character, target.global_position)
+		return
+	character.move_input = Vector2.ZERO
+	if not character.is_attacking():
+		character.melee()
+
+
+## Trigger a specific action on a reachable object; path toward the target to find one when
+## nothing is in reach. Stays in the interaction once started (until the action changes).
+func _do_interact(character) -> void:
+	if character.is_busy():
+		character.move_input = Vector2.ZERO
+		return
+	var reachable: Array = character.interactions_in_reach()
+	if reachable.is_empty():
+		character.aim_point = target.global_position
+		_path_move(character, target.global_position)
+		return
+	var entry: Dictionary = reachable[0]
+	var spec: Dictionary = entry["specs"][0]
+	character.aim_point = entry["object"].global_position
+	character.move_input = Vector2.ZERO
+	character.interact_with(entry["object"], spec.get("id", ""))
+
+
+## Steer `character.move_input` toward `dest` along a navigated path (around walls, through
+## doorways). Falls back to straight-line steering if there is no navigation agent.
+func _path_move(character, dest: Vector2) -> void:
+	if _agent == null:
+		var straight: Vector2 = dest - character.global_position
+		character.move_input = Vector2.ZERO if straight.length() < 4.0 else straight.normalized()
+		return
+	_agent.target_position = dest
+	if _agent.is_navigation_finished():
+		character.move_input = Vector2.ZERO
+		return
+	var next := _agent.get_next_path_position()
+	character.move_input = (next - character.global_position).normalized()
 
 
 ## POST the current situation and the "what next?" question to the decision server.
