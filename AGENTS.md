@@ -26,7 +26,7 @@ comments only for genuinely tricky logic).
 | **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
-| **AI** | `ai/` | Non-player brains: controllers that drive a character, plus the dev-only decision-server launcher. |
+| **AI** | `ai/` | Non-player brains: controllers that drive a character (with a world-sensing helper for their decision context), plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows
 every domain. It asks World-Gen for a house and holds the player. `project.godot`
@@ -97,14 +97,22 @@ Everything not listed here is private to its domain.
    melee punch, hand −1 = shot; `damage` is the amount dealt), `item_changed(item)` and
    `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
    path and read only the public API/signals.
-   The NPC (`character/npc.tscn`) uses `ai/jev_controller.gd`: every `decide_interval` it POSTs a
-   text state + one `choice` question to a local Jev-style `/v1/systemone` server (Von) and
-   samples its next action from the returned probabilities (random fallback when the server is
-   down). Its action set — `approach`, `wander`, `wait`, `flee`, `equip_pistol`, `equip_fists`,
-   `shoot`, `punch`, `interact` — is executed by composing the same public API above: it paths
-   with a `NavigationAgent2D` (interface 9; attached by the `nav_agent_path` export), aims via
-   `aim_point`, equips via `select_slot`, fires via `shoot()` / swings via `melee()`, and runs a
-   specific object action via `interact_with`. `ai/decision_server_launcher.gd` (a node in
+   The NPC (`character/npc.tscn`) is a **house guard** driven by `ai/jev_controller.gd`, whose goal
+   is to defend the house and not engage the player unless the player is inside it. Every
+   `decide_interval` it composes an `ai/guard_perception.gd` sensor to build a compact text state
+   (the goal, whether the intruder is inside the house, room + bearing + held item — from the
+   `rooms` rects Main injects alongside `target`) and three fixed-shape candidate sets, then POSTs
+   **three `choice` questions in one request** to a local Jev-style `/v1/systemone` server (Von) —
+   `move` (a ring of nearby points + each room centre + the intruder + post), `aim` (a ring of
+   look-directions + at-intruder), `act` (`shoot` / `punch` / `hold`) — and samples one answer each
+   (uniform fallback when the server is down). There is **no mode gating**: the full option set is
+   offered every tick and Von applies the "engage only once inside" rule from the state, so restraint
+   and cover-use emerge rather than being hard-coded. Each choice executes through the same public API
+   above: `move` paths with a `NavigationAgent2D` (interface 9; attached by the `nav_agent_path`
+   export), `aim` sets `aim_point`, and `act` equips via `select_slot` then fires via `shoot()` /
+   swings via `melee()`. `guard_perception.gd` holds no policy (it only senses and annotates) and
+   reads only published contracts (character API, objects' `get_surface()`, the injected room rects).
+   `ai/decision_server_launcher.gd` (a node in
    `main.tscn`) starts `von serve` when run from the editor — using its `von_path`, which
    defaults to the `application/von/server_path` project setting (blank = don't auto-start) —
    logs to `user://von_server.log` + `[von]` Output lines, and kills it on exit.
@@ -124,11 +132,11 @@ Everything not listed here is private to its domain.
 
 9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
-     one `NavigationRegion2D` whose walkable area is the house footprint (union of `rooms` rects)
-     minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways —
-     gaps in the walls — stay open and `RigidBody2D` furniture is ignored (it moves). `main.gd`
-     calls it once after `WorldGen.generate`. The bake runs in the house's local frame and the
-     region is offset by `house.position`, so the map lands in world space.
+	 one `NavigationRegion2D` whose walkable area is the house footprint (union of `rooms` rects)
+	 minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways —
+	 gaps in the walls — stay open and `RigidBody2D` furniture is ignored (it moves). `main.gd`
+	 calls it once after `WorldGen.generate`. The bake runs in the house's local frame and the
+	 region is offset by `house.position`, so the map lands in world space.
    Navigation imports nothing from other domains (a plain `rooms` array + a Node). Any
    `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically — the only
    consumer wiring is the AI controller setting `target_position` and reading

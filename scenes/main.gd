@@ -47,15 +47,19 @@ func _spawn_npc(rooms: Array) -> void:
 	var npc := NPC_SCENE.instantiate()
 	add_child(npc)
 	npc.global_position = rect.position + rect.size * 0.5
-	_aim_npc_at(npc, _player)
+	_bind_npc(npc, _player, rooms)
 
 
-## Point an NPC's controller at `target`, found by the same `control` duck-type the character
-## uses to pick its controller — so Main doesn't depend on the controller's node name. No-op if
-## the controller takes no target (e.g. a controller that ignores it).
-func _aim_npc_at(npc: Node, target: Node) -> void:
+## Wire an NPC's controller to the world: point it at `target` and hand it the house's `rooms`
+## (world-space rects), found by the same `control` duck-type the character uses to pick its
+## controller — so Main doesn't depend on the controller's node name, and only sets the fields a
+## given controller actually exposes. This keeps the World-Gen boundary in Main: the AI never calls
+## WorldGen itself.
+func _bind_npc(npc: Node, target: Node, rooms: Array) -> void:
 	for child in npc.get_children():
 		if child.has_method("control"):
 			if "target" in child:
 				child.target = target
+			if "rooms" in child:
+				child.rooms = rooms
 			return
