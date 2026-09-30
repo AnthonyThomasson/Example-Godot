@@ -1,40 +1,44 @@
 # AGENTS.md — Example_Godot architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
-furnished house, with two "hands" that aim at the mouse, a punch on **F**, a
-pistol that fires on left-click, and object interactions on **Space** (sit, lie, …).
-The code is organized into **ten isolated domains** so each can be changed on its own.
-This file explains the domains and the small set of interfaces that connect them — keep
-changes inside a domain, and cross a boundary only through the interfaces listed here.
+furnished house, with two "hands" that aim at the mouse, a punch on **F**, a pistol that
+fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
+organized into **ten isolated domains** so each can be changed on its own.
+
+This file is the **map**: the domains, the sanctioned cross-domain surface (the vital
+interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
+through the interfaces listed here. **When working *inside* a domain, load its
+`domain-<name>` skill** — that is where the deep implementation detail lives.
 
 **Before committing a change, run the `change-verification` skill**
 (`.claude/skills/change-verification/`): it checks that domains stay isolated (cross-domain
-connections go only through the interfaces below), keeps this file in sync when they change, and
-enforces concise current-state comments (no history; every method and property documented; inline
-comments only for genuinely tricky logic).
+connections go only through the interfaces below), keeps this file *and the domain skills* in
+sync when the architecture or a domain's internals change, and enforces concise current-state
+comments.
 
 ## The ten domains (one folder each under `scenes/`)
 
-| Domain | Folder | Owns |
-|---|---|---|
-| **World Generation** | `worldgen/` | Picking a floorplan and building/furnishing a house. |
-| **Objects** | `objects/` | The world's objects (furniture + walls): their data and how they're hit/pushed. |
-| **Items** | `items/` | The things the character holds and the actions they perform. |
-| **Character** | `character/` | The player character (built so other character types can exist). |
-| **Interaction** | `interaction/` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
-| **Projectile System** | `projectile/` | Shooting: penetration, damage, cover, ricochet. |
-| **Physics System** | `physics/` | Physical reactions: forces, knockback, deformation, debris. |
-| **Navigation** | `navigation/` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
-| **AI** | `ai/` | Non-player brains: controllers that drive a character (with a world-sensing helper for their decision context), plus the dev-only decision-server launcher. |
+| Domain | Folder | Skill | Owns |
+|---|---|---|---|
+| **World Generation** | `worldgen/` | `domain-worldgen` | Picking a floorplan and building/furnishing a house. |
+| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture + walls): their data and how they're hit/pushed. |
+| **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
+| **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
+| **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
+| **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
+| **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
+| **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
+| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
+| **AI** | `ai/` | `domain-ai` | Non-player brains: controllers that drive a character (with a world-sensing helper), plus the dev-only decision-server launcher. |
 
-`scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows
-every domain. It asks World-Gen for a house and holds the player. `project.godot`
-autoloads only `Keybinds` and `Despawner` (both General).
+`scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
+domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
+`Keybinds` and `Despawner` (both General).
 
 ## The vital interfaces (this is the whole cross-domain surface)
 
-Everything not listed here is private to its domain.
+Everything not listed here is private to its domain. Each domain's skill recaps its own
+interface(s) and describes how they're implemented; this list is authoritative for signatures.
 
 1. **Main → World Generation**
    - `WorldGen.generate(seed, force_plan, front_door_world, parent) -> Node2D` — seeds one RNG
@@ -50,97 +54,67 @@ Everything not listed here is private to its domain.
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
    - `WallFactory.spawn(rect: Rect2, thickness, openings, name, parent) -> Node`
    - `Wall.Side` — enum used when building `openings`.
-   World-Gen owns the *catalogue* (which furniture/arrangements/recipes exist); Objects
-   owns the *field schema* and turns a plain definition dict into a node. World-Gen never
-   touches an object's fields.
+   World-Gen owns the *catalogue*; Objects owns the *field schema* and turns a plain definition
+   dict into a node. World-Gen never touches an object's fields.
 
 3. **Objects ↔ strikers: the "hittable" contract**
    Every world object (furniture **and** walls) implements:
    - `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }`
    - `take_hit(hit: HitInfo) -> void`
    `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage,
-   speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then
-   hands the object a HitInfo; the object decides what a hit *does to it* (shove + deform +
-   debris). The projectile is the only striker that uses this; a melee punch shoves through
-   the "pushable" contract below and does **not** deform.
+   speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then hands
+   the object a HitInfo; the object decides what a hit *does to it*. The projectile is the only
+   striker that uses this; a melee punch shoves through the "pushable" contract below and does
+   **not** deform.
 
 4. **Objects → Physics** (objects compose physics; Physics is a leaf domain)
-   - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
-	 `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`,
-	 which feeds the engine a central or off-center (spinning) impulse.
+   - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
+	 `apply_impulse(v, at_world)`.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
    - `Deformation` (static): silhouette/collider polygons + drawing.
    - `Physics.impact_impulse(hit) -> Vector2` and `Physics.spawn_debris(world, hit, surface)`.
    Physics imports nothing from other domains.
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
-   Furniture is a `RigidBody2D`, so its native methods serve the contract (the engine
-   integrates motion, collisions, pivoting and settling); the character integrates knockback
-   into locomotion. Used by furniture→character contact transfers, bullet impacts, melee
-   punches (a range-of-motion-scaled central shove), and the walking character.
+   Furniture is a `RigidBody2D`, so its native methods serve the contract; the character
+   integrates knockback into locomotion. Used by furniture→character contact transfers, bullet
+   impacts, melee punches, and the walking character.
 
 6. **Items ↔ Character**
-   `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `primary(user)`
-   (F), `secondary(user)` (LMB), `draw_weapon(canvas, user)`. `ItemRegistry.create(id)` /
+   `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `primary(user)` (F),
+   `secondary(user)` (LMB), `draw_weapon(canvas, user)`. `ItemRegistry.create(id)` /
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-   `report_shot(body, dmg)`. The pistol is the one place Items reach into the Projectile
-   System (`ProjectileSpawner`/`CasingSpawner`).
+   `report_shot(body, dmg)`. The pistol is the one place Items reach into the Projectile System
+   (`ProjectileSpawner`/`CasingSpawner`).
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
-   character's action API: `melee()` (F — held item's primary), `shoot()` (LMB — held item's
-   secondary), `select_slot(id)`, `try_interact()` / `interact_with(object, id)` /
-   `end_interaction()`. `player_controller.gd` is the human one and is the ONLY file besides
-   `keybinds.gd` that touches `Keybinds`. Signals: `hit_landed(body, damage, hand)` (hand 0/1 =
-   melee punch, hand −1 = shot; `damage` is the amount dealt), `item_changed(item)` and
-   `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
-   path and read only the public API/signals.
-   The NPC (`character/npc.tscn`) is a **house guard** driven by `ai/jev_controller.gd`, whose goal
-   is to defend the house and not engage the player unless the player is inside it. Every
-   `decide_interval` it composes an `ai/guard_perception.gd` sensor to build a compact text state
-   (the goal, whether the intruder is inside the house, room + bearing + held item — from the
-   `rooms` rects Main injects alongside `target`) and three fixed-shape candidate sets, then POSTs
-   **three `choice` questions in one request** to a local Jev-style `/v1/systemone` server (Von) —
-   `move` (a ring of nearby points + each room centre + the intruder + post), `aim` (a ring of
-   look-directions + at-intruder), `act` (`shoot` / `punch` / `hold`) — and samples one answer each
-   (uniform fallback when the server is down). There is **no mode gating**: the full option set is
-   offered every tick and Von applies the "engage only once inside" rule from the state, so restraint
-   and cover-use emerge rather than being hard-coded. Each choice executes through the same public API
-   above: `move` paths with a `NavigationAgent2D` (interface 9; attached by the `nav_agent_path`
-   export), `aim` sets `aim_point`, and `act` equips via `select_slot` then fires via `shoot()` /
-   swings via `melee()`. `guard_perception.gd` holds no policy (it only senses and annotates) and
-   reads only published contracts (character API, objects' `get_surface()`, the injected room rects).
-   `ai/decision_server_launcher.gd` (a node in
-   `main.tscn`) starts `von serve` when run from the editor — using its `von_path`, which
-   defaults to the `application/von/server_path` project setting (blank = don't auto-start) —
-   logs to `user://von_server.log` + `[von]` Output lines, and kills it on exit.
+   character's action API: `melee()` (F), `shoot()` (LMB), `select_slot(id)`, `try_interact()` /
+   `interact_with(object, id)` / `end_interaction()`. `player_controller.gd` is the human one and
+   is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
+   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
+   and `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
+   path and read only the public API/signals. The NPC (`character/npc.tscn`) is a house guard
+   driven by `ai/jev_controller.gd` — see the `domain-ai` skill.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
-   The character composes a `CharacterInteraction` component (`interaction/`, built in
-   `_ready()` like the physics components) and exposes only opaque forwards: `try_interact()`
-   (the player's **Space** toggle — nearest-to-cursor object, random valid action),
-   `interactions_in_reach()` and `interact_with(object, id)` / `end_interaction()` (for a
-   controller — an AI — to see its options and trigger a *specific* object's *specific* action),
-   `is_busy()` (movement/actions lock) and `interaction_label()` (HUD). The component reads the
-   character's existing `facing`, `global_position`, `aim_point` and `has_item(id)`, and moves it.
-   It discovers objects through the **interactable contract** — every world object implements
-   `get_interactions() -> Array` (plain data dicts: `id`, `label`, optional `move_to` /
-   `requires_item`), advertised via the optional `interactions` object field. The character
-   never learns what an interaction *means*; add/retune actions in the catalogue data alone.
+   The character composes a `CharacterInteraction` component (`interaction/`) and exposes only
+   opaque forwards: `try_interact()` (the player's **Space** toggle), `interactions_in_reach()`
+   and `interact_with(object, id)` / `end_interaction()` (for a controller/AI), `is_busy()`
+   (movement/actions lock) and `interaction_label()` (HUD). It discovers objects through the
+   **interactable contract** — every world object implements `get_interactions() -> Array` (plain
+   data dicts: `id`, `label`, optional `move_to` / `requires_item`), advertised via the optional
+   `interactions` object field. The character never learns what an interaction *means*.
 
 9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
-	 one `NavigationRegion2D` whose walkable area is the house footprint (union of `rooms` rects)
-	 minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways —
-	 gaps in the walls — stay open and `RigidBody2D` furniture is ignored (it moves). `main.gd`
-	 calls it once after `WorldGen.generate`. The bake runs in the house's local frame and the
-	 region is offset by `house.position`, so the map lands in world space.
-   Navigation imports nothing from other domains (a plain `rooms` array + a Node). Any
-   `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically — the only
-   consumer wiring is the AI controller setting `target_position` and reading
-   `get_next_path_position()`.
+	 one `NavigationRegion2D` whose walkable area is the house footprint minus the house's
+	 **static** wall colliders, so doorways stay open and `RigidBody2D` furniture is ignored.
+   `main.gd` calls it once after `WorldGen.generate`. Any `NavigationAgent2D` then pathfinds
+   against the global map automatically — the only consumer wiring is the AI controller setting
+   `target_position` and reading `get_next_path_position()`.
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
@@ -154,188 +128,31 @@ AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Charac
 Physics debris / casings ─▶ Despawner
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
+
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
-the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into four `class_name` static holders:
-`BallisticsConfig` (projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig`
-(walking push + punch), and `BloodConfig` (blood pooling). There is no `Config` autoload.
+the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
+four `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
+deformation), `CharacterConfig` (walking push + punch), and `BloodConfig` (blood pooling). There
+is no `Config` autoload.
 
-## Layered structure — control / animate / draw
+## Cross-cutting conventions
 
-Within an entity, the three verbs live in separate files, wired via the scene tree
-(no `class_name` on scene scripts; cross-file calls resolve through `$` / `get_parent()`).
-A "draw" file is attached to its own child `Node2D` (Godot only draws from `CanvasItem`s).
+Two conventions hold across domains; the per-domain specifics live in each domain's skill.
 
-- **Control** (root body node) owns state + physics and orchestrates; it never draws.
-  `character.gd` computes `facing`, moves, and forwards intent from its controller.
-  `wall.gd` owns the wall-segment math (`wall_segments()`) and colliders.
-- **Animate** (`character_hands.gd`, a child `Node2D`) owns hand geometry, the punch
-  tween, and punch hit detection (a shape query at the raw fist position); exposes
-  `hand_position(i)` and the `punched` signal.
-- **Draw** (`*_visuals.gd`) own appearance only. `character_visuals.gd` draws the body,
-  the hands the held item wants shown, then `item.draw_weapon()`. `environment_object_visuals`
-  / `wall_visuals` read the deformed geometry from their control node.
-
-Ordering: a parent's `_physics_process` runs before its children's, so the hands see the
-character's fresh `facing`, and the character pulls its controller's intent at the top of
-its own `_physics_process` (lag-free).
-
-## Input architecture
-
-All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings
-or `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`,
-and expose a typed helper. `player_controller.gd` is the one gameplay consumer of Keybinds;
-the only other is `command_server.gd` (dev-only), which reads the action *names* to inject
-real input when driving the game from outside (see "Dev command server"). `rebind()` /
-`rebind_mouse()` remap at runtime (basis for a future config UI). `project.godot [input]`
-just keeps the editor's Input Map panel in sync.
-
-### Dev command server
-
-`general/command_server.gd` (a node in `main.tscn`, editor-only, cleaned up on exit) lets an
-external tool control a running game with text commands. It is **off** unless
-`application/debug/command_port` > 0 and never exists in an exported build (`_ready()` bails
-when `OS.has_feature("editor")` is false). It listens on 127.0.0.1 with a line-delimited
-protocol: each line is a curated verb (`help`, `pos`, `tp X Y`, `slot N`,
-`move up|down|left|right [off]`, `stop`, `fire`, `punch`, `interact`, `aim X Y`) or, failing
-that, a GDScript `Expression` evaluated against the node (e.g. `scene().get_node("Player").speed`).
-Movement and actions are driven by injecting `Input` action presses through `Keybinds` names —
-the same path a human's keyboard/mouse uses — so no game domain is coupled to it. Drive it from
-`tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`); the Godot MCP can only launch/kill the
-game and read its stdout, so the socket client is the control channel and each command is echoed
-as a `[cmd] …` Output line.
-
-## Runtime-shape convention
-
-Collision shapes are built **in code in `_ready()`**, not in the scene:
-- `wall.gd._build_walls()` — a `RectangleShape2D` per wall segment (layout is data-driven
-  from `size`/`openings`). `openings` are `{ side, offset, width }`.
-- `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
-  decor is `freeze`d (no shape) and gets `z_index = -1`.
-- `character.gd` builds its body `CircleShape2D`; `character_hands.gd` builds the fist
-  query `CircleShape2D`. Physics components (`Knockback`, `Deformable`) are added as child Nodes in
-  `environment_object._ready()`.
-
-**Because of this, the editor shows "no shape" warnings on `Player/CollisionShape2D` and
-on each `Wall`. Those are expected** — the shapes exist at runtime; don't add scene shapes.
-
-## Character, hands & items
-
-- **Facing:** `character.gd` points `facing` from itself to `aim_point` (the mouse, set by
-  the controller) each frame. The node is never rotated, so hand math stays in local space.
-- **Hands:** two circles positioned from `facing` + its perpendicular, collision-resolved so
-  they rest on walls/objects. Tunable via `character_hands.gd`'s `hand_*` exports.
-- **Items:** number keys 1–9 select a slot (`ItemRegistry`). **1** unarmed (no hands, F/LMB
-  do nothing) · **2** fists (both hands, F alternates — alternation state lives in the item)
-  · **3** pistol (right hand + pistol art; F jabs, LMB fires) · **4** key (inert carryable; it
-  exists so a `requires_item: 4` interaction has something to gate on). Add an item by writing
-  an `Item` subclass in `items/` and a case in `ItemRegistry`.
-- **Interactions:** **Space** starts/stops an object interaction. `CharacterInteraction`
-  (`interaction/`) shape-queries for reachable objects, keeps the actions whose `requires_item`
-  gate passes (`character.has_item`), targets the object nearest the mouse (`aim_point`), and
-  runs a random one of its valid actions — freezing the character (`is_busy()`), and for a
-  `move_to` action snapping it onto the object and letting the two bodies overlap (a temporary
-  `add_collision_exception_with`, so a seat/bed isn't shoved and the character isn't ejected),
-  moving it back on exit. Which objects offer which actions is pure catalogue data
-  (`get_interactions()` on the object). A non-player controller instead uses
-  `interactions_in_reach()` + `interact_with(object, id)` to pick a specific object and action
-  (interface 8).
-- **Punch hit detection:** during a swing `character_hands.gd` runs a shape query
-  (`intersect_shape`) at the fist's *raw* punch position — which extends into what is hit,
-  unlike the drawn hand that rests on the surface — and dedupes per swing. Each new hit shoves
-  the body via the "pushable" contract (`apply_impulse`) and deals damage, both scaled by the
-  swing's range of motion — how fast the fist is moving this frame (1.0 = full-speed extend).
-  It emits `punched(hand, body, damage)` → the character re-emits `hit_landed(body, damage,
-  hand)`. A punch pushes but never deforms; walls (no `apply_impulse`) take damage without
-  moving. Tuned by `CharacterConfig.punch_impulse`/`punch_damage`.
-
-## Projectile impact model
-
-A fired bullet (`projectile.gd`) is a **multi-hit traveler**: each physics frame it sweeps
-forward with a raycast and resolves every collider it crosses against that object's
-`get_surface()` `coverage`/`penetration` (0–100; a collider with no surface uses
-`BallisticsConfig.wall_*`). It flies until `speed < BallisticsConfig.projectile_min_speed`
-or it passes `max_distance`. Non-solid decor has no collider, so it's never raycast.
-
-Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_speed`,
-coverage `C`, penetration `P`, `_resolve()` picks one outcome in order:
-1. **Fly over** — `clamp((1 − C/100) × cover_flyover_scale, 0, 1)`; no damage, excluded, flies on.
-2. **Ricochet** (`P ≥ penetration_bounce_min` and `s < bounce_square_max`) — reflects,
-   `speed ×= bounce_speed_retention`, deals `damage × s × v × bounce_damage_retention`.
-3. **Penetrate** (else, while `speed ≥ penetration_min_speed`) — deals `damage × s × v`,
-   bleeds speed, deflects slightly. **Blocked** if too slow: deals the impact and embeds.
-
-On any *damaging* outcome the projectile packages a `HitInfo` and calls `body.take_hit(info)`
-(the object then shoves/deforms/sprays via Physics) and re-emits `hit(body, damage)` — which
-the pistol forwards to the character's `hit_landed`. Console lines: `Shot flew over / ricocheted
-off / penetrated / blocked by …`. All knobs live in `BallisticsConfig`.
-
-## Physics System
-
-Stateless helpers + reusable Node components, sharing no imports with other domains:
-- `HitInfo` — the one data packet a striker fills in.
-- `Physics.impact_impulse(hit)` / `Physics.spawn_debris(world, hit, surface)`.
-- `Knockback` — RigidBody2D adapter: configures its parent furniture body (no gravity, mass,
-  `PhysicsConfig.body_*` damping, origin-pinned center of mass, contact reporting) and feeds it
-  impulses via `apply_impulse(v, at_world)`. The engine does the sweeping, pivoting and settling;
-  the component only hands momentum to the kinematic character on contact (`impact_transfer_scale`).
-- `Deformable` — records local impacts (dents / carved "missing pieces") and emits
-  `changed`; the owner redraws + rebuilds its collider from the same deformed polygon.
-- `Deformation` — the polygon math + drawing (shared by furniture and walls).
-- `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). `PhysicsConfig` tunes
-  it all; the global cap lives on `Despawner`.
-- `BloodSpawner` / `BloodPool` / `BloodPoolVisuals` — a self-contained blood pooling system,
-  separate from debris and deformation. `Physics.spawn_blood(parent, hit, exclude, source, active)
-  -> Node` adds a flesh wound's blood to the body's pool and returns it; each drop emerges from
-  `source`'s live position, pushes outward and slides around
-  walls/furniture (`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-
-  tracked stain drawn beneath everything. Spread is accumulation-based per character: each character
-  bleeds into one active pool (`take_hit` keeps the returned pool in `_blood_pool`); a hit that lands
-  on that pool grows it — adding volume and widening its radius toward `pool_radius_max`, capped at
-  `max_pool_volume` — so a still victim shot repeatedly pools out wide, while moving off the pool
-  starts a new one and trails blood. Only the character's `take_hit` calls it (furniture bleeds no
-  blood). Tuned by `BloodConfig`.
-
-## House generation (World Gen pipeline)
-
-`WorldGen.generate` picks one of the `HouseDefinitions` floorplans (12, `studio_flat` …
-`luxury_home`) and hands it to `HouseSpawner`:
-
-```
-HouseDefinitions (floorplans) ─┐
-categories/*  (catalogues)  ───┼─▶ HouseSpawner ─▶ WallFactory (walls, doors cut in)
-ObjectDefinitions / ───────────┘                └▶ RoomFurnisher ─▶ ObjectFactory
-ArrangementDefinitions
-```
-
-- **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a `type`;
-  doors are points on wall lines. `HouseSpawner` cuts each door into every wall through it,
-  keeps door clearances free of furniture, and mirrors the plan L/R 50% of the time.
-- **Catalogues** (`worldgen/categories/*.gd`, one `<Name>Catalog` per room type; `general.gd`
-  holds shared entries + the `WOOD`/`FABRIC` palettes + combined recipes). Hold `OBJECTS`,
-  `ARRANGEMENTS`, `RECIPES`. `ObjectDefinitions` / `ArrangementDefinitions` are thin
-  aggregators that merge them and expose `get_definition` / `get_arrangement` / `get_recipe`.
-- **Arrangements** are authored against the top wall (`x` along, `y` depth); `placement`
-  `"wall"`/`"center"`, `prefer_corner`, `tags` (dedupe). **Recipes** list ordered `zones`
-  (each picks `count` from `options`, with optional `required`/`fallback`) + `palettes`.
-- **Placement** (`room_furnisher.gd`) fits each arrangement's footprint against a random wall
-  without overlap, rotates/mirrors it, then hands each object's definition to `ObjectFactory`.
-
-To add a room type: add a `categories/<type>.gd` catalog with its recipe and use its key as a
-room `type`. New `class_name` scripts resolve only after Godot rescans (open the editor or run
-`godot --headless --path . --import`).
+- **Layered control / animate / draw.** Within an entity the three verbs live in separate files,
+  wired via the scene tree (no `class_name` on scene scripts; cross-file calls resolve through
+  `$` / `get_parent()`). A "draw" file is attached to its own child `Node2D` (Godot only draws
+  from `CanvasItem`s). Ordering: a parent's `_physics_process` runs before its children's.
+- **Runtime shapes.** Collision shapes are built **in code in `_ready()`**, not in the scene
+  (layout is data-driven). Because of this the editor shows "no shape" warnings on
+  `Player/CollisionShape2D` and on each `Wall` — **those are expected**; don't add scene shapes.
 
 ## Running & verifying
 
-- Main scene `res://scenes/main.tscn`. Use the `godot-debug` skill for a headless check
-  (`godot --headless --path . --quit-after 30`, grep for `SCRIPT ERROR|Parse Error|ERROR:`);
-  run `--import` first when you add a `class_name`.
-- **House:** on start the house is directly ahead of the player, front door beside them; every
-  doorway is walkable. `house_seed`/`force_plan` on `Main` pin a layout.
-- **Movement/pushing:** WASD moves; heavy furniture slows you and shoves you back.
-- **Items:** **1** unarmed · **2** fists (F alternates) · **3** pistol (F jabs, LMB fires) ·
-  **4** key (inert; gates the wardrobe's "Rummage" interaction).
-- **Interactions:** walk next to furniture, press **Space** → a random valid action of the
-  object nearest the mouse starts (HUD shows its label; `move_to` snaps you onto it); press
-  **Space** again to stop and step back. The wardrobe's "Rummage" only appears with the key.
-- **Combat:** punch or shoot furniture/walls → console lines print, debris sprays, objects
-  dent + shove, and the debug HUD shows the last hit + damage.
+- Main scene `res://scenes/main.tscn`. Use the **`godot-debug` skill** for a headless load check
+  and for driving the running game via the dev command server (`tools/gcmd.py`); run `--import`
+  first when you add a `class_name`.
+- Use the **`change-verification` skill** before committing (domain isolation, doc/skill sync,
+  comment hygiene, load check).
+- The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
+  generation, movement/pushing, items, interactions, combat).
