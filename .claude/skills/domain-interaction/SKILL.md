@@ -1,6 +1,6 @@
 ---
 name: domain-interaction
-description: Deep implementation detail for the Interaction domain (scenes/interaction/) — finding a reachable object and running one of its actions (sit, lie, …). Use when editing scenes/interaction/ or working on object interactions, the Space toggle, move_to snapping, or the interactable contract. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Interaction domain (scenes/interaction/) — finding a reachable object and running one of its actions (sit, lie, …). Use when editing scenes/interaction/ or working on object interactions, the Space toggle, move_to snapping, or the interactable contract. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Interaction domain
@@ -26,7 +26,7 @@ world object implements `get_interactions() -> Array` (plain data dicts: `id`, `
 A non-player controller uses `interactions_in_reach()` + `interact_with(object, id)` to pick a
 specific object and action instead of the random toggle.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Interaction ↔ Character & Objects** (interface 8): the character exposes only opaque
   forwards — `try_interact()` (the player's Space toggle), `interactions_in_reach()` and

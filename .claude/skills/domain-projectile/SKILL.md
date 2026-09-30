@@ -1,6 +1,6 @@
 ---
 name: domain-projectile
-description: Deep implementation detail for the Projectile System domain (scenes/projectile/) — shooting: penetration, damage, cover, ricochet. Use when editing scenes/projectile/ or working on the bullet impact model, fly-over/ricochet/penetrate/blocked resolution, casings, or BallisticsConfig tuning. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Projectile System domain (scenes/projectile/) — shooting: penetration, damage, cover, ricochet. Use when editing scenes/projectile/ or working on the bullet impact model, fly-over/ricochet/penetrate/blocked resolution, casings, or BallisticsConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Projectile System domain
@@ -34,7 +34,7 @@ penetrated / blocked by …`.
 `projectile.gd` / `casing.gd` are control; `projectile_visuals.gd` / `casing_visuals.gd` draw.
 `projectile_spawner.gd` / `casing_spawner.gd` are the spawn entry points the pistol calls.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - Reaches into Objects only through the hittable contract (interface 3): reads `get_surface()`
   and calls `take_hit(HitInfo)`. The pistol (Items) is the one caller of `ProjectileSpawner` /

@@ -1,6 +1,6 @@
 ---
 name: domain-worldgen
-description: Deep implementation detail for the World Generation domain (scenes/worldgen/) — picking a floorplan and building/furnishing a house from catalogues, arrangements and recipes. Use when editing scenes/worldgen/ or working on house layouts, floorplans, room types, furniture catalogues, arrangements, recipes, or placement. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the World Generation domain (scenes/worldgen/) — picking a floorplan and building/furnishing a house from catalogues, arrangements and recipes. Use when editing scenes/worldgen/ or working on house layouts, floorplans, room types, furniture catalogues, arrangements, recipes, or placement. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # World Generation domain
@@ -40,7 +40,7 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
 `class_name` scripts resolve only after Godot rescans (open the editor or run `godot --headless
 --path . --import`).
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
   front_door_world, parent) -> Node2D` seeds one RNG for the whole run (plan pick is its first

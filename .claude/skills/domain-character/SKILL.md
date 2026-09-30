@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, hands, the punch, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands, punch hit detection, or the player/NPC scene wiring. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, hands, the punch, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands, punch hit detection, or the player/NPC scene wiring. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -54,7 +54,7 @@ character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never de
 `character/npc.tscn` is a house guard driven by `ai/jev_controller.gd` (see the `domain-ai`
 skill). The player uses `player_controller.gd`.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Character ↔ Controller** (interface 7): the character reads intent from a controller child
   (any node with `control(character, delta)`) that writes `move_input` / `aim_point` and calls

@@ -1,6 +1,6 @@
 ---
 name: domain-items
-description: Deep implementation detail for the Items domain (scenes/items/) — the things the character holds and the actions they perform (fists, pistol, key, unarmed). Use when editing scenes/items/ or working on item slots, the Item contract, adding a new item, or the pistol's link into the projectile system. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Items domain (scenes/items/) — the things the character holds and the actions they perform (fists, pistol, key, unarmed). Use when editing scenes/items/ or working on item slots, the Item contract, adding a new item, or the pistol's link into the projectile system. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Items domain
@@ -27,7 +27,7 @@ Write an `Item` subclass in `items/` and add a case in `ItemRegistry`. `ItemRegi
 The pistol is the one place Items reaches into the Projectile System
 (`ProjectileSpawner` / `CasingSpawner`). No other item crosses that boundary.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Items ↔ Character** (interface 6): `Item` (`items/item.gd`) exposes `display_name`, `reach`,
   `visible_hands()`, `primary(user)` (F), `secondary(user)` (LMB), `draw_weapon(canvas, user)`.

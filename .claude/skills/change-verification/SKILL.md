@@ -1,6 +1,6 @@
 ---
 name: change-verification
-description: Verify staged changes to this Godot project before they are committed. Use this whenever changes have been staged, a piece of work is being wrapped up, or the user asks to verify / review / check / sanity-check a change before committing — even if they don't say "verify". It audits domain isolation (cross-domain coupling must be minimal and flow only through AGENTS.md's published interfaces; a concern whose complexity bleeds across several domains should be pulled out into its own), keeps AGENTS.md AND each domain's `domain-<name>` skill in sync when domains, interfaces, or a domain's internals change, and enforces concise current-state comments. Produces a checklist of issues, each with a specific file:line recommendation.
+description: Verify staged changes to this Godot project before they are committed. Use this whenever changes have been staged, a piece of work is being wrapped up, or the user asks to verify / review / check / sanity-check a change before committing — even if they don't say "verify". It audits domain isolation (cross-domain coupling must be minimal and flow only through the published interfaces in the `architecture` skill; a concern whose complexity bleeds across several domains should be pulled out into its own), keeps the `architecture` skill AND each domain's `domain-<name>` skill in sync when domains, interfaces, or a domain's internals change, and enforces concise current-state comments. Produces a checklist of issues, each with a specific file:line recommendation.
 ---
 
 # Change verification
@@ -11,14 +11,15 @@ diff and a commit. The output is always a **checklist of concrete issues**, each
 when there is nothing to fix).
 
 Three things make a change healthy in this project, in priority order: the domains stay
-**isolated**, the docs (`AGENTS.md` + the domain skills) stay **true**, and the comments
-describe the code **as it is now**. Each has its own section below. Work through them in order
-and collect findings into the checklist at the end.
+**isolated**, the architecture skills stay **true**, and the comments describe the code **as it
+is now**. Each has its own section below. Work through them in order and collect findings into the
+checklist at the end.
 
-The architecture docs are split: `AGENTS.md` is the always-loaded **map** (the domain table, the
-vital interfaces, the dependency graph), and each domain has a `.claude/skills/domain-<folder>/`
-skill holding that domain's **deep implementation detail**. Both are held to the same
-current-state bar as code comments — see Step 3.
+The architecture docs are split across skills (`AGENTS.md` itself is just a stub that points to
+them): the **`architecture`** skill is the **map** (the domain table, the vital interfaces, the
+dependency graph, the cross-cutting conventions), and each domain has a
+`.claude/skills/domain-<folder>/` skill holding that domain's **deep implementation detail**. Both
+are held to the same current-state bar as code comments — see Step 3.
 
 ## Step 0 — Gather the change and the ground truth
 
@@ -28,10 +29,11 @@ git diff --staged --name-only --diff-filter=d
 git diff --staged            # the actual hunks — read them, this is what you are verifying
 ```
 
-Then read `AGENTS.md`. It is the source of truth for this codebase's architecture: the domain
-table (one folder per domain under `scenes/`) and, crucially, **"The vital interfaces"** — the
-*entire* sanctioned cross-domain surface. Everything not on that list is private to its domain.
-You are checking the staged change against that contract, so you need it fresh in mind.
+Then load the **`architecture`** skill. It is the source of truth for this codebase's
+architecture: the domain table (one folder per domain under `scenes/`) and, crucially, **"The
+vital interfaces"** — the *entire* sanctioned cross-domain surface. Everything not on that list is
+private to its domain. You are checking the staged change against that contract, so you need it
+fresh in mind.
 
 Also read the `domain-<folder>/SKILL.md` for **every domain the diff touches** (map a changed
 `scenes/<folder>/…` file to `.claude/skills/domain-<folder>/SKILL.md`). That skill is the deep
@@ -40,7 +42,8 @@ detail for the domain, and the change must leave it true (Step 3).
 ## Step 1 — Domain isolation (highest priority)
 
 The whole design rests on domains that can each change on their own. That only holds if the
-connections between them are few, deliberate, and named in `AGENTS.md`. A change erodes it when
+connections between them are few, deliberate, and named in the `architecture` skill. A change
+erodes it when
 it quietly adds a new thread between two domains — a call into another domain's internals, a new
 `preload` across a boundary, a node reaching in by hard-coded child path, a signal wired straight
 to a foreign node. Each new thread is a place a future change in one domain can break another.
@@ -49,17 +52,17 @@ For every cross-domain reference the diff introduces or touches, ask **"is this 
 crucial, and is it one of the vital interfaces?"** Route your judgment through these questions:
 
 - **Does it go through a published interface?** If domain A now calls into domain B, that call
-  should be one of the interfaces listed in `AGENTS.md` (a `class_name` façade like
+  should be one of the interfaces listed in the `architecture` skill (a `class_name` façade like
   `Physics.spawn_debris`, a documented contract method like `get_surface()` / `take_hit()`, a
   named signal). A call into a *private* method, member, or child-node name of another domain is
   the smell. Fix: route it through the existing interface, or — if the connection is genuinely
   needed and new — promote it to a real interface (a small façade / contract method) **and add it
-  to AGENTS.md** (see Step 3).
+  to the `architecture` skill** (see Step 3).
 - **Is it the leanest connection that works?** Reaching in by concrete node name
   (`get_node("JevController")`) couples to layout; a duck-typed lookup or a one-line seam couples
   to behaviour instead and survives refactors. Prefer the connection that knows the least about
   the other side.
-- **Does the dependency direction respect the graph?** `AGENTS.md` has a dependency graph with no
+- **Does the dependency direction respect the graph?** The `architecture` skill has a dependency graph with no
   cycles; leaves (Physics, World-Gen) depend on nothing outward. A new edge that points the wrong
   way — a leaf importing a caller, or a cycle — is a defect even if it "works".
 
@@ -88,14 +91,14 @@ mirroring how the existing domains are structured. Extraction is a bigger call t
 frame it as a recommendation with the reasoning, not a mandate. If nothing warrants it, note that
 briefly and move on.
 
-## Step 3 — Keep AGENTS.md and the domain skills true
+## Step 3 — Keep the architecture skill and the domain skills true
 
-The architecture docs are documentation, so they are held to the same current-state bar as code
+The architecture skills are documentation, so they are held to the same current-state bar as code
 comments — and because they are the architecture's source of truth, a change that alters the
-architecture but not the docs leaves the next reader with a false map. The responsibility is
-split, so update the *right* file:
+architecture but not the skills leaves the next reader with a false map. The responsibility is
+split, so update the *right* file (AGENTS.md itself is a stub pointer and rarely needs touching):
 
-**`AGENTS.md` (the map)** — update it in the same change when:
+**The `architecture` skill (the map)** — update it in the same change when:
 
 - **A domain was added or removed** — update the domain table (including its `domain-<name>`
   skill column) *and* the domain count in the intro ("the N domains"); the prose and the table
@@ -110,10 +113,11 @@ split, so update the *right* file:
 change alters that domain's *internals* as the skill describes them: a pipeline's shape, the
 projectile resolution order, the blood-pooling rules, item slots, the input flow, the guard's
 choice sets, and so on. A change to a domain's behaviour that leaves its skill describing the old
-behaviour is drift, exactly like a stale AGENTS.md. The skill also recaps its own interface(s), so
-an interface change updates both the AGENTS.md list *and* that recap.
+behaviour is drift, exactly like a stale `architecture` skill. The skill also recaps its own
+interface(s), so an interface change updates both the `architecture` list *and* that recap.
 
-Flag any drift you find as a checklist item (`AGENTS.md:line` or `domain-<name>/SKILL.md:line` →
+Flag any drift you find as a checklist item (`architecture/SKILL.md:line` or
+`domain-<name>/SKILL.md:line` →
 what to change). Both files' prose must follow the current-state rule in Step 4: state what *is*,
 never what changed.
 
@@ -204,8 +208,8 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 ### Domain extraction
 - [x] No concern is bleeding across domains; nothing to extract.
 
-### AGENTS.md & domain skills
-- [ ] `AGENTS.md:6` — intro says "eight domains" but the table now lists nine (AI added). Fix: "nine".
+### Architecture & domain skills
+- [ ] `architecture/SKILL.md:20` — intro says "eight domains" but the table now lists nine (AI added). Fix: "nine".
 - [ ] `domain-physics/SKILL.md:41` — blood section describes the 4-arg `spawn_blood`; the code now takes 5. Fix: state the current signature.
 
 ### Comments & docs

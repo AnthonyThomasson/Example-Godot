@@ -1,6 +1,6 @@
 ---
 name: domain-physics
-description: Deep implementation detail for the Physics System domain (scenes/physics/) — physical reactions: forces, knockback, deformation, debris, blood pooling. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, or PhysicsConfig/BloodConfig tuning. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Physics System domain (scenes/physics/) — physical reactions: forces, knockback, deformation, debris, blood pooling. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, or PhysicsConfig/BloodConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Physics System domain
@@ -41,7 +41,7 @@ blood. Only the character's `take_hit` calls it (furniture bleeds no blood).
 `PhysicsConfig` tunes impact + deformation; `BloodConfig` tunes blood pooling. Both are
 `class_name` static holders — there is no `Config` autoload.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
   call `Physics.impact_impulse` / `Physics.spawn_debris`. The character's `take_hit` calls

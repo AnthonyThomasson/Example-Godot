@@ -1,6 +1,6 @@
 ---
 name: domain-ai
-description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the house-guard controller, its world-sensing perception helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC guard, guard perception/state, the Von choice requests (move/aim/act), or the decision server. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the house-guard controller, its world-sensing perception helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC guard, guard perception/state, the Von choice requests (move/aim/act), or the decision server. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # AI domain
@@ -44,7 +44,7 @@ on exit.
 Note: `mcp__godot__stop_project` hard-kills Godot, so the launcher's `_exit_tree` doesn't run and
 the Von server it spawned is orphaned on port 8000 — `pkill -f "von serve"` clears it.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Character ↔ Controller** (interface 7): the controller is any node with `control(character,
   delta)`; it writes `move_input` / `aim_point` and calls `melee()`, `shoot()`, `select_slot(id)`,

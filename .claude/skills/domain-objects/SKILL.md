@@ -1,6 +1,6 @@
 ---
 name: domain-objects
-description: Deep implementation detail for the Objects domain (scenes/objects/) — the world's furniture and walls: their data, how they're hit/pushed/deformed, and how they compose Physics. Use when editing scenes/objects/ (environment_object, wall, the factories) or working on the hittable/pushable/interactable contracts, object field schema, or wall segment math. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Objects domain (scenes/objects/) — the world's furniture and walls: their data, how they're hit/pushed/deformed, and how they compose Physics. Use when editing scenes/objects/ (environment_object, wall, the factories) or working on the hittable/pushable/interactable contracts, object field schema, or wall segment math. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Objects domain
@@ -59,7 +59,7 @@ The editor shows "no shape" warnings on each `Wall` — expected; the shapes exi
 `environment_object_visuals` / `wall_visuals` (own child `Node2D`s) read the deformed geometry
 from their control node and draw it.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **World Generation → Objects** (interface 2): `ObjectFactory.spawn(definition, position,
   parent, opts) -> Node`, `WallFactory.spawn(rect, thickness, openings, name, parent) -> Node`,

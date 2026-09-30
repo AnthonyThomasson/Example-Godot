@@ -1,6 +1,6 @@
 ---
 name: domain-navigation
-description: Deep implementation detail for the Navigation domain (scenes/navigation/) — baking the house into a walkable nav map so characters can path around walls. Use when editing scenes/navigation/ or working on nav baking, NavigationRegion2D, agent radius, or doorway walkability. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Navigation domain (scenes/navigation/) — baking the house into a walkable nav map so characters can path around walls. Use when editing scenes/navigation/ or working on nav baking, NavigationRegion2D, agent radius, or doorway walkability. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Navigation domain
@@ -21,7 +21,7 @@ Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automa
 consumer wiring is the AI controller setting `target_position` and reading
 `get_next_path_position()`.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - **Main / AI → Navigation** (interface 9): `NavBuilder.build(house, rooms, parent,
   agent_radius)` bakes the region; consumers only set a `NavigationAgent2D`'s `target_position`

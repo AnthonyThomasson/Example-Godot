@@ -1,6 +1,6 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), despawner, camera, debug HUD, and the dev command server. Use when editing scenes/general/ or working on input/keybinds/rebinding, the dev command server (gcmd), camera follow, the despawn cap, or the debug HUD. Complements AGENTS.md, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), despawner, camera, debug HUD, and the dev command server. Use when editing scenes/general/ or working on input/keybinds/rebinding, the dev command server (gcmd), camera follow, the despawn cap, or the debug HUD. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
@@ -40,7 +40,7 @@ command is echoed as a `[cmd] …` Output line. (The `godot-debug` skill covers 
 - `debug_ui.gd` — attaches by exported node path, listens to `hit_landed`, shows the last hit +
   damage.
 
-## Interface recap (authoritative in AGENTS.md)
+## Interface recap (authoritative in the `architecture` skill)
 
 - Observers (debug HUD, camera) attach by exported node path and read only the Character public
   API/signals (interface 7). `player_controller.gd` and `command_server.gd` are the only files
