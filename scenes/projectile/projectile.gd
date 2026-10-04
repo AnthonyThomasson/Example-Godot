@@ -155,8 +155,13 @@ func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt
 	return info
 
 
-## Hand the hit to the object (if hittable) and re-emit `hit`.
+## Hand the hit to the object (if hittable), re-emit `hit`, and post a world `&"hit"` event so
+## decoupled listeners (the AI's combat awareness) learn that something was struck and where.
 func _deal(body: Node, info: HitInfo) -> void:
 	if body.has_method("take_hit"):
 		body.take_hit(info)
 	hit.emit(body, info.damage)
+	EventBus.post(&"hit", {
+		"position": info.position, "victim": body, "source": info.source,
+		"direction": info.direction, "damage": info.damage,
+	})

@@ -1,13 +1,14 @@
 ---
 name: domain-ai
-description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the generic goal-driven controller, its world-sensing perception helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC's goal/behaviour, agent perception/state, the act-centric decision menu, the derived movement, the commitment memory, the Von choice requests, or the decision server. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the generic goal-driven controller, its world-sensing perception helper, its event-memory helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC's goal/behaviour, agent perception/state, the agent memory, the act-centric decision menu, the derived movement, the commitment/engagement memory, the Von choice requests, or the decision server. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # AI domain
 
 Non-player brains: controllers that drive a character (with a world-sensing helper for their
-decision context), plus the dev-only decision-server launcher. A controller writes the
-character's intent and calls its public action API — it never reaches into character internals.
+decision context and an event-memory helper for what has happened), plus the dev-only
+decision-server launcher. A controller writes the character's intent and calls its public action
+API — it never reaches into character internals.
 
 ## The goal-driven agent
 
@@ -23,7 +24,9 @@ near-identical spatial points almost at random, so the NPC asks it **WHAT TO DO*
 step, and derives the movement itself. Each decision `ai/agent_perception.gd` builds a compact text
 state (the goal verbatim, then where the NPC is, what it holds, whether it is mid-interaction, and
 the player's position relative to the house — from the `rooms` rects Main injects alongside
-`target`) and POSTs **two `choice` questions in one request** to a local Jev-style `/v1/systemone`
+`target`), followed by any **combat-awareness** lines (under fire from a direction / gunfire struck
+nearby / its own injury level) and **what each character around it is holding** (threat context),
+and POSTs **two `choice` questions in one request** to a local Jev-style `/v1/systemone`
 server (Von):
 
 - `act` — the real decision: `shoot` / `punch` / `hold`, plus one **interact** option per *distinct*
@@ -57,21 +60,52 @@ inside/outside fact the controller already senses for salient events. Interactio
 through. Turn it off for a goal that should engage the player anywhere (e.g. hunt). The default goal
 is therefore phrased unconditionally ("shoot the intruder on sight"), and the gate supplies the
 "only inside" part. Otherwise there is no per-goal gating — the full act menu is offered every tick.
+**Self-defense suspends the gate:** while the NPC is under fire (`under_fire_time` window after it
+is hit) the gate no longer downgrades a `shoot`/`punch` pick, so it may defend itself against an
+attacker even one still outside — the gate's job is to not *pre-emptively* attack someone merely
+standing outside, not to forbid self-defense. But when combat is only running because of this
+suspension (the attacker is still outside), the controller **holds its ground inside**
+(`_hold_ground`): the peek-and-cover destinations are restricted to points inside the house and the
+peek fallback stops advancing, so the NPC returns fire from inside (through a doorway/window when it
+has a line) rather than chasing the attacker out. Once the attacker steps inside, normal aggressive
+engagement resumes.
 
 **Commitment memory (the System-Two layer Von lacks).** Von is stateless and cannot sequence, so
 the controller holds the thread: once it heads for a chosen object it commits to reaching it (a
 `max_commit_time` safety cap aside); once an interaction starts it stays in it for
-`interaction_dwell` seconds; combat re-decides every cadence so it keeps tracking the player. It
-re-decides when the task resolves, the dwell/cap elapses, or a **salient event** fires (the player
-crossing the house boundary). This lets multi-step goals advance instead of oscillating every tick.
+`interaction_dwell` seconds; once it enters a fight it **commits to combat** while the `&"engaged"`
+memory is fresh (`engage_dwell`, refreshed by each shot it fires or takes) rather than re-rolling
+Von's flat `shoot`/`hold` ranking every cadence — which is what made it flip combat↔hold every
+second (peek-and-cover keeps tracking the player while committed). It re-decides when the task
+resolves, the dwell/cap elapses, or a **salient event** fires — the player crossing the house
+boundary, or a **hit** (the NPC itself shot, or anything struck within `hit_awareness_radius`). This
+lets multi-step goals advance and firefights persist instead of oscillating every tick.
+
+**Agent memory (`ai/agent_memory.gd`).** A generic, behaviour-agnostic event log the controller
+owns: `remember(topic, data, ttl)` appends an event; `is_fresh`/`recall`/`recall_all`/`age`/`fresh`
+read it back. It is **not** capped per topic — many events (and many of one topic) coexist. Cleanup
+is a configurable policy run on every write: age-expired events (per-entry `ttl`, or the
+`memory_default_ttl` fallback) are dropped first, then the oldest while over `memory_capacity`. The
+controller records `&"under_fire"` (with the incoming direction, ttl `under_fire_time`) and
+`&"engaged"` (ttl `engage_dwell`) here; `_under_attack()` is just `memory.is_fresh(&"under_fire")`.
+Adding a new remembered event is one `remember()` call — give its `data` a `note` string and the
+perception surfaces it to Von automatically (see below). This replaces the old ad-hoc under-fire
+timers.
 
 `agent_perception.gd` holds no policy (it only senses, nothing goal-specific) and reads only
 published contracts (character API, objects' `get_interactions()` / `get_surface()`, the injected
 room rects). It caches the house's interactable objects via a one-time scan of
-`character.world_root()` on first sense, so a far-off object is still offerable. It also answers the
-controller's combat-geometry queries — `has_shot` (clear line to the player) and `combat_spots`
-(nearby fire/cover points, classified by raycast) — which feed the peek-and-cover logic directly,
-not Von.
+`character.world_root()` on first sense, so a far-off object is still offerable. It also scans for
+other characters each decision to report their held items, reads the character's `damage_taken()`
+for the injury line, and renders the agent's **memory** into the state — a directioned "under fire
+from the <dir>!" line when `&"under_fire"` is fresh, plus the `note` of any other fresh remembered
+event (freshest per topic). It answers the controller's combat-geometry queries too — `has_shot`
+(clear line to the player) and `combat_spots` (nearby fire/cover points, classified by raycast) —
+which feed the peek-and-cover logic directly, not Von.
+
+Tuning exports: `hit_awareness_radius`, `under_fire_time`, `engage_dwell`, `memory_capacity`,
+`memory_default_ttl` (controller) and `hurt_threshold`, `critical_threshold` (perception, for the
+injury wording).
 
 ## Decision server launcher
 

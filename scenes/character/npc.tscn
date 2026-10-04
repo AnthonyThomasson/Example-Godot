@@ -13,7 +13,7 @@ start_slot = 3
 
 [node name="GoalController" type="Node" parent="."]
 script = ExtResource("2_jev")
-goal = "You are the armed guard of this house. The player is an intruder — shoot them with your pistol on sight to stop them."
+goal = "You are the armed guard of this house. The player is an intruder — shoot them with your pistol on sight to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase the intruder outside."
 nav_agent_path = NodePath("../NavigationAgent2D")
 
 [node name="NavigationAgent2D" type="NavigationAgent2D" parent="."]

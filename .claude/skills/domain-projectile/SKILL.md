@@ -25,9 +25,11 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
    speed, deflects slightly. **Blocked** if too slow: deals the impact and embeds.
 
 On any *damaging* outcome the projectile packages a `HitInfo` and calls `body.take_hit(info)` (the
-object then shoves/deforms/sprays via Physics) and re-emits `hit(body, damage)` — which the pistol
-forwards to the character's `hit_landed`. Console lines: `Shot flew over / ricocheted off /
-penetrated / blocked by …`.
+object then shoves/deforms/sprays via Physics), re-emits `hit(body, damage)` — which the pistol
+forwards to the character's `hit_landed` — and posts a `&"hit"` event on `EventBus`
+(`{ position, victim, source, direction, damage }`, interface 10) so decoupled listeners (the AI's
+combat awareness) learn that something was struck and where. Console lines: `Shot flew over /
+ricocheted off / penetrated / blocked by …`.
 
 ## Layering
 
@@ -38,4 +40,5 @@ penetrated / blocked by …`.
 
 - Reaches into Objects only through the hittable contract (interface 3): reads `get_surface()`
   and calls `take_hit(HitInfo)`. The pistol (Items) is the one caller of `ProjectileSpawner` /
-  `CasingSpawner`. Casings despawn via the Despawner.
+  `CasingSpawner`. Casings despawn via the Despawner. Each damaging hit also posts a `&"hit"` event
+  on `EventBus` (interface 10).

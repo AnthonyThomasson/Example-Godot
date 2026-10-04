@@ -33,11 +33,11 @@ concise current-state comments.
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
-| **AI** | `ai/` | `domain-ai` | Non-player brains: controllers that drive a character (with a world-sensing helper), plus the dev-only decision-server launcher. |
+| **AI** | `ai/` | `domain-ai` | Non-player brains: controllers that drive a character (with a world-sensing helper and an event-memory helper), plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
 domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
-`Keybinds` and `Despawner` (both General).
+`Keybinds`, `Despawner` and `EventBus` (all General).
 
 ## The vital interfaces (this is the whole cross-domain surface)
 
@@ -96,7 +96,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
    character's action API: `melee()` (F), `shoot()` (LMB), `select_slot(id)`, `try_interact()` /
-   `interact_with(object, id)` / `end_interaction()`. `player_controller.gd` is the human one and
+   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
+   damage, for injury sensing). `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
    and `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
@@ -124,6 +125,13 @@ interface(s) and describes how they're implemented; this list is authoritative f
    against the global map automatically — the only consumer wiring is the AI controller setting
    `target_position` and reading `get_next_path_position()`.
 
+10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
+    - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.
+    - `signal posted(topic, data)` — listeners connect and filter by `topic`.
+    The one topic in use is `&"hit"`: the Projectile System posts one per damaging hit
+    (`{ position, victim, source, direction, damage }`) and the AI controller consumes it for combat
+    awareness. Emitters and listeners never reference each other (like `Despawner`).
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -134,6 +142,7 @@ Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)─
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
 Physics debris / casings ─▶ Despawner
+Projectile ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
 

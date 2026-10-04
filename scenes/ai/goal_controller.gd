@@ -21,11 +21,13 @@ extends Node
 ## is unreachable it holds a steady stance (watch the player).
 
 const AgentPerception := preload("res://scenes/ai/agent_perception.gd")
+const AgentMemory := preload("res://scenes/ai/agent_memory.gd")
 
 ## The behaviour to pursue, in plain language. Injected by Main; the default keeps the house-guard
 ## behaviour when none is set.
 @export_multiline var goal: String = ("You are the armed guard of this house. The player is an " +
-	"intruder — shoot them with your pistol on sight to stop them.")
+	"intruder — shoot them with your pistol on sight to stop them. If you are fired upon, return fire, " +
+	"but hold your ground inside the house; do not chase the intruder outside.")
 ## House-guard gate: when true, a shoot/punch choice made while the player is OUTSIDE the house
 ## becomes "hold" instead, so the guard only engages an intruder once they are inside. Other actions
 ## pass through unchanged. Turn off for a goal that should engage the player anywhere (e.g. hunt).
@@ -58,6 +60,19 @@ const AgentPerception := preload("res://scenes/ai/agent_perception.gd")
 ## Seconds a chosen fire/cover position is committed to before a new one may be picked. Prevents
 ## per-frame re-selection of the nearest spot (which makes the NPC vibrate).
 @export var reposition_interval: float = 0.5
+## Radius (px) within which a hit on something else still registers as gunfire near the NPC.
+@export var hit_awareness_radius: float = 160.0
+## Seconds an incoming/nearby hit keeps the NPC on "under fire" alert (reported to Von, which
+## re-decides at once). Also the window during which self-defense suspends the inside-gate.
+@export var under_fire_time: float = 3.0
+## Seconds the NPC stays committed to a fight after the last shot it fired or took, before it
+## re-asks Von. Stops it dropping out of combat between the once-a-cadence decisions.
+@export var engage_dwell: float = 3.0
+## Memory cleanup: hard cap on remembered events (oldest evicted past it); <= 0 = unlimited.
+@export var memory_capacity: int = 64
+## Memory cleanup: fallback lifetime (s) for remembered events given no explicit ttl; <= 0 = no age
+## expiry (events then persist until evicted by capacity).
+@export var memory_default_ttl: float = 0.0
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 @export var arrive_dist: float = 10.0
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
@@ -84,6 +99,7 @@ var _cover_timer := 0.0           ## Seconds left ducking behind cover before pe
 var _fire_timer := 0.0            ## Seconds left before the next shot/punch may be thrown.
 var _combat_dest := Vector2.ZERO  ## Committed fire/cover position the NPC is steering toward.
 var _combat_dest_timer := 0.0     ## Seconds left before a new combat position may be chosen.
+var _hold_ground := false         ## Combat: return fire but stay inside the house (defending an outside attacker).
 var _move_id := ""                ## Chosen move id, for the decision log.
 var _act_log := "hold"            ## Chosen act id, for the decision log.
 var _gated_hold := false          ## True when combat was gated to a hold (intruder still outside).
@@ -95,6 +111,10 @@ var _decide_timer := 0.0          ## Seconds until the next decision is allowed.
 var _force := false               ## Force a decision now (task resolved or salient event).
 var _last_inside := false         ## Last-seen "player inside the house" state, for edge detection.
 var _inside_init := false         ## Whether _last_inside has been seeded.
+# Combat awareness (fed by EventBus &"hit" events, stored in _memory).
+var _character: Node              ## The character this controller drives, captured on first control.
+var _hit_queue: Array = []        ## Hit events awaiting processing once _character is known.
+var _memory: RefCounted           ## Remembered events (under fire, engaged, …); see agent_memory.gd.
 var _pending := false             ## True while a request is in flight.
 var _http: HTTPRequest            ## Client for decision requests.
 
@@ -103,12 +123,23 @@ var _http: HTTPRequest            ## Client for decision requests.
 func _ready() -> void:
 	_perception = AgentPerception.new()
 	add_child(_perception)
+	_memory = AgentMemory.new()
+	_memory.capacity = memory_capacity
+	_memory.default_ttl = memory_default_ttl
 	_http = HTTPRequest.new()
 	_http.timeout = 3.0
 	add_child(_http)
 	_http.request_completed.connect(_on_request_completed)
+	EventBus.posted.connect(_on_event)
 	if nav_agent_path != NodePath():
 		_agent = get_node_or_null(nav_agent_path) as NavigationAgent2D
+
+
+## Buffer a world hit event for processing on the next control() tick (the signal can fire before
+## the controller knows which character it drives).
+func _on_event(topic: StringName, data: Dictionary) -> void:
+	if topic == &"hit":
+		_hit_queue.append(data)
 
 
 ## Called each physics frame by the character. Advances timers, honours the current commitment, asks
@@ -116,8 +147,11 @@ func _ready() -> void:
 func control(character, delta: float) -> void:
 	if target == null:
 		return
+	if _character == null:
+		_character = character
 	_decide_timer -= delta
 	_commit_timer -= delta
+	_process_hits(character)
 	_check_salient()
 
 	# An active interaction is held until its dwell runs out, the character leaves it, or a salient
@@ -140,13 +174,16 @@ func control(character, delta: float) -> void:
 
 
 ## Whether a new decision may be issued now: never while one is in flight; always when forced; held
-## back while committed to reaching a chosen object or an idle destination (until the safety cap);
-## combat re-decides every cadence so it keeps tracking the player.
+## back while committed to reaching a chosen object, to an idle destination (until the safety cap),
+## or to a fight (while the `engaged` memory is fresh, so it keeps fighting rather than re-rolling a
+## flat shoot/hold choice every cadence — peek-and-cover keeps tracking the player meanwhile).
 func _should_decide(character) -> bool:
 	if _pending:
 		return false
 	if _force:
 		return true
+	if _intent == "combat":
+		return not _memory.is_fresh(&"engaged")
 	if _intent == "interact":
 		return _commit_timer <= 0.0
 	if _intent == "idle" and _has_move and _commit_timer > 0.0 and not _reached(character, _move_point):
@@ -154,14 +191,37 @@ func _should_decide(character) -> bool:
 	return _decide_timer <= 0.0
 
 
+## Classify buffered hit events against the character and remember them: a hit on the NPC itself, or
+## a hit on anything within `hit_awareness_radius` (a shot landing close — being shot at and missed),
+## both count as being fired upon and record the incoming direction. Each also refreshes the combat
+## engagement so sustained fire keeps the NPC fighting. Any fresh hit forces an immediate
+## re-decision (a salient event).
+func _process_hits(character) -> void:
+	if _hit_queue.is_empty():
+		return
+	var self_pos: Vector2 = character.global_position
+	for data in _hit_queue:
+		var hit_me: bool = data.get("victim") == character
+		if not hit_me and self_pos.distance_to(data.get("position", self_pos)) > hit_awareness_radius:
+			continue  # A hit too far away to notice.
+		var from: Vector2 = -(data.get("direction", Vector2.RIGHT) as Vector2)
+		_memory.remember(&"under_fire", {"from": from}, under_fire_time)
+		_memory.remember(&"engaged", {}, engage_dwell)
+		_force = true
+	_hit_queue.clear()
+
+
+## Whether the NPC is being fired upon right now — shot, or a shot landing close (shot at and missed)
+## within the remembered window. Drives self-defense: it suspends the inside-gate and the state reads
+## "under fire".
+func _under_attack() -> bool:
+	return _memory.is_fresh(&"under_fire")
+
+
 ## Force a re-decision when the player crosses the house boundary (the one event worth interrupting a
 ## commitment for). Seeded on the first call so the initial state isn't treated as a crossing.
 func _check_salient() -> void:
-	var inside := false
-	for room in rooms:
-		if (room["rect"] as Rect2).has_point(target.global_position):
-			inside = true
-			break
+	var inside := _inside_house(target.global_position)
 	if not _inside_init:
 		_last_inside = inside
 		_inside_init = true
@@ -169,6 +229,14 @@ func _check_salient() -> void:
 	if inside != _last_inside:
 		_last_inside = inside
 		_force = true
+
+
+## Whether a world point lies within any of the house's rooms (the "inside the house" test).
+func _inside_house(p: Vector2) -> bool:
+	for room in rooms:
+		if (room["rect"] as Rect2).has_point(p):
+			return true
+	return false
 
 
 ## Carry out the current act. Movement and aim are both derived from what the NPC chose to do.
@@ -206,10 +274,13 @@ func _apply_interact(character) -> void:
 
 ## Combat intent: always face the player, then fight tactically. A punch just closes and swings; a
 ## shot runs the peek-and-cover cycle below. Firing is gated on a real line of sight, so the guard
-## never shoots through walls, and paced by `fire_cooldown`.
+## never shoots through walls, and paced by `fire_cooldown`. When combat is only happening because
+## self-defense suspended the inside-gate (the attacker is still outside), the NPC returns fire but
+## holds its ground inside the house rather than chasing the attacker out.
 func _apply_combat(character, delta: float) -> void:
 	character.aim_point = target.global_position
 	_fire_timer -= delta
+	_hold_ground = engage_only_inside and not _last_inside
 	if _act_verb == "punch":
 		_apply_melee(character)
 		return
@@ -251,18 +322,32 @@ func _apply_peek_cover(character, delta: float) -> void:
 
 ## The committed destination for the current phase: the nearest spot with a clear shot (peek) or the
 ## nearest shielded spot (cover); falls back to closing on the player (peek) or holding (cover) when
-## no suitable spot exists this sample.
+## no suitable spot exists this sample. While holding ground (defending an outside attacker), spots
+## are restricted to inside the house and the peek fallback holds position instead of advancing out,
+## so the NPC returns fire from inside rather than pursuing the attacker.
 func _choose_combat_dest(character, phase: String) -> Vector2:
 	var spots: Dictionary = _perception.combat_spots(character, target, combat_ring_radius, combat_ring_count)
+	var fire: Array = spots["fire"]
+	var cover: Array = spots["cover"]
+	if _hold_ground:
+		fire = fire.filter(func(p): return _inside_house(p))
+		cover = cover.filter(func(p): return _inside_house(p))
 	if phase == "cover":
-		return spots["cover"][0] if not spots["cover"].is_empty() else character.global_position
-	return spots["fire"][0] if not spots["fire"].is_empty() else target.global_position
+		return cover[0] if not cover.is_empty() else character.global_position
+	if not fire.is_empty():
+		return fire[0]
+	return character.global_position if _hold_ground else target.global_position
 
 
 ## Melee combat: close to punch range and swing on the fire cooldown (no cover cycle for fists).
+## While holding ground it won't chase an attacker out of the house — it only swings if one is
+## already in reach.
 func _apply_melee(character) -> void:
 	if character.global_position.distance_to(target.global_position) > punch_range:
-		_path_move(character, target.global_position)
+		if not _hold_ground:
+			_path_move(character, target.global_position)
+		else:
+			character.move_input = Vector2.ZERO
 		return
 	character.move_input = Vector2.ZERO
 	if _fire_timer <= 0.0:
@@ -270,8 +355,10 @@ func _apply_melee(character) -> void:
 		_fire_timer = fire_cooldown
 
 
-## Equip the act's slot and throw one shot/punch.
+## Equip the act's slot and throw one shot/punch, refreshing the combat engagement so an active
+## fight stays committed.
 func _fire(character) -> void:
+	_memory.remember(&"engaged", {}, engage_dwell)
 	var slot: int = _acts.get(_act_log, {}).get("slot", 0)
 	if slot > 0:
 		character.select_slot(slot)
@@ -331,7 +418,7 @@ func _path_move(character, dest: Vector2) -> void:
 ## Sense the situation and POST it with the `move` and `act` `choice` questions. Falls back to a
 ## steady stance if the request can't even be started.
 func _request_decision(character) -> void:
-	var ctx: Dictionary = _perception.sense(character, target, rooms, goal)
+	var ctx: Dictionary = _perception.sense(character, target, rooms, goal, _memory)
 	_moves = ctx["moves"]
 	_acts = ctx["acts"]
 	var body := {
@@ -412,8 +499,10 @@ func _set_act(id: String) -> void:
 	_act_log = id if id != "" else "hold"
 	_act_armed = false
 	_gated_hold = false
-	if (_act_verb == "shoot" or _act_verb == "punch") and engage_only_inside and not _last_inside:
-		# House guard: hold rather than engage an intruder who is still outside the house.
+	if (_act_verb == "shoot" or _act_verb == "punch") and engage_only_inside and not _last_inside \
+			and not _under_attack():
+		# House guard: hold rather than engage an intruder who is still outside the house — unless
+		# fired upon (hit or shot at), when self-defense overrides the restraint and it may engage.
 		_act_verb = "hold"
 		_act_log = "hold(outside)"
 		_gated_hold = true
@@ -426,6 +515,7 @@ func _set_act(id: String) -> void:
 		"shoot", "punch":
 			_intent = "combat"
 			_target_obj = null
+			_memory.remember(&"engaged", {}, engage_dwell)  # Commit to the fight (refreshed by firing).
 		_:
 			_intent = "idle"
 			_target_obj = null

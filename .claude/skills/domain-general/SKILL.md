@@ -5,8 +5,8 @@ description: Deep implementation detail for the General domain (scenes/general/)
 
 # General domain
 
-Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server.
-`Keybinds` and `Despawner` are the only autoloads (`project.godot`).
+Everything else: input (Keybinds), despawner, event bus, camera, debug HUD, dev command server.
+`Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
 
 ## Input architecture
 
@@ -30,6 +30,14 @@ false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a c
 presses through `Keybinds` names — the same path a human's keyboard/mouse uses — so no game domain
 is coupled to it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`); each
 command is echoed as a `[cmd] …` Output line. (The `godot-debug` skill covers driving it.)
+
+## Event bus
+
+`event_bus.gd` (autoload `EventBus`) — a minimal generic publish/subscribe bus for decoupled
+cross-domain notifications: `post(topic, data)` broadcasts and the `posted(topic, data)` signal
+delivers to any listener, which filters by `topic`. Emitters and listeners never reference each
+other. The only topic in use is `&"hit"`, posted by the Projectile System for each damaging hit
+(`{ position, victim, source, direction, damage }`) and consumed by the AI for combat awareness.
 
 ## Camera, despawner, debug HUD
 

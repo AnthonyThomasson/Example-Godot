@@ -248,6 +248,12 @@ func take_hit(hit: HitInfo) -> void:
 	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
 
 
+## Total accumulated hit damage this character has taken, read from its deformation record. Lets a
+## controller sense how hurt the character is (0 when unscathed).
+func damage_taken() -> float:
+	return _deformable.damage_total if _deformable else 0.0
+
+
 # --- Pushable contract (shoved by Knockback transfers and other walking characters) -----
 
 ## Take a shove; divided by mass and folded into locomotion.

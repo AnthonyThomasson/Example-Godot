@@ -21,6 +21,7 @@ debug/command_port=9080
 
 Keybinds="*res://scenes/general/keybinds.gd"
 Despawner="*res://scenes/general/despawner.gd"
+EventBus="*res://scenes/general/event_bus.gd"
 
 [dotnet]
 

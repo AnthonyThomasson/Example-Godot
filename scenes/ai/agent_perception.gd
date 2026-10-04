@@ -22,6 +22,10 @@ const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-we
 
 ## Surface coverage (0–100) at or above which a blocking object counts as usable cover.
 @export var cover_min: float = 40.0
+## Accumulated damage (see Character.damage_taken) at or above which the NPC reports being hurt.
+@export var hurt_threshold: float = 15.0
+## Accumulated damage at or above which the NPC reports being badly wounded.
+@export var critical_threshold: float = 35.0
 
 var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the first sense() call.
 var _post_set := false           ## Whether _post has been captured yet.
@@ -31,10 +35,11 @@ var _scanned := false            ## Whether the one-time interactable scan has r
 
 ## Build this tick's decision context: `{ state_text, moves, acts }`. `goal` is the behaviour string
 ## Von ranks the menu against; `rooms` is Main's world-space room list (`{ key, type, rect }`);
-## `target` is the player. `moves` maps an id to `{ desc, point }`; `acts` maps an id to
+## `target` is the player; `memory` is the agent's event memory (agent_memory.gd), whose fresh events
+## are rendered into the state. `moves` maps an id to `{ desc, point }`; `acts` maps an id to
 ## `{ desc, verb, ... }` where `verb` is shoot/punch/hold/interact and an interact also carries its
 ## `object` + `id`.
-func sense(character, target: Node2D, rooms: Array, goal: String) -> Dictionary:
+func sense(character, target: Node2D, rooms: Array, goal: String, memory: RefCounted) -> Dictionary:
 	if not _post_set:
 		_post = character.global_position
 		_post_set = true
@@ -48,23 +53,85 @@ func sense(character, target: Node2D, rooms: Array, goal: String) -> Dictionary:
 	var self_room := _room_at(self_pos, rooms)
 
 	return {
-		"state_text": _state_text(character, int(to_tgt.length()), inside, tgt_room, self_room, to_tgt, goal),
+		"state_text": _state_text(character, target, int(to_tgt.length()), inside, tgt_room, self_room, to_tgt, goal, memory),
 		"moves": _moves(tgt_pos, rooms),
 		"acts": _acts(character, self_pos, rooms),
 	}
 
 
 ## The state: the goal verbatim, then the situation line (where the NPC is, what it holds, whether
-## it is mid-interaction, and the player's position relative to the house). Kept short — Von
-## middle-truncates long states.
-func _state_text(character, dist: int, inside: bool, tgt_room: Dictionary, self_room: Dictionary, to_tgt: Vector2, goal: String) -> String:
+## it is mid-interaction, and the player's position relative to the house), then any combat-awareness
+## lines (under fire / gunfire nearby / own injury) and what the characters around it are holding.
+## Kept short — Von middle-truncates long states.
+func _state_text(character, target: Node2D, dist: int, inside: bool, tgt_room: Dictionary, self_room: Dictionary, to_tgt: Vector2, goal: String, memory: RefCounted) -> String:
 	var where := "inside the house" if inside else "outside the house"
 	if inside and not tgt_room.is_empty():
 		where += " (in the %s)" % tgt_room.get("type", "house")
 	var self_where: String = self_room.get("type", "the grounds") if not self_room.is_empty() else "the grounds"
 	var activity := ("busy: %s" % character.interaction_label()) if character.is_busy() else "free to act"
-	return ("%s\nYou are in the %s, %s, holding a %s. The player is %s, ~%dpx to your %s.") % [
-		goal, self_where, activity, character.current_item().display_name, where, dist, _compass(to_tgt)]
+	var lines: Array = ["%s\nYou are in the %s, %s, holding a %s. The player is %s, ~%dpx to your %s." % [
+		goal, self_where, activity, character.current_item().display_name, where, dist, _compass(to_tgt)]]
+	lines.append_array(_awareness_lines(character, memory))
+	lines.append_array(_characters_items(character, target))
+	return "\n".join(lines)
+
+
+## The awareness lines drawn from memory + current condition: being under fire (hit or shot at, with
+## the incoming direction when known), any other remembered event carrying a `note` (freshest per
+## topic), and the NPC's own injury level. Empty when nothing is remembered and it is unharmed.
+func _awareness_lines(character, memory: RefCounted) -> Array:
+	var out: Array = []
+	if memory.is_fresh(&"under_fire"):
+		var from: Vector2 = memory.recall(&"under_fire").get("from", Vector2.ZERO)
+		if from != Vector2.ZERO:
+			out.append("You are under fire from the %s!" % _compass(from))
+		else:
+			out.append("You are under fire — shots are striking close to you!")
+	# Surface any other remembered event that carries a note, newest-per-topic (the log may hold many).
+	var seen := {&"under_fire": true}
+	for entry in memory.fresh():
+		var topic = entry["topic"]
+		if seen.has(topic):
+			continue
+		seen[topic] = true
+		var note = entry["data"].get("note", "")
+		if note != "":
+			out.append(note)
+	var dmg: float = character.damage_taken()
+	if dmg >= critical_threshold:
+		out.append("You are badly wounded.")
+	elif dmg >= hurt_threshold:
+		out.append("You are hurt.")
+	return out
+
+
+## What each character around the NPC is holding — threat context. Scans the world for other
+## characters (any node exposing current_item), the player named plainly. Reads only published API.
+func _characters_items(character, target: Node2D) -> Array:
+	var out: Array = []
+	for other in _other_characters(character):
+		var who: String = "The player" if other == target else str(other.name)
+		var item = other.current_item()
+		out.append("%s is holding a %s." % [who, item.display_name if item != null else "nothing"])
+	return out
+
+
+## Every other character in the world (a node with a current_item method, excluding the NPC itself),
+## found by scanning from the shared world root.
+func _other_characters(character) -> Array:
+	var out: Array = []
+	var root: Node = character.world_root()
+	if root != null:
+		_collect_characters(root, character, out)
+	return out
+
+
+## Recursively gather descendants that expose current_item() (characters), excluding `self_char`.
+func _collect_characters(node: Node, self_char, out: Array) -> void:
+	for child in node.get_children():
+		if child != self_char and child.has_method("current_item"):
+			out.append(child)
+		_collect_characters(child, self_char, out)
 
 
 ## The move options: one named destination per room, "where the player is", and the NPC's post.

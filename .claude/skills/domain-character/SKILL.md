@@ -59,7 +59,8 @@ character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never de
 - **Character ↔ Controller** (interface 7): the character reads intent from a controller child
   (any node with `control(character, delta)`) that writes `move_input` / `aim_point` and calls
   the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
-  `interact_with(object, id)` / `end_interaction()`. Signals: `hit_landed(body, damage, hand)`
+  `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
+  damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`
   (hand 0/1 = melee, −1 = shot), `item_changed(item)`, `interaction_changed(active, label)`.
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
