@@ -1,6 +1,6 @@
 ---
 name: domain-ai
-description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the house-guard controller, its world-sensing perception helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC guard, guard perception/state, the Von choice requests (move/aim/act), or the decision server. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the AI domain (scenes/ai/) — non-player brains: the generic goal-driven controller, its world-sensing perception helper, and the dev-only Von decision-server launcher. Use when editing scenes/ai/ or working on the NPC's goal/behaviour, agent perception/state, the act-centric decision menu, the derived movement, the commitment memory, the Von choice requests, or the decision server. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # AI domain
@@ -9,30 +9,69 @@ Non-player brains: controllers that drive a character (with a world-sensing help
 decision context), plus the dev-only decision-server launcher. A controller writes the
 character's intent and calls its public action API — it never reaches into character internals.
 
-## The house guard
+## The goal-driven agent
 
-`character/npc.tscn` is a house guard driven by `ai/jev_controller.gd`, whose goal is to defend
-the house and not engage the player unless the player is inside it. Every `decide_interval` it
-composes an `ai/guard_perception.gd` sensor to build a compact text state (the goal, whether the
-intruder is inside the house, room + bearing + held item — from the `rooms` rects Main injects
-alongside `target`) and three fixed-shape candidate sets, then POSTs **three `choice` questions in
-one request** to a local Jev-style `/v1/systemone` server (Von):
+`character/npc.tscn` is a **generic goal-driven agent** driven by `ai/goal_controller.gd`. Its
+behaviour is pure data: an exported `goal` string in plain language ("watch tv", "make some food",
+"hunt down the player", or the default house-guard goal), **authored on the NPC itself** — the
+`goal` (and `engage_only_inside`) export on `npc.tscn`'s `GoalController` node, editable per NPC in
+the Inspector. Main injects only world wiring (`target`, `rooms`), never the goal. **There is no
+per-goal code** — the same machinery serves any behaviour; adding one means typing a string.
 
-- `move` — a ring of nearby points + each room centre + the intruder + post.
-- `aim` — a ring of look-directions + at-intruder.
-- `act` — `shoot` / `punch` / `hold`.
+**The decision is act-centric.** Von ranks distinct, verb-like options sharply but ranks many
+near-identical spatial points almost at random, so the NPC asks it **WHAT TO DO**, not where to
+step, and derives the movement itself. Each decision `ai/agent_perception.gd` builds a compact text
+state (the goal verbatim, then where the NPC is, what it holds, whether it is mid-interaction, and
+the player's position relative to the house — from the `rooms` rects Main injects alongside
+`target`) and POSTs **two `choice` questions in one request** to a local Jev-style `/v1/systemone`
+server (Von):
 
-It samples one answer each (uniform fallback when the server is down).
+- `act` — the real decision: `shoot` / `punch` / `hold`, plus one **interact** option per *distinct*
+  action available **anywhere in the house** (deduped by label, each pointing at the nearest object
+  that offers it; item-gated). So "Watch TV" / "Cook" / … are always choosable even across the
+  house, and — being distinct and verb-like — Von picks the goal's match sharply and confidently.
+- `move` — named destinations only (each room, the player, the post), consulted **only** when the
+  act is `hold` and the NPC is otherwise idle. No local step-ring and no distance annotations —
+  those are what made Von wander.
 
-**No mode gating:** the full option set is offered every tick and Von applies the "engage only
-once inside" rule from the state, so restraint and cover-use emerge rather than being hard-coded.
+It adopts Von's TOP pick (argmax `choice`) for each (steady-stance fallback when the server is down).
 
-Each choice executes through the character's public API: `move` paths with a `NavigationAgent2D`
-(interface 9; attached by the `nav_agent_path` export), `aim` sets `aim_point`, and `act` equips
-via `select_slot` then fires via `shoot()` / swings via `melee()`.
+**Movement and aim are derived from the chosen act** (there is no aim question):
+- `interact` → walk to that object, face it, and run the interaction once in reach (`interact_with`).
+- `shoot` → **peek-and-cover** (`_apply_peek_cover`): aim at the player and only ever fire when the
+  perception's `has_shot` raycast confirms a clear line (never through walls), paced by
+  `fire_cooldown`. In the PEEK phase it moves to the nearest **fire spot** (a sampled point with a
+  clear line) and fires; after a shot it drops to the COVER phase and ducks to the nearest
+  **cover spot** (shielded by a high-coverage object) for `cover_time`, then peeks again. The
+  chosen fire/cover position is committed for `reposition_interval` rather than re-picked every
+  frame, so the NPC steers smoothly instead of vibrating.
+- `punch` → close to `punch_range` and swing on the cooldown (no cover cycle for fists).
+- `hold` → watch the player, and reposition to the `move` destination if one was chosen.
 
-`guard_perception.gd` holds no policy (it only senses and annotates) and reads only published
-contracts (character API, objects' `get_surface()`, the injected room rects).
+**The inside-gate (`engage_only_inside`).** Von is a single-shot ranker and can't reliably apply an
+"only if …" condition itself (e.g. "engage only once the player is inside"); asked to defend a
+house it drifts to hiding/holding instead of shooting. So the controller enforces the one spatial
+condition that matters here: when `engage_only_inside` is true, a `shoot`/`punch` pick made while
+the player is **outside** the house becomes `hold` (`hold(outside)` in the log), using the
+inside/outside fact the controller already senses for salient events. Interactions and idle pass
+through. Turn it off for a goal that should engage the player anywhere (e.g. hunt). The default goal
+is therefore phrased unconditionally ("shoot the intruder on sight"), and the gate supplies the
+"only inside" part. Otherwise there is no per-goal gating — the full act menu is offered every tick.
+
+**Commitment memory (the System-Two layer Von lacks).** Von is stateless and cannot sequence, so
+the controller holds the thread: once it heads for a chosen object it commits to reaching it (a
+`max_commit_time` safety cap aside); once an interaction starts it stays in it for
+`interaction_dwell` seconds; combat re-decides every cadence so it keeps tracking the player. It
+re-decides when the task resolves, the dwell/cap elapses, or a **salient event** fires (the player
+crossing the house boundary). This lets multi-step goals advance instead of oscillating every tick.
+
+`agent_perception.gd` holds no policy (it only senses, nothing goal-specific) and reads only
+published contracts (character API, objects' `get_interactions()` / `get_surface()`, the injected
+room rects). It caches the house's interactable objects via a one-time scan of
+`character.world_root()` on first sense, so a far-off object is still offerable. It also answers the
+controller's combat-geometry queries — `has_shot` (clear line to the player) and `combat_spots`
+(nearby fire/cover points, classified by raycast) — which feed the peek-and-cover logic directly,
+not Von.
 
 ## Decision server launcher
 

@@ -59,7 +59,7 @@ crucial, and is it one of the vital interfaces?"** Route your judgment through t
   needed and new — promote it to a real interface (a small façade / contract method) **and add it
   to the `architecture` skill** (see Step 3).
 - **Is it the leanest connection that works?** Reaching in by concrete node name
-  (`get_node("JevController")`) couples to layout; a duck-typed lookup or a one-line seam couples
+  (`get_node("GoalController")`) couples to layout; a duck-typed lookup or a one-line seam couples
   to behaviour instead and survives refactors. Prefer the connection that knows the least about
   the other side.
 - **Does the dependency direction respect the graph?** The `architecture` skill has a dependency graph with no
@@ -201,7 +201,7 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 ## Change verification
 
 ### Domain isolation
-- [ ] `scenes/main.gd:48` — Main couples to the NPC's child node name `"JevController"`.
+- [ ] `scenes/main.gd:48` — Main couples to the NPC's child node name `"GoalController"`.
       Fix: find the controller by its `control` duck-type instead (as `character._find_controller` does).
 - [x] No calls into another domain's private members.
 

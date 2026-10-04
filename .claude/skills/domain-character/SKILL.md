@@ -51,8 +51,8 @@ character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never de
 
 ## Scenes
 
-`character/npc.tscn` is a house guard driven by `ai/jev_controller.gd` (see the `domain-ai`
-skill). The player uses `player_controller.gd`.
+`character/npc.tscn` is a generic goal-driven agent driven by `ai/goal_controller.gd` (see the
+`domain-ai` skill). The player uses `player_controller.gd`.
 
 ## Interface recap (authoritative in the `architecture` skill)
 

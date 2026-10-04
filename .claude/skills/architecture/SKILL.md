@@ -100,8 +100,12 @@ interface(s) and describes how they're implemented; this list is authoritative f
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
    and `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
-   path and read only the public API/signals. The NPC (`character/npc.tscn`) is a house guard
-   driven by `ai/jev_controller.gd` — see the `domain-ai` skill.
+   path and read only the public API/signals. The NPC (`character/npc.tscn`) is a generic
+   goal-driven agent driven by `ai/goal_controller.gd`: its behaviour is a plain-language `goal`
+   string authored on the NPC itself (an export on its controller; Main injects only `target` and
+   `rooms`). Von picks WHAT to do from an act menu
+   (combat + every house-wide object interaction) ranked against the goal, and the controller
+   derives the movement — no per-goal code. See the `domain-ai` skill.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`) and exposes only
