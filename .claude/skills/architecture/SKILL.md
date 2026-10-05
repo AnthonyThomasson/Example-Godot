@@ -120,10 +120,13 @@ interface(s) and describes how they're implemented; this list is authoritative f
 9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
 	 one `NavigationRegion2D` whose walkable area is the house footprint minus the house's
-	 **static** wall colliders, so doorways stay open and `RigidBody2D` furniture is ignored.
+	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
+	 (baked in as a hole), so paths route around furniture; it also tags each solid furniture body
+	 with a dynamic avoidance `NavigationObstacle2D` for a piece shoved off its hole.
    `main.gd` calls it once after `WorldGen.generate`. Any `NavigationAgent2D` then pathfinds
-   against the global map automatically — the only consumer wiring is the AI controller setting
-   `target_position` and reading `get_next_path_position()`.
+   against the global map automatically — the AI controller sets `target_position`, reads
+   `get_next_path_position()`, and enables the agent's RVO avoidance (feeding `velocity`, applying
+   the `velocity_computed` safe velocity) to steer around those obstacles.
 
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.

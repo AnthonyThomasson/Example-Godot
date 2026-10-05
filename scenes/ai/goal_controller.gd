@@ -77,6 +77,11 @@ const AgentMemory := preload("res://scenes/ai/agent_memory.gd")
 @export var arrive_dist: float = 10.0
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
 @export var nav_agent_path: NodePath
+## How long (s) the NPC stays blocked against furniture before it shoves straight through as a last
+## resort (when no route around exists, or it is wedged and barely moving).
+@export var push_through_delay: float = 1.0
+## Movement speed (px/s) under which the NPC counts as blocked while trying to follow a path.
+@export var stuck_speed: float = 20.0
 
 ## The player the NPC senses and may act on, set by Main.
 var target: Node2D
@@ -85,6 +90,11 @@ var rooms: Array = []
 
 var _perception: Node             ## Builds the state + menu each decision.
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
+var _safe_velocity := Vector2.ZERO ## Latest avoidance-adjusted velocity from the agent (RVO callback).
+var _avoid_ready := false          ## Whether the agent's avoidance (max_speed) has been configured.
+var _last_pos := Vector2.ZERO      ## Character position last path-move frame, for stuck detection.
+var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path.
+var _push_through := false         ## True while shoving straight through a blocker (the last resort).
 var _moves := {}                  ## This tick's move options by id (from the sensor).
 var _acts := {}                   ## This tick's act options by id.
 var _intent := "idle"             ## What the current act means to do: interact / combat / idle.
@@ -133,6 +143,11 @@ func _ready() -> void:
 	EventBus.posted.connect(_on_event)
 	if nav_agent_path != NodePath():
 		_agent = get_node_or_null(nav_agent_path) as NavigationAgent2D
+	if _agent != null:
+		# RVO avoidance steers the NPC around furniture (tagged with NavigationObstacle2D by the
+		# Navigation domain); max_speed is set from the character on the first control() tick.
+		_agent.avoidance_enabled = true
+		_agent.velocity_computed.connect(_on_avoidance_velocity)
 
 
 ## Buffer a world hit event for processing on the next control() tick (the signal can fire before
@@ -149,6 +164,9 @@ func control(character, delta: float) -> void:
 		return
 	if _character == null:
 		_character = character
+	if _agent != null and not _avoid_ready:
+		_agent.max_speed = character.speed
+		_avoid_ready = true
 	_decide_timer -= delta
 	_commit_timer -= delta
 	_process_hits(character)
@@ -400,8 +418,13 @@ func _reached(character, point: Vector2) -> bool:
 	return character.global_position.distance_to(point) < arrive_dist
 
 
-## Steer `character.move_input` toward `dest` along a navigated path (around walls, through doorways).
-## Falls back to straight-line steering when there is no navigation agent.
+## Steer `character.move_input` toward `dest` along a navigated path (around walls and furniture,
+## through doorways). The navmesh carves out furniture, so the path routes around a piece and reroutes
+## through another doorway when one is blocked; RVO avoidance (fed each frame, applied from the
+## previous frame's safe velocity) smooths steering around a piece just shoved. When no route exists
+## at all (`is_target_reachable()` false) or the NPC stays wedged for `push_through_delay`, it shoves
+## straight through the blocker as a last resort, using the character's own push physics.
+## Falls back to plain straight-line steering when there is no navigation agent.
 func _path_move(character, dest: Vector2) -> void:
 	if _agent == null:
 		var straight: Vector2 = dest - character.global_position
@@ -410,9 +433,48 @@ func _path_move(character, dest: Vector2) -> void:
 	_agent.target_position = dest
 	if _agent.is_navigation_finished():
 		character.move_input = Vector2.ZERO
+		_reset_stuck(character)
 		return
 	var next := _agent.get_next_path_position()
-	character.move_input = (next - character.global_position).normalized()
+	var desired: Vector2 = next - character.global_position
+	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
+	_agent.velocity = desired * character.speed  # Request this frame's avoidance-safe velocity.
+	_update_stuck(character)
+	if _push_through:
+		# No route around (or wedged): drive straight at the blocker so the character shoves it.
+		var aim: Vector2 = dest if not _agent.is_target_reachable() else next
+		character.move_input = (aim - character.global_position).normalized()
+	elif character.speed > 0.0:
+		character.move_input = _safe_velocity / character.speed  # Length <= 1 (push-strength scaling).
+	else:
+		character.move_input = desired
+
+
+## Store the agent's avoidance-adjusted velocity; `_path_move` applies it the next frame (writing
+## move_input synchronously there, like every other act, rather than from this async callback).
+func _on_avoidance_velocity(safe_velocity: Vector2) -> void:
+	_safe_velocity = safe_velocity
+
+
+## Track whether the NPC is blocked while pathing and flip `_push_through` once it has been blocked
+## for `push_through_delay`. Blocked = the target is unreachable (furniture seals every route) or the
+## character advanced less than `stuck_speed` this frame.
+func _update_stuck(character) -> void:
+	var step := get_physics_process_delta_time()
+	var moved: float = character.global_position.distance_to(_last_pos)
+	_last_pos = character.global_position
+	if not _agent.is_target_reachable() or moved < stuck_speed * step:
+		_stuck_time += step
+	else:
+		_stuck_time = 0.0
+	_push_through = _stuck_time >= push_through_delay
+
+
+## Clear stuck/push-through state when the NPC arrives or stops pathing.
+func _reset_stuck(character) -> void:
+	_stuck_time = 0.0
+	_push_through = false
+	_last_pos = character.global_position
 
 
 ## Sense the situation and POST it with the `move` and `act` `choice` questions. Falls back to a

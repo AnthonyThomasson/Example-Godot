@@ -51,6 +51,19 @@ It adopts Von's TOP pick (argmax `choice`) for each (steady-stance fallback when
 - `punch` → close to `punch_range` and swing on the cooldown (no cover cycle for fists).
 - `hold` → watch the player, and reposition to the `move` destination if one was chosen.
 
+**Pathing avoids furniture, shoving through only as a last resort.** All derived movement flows
+through `_path_move` on a `NavigationAgent2D`. The Navigation domain bakes furniture in as navmesh
+holes, so the path already routes **around** furniture and reroutes through another doorway when the
+near one is blocked. On top of that the controller enables the agent's RVO **avoidance**: each frame
+`_path_move` feeds `_agent.velocity` the desired direction and applies the previous frame's
+avoidance-safe velocity (from the `velocity_computed` callback, stored in `_safe_velocity`) to
+`move_input`, so it steers around a piece shoved off its hole. When no route exists at all — a piece
+seals the only way so `_agent.is_target_reachable()` is false, or the NPC stays wedged (advancing less
+than `stuck_speed`) for `push_through_delay` seconds — it enters `_push_through`: it drives straight at
+the blocker at full strength, letting the character's own push physics shove it aside, then resumes
+normal pathing once it progresses or the target is reachable again. Tuning exports: `push_through_delay`,
+`stuck_speed`.
+
 **The inside-gate (`engage_only_inside`).** Von is a single-shot ranker and can't reliably apply an
 "only if …" condition itself (e.g. "engage only once the player is inside"); asked to defend a
 house it drifts to hiding/holding instead of shooting. So the controller enforces the one spatial
@@ -104,8 +117,8 @@ event (freshest per topic). It answers the controller's combat-geometry queries 
 which feed the peek-and-cover logic directly, not Von.
 
 Tuning exports: `hit_awareness_radius`, `under_fire_time`, `engage_dwell`, `memory_capacity`,
-`memory_default_ttl` (controller) and `hurt_threshold`, `critical_threshold` (perception, for the
-injury wording).
+`memory_default_ttl`, `push_through_delay`, `stuck_speed` (controller) and `hurt_threshold`,
+`critical_threshold` (perception, for the injury wording).
 
 ## Decision server launcher
 
