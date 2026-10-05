@@ -19,9 +19,18 @@ extends Node
 ## salient event fires (the player crossing the house boundary), which lets multi-step goals advance
 ## instead of oscillating. Movement is real pathfinding through a NavigationAgent2D. When the server
 ## is unreachable it holds a steady stance (watch the player).
+##
+## The NPC is NOT omniscient. Each tick the perception's SEE pass runs the world through a tunable
+## vision sense (agent_vision.gd — field of view, range, line of sight) and deposits what is visible
+## into the agent's memory; the BUILD pass then composes the decision state + menu from what the NPC
+## currently sees AND remembers. So it acts on a last-KNOWN player position (resolved from memory),
+## engages only a player it can locate, and — once a sighting decays (`player_memory_ttl`) — loses
+## the target and drops back to its goal. `familiar_with_house` pre-seeds the house's rooms/objects as
+## already-known; an unfamiliar NPC must see them first. People are never pre-known.
 
 const AgentPerception := preload("res://scenes/ai/agent_perception.gd")
 const AgentMemory := preload("res://scenes/ai/agent_memory.gd")
+const AgentVision := preload("res://scenes/ai/agent_vision.gd")
 
 ## The behaviour to pursue, in plain language. Injected by Main; the default keeps the house-guard
 ## behaviour when none is set.
@@ -34,6 +43,15 @@ const AgentMemory := preload("res://scenes/ai/agent_memory.gd")
 ## This exists because Von (a single-shot ranker) can't reliably apply an "only if inside" condition
 ## itself, so the controller enforces it from the inside/outside fact it already senses.
 @export var engage_only_inside: bool = true
+## Pursuit behaviour: when true this NPC actively hunts the player instead of doing house chores.
+## While it cannot locate the player it holds/patrols and sweeps its view to search (rather than
+## settling into a passive interaction, which freezes its facing and blinds it); once it can locate
+## the player it ENGAGES (shoot/punch) rather than picking an unrelated interaction — the large
+## object-interaction menu otherwise dilutes Von's choice and lets it wander off to sit mid-hunt. The
+## inside-gate still applies to the resulting engagement. Turn off for an NPC whose goal is unrelated
+## to the player (e.g. "watch tv"), so it keeps doing its task and Von chooses freely. Like
+## `engage_only_inside`, this is a controller policy Von (a single-shot ranker) can't apply itself.
+@export var pursue_player: bool = true
 ## The `/v1/systemone` endpoint to ask.
 @export var server_url: String = "http://127.0.0.1:8000/v1/systemone"
 ## Model name sent with each request.
@@ -73,6 +91,26 @@ const AgentMemory := preload("res://scenes/ai/agent_memory.gd")
 ## Memory cleanup: fallback lifetime (s) for remembered events given no explicit ttl; <= 0 = no age
 ## expiry (events then persist until evicted by capacity).
 @export var memory_default_ttl: float = 0.0
+
+@export_group("Vision")
+## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
+@export var vision_enabled: bool = true
+## Maximum distance (px) at which the NPC can see anything.
+@export var view_distance: float = 2520.0
+## Full angular width (degrees) of the forward view cone, centred on the NPC's facing (its aim).
+@export var fov_degrees: float = 110.0
+## Radius (px) of a 360° near-awareness bubble: things this close are sensed regardless of facing.
+@export var awareness_radius: float = 48.0
+## Whether this NPC starts already knowing the house (its rooms + objects). Off = it must see them
+## first. People are never pre-known either way — they are known only once seen.
+@export var familiar_with_house: bool = true
+## Lifetime (s) of a player sighting — the window the NPC keeps acting on a last-seen position after
+## losing sight before it gives up and drops back to its goal.
+@export var player_memory_ttl: float = 4.0
+## Lifetime (s) of another character's sighting (held-item threat context).
+@export var character_memory_ttl: float = 4.0
+
+@export_group("")
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 @export var arrive_dist: float = 10.0
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
@@ -88,7 +126,16 @@ var target: Node2D
 ## World-space room rects (`{ key, type, rect }`) from Main — the sensor's map of the house.
 var rooms: Array = []
 
-var _perception: Node             ## Builds the state + menu each decision.
+var _perception: Node             ## Senses + builds the state + menu each decision.
+var _vision: RefCounted           ## The sight sense (FOV/range/LoS); see agent_vision.gd.
+var _known_target_pos := Vector2.ZERO ## Last position the NPC saw the player at (from memory).
+var _target_known := false        ## Whether a fresh player sighting is remembered (player locatable).
+var _patrol_point := Vector2.ZERO ## Current patrol/search destination while hunting an unseen player.
+var _patrol_active := false       ## Whether `_patrol_point` holds a live destination to walk to.
+var _patrol_idx := 0              ## Round-robin index into `rooms` for the patrol tour (full coverage).
+var _patrol_room_key := ""        ## Target room key; the leg is done once the NPC ENTERS it (""=a point).
+var _patrol_timer := 0.0          ## Safety cap (s) to advance the tour if a leg can't be reached.
+var _investigate_last_seen := false ## Head for the last-known player spot first after losing sight.
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
 var _safe_velocity := Vector2.ZERO ## Latest avoidance-adjusted velocity from the agent (RVO callback).
 var _avoid_ready := false          ## Whether the agent's avoidance (max_speed) has been configured.
@@ -119,8 +166,9 @@ var _interaction_timer := 0.0     ## Seconds left before ending the current inte
 var _commit_timer := 0.0          ## Seconds left on the current approach commitment (safety cap).
 var _decide_timer := 0.0          ## Seconds until the next decision is allowed.
 var _force := false               ## Force a decision now (task resolved or salient event).
-var _last_inside := false         ## Last-seen "player inside the house" state, for edge detection.
-var _inside_init := false         ## Whether _last_inside has been seeded.
+var _last_inside := false         ## Last-KNOWN "player inside the house" state, for edge detection.
+var _last_known := false          ## Last belief about whether the player is locatable, for edge detection.
+var _inside_init := false         ## Whether _last_inside/_last_known have been seeded.
 # Combat awareness (fed by EventBus &"hit" events, stored in _memory).
 var _character: Node              ## The character this controller drives, captured on first control.
 var _hit_queue: Array = []        ## Hit events awaiting processing once _character is known.
@@ -132,7 +180,14 @@ var _http: HTTPRequest            ## Client for decision requests.
 ## Build the perception component, the HTTP client, and resolve the navigation agent.
 func _ready() -> void:
 	_perception = AgentPerception.new()
+	_perception.player_memory_ttl = player_memory_ttl
+	_perception.character_memory_ttl = character_memory_ttl
 	add_child(_perception)
+	_vision = AgentVision.new()
+	_vision.enabled = vision_enabled
+	_vision.view_distance = view_distance
+	_vision.fov_degrees = fov_degrees
+	_vision.awareness_radius = awareness_radius
 	_memory = AgentMemory.new()
 	_memory.capacity = memory_capacity
 	_memory.default_ttl = memory_default_ttl
@@ -170,7 +225,15 @@ func control(character, delta: float) -> void:
 	_decide_timer -= delta
 	_commit_timer -= delta
 	_process_hits(character)
+	_perception.observe(character, target, rooms, _vision, _memory, familiar_with_house)
+	_update_known()
 	_check_salient()
+
+	# Lost sight of the player mid-fight (the sighting decayed): drop combat and reconsider now,
+	# rather than keep peeking at a target we can no longer locate.
+	if _intent == "combat" and not _target_known:
+		_intent = "idle"
+		_force = true
 
 	# An active interaction is held until its dwell runs out, the character leaves it, or a salient
 	# event forces a rethink; then it ends and we fall through to decide.
@@ -204,6 +267,8 @@ func _should_decide(character) -> bool:
 		return not _memory.is_fresh(&"engaged")
 	if _intent == "interact":
 		return _commit_timer <= 0.0
+	if _intent == "idle" and pursue_player and not _target_known:
+		return false  # Patrolling the house to search; only a salient event (via _force, above) re-decides.
 	if _intent == "idle" and _has_move and _commit_timer > 0.0 and not _reached(character, _move_point):
 		return false
 	return _decide_timer <= 0.0
@@ -211,9 +276,11 @@ func _should_decide(character) -> bool:
 
 ## Classify buffered hit events against the character and remember them: a hit on the NPC itself, or
 ## a hit on anything within `hit_awareness_radius` (a shot landing close — being shot at and missed),
-## both count as being fired upon and record the incoming direction. Each also refreshes the combat
-## engagement so sustained fire keeps the NPC fighting. Any fresh hit forces an immediate
-## re-decision (a salient event).
+## both count as being fired upon and record the incoming direction. Each refreshes the combat
+## engagement so sustained fire keeps the NPC fighting. A hit forces an immediate re-decision only
+## when it is NOT already in combat (to kick off a fight); while already fighting it just refreshes
+## the engagement, so a firefight doesn't re-ask Von every frame (which let it pick an interaction
+## like sitting mid-fight).
 func _process_hits(character) -> void:
 	if _hit_queue.is_empty():
 		return
@@ -225,7 +292,8 @@ func _process_hits(character) -> void:
 		var from: Vector2 = -(data.get("direction", Vector2.RIGHT) as Vector2)
 		_memory.remember(&"under_fire", {"from": from}, under_fire_time)
 		_memory.remember(&"engaged", {}, engage_dwell)
-		_force = true
+		if _intent != "combat":
+			_force = true
 	_hit_queue.clear()
 
 
@@ -236,16 +304,36 @@ func _under_attack() -> bool:
 	return _memory.is_fresh(&"under_fire")
 
 
-## Force a re-decision when the player crosses the house boundary (the one event worth interrupting a
-## commitment for). Seeded on the first call so the initial state isn't treated as a crossing.
+## Resolve what the NPC currently knows of the player from its freshest sighting: whether the player
+## is locatable at all (`_target_known`) and, if so, where (`_known_target_pos`). All acting reads
+## these rather than the player's true position, so the NPC only ever acts on what it has perceived.
+func _update_known() -> void:
+	var seen: Dictionary = _memory.recall(&"saw_player")
+	var now_known := not seen.is_empty()
+	if _target_known and not now_known:
+		# Just lost sight: have the patrol investigate the last-known spot before sweeping rooms.
+		_investigate_last_seen = true
+		_patrol_active = false
+	_target_known = now_known
+	if now_known:
+		_known_target_pos = seen.get("pos", _known_target_pos)
+
+
+## Force a re-decision when the NPC's BELIEF about the player changes: it is first spotted or lost,
+## or the player crosses the house boundary (per the last sighting). These are the events worth
+## interrupting a commitment for. Seeded on the first call so the initial state isn't a "change".
 func _check_salient() -> void:
-	var inside := _inside_house(target.global_position)
+	var seen: Dictionary = _memory.recall(&"saw_player")
+	var known := not seen.is_empty()
+	var inside: bool = known and bool(seen.get("inside", false))
 	if not _inside_init:
 		_last_inside = inside
+		_last_known = known
 		_inside_init = true
 		return
-	if inside != _last_inside:
+	if inside != _last_inside or known != _last_known:
 		_last_inside = inside
+		_last_known = known
 		_force = true
 
 
@@ -268,18 +356,20 @@ func _apply(character, delta: float) -> void:
 			_apply_idle(character)
 
 
-## Interact intent: face and walk to the chosen object; once its action is in reach, run it and hold
-## the interaction. Drops to idle if the object is gone or the action can't start.
+## Interact intent: walk to the chosen object facing it (or a located intruder, to keep eyes on them);
+## once its action is in reach, face it, run it and hold the interaction. Drops to idle if the object
+## is gone or the action can't start. (Only non-pursuing NPCs reach this with an unseen player.)
 func _apply_interact(character) -> void:
 	if _target_obj == null or not is_instance_valid(_target_obj):
 		_intent = "idle"
 		character.move_input = Vector2.ZERO
 		return
-	character.aim_point = _target_obj.global_position
 	if not _interaction_in_reach(character):
+		character.aim_point = _known_target_pos if _target_known else _target_obj.global_position
 		_path_move(character, _target_obj.global_position)
 		return
 	character.move_input = Vector2.ZERO
+	character.aim_point = _target_obj.global_position  # face the object to perform the interaction
 	if not _act_armed:
 		_act_armed = true  # Let facing settle before acting.
 		return
@@ -290,13 +380,14 @@ func _apply_interact(character) -> void:
 		_intent = "idle"
 
 
-## Combat intent: always face the player, then fight tactically. A punch just closes and swings; a
-## shot runs the peek-and-cover cycle below. Firing is gated on a real line of sight, so the guard
-## never shoots through walls, and paced by `fire_cooldown`. When combat is only happening because
+## Combat intent: always face where the player was last seen, then fight tactically. A punch just
+## closes and swings; a shot runs the peek-and-cover cycle below. Firing is gated on a clear line to
+## the player's last-known position (so the NPC never shoots through walls) and paced by
+## `fire_cooldown`; it only ever engages a player it has actually seen. When combat is only happening because
 ## self-defense suspended the inside-gate (the attacker is still outside), the NPC returns fire but
 ## holds its ground inside the house rather than chasing the attacker out.
 func _apply_combat(character, delta: float) -> void:
-	character.aim_point = target.global_position
+	character.aim_point = _known_target_pos  # Aim at where we last saw them, not their true position.
 	_fire_timer -= delta
 	_hold_ground = engage_only_inside and not _last_inside
 	if _act_verb == "punch":
@@ -310,7 +401,7 @@ func _apply_combat(character, delta: float) -> void:
 ## fire/cover destination is committed for `reposition_interval` rather than re-picked every frame,
 ## so the NPC steers smoothly instead of vibrating between near-equal candidates.
 func _apply_peek_cover(character, delta: float) -> void:
-	var dist: float = character.global_position.distance_to(target.global_position)
+	var dist: float = character.global_position.distance_to(_known_target_pos)
 	_combat_dest_timer -= delta
 	if _combat_phase == "cover":
 		_cover_timer -= delta
@@ -322,8 +413,8 @@ func _apply_peek_cover(character, delta: float) -> void:
 			_combat_phase = "peek"
 			_combat_dest_timer = 0.0  # Re-pick a firing spot immediately on peeking out.
 		return
-	# PEEK: take the shot if we have a clear line in range, else reposition to get one.
-	if dist <= shoot_range and _perception.has_shot(character, target):
+	# PEEK: take the shot if a clear line to the known position is in range, else reposition to get one.
+	if dist <= shoot_range and _perception.has_line_to(character, target, _known_target_pos):
 		character.move_input = Vector2.ZERO
 		if _fire_timer <= 0.0:
 			_fire(character)
@@ -344,7 +435,7 @@ func _apply_peek_cover(character, delta: float) -> void:
 ## are restricted to inside the house and the peek fallback holds position instead of advancing out,
 ## so the NPC returns fire from inside rather than pursuing the attacker.
 func _choose_combat_dest(character, phase: String) -> Vector2:
-	var spots: Dictionary = _perception.combat_spots(character, target, combat_ring_radius, combat_ring_count)
+	var spots: Dictionary = _perception.combat_spots(character, target, _known_target_pos, combat_ring_radius, combat_ring_count)
 	var fire: Array = spots["fire"]
 	var cover: Array = spots["cover"]
 	if _hold_ground:
@@ -354,16 +445,16 @@ func _choose_combat_dest(character, phase: String) -> Vector2:
 		return cover[0] if not cover.is_empty() else character.global_position
 	if not fire.is_empty():
 		return fire[0]
-	return character.global_position if _hold_ground else target.global_position
+	return character.global_position if _hold_ground else _known_target_pos
 
 
 ## Melee combat: close to punch range and swing on the fire cooldown (no cover cycle for fists).
 ## While holding ground it won't chase an attacker out of the house — it only swings if one is
 ## already in reach.
 func _apply_melee(character) -> void:
-	if character.global_position.distance_to(target.global_position) > punch_range:
+	if character.global_position.distance_to(_known_target_pos) > punch_range:
 		if not _hold_ground:
-			_path_move(character, target.global_position)
+			_path_move(character, _known_target_pos)
 		else:
 			character.move_input = Vector2.ZERO
 		return
@@ -386,9 +477,15 @@ func _fire(character) -> void:
 		character.melee()
 
 
-## Idle intent (hold): watch the player, and move to the chosen named destination if there is one.
+## Idle intent (hold). A hunting NPC that can't locate the player patrols the house to search for it
+## (walking room to room, looking where it goes). Otherwise it watches a known player and/or moves to
+## a chosen named destination if there is one.
 func _apply_idle(character) -> void:
-	character.aim_point = target.global_position
+	if pursue_player and not _target_known:
+		_patrol(character)
+		return
+	if _target_known:
+		character.aim_point = _known_target_pos
 	if _has_move and not _reached(character, _move_point):
 		_path_move(character, _move_point)
 		return
@@ -396,6 +493,69 @@ func _apply_idle(character) -> void:
 		_has_move = false
 		_force = true  # Arrived; pick the next step.
 	character.move_input = Vector2.ZERO
+
+
+## Patrol the house searching for an unseen player: walk to the current patrol destination and face
+## the direction of travel so the view cone leads the way (no in-place spin). The destination is the
+## last-known player spot right after losing sight (investigate there first), then a cycle through the
+## rooms, re-picked each time the current one is reached. Acquisition happens via the vision sense; the
+## instant the player is seen, a salient event re-decides and pursuit converts this to combat.
+func _patrol(character) -> void:
+	_patrol_timer -= get_physics_process_delta_time()
+	var arrived := not _patrol_active
+	if _patrol_active and _patrol_room_key != "":
+		arrived = _room_key_at(character.global_position) == _patrol_room_key  # entered the room
+	elif _patrol_active:
+		arrived = _reached(character, _patrol_point)  # a non-room point (the last-seen spot)
+	if arrived or _patrol_timer <= 0.0:  # timeout guards against a leg that can't be reached
+		_patrol_point = _reachable(_next_patrol_point(character))
+		_patrol_active = true
+		_patrol_timer = max_commit_time
+	_path_move(character, _patrol_point)
+	if character.move_input != Vector2.ZERO:
+		character.aim_point = character.global_position + character.move_input * 100.0
+
+
+## The next place to search: the last-known player position once, right after losing sight, then a
+## round-robin tour through every room (skipping the one the NPC is standing in), so the patrol covers
+## the whole house rather than circling one corner. Also sets `_patrol_room_key` (the leg's target
+## room, or "" for the last-seen point). Holds position when there are no rooms.
+func _next_patrol_point(character) -> Vector2:
+	if _investigate_last_seen:
+		_investigate_last_seen = false
+		_patrol_room_key = ""
+		return _known_target_pos
+	if rooms.is_empty():
+		_patrol_room_key = ""
+		return character.global_position
+	var here := _room_key_at(character.global_position)
+	for _n in rooms.size():  # advance through the list, skipping the current room
+		_patrol_idx = (_patrol_idx + 1) % rooms.size()
+		if rooms[_patrol_idx]["key"] != here:
+			break
+	var rect: Rect2 = rooms[_patrol_idx]["rect"]
+	_patrol_room_key = rooms[_patrol_idx]["key"]
+	return rect.position + rect.size * 0.5
+
+
+## Snap a world point onto the navigation mesh so it is actually reachable — a room's geometric
+## centre is often inside furniture (off the navmesh), which would make the nav agent treat it as
+## unreachable and wedge the NPC trying to shove toward it. Returns `p` unchanged with no nav agent.
+func _reachable(p: Vector2) -> Vector2:
+	if _agent == null:
+		return p
+	var map: RID = _agent.get_navigation_map()
+	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
+		return p  # Nav map not synchronized yet (very first frames); snap once it is baked.
+	return NavigationServer2D.map_get_closest_point(map, p)
+
+
+## The key of the room containing world point `p`, or "" when `p` is in no room.
+func _room_key_at(p: Vector2) -> String:
+	for room in rooms:
+		if (room["rect"] as Rect2).has_point(p):
+			return room["key"]
+	return ""
 
 
 ## Whether the chosen interaction on `_target_obj` is currently reachable (lets the approach stop and
@@ -480,7 +640,7 @@ func _reset_stuck(character) -> void:
 ## Sense the situation and POST it with the `move` and `act` `choice` questions. Falls back to a
 ## steady stance if the request can't even be started.
 func _request_decision(character) -> void:
-	var ctx: Dictionary = _perception.sense(character, target, rooms, goal, _memory)
+	var ctx: Dictionary = _perception.sense(character, rooms, goal, _memory)
 	_moves = ctx["moves"]
 	_acts = ctx["acts"]
 	var body := {
@@ -561,6 +721,22 @@ func _set_act(id: String) -> void:
 	_act_log = id if id != "" else "hold"
 	_act_armed = false
 	_gated_hold = false
+	if pursue_player and _target_known and _act_verb in ["interact", "hold"]:
+		# Hunting NPC with a located target: engage rather than do a chore or stand idle. The large
+		# interaction menu otherwise dilutes Von's ranking and lets it pick e.g. "sit" with the
+		# player in view. The inside-gate below still turns this back into a hold if it's not allowed.
+		_act_verb = "shoot" if _acts.has("shoot") else ("punch" if _acts.has("punch") else _act_verb)
+		_act_log = _act_verb
+	elif pursue_player and not _target_known and _act_verb == "interact":
+		# Searching: don't park in a passive interaction (it freezes the NPC facing one way and
+		# blinds it). Hold and patrol while sweeping the view instead, so it looks for the player.
+		_act_verb = "hold"
+		_act_log = "search"
+	elif _memory.is_fresh(&"engaged") and _act_verb == "interact":
+		# Backstop for a non-pursuing NPC dragged into a fight (self-defense): once engaged, a
+		# re-decision must not peel it off to sit/use furniture mid-combat.
+		_act_verb = "shoot" if _acts.has("shoot") else ("punch" if _acts.has("punch") else "hold")
+		_act_log = _act_verb
 	if (_act_verb == "shoot" or _act_verb == "punch") and engage_only_inside and not _last_inside \
 			and not _under_attack():
 		# House guard: hold rather than engage an intruder who is still outside the house — unless

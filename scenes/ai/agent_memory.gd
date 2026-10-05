@@ -10,7 +10,9 @@ extends RefCounted
 ## Cleanup is a configurable policy, not a per-topic limit. `default_ttl` sets a fallback lifetime
 ## for events remembered without an explicit one, and `capacity` caps the total stored. Eviction
 ## runs on every write: age-expired events are dropped first, then, if still over capacity, the
-## oldest. So memory self-cleans by age and by volume, both tunable per NPC.
+## oldest EXPIRABLE event (one with a positive ttl). Permanent events (ttl <= 0 — long-term facts
+## like learned house knowledge) never age out and are never volume-evicted. So memory self-cleans
+## its volatile events by age and by volume, both tunable per NPC, while keeping what it has learned.
 
 ## Fallback lifetime (seconds) for events remembered without an explicit ttl; <= 0 = no age expiry.
 var default_ttl: float = 0.0
@@ -84,11 +86,21 @@ func forget(topic: StringName) -> void:
 	_entries = _entries.filter(func(entry): return entry["topic"] != topic)
 
 
-## Apply the cleanup policy: drop age-expired events, then the oldest while over `capacity`.
+## Apply the cleanup policy: drop age-expired events, then, while over `capacity`, drop the oldest
+## EXPIRABLE events (positive ttl). Permanent events (ttl <= 0) are long-term facts and are never
+## volume-evicted — they persist until explicitly forgotten.
 func prune() -> void:
 	_entries = _entries.filter(func(entry): return not _expired(entry))
-	if capacity > 0 and _entries.size() > capacity:
-		_entries = _entries.slice(_entries.size() - capacity)
+	if capacity <= 0 or _entries.size() <= capacity:
+		return
+	var over: int = _entries.size() - capacity
+	var kept: Array = []
+	for entry in _entries:  # Oldest first, so this evicts the oldest expirable events.
+		if over > 0 and entry["ttl"] > 0.0:
+			over -= 1
+			continue
+		kept.append(entry)
+	_entries = kept
 
 
 ## Whether an event has outlived its ttl (ttl <= 0 never expires on age).
