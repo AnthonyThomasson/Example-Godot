@@ -13,3 +13,7 @@ hostile_on_attack = true
 
 [node name="Visuals" parent="."]
 body_color = Color(0.5, 0.8, 0.4, 1)
+
+[node name="AgentDebug" parent="."]
+label_color = Color(0.7, 1, 0.6, 1)
+path_color = Color(0.5, 0.8, 0.4, 0.8)

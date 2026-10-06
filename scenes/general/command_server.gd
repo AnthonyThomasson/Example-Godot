@@ -179,10 +179,8 @@ func _match_status() -> String:
 	var lines := PackedStringArray()
 	var dead := PackedStringArray()
 	var alive := PackedStringArray()
-	for cname in ["Defender", "Invader"]:
-		var c := node(cname)
-		if c == null:
-			continue
+	for c in _combatants():
+		var cname := str(c.name)
 		var hp: float = c.health if "health" in c else -1.0
 		var is_dead: bool = c.get("is_dead") == true
 		lines.append("%s hp=%.0f act=%s alive=%s" % [cname, hp, _act_of(c), str(not is_dead)])
@@ -200,6 +198,20 @@ func _act_of(character: Node) -> String:
 		if child.has_method("current_act"):
 			return child.current_act()
 	return "?"
+
+
+## Every AI combatant in the running scene, discovered rather than named: a scene-root child that has
+## an AI controller child (the same `current_act` duck-type `_act_of` uses). So the match status
+## covers every defender/invader in the scene, with no coupling to their node names.
+func _combatants() -> Array:
+	var out: Array = []
+	var s := scene()
+	if s == null:
+		return out
+	for c in s.get_children():
+		if _act_of(c) != "?":
+			out.append(c)
+	return out
 
 
 # --- Helpers, callable both from the verbs and from `eval` expressions --------------------

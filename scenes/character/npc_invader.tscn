@@ -14,3 +14,7 @@ hostile_on_trespass = false
 
 [node name="Visuals" parent="."]
 body_color = Color(0.85, 0.35, 0.3, 1)
+
+[node name="AgentDebug" parent="."]
+label_color = Color(1, 0.6, 0.55, 1)
+path_color = Color(0.85, 0.35, 0.3, 0.8)

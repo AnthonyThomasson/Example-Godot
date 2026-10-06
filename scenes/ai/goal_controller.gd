@@ -7,7 +7,8 @@ extends Node
 ## `interact_with`, `end_interaction`). The behaviour is pure DATA: `goal` is a plain-language
 ## sentence, plus a handful of generic primitives exported below — who counts as HOSTILE (on sight /
 ## on trespass / on attack, allies by faction), whether to actively pursue hostiles, whether to defend
-## the house as territory. A house defender and a house invader are the same code with different data;
+## the house as territory, whether to flank (attack from the target's side/rear and spread allied
+## attackers around it). A house defender and a house invader are the same code with different data;
 ## there is no per-goal or per-NPC-type code.
 ##
 ## The decision is ACT-centric. Von ranks distinct, verb-like options reliably but ranks many
@@ -75,6 +76,19 @@ const AgentHostility := preload("res://scenes/ai/agent_hostility.gd")
 ## Seconds a chosen fire/cover position is committed to before a new one may be picked. Prevents
 ## per-frame re-selection of the nearest spot (which makes the NPC vibrate).
 @export var reposition_interval: float = 0.5
+## Flanking primitive: when true, firing spots are chosen to attack from the target's side/rear and
+## to spread allied attackers around it (a pincer), rather than always taking the nearest spot. It
+## re-ranks the peek fire spots by angular openness — distance from the bearings the NPC should avoid
+## (where a visible target is FACING, and where each nearby ally already stands) — traded against
+## travel distance. Off, or with no such bearings to avoid, it reverts to nearest-spot (the old
+## behaviour), so flanking is purely additive.
+@export var flank: bool = true
+## How far (px) the NPC will travel for a fully-open flanking angle: the px-value of going from the
+## worst angle (right on an avoided bearing) to the best (opposite it). Higher = flanks harder.
+@export var flank_weight: float = 140.0
+## An ally within this distance (px) of the engaged target counts as holding an angle on it, so this
+## NPC spreads to a different bearing instead of stacking alongside the ally.
+@export var flank_ally_radius: float = 500.0
 ## Radius (px) within which a hit on something else still registers as gunfire near the NPC.
 @export var hit_awareness_radius: float = 160.0
 ## Seconds an incoming/nearby hit keeps the NPC on "under fire" alert (reported to Von, which
@@ -135,6 +149,7 @@ var _perception: Node             ## Senses + builds the state + menu each decis
 var _vision: RefCounted           ## The sight sense (FOV/range/LoS); see agent_vision.gd.
 var _hostility: RefCounted        ## The hostility rules; see agent_hostility.gd.
 var _hostiles: Array = []         ## Known hostile contacts this tick (nearest first), from perception.
+var _allies: Array = []           ## Known non-hostile contacts this tick — the bearings flanking spreads away from.
 var _last_hostile_pos := Vector2.ZERO ## Where the nearest known hostile was last seen.
 var _engage_id := 0               ## Instance id of the contact being engaged (0 = none).
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
@@ -229,6 +244,27 @@ func _on_event(topic: StringName, data: Dictionary) -> void:
 ## Read-only: the act the NPC is currently carrying out (its last decision), for observers/HUD.
 func current_act() -> String:
 	return _act_log
+
+
+## Read-only: a compact, human-readable summary of what the NPC is doing right now — for debug
+## overlays/observers. Built from live state (never mutates), it reads more clearly than the raw
+## `current_act()` id: the intent, the act verb + target/object, the combat phase, and any alert.
+func debug_status() -> String:
+	var line := ""
+	match _intent:
+		"combat":
+			var who := str(_engage_node.name) if _engage_node != null and is_instance_valid(_engage_node) else "?"
+			line = "COMBAT · %s %s · %s" % [_act_verb, who, _combat_phase]
+		"interact":
+			var what := str(_target_obj.name) if _target_obj != null and is_instance_valid(_target_obj) else _interact_id
+			line = "INTERACT · %s" % what
+		"search":
+			line = "SEARCH"
+		_:
+			line = ("IDLE → %s" % _move_id) if _has_move else "IDLE"
+	if _memory != null and _memory.is_fresh(&"under_fire"):
+		line += "  ⚠ under fire"
+	return line
 
 
 ## Called each physics frame by the character. Advances timers, honours the current commitment, asks
@@ -331,6 +367,7 @@ func _update_known(character) -> void:
 	var known: Array = _perception.contacts(character.global_position, _memory, _hostility)
 	var was_known := not _hostiles.is_empty()
 	_hostiles = known.filter(func(c): return c["hostile"])
+	_allies = known.filter(func(c): return not c["hostile"])  ## For flanking: bearings to spread away from.
 	if was_known and _hostiles.is_empty():
 		# Just lost every hostile: have the patrol investigate the last-known spot before sweeping rooms.
 		_investigate_last_seen = true
@@ -464,11 +501,12 @@ func _apply_peek_cover(character, delta: float) -> void:
 	_path_move(character, _combat_dest)
 
 
-## The committed destination for the current phase: the nearest spot with a clear shot (peek) or the
-## nearest shielded spot (cover); falls back to closing on the contact (peek) or holding (cover) when
-## no suitable spot exists this sample. While holding ground (an outside contact under
-## `defend_territory`), spots are restricted to inside the house and the peek fallback holds position
-## instead of advancing out, so the NPC returns fire from inside rather than pursuing it.
+## The committed destination for the current phase: a spot with a clear shot (peek) or the nearest
+## shielded spot (cover); falls back to closing on the contact (peek) or holding (cover) when no
+## suitable spot exists this sample. The peek spot is the nearest clear one, unless `flank` is on, in
+## which case `_flank_pick` re-ranks for the best flanking angle. While holding ground (an outside
+## contact under `defend_territory`), spots are restricted to inside the house and the peek fallback
+## holds position instead of advancing out, so the NPC returns fire from inside rather than pursuing it.
 func _choose_combat_dest(character, phase: String) -> Vector2:
 	var spots: Dictionary = _perception.combat_spots(character, _engage_node, _engage_pos, combat_ring_radius, combat_ring_count)
 	var fire: Array = spots["fire"]
@@ -479,8 +517,47 @@ func _choose_combat_dest(character, phase: String) -> Vector2:
 	if phase == "cover":
 		return cover[0] if not cover.is_empty() else character.global_position
 	if not fire.is_empty():
-		return fire[0]
+		return _flank_pick(character, fire) if flank else fire[0]
 	return character.global_position if _hold_ground else _engage_pos
+
+
+## The bearings (radians, measured FROM the engaged target) that flanking should steer AWAY from:
+## where the target is FACING when it is currently visible (so the NPC attacks its side/rear, not its
+## front), and the bearing to each known ally within `flank_ally_radius` of the target (so allied
+## attackers spread around it instead of bunching). An unseen target yields no facing bearing — the
+## NPC never reads an omniscient facing it hasn't perceived.
+func _flank_anchors() -> Array:
+	var anchors: Array = []
+	if _engage_node != null and is_instance_valid(_engage_node) and "facing" in _engage_node \
+			and _perception.contact_visible(_engage_id):
+		anchors.append((_engage_node.facing as Vector2).angle())
+	for ally in _allies:
+		var pos: Vector2 = ally["pos"]
+		if pos.distance_to(_engage_pos) <= flank_ally_radius:
+			anchors.append((pos - _engage_pos).angle())
+	return anchors
+
+
+## Pick the flanking fire spot: the one whose bearing from the target is furthest from every avoided
+## bearing (openness), traded against how far the NPC must travel to it. With no bearings to avoid it
+## returns the nearest spot, so flanking collapses to the old nearest-spot behaviour.
+func _flank_pick(character, fire: Array) -> Vector2:
+	var anchors: Array = _flank_anchors()
+	if anchors.is_empty() or fire.is_empty():
+		return fire[0]
+	var self_pos: Vector2 = character.global_position
+	var best: Vector2 = fire[0]
+	var best_score := -INF
+	for p in fire:
+		var bearing: float = ((p as Vector2) - _engage_pos).angle()
+		var sep := PI
+		for a in anchors:
+			sep = minf(sep, absf(angle_difference(bearing, a)))
+		var score := (sep / PI) * flank_weight - self_pos.distance_to(p)
+		if score > best_score:
+			best_score = score
+			best = p
+	return best
 
 
 ## Melee combat: close to punch range and swing on the fire cooldown (no cover cycle for fists).

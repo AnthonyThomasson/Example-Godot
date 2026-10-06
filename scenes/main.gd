@@ -11,9 +11,13 @@ extends Node2D
 @export var force_plan: String = ""
 ## Distance from the player to the front door's center, straight up the screen.
 @export var door_distance: float = 70.0
-## Whether to also spawn an invader NPC outside the house.
-@export var spawn_invader: bool = true
-## Distance (px) beyond the house's outer edge the invader starts at (inside the navmesh's outer band).
+## How many defender NPCs to drop into the house (0 = none). Raise it to exercise coordinated
+## flanking from the defending side.
+@export var defender_count: int = 1
+## How many invader NPCs to spawn outside the house (0 = none). With more than one they start on
+## different sides and flank a shared target (a pincer).
+@export var invader_count: int = 1
+## Distance (px) beyond the house's outer edge an invader starts at (inside the navmesh's outer band).
 @export var invader_margin: float = 80.0
 ## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
 ## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
@@ -25,6 +29,9 @@ const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
 const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
 
 @onready var _player: Node2D = $Player
+
+## Every NPC spawned this run, in spawn order — the spectator camera + match HUD observe these.
+var _combatants: Array = []
 
 
 func _ready() -> void:
@@ -46,9 +53,10 @@ func _spawn_world() -> void:
 	NavBuilder.build(house, rooms, self)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed if house_seed != 0 else randi()
-	_spawn_defender(rooms, rng)
-	if spawn_invader:
-		_spawn_invader(rooms, rng)
+	for i in defender_count:
+		_spawn_defender(rooms, rng, i)
+	for i in invader_count:
+		_spawn_invader(rooms, rng, i, invader_count)
 	if spectator_mode:
 		_setup_spectator()
 
@@ -57,11 +65,7 @@ func _spawn_world() -> void:
 ## the camera at both NPCs, and activate the match HUD. Composition-root wiring only — each observer
 ## reads the characters' public API/signals, never their internals.
 func _setup_spectator() -> void:
-	var combatants := []
-	for npc_name in ["Defender", "Invader"]:
-		var npc := get_node_or_null(npc_name)
-		if npc:
-			combatants.append(npc)
+	var combatants := _combatants.filter(func(c): return is_instance_valid(c))
 	var cam := get_node_or_null("MainCamera")
 	if cam and cam.has_method("frame"):
 		cam.frame(combatants)
@@ -75,42 +79,59 @@ func _setup_spectator() -> void:
 		_player.queue_free()
 
 
-## Drop the defender at the center of a random room. `rng` is seeded from `house_seed` so a pinned
-## layout also pins the NPCs. Added after the house, so it draws above it. `rooms` is
+## Drop defender number `index` at the center of a random room. `rng` is seeded from `house_seed` so a
+## pinned layout also pins the NPCs. Added after the house, so it draws above it. `rooms` is
 ## WorldGen.get_rooms(house), already fetched by the caller.
-func _spawn_defender(rooms: Array, rng: RandomNumberGenerator) -> void:
+func _spawn_defender(rooms: Array, rng: RandomNumberGenerator, index: int) -> void:
 	if rooms.is_empty():
 		return
 	var room: Dictionary = rooms[rng.randi() % rooms.size()]
 	var rect: Rect2 = room["rect"]
-	_add_npc(DEFENDER_SCENE, "Defender", rect.position + rect.size * 0.5, rooms)
+	_add_npc(DEFENDER_SCENE, _npc_name("Defender", index), rect.position + rect.size * 0.5, rooms)
 
 
-## Drop the invader just outside a random side of the house (the rooms' bounding box), at a random
-## point along that side, `invader_margin` px out.
-func _spawn_invader(rooms: Array, rng: RandomNumberGenerator) -> void:
+## Drop invader number `index` (of `count`) just outside the house (the rooms' bounding box),
+## `invader_margin` px out. Invaders are spread evenly around the perimeter (one even fraction per
+## index, plus a little jitter) so several attackers start on different sides and flank a shared
+## target rather than stacking on one side.
+func _spawn_invader(rooms: Array, rng: RandomNumberGenerator, index: int, count: int) -> void:
 	if rooms.is_empty():
 		return
 	var bounds: Rect2 = rooms[0]["rect"]
 	for room in rooms:
 		bounds = bounds.merge(room["rect"])
-	var t := rng.randf()
-	var pos: Vector2
-	match rng.randi() % 4:
-		0: pos = Vector2(lerpf(bounds.position.x, bounds.end.x, t), bounds.position.y - invader_margin)
-		1: pos = Vector2(lerpf(bounds.position.x, bounds.end.x, t), bounds.end.y + invader_margin)
-		2: pos = Vector2(bounds.position.x - invader_margin, lerpf(bounds.position.y, bounds.end.y, t))
-		_: pos = Vector2(bounds.end.x + invader_margin, lerpf(bounds.position.y, bounds.end.y, t))
-	_add_npc(INVADER_SCENE, "Invader", pos, rooms)
+	bounds = bounds.grow(invader_margin)
+	var frac := fposmod((index + 0.5) / maxi(count, 1) + rng.randf_range(-0.05, 0.05), 1.0)
+	_add_npc(INVADER_SCENE, _npc_name("Invader", index), _perimeter_point(bounds, frac), rooms)
 
 
-## Instance an NPC scene named `npc_name` at `pos` and hand its controller the house's rooms.
+## A point at fraction `frac` (0..1, clockwise from the top-left) around the perimeter of `rect`.
+func _perimeter_point(rect: Rect2, frac: float) -> Vector2:
+	var d := frac * 4.0  # Four equal sides.
+	if d < 1.0:
+		return Vector2(lerpf(rect.position.x, rect.end.x, d), rect.position.y)          # top
+	elif d < 2.0:
+		return Vector2(rect.end.x, lerpf(rect.position.y, rect.end.y, d - 1.0))         # right
+	elif d < 3.0:
+		return Vector2(lerpf(rect.end.x, rect.position.x, d - 2.0), rect.end.y)         # bottom
+	return Vector2(rect.position.x, lerpf(rect.end.y, rect.position.y, d - 3.0))        # left
+
+
+## The node name for NPC `index` of a kind: the plain base for the first (so existing tooling that
+## addresses "Defender"/"Invader" keeps working), then "<base> 2", "<base> 3", … for the rest.
+func _npc_name(base: String, index: int) -> String:
+	return base if index == 0 else "%s %d" % [base, index + 1]
+
+
+## Instance an NPC scene named `npc_name` at `pos`, hand its controller the house's rooms, and record
+## it as a combatant (for the spectator camera + match HUD).
 func _add_npc(scene: PackedScene, npc_name: String, pos: Vector2, rooms: Array) -> void:
 	var npc := scene.instantiate()
 	npc.name = npc_name
 	add_child(npc)
 	npc.global_position = pos
 	_bind_npc(npc, rooms)
+	_combatants.append(npc)
 
 
 ## Wire an NPC's controller to the world: hand it the house's `rooms` (world-space rects), found by

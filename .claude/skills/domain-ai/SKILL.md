@@ -19,6 +19,7 @@ plain-language `goal` string plus a few generic **primitives** (exports on the `
 | Hostility | `hostile_on_sight`, `hostile_on_trespass`, `hostile_on_attack`, `hostility_ttl`, `allied_factions` | Which perceived characters count as hostile (see below). |
 | Pursuit | `pursue_hostiles` | Actively hunt: patrol when no hostile is known, engage when one is. |
 | Territory | `defend_territory` | Fight a contact outside the house from inside rather than chase it. |
+| Flanking | `flank`, `flank_weight`, `flank_ally_radius` | Re-rank fire spots to attack from the target's side/rear and spread allied attackers around it. |
 | Knowledge | `familiar_with_house` + the Vision group | What the NPC starts knowing and how it sees. |
 
 The two presets:
@@ -26,7 +27,10 @@ The two presets:
   `hostile_on_attack`, `defend_territory`, familiar with the house. Main drops it into a random room.
 - **Invader** — `character/npc_invader.tscn`, an inherited scene that overrides only data (faction
   `invader`): `hostile_on_sight`, not territorial, unfamiliar with the house, a red body. Main drops
-  it just outside the house (`spawn_invader`, `invader_margin`).
+  it just outside the house (`invader_margin`).
+
+Main spawns `defender_count` defenders and `invader_count` invaders (both exports on `main.gd`,
+default 1 each); invaders start spread around the house perimeter so several flank a shared target.
 
 ## Contacts and hostility
 
@@ -81,7 +85,7 @@ and holds a steady stance when the server is down.
   **last-known** position and fire when `has_line_to(known_pos)` confirms a clear line (never
   through walls), paced by `fire_cooldown`. Vision gates whether it KNOWS a contact; a clear line
   gates whether it can HIT it — so it fires at where it knows they are, independent of its cone.
-  PEEK: move to the nearest **fire spot** and shoot, then drop to COVER and duck to the nearest
+  PEEK: move to a **fire spot** and shoot, then drop to COVER and duck to the nearest
   **cover spot** for `cover_time`. Positions are committed for `reposition_interval`.
 - `punch_<id>` → close to `punch_range` of the last-known position and swing on the cooldown.
 - `search` / pursuing with no hostile known → **house patrol** (below).
@@ -109,6 +113,17 @@ a *non-pursuing* NPC dragged into a fight (`&"engaged"` fresh) from peeling off 
 peek fallback stops advancing; melee won't chase out. So a defender returns fire through a
 doorway/window instead of leaving the house. When the contact steps inside, normal engagement
 resumes.
+
+**Flanking (`flank`).** When on, the peek **fire spot** is no longer just the nearest clear one:
+`_flank_pick` re-ranks the clear spots by *angular openness* — how far each spot's bearing from the
+target is from the bearings the NPC should avoid — traded against travel distance (`flank_weight` =
+px-value of a fully-open angle). The avoided bearings (`_flank_anchors`) are where the target is
+**facing** (only when it is currently visible, so no omniscient facing read) and where each known
+ally within `flank_ally_radius` of the target stands. So a lone NPC works around to the target's
+side/rear, and several attackers **spread around** it (a pincer) — coordination is stigmergic, each
+NPC just avoiding where it *sees* friends, with no shared state. Cover spots stay nearest-first; it
+composes with territory (the inside-the-house filter runs first, then flanking re-ranks what remains)
+and collapses to nearest-spot when off or when there are no bearings to avoid.
 
 **Pathing avoids furniture, shoving through only as a last resort.** All derived movement flows
 through `_path_move` on a `NavigationAgent2D`. The Navigation domain bakes furniture in as navmesh
@@ -152,10 +167,19 @@ character is known only once seen, and forgotten after `contact_memory_ttl` out 
 `show_vision`) that renders the cone, far arc and awareness bubble from the controller's live
 vision params. It senses nothing and feeds nothing back.
 
+`ai/agent_debug.gd` on the NPC's `AgentDebug` child is a second draw-only overlay: it draws, next to
+the NPC, a floating **action label** (the controller's `debug_status()` — intent, act verb + target,
+combat phase, under-fire alert) and the NPC's current **movement path** (the `NavigationAgent2D`'s
+remaining path as a polyline + waypoints + target ring). Independent toggles `show_actions` /
+`show_path`; `label_color` / `path_color` are set per side in the preset scenes to match the body
+colour. Like `vision_debug`, it reads only public API and feeds nothing back. The controller's
+`debug_status()` is a read-only observer getter alongside `current_act()`.
+
 Tuning exports on the controller: `goal`, `pursue_hostiles`, `defend_territory`,
 `hit_awareness_radius`, `under_fire_time`, `engage_dwell`, `memory_capacity`,
 `memory_default_ttl`, `push_through_delay`, `stuck_speed`, combat (`shoot_range`, `punch_range`,
-`combat_ring_*`, `cover_time`, `fire_cooldown`, `reposition_interval`), the **Vision** group
+`combat_ring_*`, `cover_time`, `fire_cooldown`, `reposition_interval`, flanking: `flank`,
+`flank_weight`, `flank_ally_radius`), the **Vision** group
 (`vision_enabled`, `view_distance`, `fov_degrees`, `awareness_radius`, `familiar_with_house`,
 `contact_memory_ttl`) and the **Hostility** group. On the perception: `cover_min`,
 `hurt_threshold`, `critical_threshold`, `max_contacts_in_state`.
