@@ -25,6 +25,8 @@ var _release_next_frame: Array = []
 var _move_actions: Dictionary = {}
 ## Item slot 1-9 -> Keybinds action, indexed by slot minus one.
 var _item_actions: Array = []
+## When this server (hence the scene) started, so the `match` verb can report elapsed match time.
+var _match_start_ms: int = Time.get_ticks_msec()
 
 
 ## Start listening only from an editor run and only when a port is configured; otherwise stay off.
@@ -97,7 +99,17 @@ func _execute(line: String) -> String:
 	match parts[0]:
 		"help":
 			return "verbs: help, pos, tp X Y, slot N, move up|down|left|right [off], stop, " \
-				+ "fire, punch, interact, aim X Y, eval EXPR; anything else = GDScript expression"
+				+ "fire, punch, interact, aim X Y, match, restart [seed], eval EXPR; " \
+				+ "anything else = GDScript expression"
+		"match":
+			return _match_status()
+		"restart":
+			# Reload for a fresh matchup. An optional seed pins the next layout; Engine meta survives
+			# the scene reload, and main.gd reads it on start.
+			if parts.size() >= 2:
+				Engine.set_meta("match_seed", parts[1].to_int())
+			get_tree().reload_current_scene()
+			return "ok"
 		"pos":
 			var p := player()
 			return "no player" if p == null else str(p.global_position)
@@ -158,6 +170,36 @@ func _eval(text: String) -> String:
 	if expr.has_execute_failed():
 		return "error: " + expr.get_error_text()
 	return var_to_str(result)
+
+
+## One-line, parseable match status for the headless harness: each combatant's health/act/alive,
+## then the verdict and elapsed seconds. Reads only the characters' public API (`health`, `is_dead`)
+## and their controller's `current_act()`, so the server stays a decoupled observer.
+func _match_status() -> String:
+	var lines := PackedStringArray()
+	var dead := PackedStringArray()
+	var alive := PackedStringArray()
+	for cname in ["Defender", "Invader"]:
+		var c := node(cname)
+		if c == null:
+			continue
+		var hp: float = c.health if "health" in c else -1.0
+		var is_dead: bool = c.get("is_dead") == true
+		lines.append("%s hp=%.0f act=%s alive=%s" % [cname, hp, _act_of(c), str(not is_dead)])
+		(dead if is_dead else alive).append(cname)
+	var verdict := "none"
+	if not dead.is_empty():
+		verdict = alive[0] if alive.size() == 1 else "draw"
+	var elapsed := (Time.get_ticks_msec() - _match_start_ms) / 1000.0
+	return "%s | verdict=%s elapsed=%.1f" % [" | ".join(lines), verdict, elapsed]
+
+
+## The current act of `character`'s AI controller child, or "?" when it has none (e.g. the player).
+func _act_of(character: Node) -> String:
+	for child in character.get_children():
+		if child.has_method("current_act"):
+			return child.current_act()
+	return "?"
 
 
 # --- Helpers, callable both from the verbs and from `eval` expressions --------------------

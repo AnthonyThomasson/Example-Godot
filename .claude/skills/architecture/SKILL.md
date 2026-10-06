@@ -32,7 +32,7 @@ concise current-state comments.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
+| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, dev command server. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC (with sensing, sight, hostility and event-memory helpers), plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
@@ -102,9 +102,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
-   and `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
-   path and read only the public API/signals. Every NPC is the same generic goal-driven agent
-   driven by `ai/goal_controller.gd`; the defender (`character/npc.tscn`) and the invader
+   and `interaction_changed(active, label)`. Observers (debug HUD, match HUD, camera) attach by
+   exported node path and read only the public API/signals; the controller also exposes
+   `current_act()` (its live decision) for those observers to show. Every NPC is the same generic goal-driven agent
+   driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
    (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory). Main
    injects only `rooms`; the AI finds and categorizes the characters it perceives by sight. Von
@@ -150,8 +151,8 @@ Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)─
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
 Physics debris / casings ─▶ Despawner
-Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController
-DebugUI / Camera ──(exported path + signals)──▶ Character
+Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
+DebugUI / MatchHUD / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.current_act)
 ```
 
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +

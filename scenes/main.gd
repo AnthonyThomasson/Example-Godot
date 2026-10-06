@@ -15,6 +15,9 @@ extends Node2D
 @export var spawn_invader: bool = true
 ## Distance (px) beyond the house's outer edge the invader starts at (inside the navmesh's outer band).
 @export var invader_margin: float = 80.0
+## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
+## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
+@export var spectator_mode: bool = true
 
 ## The house defender, dropped into one of the generated rooms.
 const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
@@ -30,6 +33,10 @@ func _ready() -> void:
 
 ## Ask World-Gen for a house placed so its front door sits just above the player.
 func _spawn_world() -> void:
+	# A dev/headless harness can pin the next match's layout via Engine meta (it survives the scene
+	# reload the `restart` command does); otherwise the exported seed (0 = random) stands.
+	if Engine.has_meta("match_seed"):
+		house_seed = Engine.get_meta("match_seed")
 	var front_door := _player.global_position + Vector2(0, -door_distance)
 	var house := WorldGen.generate(house_seed, force_plan, front_door, self)
 	# Keep the house beneath the player in draw order.
@@ -42,6 +49,30 @@ func _spawn_world() -> void:
 	_spawn_defender(rooms, rng)
 	if spawn_invader:
 		_spawn_invader(rooms, rng)
+	if spectator_mode:
+		_setup_spectator()
+
+
+## Turn the scene into a pure 2-AI spectator match: drop the human player and its player-HUD, point
+## the camera at both NPCs, and activate the match HUD. Composition-root wiring only — each observer
+## reads the characters' public API/signals, never their internals.
+func _setup_spectator() -> void:
+	var combatants := []
+	for npc_name in ["Defender", "Invader"]:
+		var npc := get_node_or_null(npc_name)
+		if npc:
+			combatants.append(npc)
+	var cam := get_node_or_null("MainCamera")
+	if cam and cam.has_method("frame"):
+		cam.frame(combatants)
+	var hud := get_node_or_null("MatchHUD")
+	if hud and hud.has_method("begin"):
+		hud.begin(combatants)
+	var debug := get_node_or_null("DebugUI")
+	if debug:
+		debug.queue_free()
+	if _player:
+		_player.queue_free()
 
 
 ## Drop the defender at the center of a random room. `rng` is seeded from `house_seed` so a pinned

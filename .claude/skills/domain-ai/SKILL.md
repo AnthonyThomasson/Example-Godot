@@ -22,7 +22,7 @@ plain-language `goal` string plus a few generic **primitives** (exports on the `
 | Knowledge | `familiar_with_house` + the Vision group | What the NPC starts knowing and how it sees. |
 
 The two presets:
-- **Defender** — `character/npc.tscn` (faction `household`): `hostile_on_trespass` +
+- **Defender** — `character/npc_defender.tscn` (faction `household`): `hostile_on_trespass` +
   `hostile_on_attack`, `defend_territory`, familiar with the house. Main drops it into a random room.
 - **Invader** — `character/npc_invader.tscn`, an inherited scene that overrides only data (faction
   `invader`): `hostile_on_sight`, not territorial, unfamiliar with the house, a red body. Main drops
@@ -175,7 +175,8 @@ the Von server it spawned is orphaned on port 8000 — `pkill -f "von serve"` cl
 - **Character ↔ Controller** (interface 7): the controller is any node with `control(character,
   delta)`; it writes `move_input` / `aim_point` and calls `melee()`, `shoot()`, `select_slot(id)`,
   `interact_with(object, id)` / `end_interaction()`; reads `damage_taken()`, `faction`,
-  `current_item()`, `has_item()`. Main injects only `rooms`.
+  `current_item()`, `has_item()`. Main injects only `rooms`. For observers (the match HUD / command
+  server) the controller also exposes `current_act()` — its live decision id, read-only.
 - **AI → Navigation** (interface 9): the controller sets a `NavigationAgent2D`'s `target_position`
   and reads `get_next_path_position()`.
 - **EventBus** (interface 10): consumes `&"hit"` (`victim`, `position`, `direction`, `attacker`).

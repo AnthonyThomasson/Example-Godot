@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3 uid="uid://6ws06w1cxad1"]
+[gd_scene load_steps=11 format=3 uid="uid://6ws06w1cxad1"]
 
 [ext_resource type="Script" uid="uid://qn373ge4rrj2" path="res://scenes/main.gd" id="1_main"]
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="4_player"]
@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/general/debug_ui.gd" id="10_debug"]
 [ext_resource type="Script" uid="uid://cheoflbylqgpr" path="res://scenes/ai/decision_server_launcher.gd" id="11_launcher"]
 [ext_resource type="Script" uid="uid://csdc7o645rrtb" path="res://scenes/general/command_server.gd" id="12_command"]
+[ext_resource type="Script" uid="uid://c0jc3adwnfrqb" path="res://scenes/general/match_hud.gd" id="13_match_hud"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")
@@ -21,6 +22,9 @@ script = ExtResource("12_command")
 
 [node name="MainCamera" type="Camera2D" parent="."]
 script = ExtResource("9_camera")
+
+[node name="MatchHUD" type="CanvasLayer" parent="."]
+script = ExtResource("13_match_hud")
 
 [node name="DebugUI" type="CanvasLayer" parent="."]
 script = ExtResource("10_debug")

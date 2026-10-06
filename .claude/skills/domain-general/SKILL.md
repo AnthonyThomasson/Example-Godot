@@ -25,11 +25,17 @@ control a running game with text commands. It is **off** unless `application/deb
 0 and never exists in an exported build (`_ready()` bails when `OS.has_feature("editor")` is
 false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a curated verb
 (`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`,
-`interact`, `aim X Y`) or, failing that, a GDScript `Expression` evaluated against the node (e.g.
-`scene().get_node("Player").speed`). Movement and actions are driven by injecting `Input` action
-presses through `Keybinds` names — the same path a human's keyboard/mouse uses — so no game domain
-is coupled to it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`); each
-command is echoed as a `[cmd] …` Output line. (The `godot-debug` skill covers driving it.)
+`interact`, `aim X Y`, `match`, `restart [seed]`) or, failing that, a GDScript `Expression`
+evaluated against the node (e.g. `scene().get_node("Player").speed`). Movement and actions are
+driven by injecting `Input` action presses through `Keybinds` names — the same path a human's
+keyboard/mouse uses — so no game domain is coupled to it. `match` prints a one-line, parseable
+status of both spectator combatants (`Defender`/`Invader`): each one's health, current act and
+alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
+controller's `current_act()`. `restart [seed]` reloads the scene for a fresh matchup, pinning the
+next layout when a seed is given (stashed in `Engine` meta, which survives the reload; `main.gd`
+reads it). Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
+commands, or `tools/match.py` to run and score N matches in a row; each command is echoed as a
+`[cmd] …` Output line. (The `godot-debug` skill covers driving it.)
 
 ## Event bus
 
@@ -40,17 +46,33 @@ other. The only topic in use is `&"hit"`, posted by the Projectile System for ea
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`)
 and consumed by the AI for combat awareness and hostility.
 
-## Camera, despawner, debug HUD
+## Camera, despawner, HUDs
 
-- `camera_controller.gd` — follows the character; attaches by exported node path and reads only
-  the public API/signals.
+- `camera_controller.gd` — by default follows the character; attaches by exported node path and
+  reads only the public API/signals. It also has a **framing mode** (`frame(targets)`): instead of
+  following one target it eases to the midpoint of the live targets and zooms to fit them plus
+  `frame_margin` (clamped by `min_zoom`/`max_zoom`), dropping any whose `is_dead` is true — used by
+  the spectator match view.
 - `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood pools);
   domains register spawns with it.
-- `debug_ui.gd` — attaches by exported node path, listens to `hit_landed`, shows the last hit +
-  damage.
+- `debug_ui.gd` — the player HUD; attaches by exported node path, listens to `hit_landed`, shows
+  the last hit + damage.
+- `match_hud.gd` — the spectator-match HUD (`MatchHUD` node). `begin(combatants)` wires it to the
+  two NPCs; per side it shows goal, current act, faction and a health bar, with a shared combat feed
+  (EventBus `&"hit"`), a running timer and the winner banner (on `died`). A decoupled observer: it
+  reads the Character public API/signals, each controller's `current_act()` + exported `goal`, and
+  the EventBus — never a domain's internals.
+
+## Spectator match mode
+
+`main.gd`'s `spectator_mode` (on by default) turns the scene into a 2-AI contest: it frees the
+human `Player` and `DebugUI`, points the camera at both NPCs in framing mode, and activates
+`MatchHUD`. The `match` / `restart` command verbs plus `tools/match.py` make the matchup scriptable
+for watching and regression-testing both AI agent-types (defender and invader). Composition-root
+wiring lives in `main.gd`; the General observers only read published contracts.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
-- Observers (debug HUD, camera) attach by exported node path and read only the Character public
-  API/signals (interface 7). `player_controller.gd` and `command_server.gd` are the only files
-  that touch `Keybinds`.
+- Observers (debug HUD, match HUD, camera) attach by exported node path and read only the Character
+  public API/signals plus the AI controller's observer reads `current_act()` / `goal` (interface 7).
+  `player_controller.gd` and `command_server.gd` are the only files that touch `Keybinds`.

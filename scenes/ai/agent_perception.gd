@@ -123,7 +123,8 @@ func contacts(self_pos: Vector2, memory: RefCounted, hostility: RefCounted) -> A
 	var seen := {}
 	for data in memory.recall_all(&"saw_character"):  # Newest first: the first per id is the freshest.
 		var id: int = data.get("id", 0)
-		if seen.has(id) or not is_instance_valid(data.get("node")):
+		var n: Variant = data.get("node")
+		if seen.has(id) or not is_instance_valid(n) or (n as Node).get("is_dead") == true:
 			continue
 		seen[id] = true
 		var c: Dictionary = data.duplicate()

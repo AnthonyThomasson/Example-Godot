@@ -226,6 +226,11 @@ func _on_event(topic: StringName, data: Dictionary) -> void:
 		_hit_queue.append(data)
 
 
+## Read-only: the act the NPC is currently carrying out (its last decision), for observers/HUD.
+func current_act() -> String:
+	return _act_log
+
+
 ## Called each physics frame by the character. Advances timers, honours the current commitment, asks
 ## for a new decision only when free to, then carries out the current act.
 func control(character, delta: float) -> void:
