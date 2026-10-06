@@ -121,6 +121,22 @@ Flag any drift you find as a checklist item (`architecture/SKILL.md:line` or
 what to change). Both files' prose must follow the current-state rule in Step 4: state what *is*,
 never what changed.
 
+**AI behaviour changes also require updating `.claude/commands/test-ai-behavior.md`.** When the
+diff touches the `ai/` domain — any change to `goal_controller.gd`, the hostility / vision /
+memory / perception helpers, the NPC preset scenes, or the decision-server launcher — check that
+the test command still covers the changed behaviour:
+
+- A new export or tuning primitive → add a scenario or override example to the relevant test
+  section (or a new section if it is a genuinely new behaviour).
+- A removed or renamed export → delete the corresponding `--defender`/`--invader` override lines
+  so the command doesn't pass dead GDScript to the game.
+- A changed decision rule (e.g. pursuit override logic, flanking anchor selection, peek-cover
+  pacing) → update the "Expected:" note in the matching scenario to reflect what the code now does.
+- A new NPC preset or a changed controller primitive → add a scenario that exercises it.
+
+Flag any test command drift the same way as skill drift: `.claude/commands/test-ai-behavior.md:line`
+→ what to change.
+
 ## Step 4 — Comments describe the code as it is now
 
 Comments in this project are a liability when they lie or waffle and an asset when they are short
