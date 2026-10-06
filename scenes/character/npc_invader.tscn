@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://c3txvqyp68mko"]
+
+[ext_resource type="PackedScene" path="res://scenes/character/npc.tscn" id="1_base"]
+
+[node name="Invader" instance=ExtResource("1_base")]
+faction = &"invader"
+
+[node name="GoalController" parent="."]
+goal = "You are breaking into this house. Search it and shoot everyone you find with your pistol."
+defend_territory = false
+familiar_with_house = false
+hostile_on_sight = true
+hostile_on_trespass = false
+
+[node name="Visuals" parent="."]
+body_color = Color(0.85, 0.35, 0.3, 1)

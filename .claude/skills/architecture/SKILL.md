@@ -33,7 +33,7 @@ concise current-state comments.
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug HUD, dev command server. |
-| **AI** | `ai/` | `domain-ai` | Non-player brains: controllers that drive a character (with a world-sensing helper and an event-memory helper), plus the dev-only decision-server launcher. |
+| **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC (with sensing, sight, hostility and event-memory helpers), plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
 domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
@@ -51,7 +51,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
    `main.gd` positions the front door, fixes draw order, builds the nav map from the rooms
-   (interface 9), and drops the NPC into a random room (all via `get_rooms`); it never touches
+   (interface 9), drops the defender NPC into a random room and the invader NPC just outside the
+   house (all via `get_rooms`); it never touches
    world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
@@ -97,16 +98,19 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
    character's action API: `melee()` (F), `shoot()` (LMB), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing). `player_controller.gd` is the human one and
+   damage, for injury sensing) and `faction` (allegiance tag, for AI hostility).
+   `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
    and `interaction_changed(active, label)`. Observers (debug HUD, camera) attach by exported node
-   path and read only the public API/signals. The NPC (`character/npc.tscn`) is a generic
-   goal-driven agent driven by `ai/goal_controller.gd`: its behaviour is a plain-language `goal`
-   string authored on the NPC itself (an export on its controller; Main injects only `target` and
-   `rooms`). Von picks WHAT to do from an act menu
-   (combat + every house-wide object interaction) ranked against the goal, and the controller
-   derives the movement — no per-goal code. See the `domain-ai` skill.
+   path and read only the public API/signals. Every NPC is the same generic goal-driven agent
+   driven by `ai/goal_controller.gd`; the defender (`character/npc.tscn`) and the invader
+   (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
+   a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory). Main
+   injects only `rooms`; the AI finds and categorizes the characters it perceives by sight. Von
+   picks WHAT to do from an act menu (engage a known hostile, search, hold, or a known object
+   interaction) ranked against the goal, and the controller derives the movement — no per-goal or
+   per-NPC-type code. See the `domain-ai` skill.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`) and exposes only
@@ -119,7 +123,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 
 9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
-	 one `NavigationRegion2D` whose walkable area is the house footprint minus the house's
+	 one `NavigationRegion2D` whose walkable area is the house footprint plus an outdoor ring minus the house's
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
 	 (baked in as a hole), so paths route around furniture; it also tags each solid furniture body
 	 with a dynamic avoidance `NavigationObstacle2D` for a piece shoved off its hole.
@@ -131,9 +135,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.
     - `signal posted(topic, data)` — listeners connect and filter by `topic`.
-    The one topic in use is `&"hit"`: the Projectile System posts one per damaging hit
-    (`{ position, victim, source, direction, damage }`) and the AI controller consumes it for combat
-    awareness. Emitters and listeners never reference each other (like `Despawner`).
+    The one topic in use is `&"hit"`: the Projectile System posts one per damaging hit and the
+    Character one per landed punch (`{ position, victim, source, direction, damage, attacker }`;
+    `attacker` = the striking character or null), and the AI controller consumes it for combat
+    awareness and hostility ("attacked me"). Emitters and listeners never reference each other (like `Despawner`).
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
@@ -145,7 +150,7 @@ Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)─
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
 Physics debris / casings ─▶ Despawner
-Projectile ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController
+Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController
 DebugUI / Camera ──(exported path + signals)──▶ Character
 ```
 

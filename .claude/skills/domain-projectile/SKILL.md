@@ -27,8 +27,9 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
 On any *damaging* outcome the projectile packages a `HitInfo` and calls `body.take_hit(info)` (the
 object then shoves/deforms/sprays via Physics), re-emits `hit(body, damage)` — which the pistol
 forwards to the character's `hit_landed` — and posts a `&"hit"` event on `EventBus`
-(`{ position, victim, source, direction, damage }`, interface 10) so decoupled listeners (the AI's
-combat awareness) learn that something was struck and where. Console lines: `Shot flew over /
+(`{ position, victim, source, direction, damage, attacker }`, interface 10 — `attacker` is the
+shooter, the projectile's `ignore` body) so decoupled listeners (the AI's combat awareness and
+hostility) learn what was struck, where, and by whom. Console lines: `Shot flew over /
 ricocheted off / penetrated / blocked by …`.
 
 ## Layering

@@ -51,8 +51,15 @@ character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never de
 
 ## Scenes
 
-`character/npc.tscn` is a generic goal-driven agent driven by `ai/goal_controller.gd` (see the
-`domain-ai` skill). The player uses `player_controller.gd`.
+`character/npc.tscn` (the house defender) is a generic goal-driven agent driven by
+`ai/goal_controller.gd` (see the `domain-ai` skill); `character/npc_invader.tscn` is an inherited
+scene of it that only overrides data (faction, goal, hostility exports, colour). The player uses
+`player_controller.gd`.
+
+Every character has an exported `faction` (`&"player"` by default; the NPC presets set
+`&"household"` / `&"invader"`), read by AI perception to tell allies from potential hostiles. A
+landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus` event with
+`attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility.
 
 ## Interface recap (authoritative in the `architecture` skill)
 

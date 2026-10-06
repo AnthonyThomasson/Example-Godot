@@ -11,6 +11,18 @@ extends CharacterBody2D
 @export var speed: float = 300.0  ## Move speed (px/s).
 ## Slot the character starts holding.
 @export var start_slot: int = 1
+## Allegiance tag, read by AI perception to tell allies from potential hostiles.
+@export var faction: StringName = &"player"
+## Maximum health. Characters start at this value; configurable per character in the inspector.
+@export var max_health: float = 50.0
+
+## Emitted once when health drops to zero.
+signal died
+
+## Current health, initialised to max_health. Read-only outside this script.
+var health: float
+## True once the character has died; gates all movement and action permanently.
+var is_dead: bool = false
 
 ## Unit vector from the character toward its aim point; read by the hands and visuals.
 var facing := Vector2.RIGHT
@@ -63,10 +75,12 @@ func _ready() -> void:
 	circle.radius = radius
 	_shape.shape = circle
 
+	health = max_health
+
 	_items = ItemRegistry.default_inventory()
 	_current_slot = start_slot
 	# Re-emit the hands' punch as a unified hit_landed (melee → hand 0/1, with its dealt damage).
-	_hands.punched.connect(func(hand: int, body: Node, damage: float) -> void: hit_landed.emit(body, damage, hand))
+	_hands.punched.connect(_on_punched)
 
 	# Compose the flesh deformation component; its impacts dent the drawn silhouette (visual
 	# only — the body keeps its circular hitbox). No carved chunks, since a chunk's reach
@@ -84,6 +98,10 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if is_dead:
+		velocity = Vector2.ZERO
+		return
+
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
@@ -170,6 +188,17 @@ func interaction_label() -> String:
 	return _interaction.active_label()
 
 
+## A punch landed: surface it as hit_landed and post a world `&"hit"` event (like a projectile's)
+## so listeners such as the AI learn who struck whom.
+func _on_punched(hand: int, body: Node, damage: float) -> void:
+	hit_landed.emit(body, damage, hand)
+	var pos: Vector2 = body.global_position if body is Node2D else global_position
+	EventBus.post(&"hit", {
+		"position": pos, "victim": body, "source": self, "attacker": self,
+		"direction": facing, "damage": damage,
+	})
+
+
 # --- Item-facing API (what an Item may call on its user) --------------------------------
 
 ## The held item.
@@ -246,6 +275,27 @@ func take_hit(hit: HitInfo) -> void:
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
 	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
+	_apply_damage(hit.damage)
+
+
+## Reduce health by `amount`; called by the punch path (projectile path goes through take_hit).
+func take_damage(amount: float) -> void:
+	_apply_damage(amount)
+
+
+func _apply_damage(amount: float) -> void:
+	if is_dead:
+		return
+	health = maxf(health - amount, 0.0)
+	if health == 0.0:
+		_die()
+
+
+func _die() -> void:
+	is_dead = true
+	velocity = Vector2.ZERO
+	_knockback = Vector2.ZERO
+	died.emit()
 
 
 ## Total accumulated hit damage this character has taken, read from its deformation record. Lets a

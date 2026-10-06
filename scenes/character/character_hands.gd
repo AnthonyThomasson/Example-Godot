@@ -192,3 +192,5 @@ func _report_hits() -> void:
 			_active_hand, body.name, damage, impulse.length(),
 			"pushable" if pushed else "fixed", motion * 100.0])
 		punched.emit(_active_hand, body, damage)
+		if body.has_method("take_damage"):
+			body.take_damage(damage)

@@ -36,8 +36,9 @@ command is echoed as a `[cmd] …` Output line. (The `godot-debug` skill covers 
 `event_bus.gd` (autoload `EventBus`) — a minimal generic publish/subscribe bus for decoupled
 cross-domain notifications: `post(topic, data)` broadcasts and the `posted(topic, data)` signal
 delivers to any listener, which filters by `topic`. Emitters and listeners never reference each
-other. The only topic in use is `&"hit"`, posted by the Projectile System for each damaging hit
-(`{ position, victim, source, direction, damage }`) and consumed by the AI for combat awareness.
+other. The only topic in use is `&"hit"`, posted by the Projectile System for each damaging hit and
+by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`)
+and consumed by the AI for combat awareness and hostility.
 
 ## Camera, despawner, debug HUD
 
