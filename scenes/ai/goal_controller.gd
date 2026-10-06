@@ -141,9 +141,17 @@ const AgentHostility := preload("res://scenes/ai/agent_hostility.gd")
 @export var push_through_delay: float = 1.0
 ## Movement speed (px/s) under which the NPC counts as blocked while trying to follow a path.
 @export var stuck_speed: float = 20.0
+## How close (px) a shut door must be, while the NPC is blocked on its path, for it to deliberately
+## open the door instead of shoving through. Doorways stay walkable in the navmesh (doors are
+## nav-invisible), so the NPC paths up to a closed door and opens it. 0 disables door-opening.
+@export var door_open_reach: float = 40.0
 
 ## World-space room rects (`{ key, type, rect }`) from Main — the sensor's map of the house.
 var rooms: Array = []
+## The house entrance in world space, injected by Main for NPCs that start outside (e.g. the
+## invader). When set, the patrol heads here first while the NPC is outside all rooms, giving the
+## shortest direct path to the entrance instead of circling. Cleared after first use.
+var entry_point: Vector2 = Vector2.ZERO
 
 var _perception: Node             ## Senses + builds the state + menu each decision.
 var _vision: RefCounted           ## The sight sense (FOV/range/LoS); see agent_vision.gd.
@@ -369,8 +377,11 @@ func _update_known(character) -> void:
 	_hostiles = known.filter(func(c): return c["hostile"])
 	_allies = known.filter(func(c): return not c["hostile"])  ## For flanking: bearings to spread away from.
 	if was_known and _hostiles.is_empty():
-		# Just lost every hostile: have the patrol investigate the last-known spot before sweeping rooms.
-		_investigate_last_seen = true
+		# Only investigate the last-known spot when a contact was lost (sighting decayed). Skip it when
+		# the engaged contact was just killed — their corpse is already there and adds no information.
+		var engaged_killed: bool = is_instance_valid(_engage_node) and _engage_node.get("is_dead") == true
+		if not engaged_killed:
+			_investigate_last_seen = true
 		_patrol_active = false
 	if not _hostiles.is_empty():
 		_last_hostile_pos = _hostiles[0]["pos"]
@@ -408,6 +419,15 @@ func _check_salient() -> void:
 ## hostiles and holds with none known.
 func _searching() -> bool:
 	return _intent == "search" or (_intent == "idle" and pursue_hostiles and _hostiles.is_empty())
+
+
+## The centre of the bounding box that encloses all rooms — used as the "head toward the building"
+## target for an NPC that is outside and doesn't know the entrance location.
+func _house_centroid() -> Vector2:
+	var bounds := (rooms[0]["rect"] as Rect2)
+	for room in rooms:
+		bounds = bounds.merge(room["rect"])
+	return bounds.position + bounds.size * 0.5
 
 
 ## Whether a world point lies within any of the house's rooms (the "inside the house" test).
@@ -627,10 +647,11 @@ func _patrol(character) -> void:
 		character.aim_point = character.global_position + character.move_input * 100.0
 
 
-## The next place to search: the last-known hostile position once, right after losing sight, then a
+## The next place to search: the last-known hostile position once, right after losing sight; then,
+## when outside all rooms and given an entry_point (e.g. the front door), head there directly; then a
 ## round-robin tour through every room (skipping the one the NPC is standing in), so the patrol covers
-## the whole house rather than circling one corner. Also sets `_patrol_room_key` (the leg's target
-## room, or "" for the last-seen point). Holds position when there are no rooms.
+## the whole house. Also sets `_patrol_room_key` (the leg's target room, or "" for a point leg).
+## Holds position when there are no rooms.
 func _next_patrol_point(character) -> Vector2:
 	if _investigate_last_seen:
 		_investigate_last_seen = false
@@ -640,6 +661,17 @@ func _next_patrol_point(character) -> Vector2:
 		_patrol_room_key = ""
 		return character.global_position
 	var here := _room_key_at(character.global_position)
+	if here == "":
+		_patrol_room_key = ""
+		if entry_point != Vector2.ZERO:
+			# Familiar NPC: go directly to the known entrance. Cleared after use so the NPC
+			# switches to room patrol once past the door.
+			var dest := entry_point
+			entry_point = Vector2.ZERO
+			return dest
+		# Unfamiliar NPC outside: aim at the house centroid — the NPC can see the building and
+		# heads toward it; the nav agent routes naturally through the entrance to get there.
+		return _house_centroid()
 	for _n in rooms.size():  # advance through the list, skipping the current room
 		_patrol_idx = (_patrol_idx + 1) % rooms.size()
 		if rooms[_patrol_idx]["key"] != here:
@@ -711,6 +743,7 @@ func _path_move(character, dest: Vector2) -> void:
 	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
 	_agent.velocity = desired * character.speed  # Request this frame's avoidance-safe velocity.
 	_update_stuck(character)
+	_open_blocking_door(character)
 	if _push_through:
 		# No route around (or wedged): drive straight at the blocker so the character shoves it.
 		var aim: Vector2 = dest if not _agent.is_target_reachable() else next
@@ -746,6 +779,22 @@ func _reset_stuck(character) -> void:
 	_stuck_time = 0.0
 	_push_through = false
 	_last_pos = character.global_position
+
+
+## While blocked on a path, deliberately open a shut door within `door_open_reach` instead of
+## shoving through it: the doorway is walkable in the navmesh, so the NPC simply walks up to the
+## closed door and opens it. Generic over every NPC — the invader opening the front door and the
+## defender opening interior doors as it searches are the same code. A closed door still blocks
+## movement and line-of-fire until opened (or shot out).
+func _open_blocking_door(character) -> void:
+	if door_open_reach <= 0.0 or _stuck_time <= 0.0:
+		return
+	for door in get_tree().get_nodes_in_group("doors"):
+		if not is_instance_valid(door) or door.is_open():
+			continue
+		if door.operate_distance(character.global_position) <= door_open_reach:
+			door.open()
+			return
 
 
 ## Sense the situation and POST it with the `move` and `act` `choice` questions. Falls back to a

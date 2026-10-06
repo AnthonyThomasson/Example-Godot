@@ -11,8 +11,9 @@ const INTERIOR_MARGIN := 6.0   ## Gap between wall faces and furniture.
 
 
 ## Build the named floorplan under `parent`, positioned so its front door lands on
-## `front_door_world`. `rng` drives every random choice. Returns the house root.
-static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumberGenerator, parent: Node) -> Node2D:
+## `front_door_world`. `rng` drives every random choice. `spawn_doors` false skips placing door
+## objects so every doorway is a plain open archway. Returns the house root.
+static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumberGenerator, parent: Node, spawn_doors: bool = true) -> Node2D:
 	var plan := HouseDefinitions.get_plan(plan_key)
 	if plan.is_empty():
 		push_error("Unknown house plan: ", plan_key)
@@ -58,8 +59,55 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 			"rect": Rect2(house.position + rect.position, rect.size),
 		})
 
+	if spawn_doors:
+		_place_doors(rooms, doors, wall_thickness, house)
+
 	house.set_meta("rooms", rooms_world)
 	return house
+
+
+## Spawn a swinging door in each doorway the policy calls for: every exterior (front) door, and
+## interior doors bordering a private room (see DoorPolicy). Runs once per door, after walls are
+## built, so an interior door shared by two rooms is placed a single time. Doors are children of
+## `house` like walls; being frozen bodies they are invisible to the nav bake (the doorway stays
+## walkable) yet still block movement and line-of-sight until opened or destroyed.
+static func _place_doors(rooms: Array, doors: Array, wall_thickness: float, house: Node2D) -> void:
+	for door in doors:
+		var is_front: bool = door.get("front", false)
+		if not DoorPolicy.wants_door(_adjoining_types(rooms, door), is_front):
+			continue
+		var p: Vector2 = door["pos"]
+		var width: float = door["width"]
+		# A door on a horizontal (top/bottom) wall spans along x and hinges at its left jamb; one on a
+		# vertical wall spans along y and hinges at its top jamb. closed_dir points along the gap.
+		var hinge: Vector2
+		var closed_dir: Vector2
+		if _on_horizontal_wall(rooms, p):
+			hinge = Vector2(p.x - width * 0.5, p.y)
+			closed_dir = Vector2.RIGHT
+		else:
+			hinge = Vector2(p.x, p.y - width * 0.5)
+			closed_dir = Vector2.DOWN
+		DoorFactory.spawn(hinge, closed_dir, width, wall_thickness, 1.0, house)
+
+
+## The room types a door borders: one entry for a front/exterior door, two for an interior door
+## (the rooms on either side). Uses the same wall-membership test as _validate / placement.
+static func _adjoining_types(rooms: Array, door: Dictionary) -> Array:
+	var types: Array = []
+	for room in rooms:
+		if not _openings_for(room["rect"], [door]).is_empty():
+			types.append(room["type"])
+	return types
+
+
+## Whether the doorway at `p` sits on a horizontal (top/bottom) room wall (so it spans along x).
+## Mirrors the detection in _door_clearances.
+static func _on_horizontal_wall(rooms: Array, p: Vector2) -> bool:
+	return rooms.any(func(room: Dictionary) -> bool:
+		var r: Rect2 = room["rect"]
+		var on_edge := is_equal_approx(p.y, r.position.y) or is_equal_approx(p.y, r.end.y)
+		return on_edge and p.x > r.position.x and p.x < r.end.x)
 
 
 ## Author-error checks (warnings only): overlapping rooms, a door not on a shared

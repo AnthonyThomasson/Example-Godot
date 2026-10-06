@@ -14,6 +14,11 @@ const MOVE_DOWN := "move_down"
 const PUNCH := "punch"
 const FIRE := "fire"
 const INTERACT := "interact"
+## Operate a nearby door: tap to swing it fully, hold + mouse wheel to move it gradually.
+const OPERATE_DOOR := "operate_door"
+## Return to the pre-game setup window to start a fresh match (handled by main.gd, works in both
+## player and spectator mode).
+const MENU := "menu"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -33,6 +38,8 @@ const DEFAULTS := {
 	MOVE_DOWN: KEY_S,
 	PUNCH: KEY_F,
 	INTERACT: KEY_SPACE,
+	OPERATE_DOOR: KEY_E,
+	MENU: KEY_ESCAPE,
 	ITEM_1: KEY_1,
 	ITEM_2: KEY_2,
 	ITEM_3: KEY_3,
@@ -43,6 +50,11 @@ const DEFAULTS := {
 	ITEM_8: KEY_8,
 	ITEM_9: KEY_9,
 }
+
+
+## Accumulated mouse-wheel ticks since the last consume_wheel() (+ up, - down). The wheel is
+## event-only (no held state), so Keybinds captures it here and the controller polls consume_wheel().
+var _wheel_ticks := 0
 
 
 func _ready() -> void:
@@ -80,6 +92,25 @@ func rebind_mouse(action: StringName, button: MouseButton) -> void:
 	InputMap.action_add_event(action, event)
 
 
+## Capture mouse-wheel ticks (the one event-driven input): the wheel has no held/pressed state to
+## poll, so we accumulate ticks here and hand them to the controller via consume_wheel().
+func _unhandled_input(event: InputEvent) -> void:
+	var mb := event as InputEventMouseButton
+	if mb == null or not mb.pressed:
+		return
+	if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
+		_wheel_ticks += 1
+	elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		_wheel_ticks -= 1
+
+
+## Return the wheel ticks accumulated since the last call and reset to zero (+ up, - down).
+func consume_wheel() -> int:
+	var ticks := _wheel_ticks
+	_wheel_ticks = 0
+	return ticks
+
+
 ## Movement direction from the four move actions, ready to multiply by speed.
 func get_move_vector() -> Vector2:
 	return Input.get_vector(MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN)
@@ -101,6 +132,26 @@ func is_fire_just_pressed() -> bool:
 ## action path as the others.
 func is_interact_just_pressed() -> bool:
 	return Input.is_action_just_pressed(INTERACT)
+
+
+## Door-operate key state. just_pressed/just_released edge the E tap; pressed holds it for the
+## wheel-driven gradual mode. Rebindable like the others via rebind().
+func is_operate_door_pressed() -> bool:
+	return Input.is_action_pressed(OPERATE_DOOR)
+
+
+func is_operate_door_just_pressed() -> bool:
+	return Input.is_action_just_pressed(OPERATE_DOOR)
+
+
+func is_operate_door_just_released() -> bool:
+	return Input.is_action_just_released(OPERATE_DOOR)
+
+
+## True on the frame the menu key (Escape) is pressed — main.gd uses it to return to the setup window.
+## Rebindable like the others via rebind().
+func is_menu_just_pressed() -> bool:
+	return Input.is_action_just_pressed(MENU)
 
 
 ## Item selection (1-9). Returns the item number (1-9) if an item key was pressed

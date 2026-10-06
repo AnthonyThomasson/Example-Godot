@@ -32,7 +32,7 @@ concise current-state comments.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, dev command server. |
+| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, pre-game setup window, dev command server. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC (with sensing, sight, hostility and event-memory helpers), plus the dev-only decision-server launcher. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
@@ -45,7 +45,7 @@ Everything not listed here is private to its domain. Each domain's skill recaps 
 interface(s) and describes how they're implemented; this list is authoritative for signatures.
 
 1. **Main → World Generation**
-   - `WorldGen.generate(seed, force_plan, front_door_world, parent) -> Node2D` — seeds one RNG
+   - `WorldGen.generate(seed, force_plan, front_door_world, parent, spawn_doors=true) -> Node2D` — seeds one RNG
 	 for the whole run (plan pick is its first draw), prints `House: <plan>  seed: N`, builds
 	 the house.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts

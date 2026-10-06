@@ -43,8 +43,9 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
-  front_door_world, parent) -> Node2D` seeds one RNG for the whole run (plan pick is its first
-  draw), prints `House: <plan>  seed: N`, builds the house. `WorldGen.get_rooms(house) -> Array`
+  front_door_world, parent, spawn_doors=true) -> Node2D` seeds one RNG for the whole run (plan
+  pick is its first draw), prints `House: <plan>  seed: N`, builds the house. `spawn_doors` false
+  skips placing door objects so every doorway is an open archway. `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
   `rooms` metadata. `main.gd` positions the front door, fixes draw order, builds the nav map, and
   drops the NPC in — all via `get_rooms`; it never touches world-gen internals.

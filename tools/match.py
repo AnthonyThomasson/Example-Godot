@@ -40,7 +40,7 @@ def parse_verdict(status: str) -> str:
     for token in status.split("|"):
         token = token.strip()
         if token.startswith("verdict="):
-            return token[len("verdict="):]
+            return token[len("verdict="):].split()[0]
     return "none"
 
 

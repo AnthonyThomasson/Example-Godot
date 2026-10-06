@@ -33,7 +33,8 @@ status of both spectator combatants (`Defender`/`Invader`): each one's health, c
 alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
 controller's `current_act()`. `restart [seed]` reloads the scene for a fresh matchup, pinning the
 next layout when a seed is given (stashed in `Engine` meta, which survives the reload; `main.gd`
-reads it). Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
+reads it) and sets the `skip_setup` Engine meta so the reloaded scene builds immediately instead of
+reopening the pre-game setup window — the harness never clicks it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
 commands, or `tools/match.py` to run and score N matches in a row; each command is echoed as a
 `[cmd] …` Output line. (The `godot-debug` skill covers driving it.)
 
@@ -62,6 +63,15 @@ and consumed by the AI for combat awareness and hostility.
   (EventBus `&"hit"`), a running timer and the winner banner (on `died`). A decoupled observer: it
   reads the Character public API/signals, each controller's `current_act()` + exported `goal`, and
   the EventBus — never a domain's internals.
+- `setup_menu.gd` — the pre-game setup window (`SetupMenu` node, a `CanvasLayer` that builds its own
+  UI in code like the other HUDs). `open(defaults)` shows a modal with a "Human player" checkbox,
+  a "Spawn doors" checkbox, defender/invader count spinboxes, and three debug-overlay checkboxes
+  ("Agent labels", "Agent paths", "Vision cones"); pressing Start emits
+  `start_requested({ has_player, spawn_doors, defenders, invaders, show_agent_labels,
+  show_agent_paths, show_vision })`. Main opens it on a fresh launch and builds the world only once
+  Start is pressed; a scripted `restart` sets the Engine `skip_setup` meta so reloaded scenes build
+  immediately and the headless match harness never has to click it. A decoupled piece: it knows
+  nothing of the domains, only the parameter dict it emits.
 
 ## Spectator match mode
 

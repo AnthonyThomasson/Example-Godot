@@ -67,8 +67,12 @@ func observe(character, rooms: Array, vision: RefCounted, hostility: RefCounted,
 	var exclude := [character.get_rid()]
 
 	# Every other character (the player included): remember a sighting whenever currently visible.
+	# Dead characters are skipped entirely — corpses add no tactical information and must not keep
+	# refreshing memory entries that would otherwise age out.
 	_visible_now.clear()
 	for other in _other_characters(character):
+		if other.get("is_dead") == true:
+			continue
 		if not vision.can_see_node(other, self_pos, facing, space, exclude):
 			continue
 		var pos: Vector2 = other.global_position

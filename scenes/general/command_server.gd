@@ -99,15 +99,25 @@ func _execute(line: String) -> String:
 	match parts[0]:
 		"help":
 			return "verbs: help, pos, tp X Y, slot N, move up|down|left|right [off], stop, " \
-				+ "fire, punch, interact, aim X Y, match, restart [seed], eval EXPR; " \
+				+ "fire, punch, interact, aim X Y, match, restart [seed], menu, eval EXPR; " \
 				+ "anything else = GDScript expression"
 		"match":
 			return _match_status()
+		"menu":
+			# Return to the pre-game setup window (the same as pressing Escape) so a fresh match can be
+			# configured. Composition-root owns the window, so defer to main's return_to_setup().
+			var s := scene()
+			if s == null or not s.has_method("return_to_setup"):
+				return "no scene"
+			s.return_to_setup()
+			return "ok"
 		"restart":
-			# Reload for a fresh matchup. An optional seed pins the next layout; Engine meta survives
-			# the scene reload, and main.gd reads it on start.
+			# Reload for a fresh matchup. An optional seed pins the next layout; `skip_setup` makes the
+			# reloaded scene build immediately rather than reopening the pre-game setup window (the
+			# harness never clicks it). Engine meta survives the scene reload; main.gd reads both.
 			if parts.size() >= 2:
 				Engine.set_meta("match_seed", parts[1].to_int())
+			Engine.set_meta("skip_setup", true)
 			get_tree().reload_current_scene()
 			return "ok"
 		"pos":

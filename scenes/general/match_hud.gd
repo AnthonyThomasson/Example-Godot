@@ -70,18 +70,36 @@ func _health_bar(hp: float, max_hp: float) -> String:
 	return "[%s%s] %.0f/%.0f" % ["#".repeat(filled), "-".repeat(10 - filled), hp, max_hp]
 
 
-## Record the winner when a combatant dies: whichever other side is still alive takes it (a mutual
-## kill is a draw). Only the first death decides the match.
+## Record the outcome when a combatant dies. The match waits until the victim's whole faction is
+## eliminated before declaring a result — a single death does not end a multi-NPC side. Once a faction
+## is down, all surviving combatants are checked: if they share one faction that faction wins (by name
+## for a 1v1, by faction label for a larger match); no survivors or survivors from multiple factions is
+## a draw.
 func _on_died(victim: Node) -> void:
 	if _end_ms >= 0:
 		return
-	_end_ms = Time.get_ticks_msec()
-	var survivors := []
+	var victim_faction = victim.get("faction") if "faction" in victim else null
 	for entry in _combatants:
 		var c: Node = entry["character"]
-		if is_instance_valid(c) and c != victim and c.get("is_dead") != true:
-			survivors.append(str(c.name))
-	_verdict = "%s WINS" % survivors[0] if survivors.size() == 1 else "DRAW"
+		if c != victim and is_instance_valid(c) and c.get("is_dead") != true \
+				and c.get("faction") == victim_faction:
+			return  # Victim's faction still has living members; match continues.
+	_end_ms = Time.get_ticks_msec()
+	var survivors: Array = []
+	for entry in _combatants:
+		var c: Node = entry["character"]
+		if is_instance_valid(c) and c.get("is_dead") != true:
+			survivors.append(c)
+	if survivors.is_empty():
+		_verdict = "DRAW"
+		return
+	var wf = survivors[0].get("faction") if "faction" in survivors[0] else null
+	if not survivors.all(func(c): return c.get("faction") == wf):
+		_verdict = "DRAW"
+	elif survivors.size() == 1:
+		_verdict = "%s WINS" % str(survivors[0].name)
+	else:
+		_verdict = "%s WINS" % str(wf).to_upper()
 
 
 ## Append a line to the combat feed for each damaging hit (EventBus `&"hit"` — the same event the AI
@@ -121,11 +139,17 @@ func _build_ui() -> void:
 	_feed_label = _add_label(0.0, 1.0, Vector2(24, -180), Vector2(420, 170), 18, Color.ORANGE, HORIZONTAL_ALIGNMENT_LEFT)
 
 
-## One combatant panel: left side for the first combatant, right side for the second.
+## One combatant panel: left side for the first combatant, right side for the second. Word-wrap is
+## on so long goal strings fold within the 380 px width rather than overflowing off-screen.
 func _make_panel(index: int) -> Label:
+	var label: Label
 	if index == 0:
-		return _add_label(0.0, 0.0, Vector2(24, 60), Vector2(380, 160), 20, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
-	return _add_label(1.0, 0.0, Vector2(-404, 60), Vector2(380, 160), 20, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
+		label = _add_label(0.0, 0.0, Vector2(24, 60), Vector2(380, 200), 20, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	else:
+		label = _add_label(1.0, 0.0, Vector2(-404, 60), Vector2(380, 200), 20, Color.WHITE, HORIZONTAL_ALIGNMENT_RIGHT)
+	label.autowrap_mode = 3  # TextServer.AUTOWRAP_WORD_ARBITRARY
+	label.max_lines_visible = 7
+	return label
 
 
 ## Create and return a Label anchored at (`ax`,`ay`) with the given offset, size, font size, colour

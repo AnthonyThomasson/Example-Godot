@@ -8,14 +8,15 @@ class_name WorldGen
 
 ## Build a house and return its root Node2D (parented under `parent`). `seed` of 0 picks a
 ## fresh random layout each run; `force_plan` ("" = random) pins a specific floorplan.
-static func generate(seed: int, force_plan: String, front_door_world: Vector2, parent: Node) -> Node2D:
+## `spawn_doors` false skips placing door objects, leaving every doorway as an open archway.
+static func generate(seed: int, force_plan: String, front_door_world: Vector2, parent: Node, spawn_doors: bool = true) -> Node2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = seed if seed != 0 else randi()
 	var all_plans: Array = HouseDefinitions.get_all()
 	var pick: String = all_plans[rng.randi() % all_plans.size()]
 	var plan_key: String = force_plan if force_plan != "" else pick
 	print("House: ", plan_key, "  seed: ", rng.seed)
-	return HouseSpawner.spawn(plan_key, front_door_world, rng, parent)
+	return HouseSpawner.spawn(plan_key, front_door_world, rng, parent, spawn_doors)
 
 
 ## The generated house's rooms as an Array of { key, type, rect } with `rect` in WORLD
