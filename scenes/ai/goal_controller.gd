@@ -257,7 +257,7 @@ func control(character, delta: float) -> void:
 	if _behavior.update_known(character, known, delta):
 		_force = true  # Lost the engaged contact mid-fight → reconsider.
 	_check_salient()
-	# An active interaction holds the tick; when it or an idle move resolves, re-decide at once.
+	# An active interaction holds the tick; when it or a hold move resolves, re-decide at once.
 	if _behavior.service_interaction(character, delta, _force):
 		return
 	if _behavior.take_resolved():
@@ -273,7 +273,7 @@ func control(character, delta: float) -> void:
 
 ## Whether a new decision may be issued now: never while one is in flight; always when forced;
 ## otherwise the behaviour decides whether its current commitment still holds (a fight, an approach, a
-## search patrol, an idle move) or the decide cadence has elapsed.
+## search patrol, a hold move) or the decide cadence has elapsed.
 func _should_decide() -> bool:
 	if _decision.is_pending():
 		return false

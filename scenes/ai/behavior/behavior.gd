@@ -58,12 +58,12 @@ var _patrol_idx := 0              ## Round-robin index into `rooms` for the patr
 var _patrol_room_key := ""        ## Target room key; the leg is done once the NPC ENTERS it (""=a point).
 var _patrol_timer := 0.0          ## Safety cap (s) to advance the tour if a leg can't be reached.
 var _investigate_last_seen := false ## Head for the last-known hostile spot first after losing sight.
-var _intent := "idle"             ## What the current act means to do: interact / combat / search / idle.
+var _intent := "hold"             ## What the current act means to do: interact / combat / search / hold.
 var _act_verb := "hold"           ## The chosen act's verb (shoot / punch / interact / search / hold).
 var _target_obj: Node             ## The object to approach + use (interact intent), else null.
 var _interact_id := ""            ## The interaction id to run on `_target_obj`.
-var _move_point := Vector2.ZERO   ## Destination for an idle reposition.
-var _has_move := false            ## Whether an idle move destination is set.
+var _move_point := Vector2.ZERO   ## Destination for a hold reposition.
+var _has_move := false            ## Whether a hold destination is set.
 var _act_armed := false           ## Delays an interaction one frame so facing settles first.
 var _combat_phase := "peek"       ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
 var _cover_timer := 0.0           ## Seconds left ducking behind cover before peeking again.
@@ -76,7 +76,7 @@ var _act_log := "hold"            ## Chosen act id, for the decision log.
 var _in_interaction := false      ## Committed to an active object interaction.
 var _interaction_timer := 0.0     ## Seconds left before ending the current interaction.
 var _commit_timer := 0.0          ## Seconds left on the current approach commitment (safety cap).
-var _resolved := false            ## A task just finished (interaction ended / idle destination reached) → re-decide.
+var _resolved := false            ## A task just finished (interaction ended / hold destination reached) → re-decide.
 
 
 ## Build the Locomotion child and capture the perception sub-domain. The controller calls this once in
@@ -97,7 +97,7 @@ func current_act() -> String:
 	return _act_log
 
 
-## Read-only: the current intent mode (interact / combat / search / idle), for the controller's log
+## Read-only: the current intent mode (interact / combat / search / hold), for the controller's log
 ## and salient/decide logic.
 func intent() -> String:
 	return _intent
@@ -130,7 +130,7 @@ func debug_status() -> String:
 		"search":
 			line = "SEARCH"
 		_:
-			line = ("IDLE → %s" % _move_id) if _has_move else "IDLE"
+			line = ("HOLD → %s" % _move_id) if _has_move else "HOLD"
 	if _perception != null and _perception.under_fire():
 		line += "  ⚠ under fire"
 	return line
@@ -140,7 +140,7 @@ func debug_status() -> String:
 ## engaged contact's last-known body/position/inside state), advancing the commitment timer. If the
 ## engaged contact is no longer known (its sighting decayed) or no longer hostile, a fight retargets to
 ## the nearest other known hostile, else `_engage_id` drops to 0 — and when that empties an active
-## fight it drops to idle and returns true so the controller re-decides. All acting reads these rather
+## fight it drops to hold and returns true so the controller re-decides. All acting reads these rather
 ## than true positions, so the NPC only ever acts on what it has perceived.
 func update_known(character, known: Array, delta: float) -> bool:
 	_loco.ensure_max_speed(character)
@@ -171,7 +171,7 @@ func update_known(character, known: Array, delta: float) -> bool:
 	# Lost every hostile mid-fight (the sightings decayed): drop combat so the controller reconsiders,
 	# rather than keep peeking at a target we can no longer locate.
 	if _intent == "combat" and _engage_id == 0:
-		_intent = "idle"
+		_intent = "hold"
 		return true
 	return false
 
@@ -191,7 +191,7 @@ func service_interaction(character, delta: float, force: bool) -> bool:
 	return true
 
 
-## Whether a committed task just finished (interaction ended / idle destination reached). Clears the
+## Whether a committed task just finished (interaction ended / hold destination reached). Clears the
 ## flag; the controller forces a re-decision when it returns true.
 func take_resolved() -> bool:
 	var r := _resolved
@@ -201,7 +201,7 @@ func take_resolved() -> bool:
 
 ## Whether the NPC wants a new decision now, given its commitment: a fight re-decides once the
 ## `engaged` memory lapses; an approach holds until its safety cap; a pursuing search never re-decides
-## on cadence (only a salient event does); an idle move holds until it arrives; otherwise the cadence
+## on cadence (only a salient event does); a hold move holds until it arrives; otherwise the cadence
 ## (`decide_timer_elapsed`) governs.
 func wants_decision(character, decide_timer_elapsed: bool) -> bool:
 	if _intent == "combat":
@@ -210,7 +210,7 @@ func wants_decision(character, decide_timer_elapsed: bool) -> bool:
 		return _commit_timer <= 0.0
 	if _searching() and pursue_hostiles:
 		return false  # Patrolling the house to search; only a salient event re-decides.
-	if _intent == "idle" and _has_move and _commit_timer > 0.0 and not _loco.reached(character, _move_point):
+	if _intent == "hold" and _has_move and _commit_timer > 0.0 and not _loco.reached(character, _move_point):
 		return false
 	return decide_timer_elapsed
 
@@ -218,7 +218,7 @@ func wants_decision(character, decide_timer_elapsed: bool) -> bool:
 ## Whether the NPC is (or should be) searching for hostiles: it chose to search, or it pursues
 ## hostiles and holds with none known.
 func _searching() -> bool:
-	return _intent == "search" or (_intent == "idle" and pursue_hostiles and _hostiles.is_empty())
+	return _intent == "search" or (_intent == "hold" and pursue_hostiles and _hostiles.is_empty())
 
 
 ## Carry out the current act. Movement and aim are both derived from what the NPC chose to do.
@@ -229,15 +229,15 @@ func apply(character, delta: float) -> void:
 		"combat":
 			_apply_combat(character, delta)
 		_:
-			_apply_idle(character)
+			_apply_hold(character)
 
 
 ## Interact intent: walk to the chosen object facing it (or a known hostile, to keep eyes on them);
-## once its action is in reach, face it, run it and hold the interaction. Drops to idle if the object
+## once its action is in reach, face it, run it and hold the interaction. Drops to hold if the object
 ## is gone or the action can't start.
 func _apply_interact(character) -> void:
 	if _target_obj == null or not is_instance_valid(_target_obj):
-		_intent = "idle"
+		_intent = "hold"
 		character.move_input = Vector2.ZERO
 		return
 	if not _interaction_in_reach(character):
@@ -253,7 +253,7 @@ func _apply_interact(character) -> void:
 		_in_interaction = true
 		_interaction_timer = interaction_dwell
 	else:
-		_intent = "idle"
+		_intent = "hold"
 
 
 ## Combat intent: always face where the engaged contact was last seen, then fight tactically. A punch
@@ -391,10 +391,10 @@ func _fire(character) -> void:
 		character.melee()
 
 
-## Idle / search intent. A searching NPC (chose to search, or pursues hostiles and knows none) patrols
+## Hold / search intent. A searching NPC (chose to search, or pursues hostiles and knows none) patrols
 ## the house, walking room to room and looking where it goes. Otherwise it watches the nearest known
 ## hostile and/or moves to a chosen named destination if there is one.
-func _apply_idle(character) -> void:
+func _apply_hold(character) -> void:
 	if _searching():
 		_patrol(character)
 		return
@@ -501,13 +501,13 @@ func _interaction_in_reach(character) -> bool:
 	return false
 
 
-## Adopt the chosen act: resolve its verb into an intent (interact / combat / search / idle), capture
+## Adopt the chosen act: resolve its verb into an intent (interact / combat / search / hold), capture
 ## the object + id for an interaction or the contact for an engagement, commit, and re-arm the
 ## one-frame action delay. The pursuit primitive and the engaged backstop override Von's pick first.
 func set_act(id: String, acts: Dictionary) -> void:
 	var verb: String = acts.get(id, {}).get("verb", "hold")
 	if pursue_hostiles and not _hostiles.is_empty() and verb in ["interact", "hold", "search"]:
-		# Pursuing with a known hostile: engage the nearest rather than do a chore or stand idle. The
+		# Pursuing with a known hostile: engage the nearest rather than do a chore or hold. The
 		# large interaction menu otherwise dilutes Von's ranking and lets it pick e.g. "sit".
 		id = _engage_act_for(_hostiles[0]["id"], id, acts)
 	elif pursue_hostiles and _hostiles.is_empty() and verb == "interact":
@@ -543,7 +543,7 @@ func set_act(id: String, acts: Dictionary) -> void:
 			_intent = "search"
 			_target_obj = null
 		_:
-			_intent = "idle"
+			_intent = "hold"
 			_target_obj = null
 
 
@@ -556,20 +556,20 @@ func _engage_act_for(contact_id: int, fallback_id: String, acts: Dictionary) -> 
 	return fallback_id
 
 
-## Adopt the chosen idle destination (used only when the act is "hold").
+## Adopt the chosen hold destination (used only when the act is "hold").
 func set_move(id: String, moves: Dictionary) -> void:
 	_move_id = id
 	_has_move = id != "" and moves.has(id)
 	if _has_move:
 		_move_point = moves[id]["point"]
-		if _intent == "idle":
+		if _intent == "hold":
 			_commit_timer = max_commit_time
 
 
 ## A steady, non-chaotic stance for when Von is unreachable (server-down path): stop and watch any
 ## known hostile rather than thrash between random options.
 func fallback() -> void:
-	_intent = "idle"
+	_intent = "hold"
 	_target_obj = null
 	_has_move = false
 	_act_verb = "hold"
