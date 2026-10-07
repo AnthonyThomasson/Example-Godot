@@ -62,7 +62,10 @@ The AI's external surface is unchanged by the sub-domain split — all of it is 
   `interact_with(object, id)` / `end_interaction()`; reads `damage_taken()`, `faction`,
   `current_item()`, `has_item()`. Main injects only `rooms` (and `entry_point`). For observers (the
   match HUD / command server) the controller exposes `current_act()` — its live decision id — and
-  `debug_status()`, both read-only (forwarded from the behaviour sub-domain).
+  `debug_status()`, both read-only (forwarded from the behaviour sub-domain), plus
+  `debug_state() -> Dictionary` — the deep on-demand snapshot it assembles from all three
+  sub-domains (the state text Von was told, the menus offered, Von's raw pick vs. any policy
+  override, the known contacts, the pathing state). The dev command server's `ai` verb dumps it.
 - **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s
   `target_position` and reads `get_next_path_position()`.
 - **EventBus** (interface 10): the orchestrator consumes `&"hit"` (`victim`, `position`, `direction`,

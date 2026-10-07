@@ -41,6 +41,9 @@ const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
 ## the world; a scripted restart skips it (see `_ready`).
 @onready var _setup_menu: CanvasLayer = $SetupMenu
+## Dev-only Von server launcher (AI). The match start waits on it so no NPC decides against a cold
+## server; absent (or resolved to "none coming") it imposes no delay.
+@onready var _von_launcher: Node = get_node_or_null("DecisionServerLauncher")
 
 ## Every NPC spawned this run, in spawn order — the spectator camera + match HUD observe these.
 var _combatants: Array = []
@@ -81,11 +84,32 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	show_agent_labels = bool(config.get("show_agent_labels", show_agent_labels))
 	show_agent_paths = bool(config.get("show_agent_paths", show_agent_paths))
 	show_vision = bool(config.get("show_vision", show_vision))
+	# Hold the start until the decision server is live, so the NPCs' first decisions don't fail
+	# against a booting server and leave them holding steady. The window stays up (showing why)
+	# until then; this returns immediately when a server is already up or none is coming.
+	await _await_decision_server()
+	if not is_inside_tree():
+		return  # Escape returned us to setup (reloading the scene) while we were waiting.
 	_setup_menu.queue_free()
 	var _debug_ui := get_node_or_null("DebugUI")
 	if _debug_ui:
 		_debug_ui.visible = true  # restored here; _setup_spectator frees it in spectator mode
 	_spawn_world()
+
+
+## Wait for the Von decision server to settle before the world is built. Returns at once when the
+## launcher has already resolved — a reused server, or none coming (exported build, blank von_path,
+## timeout) — so the usual case adds no delay at all. The launcher guarantees it always resolves, so
+## this cannot stall the setup window indefinitely; a run without a server still starts, just with
+## NPCs that hold steady.
+func _await_decision_server() -> void:
+	if _von_launcher == null or not _von_launcher.has_method("is_resolved") or _von_launcher.is_resolved():
+		return
+	if _setup_menu != null and _setup_menu.has_method("set_status"):
+		_setup_menu.set_status("Waiting for the decision server…")
+	var live: bool = await _von_launcher.resolved
+	if not live:
+		push_warning("Starting without a decision server — NPCs will hold steady until one answers.")
 
 
 ## Escape returns to the setup window to start a fresh match. Routed through Keybinds like all input,

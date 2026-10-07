@@ -71,7 +71,9 @@ var _combat_dest := Vector2.ZERO  ## Committed fire/cover position the NPC is st
 var _combat_dest_timer := 0.0     ## Seconds left before a new combat position may be chosen.
 var _hold_ground := false         ## Combat: return fire but stay inside the house (territory vs. an outsider).
 var _move_id := ""                ## Chosen move id, for the decision log.
-var _act_log := "hold"            ## Chosen act id, for the decision log.
+var _act_log := "hold"            ## Chosen act id (AFTER any policy override), for the decision log.
+var _act_raw := "hold"            ## Von's OWN pick, before the policy overrides below rewrote it.
+var _act_override := ""           ## Which policy rewrote Von's pick ("" = adopted exactly as chosen).
 var _in_interaction := false      ## Committed to an active object interaction.
 var _interaction_timer := 0.0     ## Seconds left before ending the current interaction.
 var _commit_timer := 0.0          ## Seconds left on the current approach commitment (safety cap).
@@ -112,6 +114,43 @@ func salient_key() -> String:
 	var ids: Array = _hostiles.map(func(c): return c["id"])
 	ids.sort()
 	return "%s|%s" % [str(ids), str(_engage_inside) if _engage_id != 0 else "-"]
+
+
+## Read-only: which policy rewrote Von's pick this decision, or "" when its choice was adopted as-is.
+## The controller logs it so an overridden act is never silently attributed to Von.
+func act_override() -> String:
+	return _act_override
+
+
+## Read-only: the full act/engagement/commitment state as structured data, for the controller's
+## `debug_state()` snapshot. Where `debug_status()` is a one-line label for the HUD, this is the
+## deep dump an observer inspects on demand. Built from live state (never mutates).
+func debug_state() -> Dictionary:
+	return {
+		"intent": _intent,
+		"act": _act_log,
+		"act_raw": _act_raw,
+		"act_override": _act_override,
+		"act_verb": _act_verb,
+		"move": _move_id,
+		"engage": str(_engage_node.name) if is_instance_valid(_engage_node) else "",
+		"engage_id": _engage_id,
+		"engage_inside": _engage_inside,
+		"combat_phase": _combat_phase,
+		"hold_ground": _hold_ground,
+		"hostiles_known": _hostiles.size(),
+		"allies_known": _allies.size(),
+		"in_interaction": _in_interaction,
+		"patrol_room": _patrol_room_key,
+		"timers": {
+			"commit": _commit_timer,
+			"interaction": _interaction_timer,
+			"fire": _fire_timer,
+			"cover": _cover_timer,
+			"combat_dest": _combat_dest_timer,
+		},
+		"loco": _loco.debug_state(),
+	}
 
 
 ## Read-only: a compact, human-readable summary of what the NPC is doing right now — for debug
@@ -502,19 +541,27 @@ func _interaction_in_reach(character) -> bool:
 ## the object + id for an interaction or the contact for an engagement, commit, and re-arm the
 ## one-frame action delay. The pursuit primitive and the engaged backstop override Von's pick first.
 func set_act(id: String, acts: Dictionary) -> void:
+	var raw := id
+	var why := ""
 	var verb: String = acts.get(id, {}).get("verb", "hold")
 	if pursue_hostiles and not _hostiles.is_empty() and verb in ["interact", "hold", "search"]:
 		# Pursuing with a known hostile: engage the nearest rather than do a chore or hold. The
 		# large interaction menu otherwise dilutes Von's ranking and lets it pick e.g. "sit".
 		id = _engage_act_for(_hostiles[0]["id"], id, acts)
+		why = "pursuit: engage nearest hostile"
 	elif pursue_hostiles and _hostiles.is_empty() and verb == "interact":
 		# Searching: don't park in a passive interaction (it freezes the NPC facing one way and
 		# blinds it). Search the house instead.
 		id = "search"
+		why = "pursuit: search rather than a chore"
 	elif _perception.engaged_fresh() and verb == "interact" and not _hostiles.is_empty():
 		# Backstop for a non-pursuing NPC dragged into a fight: once engaged, a re-decision must not
 		# peel it off to sit/use furniture mid-combat.
 		id = _engage_act_for(_hostiles[0]["id"], id, acts)
+		why = "engaged backstop: stay in the fight"
+	# An override rule can fire yet leave the id alone (no engage act was on offer), so compare.
+	_act_raw = raw if raw != "" else "hold"
+	_act_override = why if id != raw else ""
 	var opt: Dictionary = acts.get(id, {})
 	_act_verb = opt.get("verb", "search" if id == "search" else "hold")
 	_act_log = id if id != "" else "hold"

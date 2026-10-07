@@ -31,7 +31,10 @@ and `goal`, and the EventBus `&"hit"` topic. They know nothing of the domains.
   emits `start_requested({ has_player, seed, spawn_doors, defenders, invaders, show_agent_labels,
   show_agent_paths, show_vision })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
-  Start button 32pt.
+  Start button 32pt. Pressing Start also **disables the button**, because Main may hold the start
+  open for a moment (it waits for the Von decision server) and a second press would build the world
+  twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
+  shows "Waiting for the decision server…" there so that pause is never silent.
 
 - `seed_display.gd` — the **seed readout** (`SeedDisplay` node). `show_seed(level_seed)` writes the
   run's seed into a 32pt label anchored to the bottom-right corner (semi-transparent), so a layout
@@ -42,5 +45,6 @@ and `goal`, and the EventBus `&"hit"` topic. They know nothing of the domains.
 - UI observers attach by exported node path (or node name duck-typed in `main.gd`) and read only the
   Character public API/signals plus `AIController.current_act()` / `goal` (interface 7 in the
   `architecture` skill). EventBus `&"hit"` is the only cross-domain event consumed here.
-- `main.gd` calls `MatchHUD.begin(combatants)`, `SetupMenu.open(defaults)`, and
-  `SeedDisplay.show_seed(seed)` — the only outward calls the UI domain receives.
+- `main.gd` calls `MatchHUD.begin(combatants)`, `SetupMenu.open(defaults)` /
+  `SetupMenu.set_status(text)`, and `SeedDisplay.show_seed(seed)` — the only outward calls the UI
+  domain receives.

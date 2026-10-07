@@ -99,10 +99,12 @@ func _execute(line: String) -> String:
 	match parts[0]:
 		"help":
 			return "verbs: help, pos, tp X Y, slot N, move up|down|left|right [off], stop, " \
-				+ "fire, punch, interact, aim X Y, match, restart [seed], menu, eval EXPR; " \
+				+ "fire, punch, interact, aim X Y, match, ai, restart [seed], menu, eval EXPR; " \
 				+ "anything else = GDScript expression"
 		"match":
 			return _match_status()
+		"ai":
+			return _ai_status()
 		"menu":
 			# Return to the pre-game setup window (the same as pressing Escape) so a fresh match can be
 			# configured. Composition-root owns the window, so defer to main's return_to_setup().
@@ -200,6 +202,21 @@ func _match_status() -> String:
 		verdict = alive[0] if alive.size() == 1 else "draw"
 	var elapsed := (Time.get_ticks_msec() - _match_start_ms) / 1000.0
 	return "%s | verdict=%s elapsed=%.1f" % [" | ".join(lines), verdict, elapsed]
+
+
+## The deep AI state of every AI combatant, as JSON — what `match` is to scoring, this is to
+## diagnosing a brain: the state Von was told, the menu it chose from, its pick vs. any policy
+## override, the known contacts and the pathing state. Reads only the controller's read-only
+## `debug_state()` (the same duck-type as `current_act()`), so the server stays a decoupled observer
+## and a character without an AI controller is simply skipped.
+func _ai_status() -> String:
+	var out: Array = []
+	for c in _combatants():
+		for child in c.get_children():
+			if child.has_method("debug_state"):
+				out.append(child.debug_state())
+				break
+	return "no AI combatants" if out.is_empty() else JSON.stringify(out, "  ")
 
 
 ## The current act of `character`'s AI controller child, or "?" when it has none (e.g. the player).

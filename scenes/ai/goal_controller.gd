@@ -146,6 +146,7 @@ var _decision: Node ## THINK sub-domain: the Von round-trip (decision/decision_c
 var _behavior: Node ## ACT sub-domain: derives movement/actions + holds commitment state.
 var _acts := {} ## This tick's act options (from perception), brokered to the behaviour on decide.
 var _moves := {} ## This tick's move options.
+var _last_state := "" ## The state text Von was last shown, retained for `debug_state()`.
 var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
 var _force := false ## Force a decision now (task resolved or salient event).
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
@@ -230,6 +231,52 @@ func current_act() -> String:
 ## overlays/observers (the behaviour sub-domain builds it from its live act state).
 func debug_status() -> String:
 	return _behavior.debug_status() if _behavior != null else "HOLD"
+
+
+## Read-only: the WHOLE AI state as structured data — the deep counterpart to `debug_status()`'s
+## one-line label, for an observer (the dev command server) to inspect on demand. It answers the
+## questions a log line can't: what Von was actually TOLD (`state`), what it was allowed to pick from
+## (`acts_offered`), what it picked versus what policy overrode (`act_raw` / `act_override`), what the
+## NPC currently knows (`contacts`), and where pathing stands (`loco`). Assembled here because the
+## orchestrator is the only place that sees all three sub-domains; each reports its own state. Pure
+## reads — calling this never perturbs the loop.
+func debug_state() -> Dictionary:
+	var out := {
+		"npc": _npc_name(),
+		"goal": goal,
+		"state": _last_state,
+		"acts_offered": _acts.keys(),
+		"moves_offered": _moves.keys(),
+		"decide_in": _decide_timer,
+		"forced": _force,
+		"request_pending": _decision != null and _decision.is_pending(),
+	}
+	if _perception != null:
+		out["under_fire"] = _perception.under_fire()
+		out["engaged_fresh"] = _perception.engaged_fresh()
+		out["contacts"] = _contact_digest()
+	if _behavior != null:
+		out.merge(_behavior.debug_state())
+	return out
+
+
+## The known-contacts list flattened to the fields worth reading in a snapshot (who, whether hostile
+## and why, whether seen this tick, and how far off). Empty until the controller knows its character.
+func _contact_digest() -> Array:
+	if _character == null:
+		return []
+	var self_pos: Vector2 = _character.global_position
+	var out: Array = []
+	for c in _perception.contacts(self_pos):
+		out.append({
+			"name": c["name"],
+			"hostile": c["hostile"],
+			"reason": c["reason"],
+			"visible": c["visible"],
+			"inside": c.get("inside", false),
+			"dist": int((c["pos"] as Vector2).distance_to(self_pos)),
+		})
+	return out
 
 
 ## Called each physics frame by the character. Runs the SENSE → THINK → ACT loop: fold any hits in,
@@ -318,6 +365,7 @@ func _request_decision(character) -> void:
 	var ctx: Dictionary = _perception.sense(character, rooms, goal)
 	_moves = ctx["moves"]
 	_acts = ctx["acts"]
+	_last_state = ctx["state_text"]  # Kept so `debug_state()` can show what Von was actually told.
 	_decision.request(ctx, _npc_name())
 
 
@@ -326,7 +374,11 @@ func _request_decision(character) -> void:
 func _on_decided(act_id: String, move_id: String) -> void:
 	_behavior.set_act(act_id, _acts)
 	_behavior.set_move(move_id, _moves)
-	print("%s (Von) act=%s move=%s intent=%s" % [_npc_name(), _behavior.current_act(), move_id, _behavior.intent()])
+	# Report Von's OWN pick whenever a policy rewrote it, so an override is never read as Von's choice.
+	var final_act: String = _behavior.current_act()
+	var override: String = _behavior.act_override()
+	var act_text: String = final_act if override == "" else "%s→%s [%s]" % [act_id, final_act, override]
+	print("%s (Von) act=%s move=%s intent=%s" % [_npc_name(), act_text, move_id, _behavior.intent()])
 
 
 ## The driven character's name, for log lines.

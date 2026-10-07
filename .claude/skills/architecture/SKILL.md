@@ -40,6 +40,12 @@ concise current-state comments.
 domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
 `Keybinds`, `Despawner` and `EventBus` (all General).
 
+On a fresh launch Main opens the UI setup window and builds nothing until Start, then **awaits the
+AI domain's `DecisionServerLauncher.resolved(live)`** before `_spawn_world()`, so no NPC makes its
+first decision against a still-booting Von server. That launcher is a root node of `main.tscn`, so
+it begins probing/launching at scene load and usually resolves while the window is still open (no
+delay); it always resolves, so a run with no server still starts, with NPCs that hold steady.
+
 ## The vital interfaces (this is the whole cross-domain surface)
 
 Everything not listed here is private to its domain. Each domain's skill recaps its own

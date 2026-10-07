@@ -42,6 +42,34 @@ func reachable(p: Vector2) -> Vector2:
 	return NavigationServer2D.map_get_closest_point(map, p)
 
 
+## Read-only: the pathing state behind the current move, for the AI's `debug_state()` snapshot. Uses
+## only side-effect-free agent reads — notably NOT `get_next_path_position()`, which advances the
+## agent's path index and so would perturb movement if called out of band by an observer. `next` is
+## therefore read off the path array at the live index instead.
+func debug_state() -> Dictionary:
+	if _agent == null:
+		return { "agent": false }
+	var path: PackedVector2Array = _agent.get_current_navigation_path()
+	var idx: int = _agent.get_current_navigation_path_index()
+	# Points go out as [x, y] int pairs: JSON (how an observer serializes this) has no Vector2, and
+	# pixel precision is ample for diagnosis.
+	return {
+		"agent": true,
+		"target": _point(_agent.target_position),
+		"reachable": _agent.is_target_reachable(),
+		"finished": _agent.is_navigation_finished(),
+		"next": _point(path[idx]) if idx < path.size() else [],
+		"path_points": path.size(),
+		"path_index": idx,
+		"stuck_time": _stuck_time,
+	}
+
+
+## A world point as a JSON-safe [x, y] int pair.
+func _point(p: Vector2) -> Array:
+	return [int(p.x), int(p.y)]
+
+
 ## Whether the NPC has reached `point` (nav path finished, or within arrive_dist straight-line).
 func reached(character, point: Vector2) -> bool:
 	if _agent != null:

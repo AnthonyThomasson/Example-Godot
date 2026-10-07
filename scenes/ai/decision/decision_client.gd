@@ -24,6 +24,7 @@ var _pending := false             ## True while a request is in flight.
 var _acts := {}                   ## Act options sent with the in-flight request (to validate the pick).
 var _moves := {}                  ## Move options sent with the in-flight request.
 var _npc_name := "NPC"            ## Name of the driven NPC, for log lines.
+var _last_error := ""             ## Last failure reported, so a persistent one isn't logged every tick.
 
 
 ## Configure the endpoint + request timeout and build the HTTP client. Called once by the controller.
@@ -60,8 +61,7 @@ func request(ctx: Dictionary, npc_name: String) -> bool:
 	if _http.request(server_url, headers, HTTPClient.METHOD_POST, JSON.stringify(body)) == OK:
 		_pending = true
 		return true
-	failed.emit()
-	print("%s (Von) request failed to start — holding steady" % _npc_name)
+	_fail("request failed to start")
 	return false
 
 
@@ -76,17 +76,43 @@ func _question(instructions: String, options: Dictionary) -> Dictionary:
 ## Read the answers and emit Von's top pick for each; emit `failed()` on transport or parse error.
 func _on_request_completed(result: int, code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
 	_pending = false
-	if result != HTTPRequest.RESULT_SUCCESS or code != 200:
-		failed.emit()
-		print("%s (Von) server unreachable (result %d, HTTP %d) — holding steady" % [_npc_name, result, code])
+	# A transport failure and an HTTP error answer are DIFFERENT faults and must not share a message:
+	# calling a 4xx/5xx "unreachable" hides the server's own explanation (a missing model checkpoint,
+	# say) behind what reads as a connection problem.
+	if result != HTTPRequest.RESULT_SUCCESS:
+		_fail("no reply from %s (HTTPRequest result %d)" % [server_url, result])
+		return
+	if code != 200:
+		_fail("server refused the decision: HTTP %d — %s" % [code, _error_detail(body)])
 		return
 	var data = JSON.parse_string(body.get_string_from_utf8())
 	if not data is Dictionary or not data.get("answers") is Dictionary:
-		failed.emit()
-		print("%s (Von) malformed response — holding steady" % _npc_name)
+		_fail("malformed response")
 		return
+	_last_error = ""  # Recovered, so a later recurrence is worth reporting again.
 	var answers: Dictionary = data["answers"]
 	decided.emit(_pick(answers, "act", _acts), _pick(answers, "move", _moves))
+
+
+## Report a failed decision and fall back. The same `reason` is logged only ONCE: every NPC re-asks
+## about once a second, so a persistent fault (a server that cannot load its weights) would otherwise
+## bury the log. A different reason, or a recovery followed by a relapse, logs again.
+func _fail(reason: String) -> void:
+	failed.emit()
+	if reason == _last_error:
+		return
+	_last_error = reason
+	print("%s (Von) %s — holding steady" % [_npc_name, reason])
+
+
+## The server's own explanation for a non-200 (`{ "detail": … }`), so a configuration fault is
+## reported as itself. Falls back to the raw body, trimmed, when it isn't that shape.
+func _error_detail(body: PackedByteArray) -> String:
+	var text := body.get_string_from_utf8().strip_edges()
+	var data = JSON.parse_string(text)
+	if data is Dictionary and data.has("detail"):
+		return str(data["detail"])
+	return text if text != "" else "(empty response body)"
 
 
 ## The offered option id Von ranks highest for question `key`: its argmax `choice` when that is one of

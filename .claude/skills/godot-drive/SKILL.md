@@ -71,12 +71,19 @@ python3 tools/gcmd.py "slot 3"              # select item slot 1-9 (3 = pistol)
 python3 tools/gcmd.py fire                  # LMB (pistol) — prints a Shot … line
 python3 tools/gcmd.py punch                 # F
 python3 tools/gcmd.py interact              # Space
+python3 tools/gcmd.py ai                    # every NPC's full AI state as JSON (see below)
 python3 tools/gcmd.py "aim 700 300"         # windowed runs only (needs a real cursor)
 python3 tools/gcmd.py 'player().speed'      # arbitrary GDScript; helpers: player(), scene(), node(path)
 ```
 
 Verbs: `help, pos, tp X Y, slot N, move up|down|left|right [off], stop, fire, punch, interact,
-aim X Y, eval EXPR`. Port resolves as `--port` → `$GODOT_CMD_PORT` → `9080`.
+aim X Y, match, ai, restart [seed], menu, eval EXPR`. Port resolves as `--port` →
+`$GODOT_CMD_PORT` → `9080`.
+
+**`ai` is the AI diagnostic verb**: it dumps every NPC's full brain state as JSON — the state text
+Von was actually shown, the act/move menus it chose from, its raw pick vs. any policy override, the
+known contacts (hostile + why + visible + distance), the commitment timers, and the pathing state
+(nav target, reachable, stuck time). Prefer it over guessing from log lines when an NPC misbehaves.
 
 ## 3. Read the reaction
 
@@ -87,8 +94,14 @@ output as `[cmd] <line> -> <reply>`, alongside the gameplay lines it triggers (`
 ## 4. Clean up
 
 `mcp__godot__stop_project` (or `kill` the Bash pid). `stop_project` hard-kills Godot, so its
-`_exit_tree` doesn't run and the **Von decision server it spawned is orphaned** on port 8000 — the
-next launch reuses it; to remove it, `pkill -f "von serve"`.
+`_exit_tree` doesn't run and the **Von decision server it spawned is orphaned** on port 8000.
+
+**Always `pkill -f "von serve"` after a hard kill.** An orphaned server is not merely untidy: its
+stdout pipe died with the Godot process, so any weight fetch it attempts dies on `EPIPE` and it can
+**never load a model again** — while still answering HTTP, so it looks healthy. Every decision then
+returns `422 Failed to load Option-Marker decision weights … [Errno 32] Broken pipe` and every NPC
+sits in `HOLD` forever. The launcher's readiness probe now detects this (it POSTs a real decision,
+not `GET /`) and refuses to treat such a server as live, but the fix is still to kill it.
 
 ## Limitations
 

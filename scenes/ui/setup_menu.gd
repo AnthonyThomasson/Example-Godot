@@ -26,6 +26,8 @@ var _invader_spin: SpinBox          ## How many invaders to spawn outside the ho
 var _agent_labels_check: CheckBox   ## Checked = draw the floating action-status label above each NPC.
 var _agent_paths_check: CheckBox    ## Checked = draw the NPC's live navigation path in the world.
 var _vision_check: CheckBox         ## Checked = draw each NPC's line-of-sight / awareness overlay.
+var _start_button: Button           ## Disabled on press, so holding the start can't be triggered twice.
+var _status: Label                  ## Status line Main shows while it holds the start (hidden when blank).
 
 
 ## Build the window seeded from `defaults` (`{ has_player, seed, spawn_doors, defenders, invaders,
@@ -108,11 +110,17 @@ func _build_ui(defaults: Dictionary) -> void:
 	_vision_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_vision_check)
 
-	var start := Button.new()
-	start.text = "Start"
-	start.add_theme_font_size_override("font_size", 32)
-	start.pressed.connect(_on_start)
-	box.add_child(start)
+	_status = Label.new()
+	_status.add_theme_font_size_override("font_size", 24)
+	_status.modulate = Color(1, 1, 1, 0.75)
+	_status.visible = false
+	box.add_child(_status)
+
+	_start_button = Button.new()
+	_start_button.text = "Start"
+	_start_button.add_theme_font_size_override("font_size", 32)
+	_start_button.pressed.connect(_on_start)
+	box.add_child(_start_button)
 
 
 ## A labelled seed row (label + LineEdit), added to `parent`; returns the LineEdit so the caller can
@@ -157,9 +165,21 @@ func _spin_row(parent: VBoxContainer, label_text: String, value: int) -> SpinBox
 	return spin
 
 
+## Show a status line in the window, or hide it again when `text` is blank. Main uses it while it
+## holds the start — e.g. waiting for the decision server — so the pause is never silent.
+func set_status(text: String) -> void:
+	if _status == null:
+		return
+	_status.text = text
+	_status.visible = text != ""
+
+
 ## Gather the chosen parameters and hand them to Main. Main applies them, frees this window and builds
-## the world.
+## the world. Start is disabled on the way out: Main may hold the start open for a moment (waiting on
+## the decision server), and a second press would build the world twice.
 func _on_start() -> void:
+	if _start_button != null:
+		_start_button.disabled = true
 	start_requested.emit({
 		"has_player": _player_check.button_pressed,
 		"seed": _seed_edit.text.strip_edges().to_int(),

@@ -44,6 +44,10 @@ The controller copies its exports onto the behaviour's config fields and calls
 - `set_act(act_id, acts)` / `set_move(move_id, moves)` — adopt Von's pick (incl. the pursuit/engaged
   policy overrides); `apply(character, delta)` — carry out the current act; `fallback()` — steady
   stance when Von is unreachable; `current_act()` / `intent()` / `in_combat()` / `debug_status()`.
+- `act_override() -> String` — which policy rewrote Von's pick this decision ("" = adopted as
+  chosen), so the controller's log never attributes an overridden act to Von; `debug_state() ->
+  Dictionary` — the structured act/engagement/commitment dump (with the locomotion layer's own
+  `debug_state()` nested under `loco`) for the controller's snapshot.
 
 ## The act-centric derivation
 

@@ -26,13 +26,16 @@ control a running game with text commands. It is **off** unless `application/deb
 0 and never exists in an exported build (`_ready()` bails when `OS.has_feature("editor")` is
 false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a curated verb
 (`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`,
-`interact`, `aim X Y`, `match`, `restart [seed]`) or, failing that, a GDScript `Expression`
+`interact`, `aim X Y`, `match`, `ai`, `restart [seed]`) or, failing that, a GDScript `Expression`
 evaluated against the node (e.g. `scene().get_node("Player").speed`). Movement and actions are
 driven by injecting `Input` action presses through `Keybinds` names — the same path a human's
 keyboard/mouse uses — so no game domain is coupled to it. `match` prints a one-line, parseable
 status of both spectator combatants (`Defender`/`Invader`): each one's health, current act and
 alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
-controller's `current_act()`. `restart [seed]` reloads the scene for a fresh matchup, pinning the
+controller's `current_act()`. `ai` is the diagnostic counterpart: it dumps every AI combatant's
+`debug_state()` as JSON (what Von was told, the menu offered, its pick vs. any policy override, the
+known contacts, the pathing state), duck-typed the same way so the server stays a decoupled
+observer. `restart [seed]` reloads the scene for a fresh matchup, pinning the
 next layout when a seed is given (stashed in `Engine` meta, which survives the reload; `main.gd`
 reads it) and sets the `skip_setup` Engine meta so the reloaded scene builds immediately instead of
 reopening the pre-game setup window — the harness never clicks it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
