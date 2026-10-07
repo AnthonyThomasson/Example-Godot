@@ -140,8 +140,7 @@ func debug_status() -> String:
 ## the nearest other known hostile, else `_engage_id` drops to 0 — and when that empties an active
 ## fight it drops to hold and returns true so the controller re-decides. All acting reads these rather
 ## than true positions, so the NPC only ever acts on what it has perceived.
-func update_known(character, known: Array, delta: float) -> bool:
-	_loco.ensure_max_speed(character)
+func update_known(known: Array, delta: float) -> bool:
 	_commit_timer -= delta
 	var was_known := not _hostiles.is_empty()
 	_hostiles = known.filter(func(c): return c["hostile"])

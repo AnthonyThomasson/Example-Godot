@@ -30,10 +30,6 @@ func setup(agent: NavigationAgent2D) -> void:
 	_agent = agent
 
 
-func ensure_max_speed(_character) -> void:
-	pass
-
-
 ## Snap a world point onto the navigation mesh so it is actually reachable — a room's geometric
 ## centre is often inside furniture (off the navmesh), which would make the nav agent treat it as
 ## unreachable and wedge the NPC trying to shove toward it. Returns `p` unchanged with no nav agent.

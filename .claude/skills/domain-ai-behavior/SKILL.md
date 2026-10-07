@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — turning the chosen act into movement + actions, and the System-Two state Von lacks. The generic primitives (pursuit, territory, flanking), act interpretation, peek-and-cover shooting, melee, house patrol/search, object interaction, commitment memory, and the locomotion layer (nav pathing, RVO avoidance, stuck/push-through, door-opening). Use when editing scenes/ai/behavior/ or working on NPC combat maneuvering, flanking, holding ground, patrol/search, how an act becomes movement, engagement retargeting, commitment/dwell timers, or pathing/stuck recovery. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — turning the chosen act into movement + actions, and the System-Two state Von lacks. The generic primitives (pursuit, territory, flanking), act interpretation, peek-and-cover shooting, melee, house patrol/search, object interaction, commitment memory, and the locomotion layer (nav pathing, furniture bulldozing, stuck detection, door-opening). Use when editing scenes/ai/behavior/ or working on NPC combat maneuvering, flanking, holding ground, patrol/search, how an act becomes movement, engagement retargeting, commitment/dwell timers, or pathing/stuck recovery. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -30,16 +30,16 @@ The controller copies its exports onto the behaviour's config fields and calls
 ## Public interface (what the orchestrator calls)
 
 - `setup(perception, nav_agent)`; config fields; `rooms` (set each tick) + `entry_point` (handed once).
-- `update_known(character, known, delta) -> bool` — adopt the perception's contacts (hostiles/allies,
+- `update_known(known, delta) -> bool` — adopt the perception's contacts (hostiles/allies,
   retarget the engaged contact, investigate-last-seen on loss), advance the commit timer; returns true
   when it dropped a fight whose target decayed (→ controller forces a re-decision).
 - `salient_key() -> String` — the known-hostile set + engaged inside/outside, for the controller's
   edge-detection (spotting/losing/recategorizing a hostile, or the target crossing the boundary).
 - `service_interaction(character, delta, force) -> bool` — hold/advance/end an active interaction;
   true while still interacting (the tick returns). `take_resolved() -> bool` — a task just finished
-  (interaction ended / idle destination reached) → the controller forces a re-decision.
+  (interaction ended / hold destination reached) → the controller forces a re-decision.
 - `wants_decision(character, decide_timer_elapsed) -> bool` — whether the current commitment still
-  holds (fight while `engaged` fresh, approach until its cap, pursuing-search never on cadence, idle
+  holds (fight while `engaged` fresh, approach until its cap, pursuing-search never on cadence, hold
   move until arrival) or it's time to re-ask.
 - `set_act(act_id, acts)` / `set_move(move_id, moves)` — adopt Von's pick (incl. the pursuit/engaged
   policy overrides); `apply(character, delta)` — carry out the current act; `fallback()` — steady
@@ -89,11 +89,14 @@ retargets to the nearest other known hostile if its sighting decays mid-fight, e
 ## Locomotion (`locomotion.gd`)
 
 All derived movement flows through `move_to(character, dest)` on a `NavigationAgent2D`. The Navigation
-domain bakes furniture in as navmesh holes and rings the house with a walkable outdoor strip; the
-behaviour enables RVO **avoidance** (feeds `velocity` the desired dir, applies the previous frame's
-safe velocity). When no route exists (`is_target_reachable()` false) or the NPC stays wedged
-(advancing < `stuck_speed`) for `push_through_delay`, it drives straight at the blocker so the
-character's push physics shove it — except a shut door within `door_open_reach` is OPENED instead
-(doorways stay walkable in the navmesh). `reachable(p)` snaps a point onto the navmesh (a room centre
-is often inside furniture); `reached(character, point)` reports arrival. Falls back to straight-line
-steering with no agent.
+domain bakes furniture in as navmesh holes and rings the house with a walkable outdoor strip.
+Steering always aims at `get_next_path_position()` — a navmesh waypoint, so it is wall-safe, and for
+an unreachable target it steps toward the closest reachable point. Furniture physically on the route
+(a piece shoved off its baked hole) is bulldozed by the character's own push physics as it walks into
+it; there is no RVO avoidance and no straight-at-the-destination fallback, which is what used to let
+an unreachable `dest` tunnel a wall. A shut door within `door_open_reach` that the NPC is wedged
+against (advancing < `stuck_speed`) is OPENED instead, since doorways stay walkable in the navmesh
+and a door is static so the push physics can't move it. `reachable(p)` snaps a point onto the navmesh
+(a room centre is often inside furniture, and an off-navmesh target would otherwise be unreachable) —
+both the patrol legs and the chosen hold destination are snapped through it;
+`reached(character, point)` reports arrival. Falls back to straight-line steering with no agent.

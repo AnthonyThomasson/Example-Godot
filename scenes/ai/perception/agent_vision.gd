@@ -12,7 +12,9 @@ extends RefCounted
 ## straight line on the physics query layer (walls and solid furniture block sight). Set `enabled`
 ## to false to make everything visible (omniscient), restoring the pre-vision behaviour.
 
-## Physics layer walls + solid furniture live on (matches agent_perception.QUERY_MASK).
+## Physics layer walls + solid furniture live on (matches CharacterInteraction.QUERY_MASK). This
+## module is the sub-domain's single owner of the solid-geometry ray query: the perception runs its
+## line-of-fire and cover tests through `blocked()` / `raycast()` below rather than repeating it.
 const QUERY_MASK := 1
 
 ## Whether vision is gated at all; false = the agent sees everything (omniscient fallback).
@@ -41,7 +43,7 @@ func can_see(from_pos: Vector2, facing: Vector2, point: Vector2, space, exclude:
 			return false
 		if absf(facing.angle_to(to)) > deg_to_rad(fov_degrees) * 0.5:
 			return false
-	return space == null or not _blocked(space, from_pos, point, exclude)
+	return space == null or not blocked(space, from_pos, point, exclude)
 
 
 ## Whether `node` (a Node2D) is visible — convenience wrapper over can_see using its global position.
@@ -56,9 +58,17 @@ func can_see_node(node: Node2D, from_pos: Vector2, facing: Vector2, space, exclu
 	return can_see(from_pos, facing, node.global_position, space, ex)
 
 
-## Whether the straight segment `from`→`to` hits a wall or solid object on the query layer.
-func _blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
+## Whether the straight segment `from`→`to` hits a wall or solid object on the query layer. A pure
+## geometry test — it ignores `enabled`, so line-of-fire and cover stay physical even when sight is
+## disabled (vision gates what the agent KNOWS; this gates what a straight line can reach).
+func blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
+	return not raycast(space, from, to, exclude).is_empty()
+
+
+## The first solid hit along `from`→`to` on the query layer, or an empty dict when the line is clear.
+## Callers that need the blocking collider itself (e.g. a cover test) use this instead of `blocked()`.
+func raycast(space, from: Vector2, to: Vector2, exclude: Array) -> Dictionary:
 	var p := PhysicsRayQueryParameters2D.create(from, to)
 	p.collision_mask = QUERY_MASK
 	p.exclude = exclude
-	return not space.intersect_ray(p).is_empty()
+	return space.intersect_ray(p)

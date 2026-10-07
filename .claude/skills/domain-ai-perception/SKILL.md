@@ -71,7 +71,9 @@ grudge), so it persists after the trigger ends.
 `agent_vision.gd.can_see(from, facing, point, space, exclude)` is true when `point` is within
 `view_distance`, AND either within the 360° `awareness_radius` bubble or inside the forward cone of
 half-angle `fov_degrees/2` around facing, AND reachable by a clear line on the physics query layer
-(`QUERY_MASK = 1` — walls + solid furniture). `enabled = false` = omniscient.
+(`QUERY_MASK = 1` — walls + solid furniture). `enabled = false` = omniscient. `agent_vision.gd` is
+the sub-domain's single owner of that ray query: it also exposes `blocked(…)` / `raycast(…)` (pure
+geometry, ignoring `enabled`), which the combat-geometry tests below use instead of repeating it.
 
 **Per-NPC knowledge** is a memory seed: `familiar_with_house` (on) seeds every room/object as
 permanent on the first observe (`_seed_house`); (off) the NPC must *see* each room/object first.
@@ -79,7 +81,7 @@ People are never pre-known — known only once seen, forgotten after `contact_me
 
 ## Memory (`agent_memory.gd`)
 
-A generic event log: `remember(topic, data, ttl)`; `is_fresh`/`recall`/`recall_all`/`age`/`fresh`
+A generic event log: `remember(topic, data, ttl)`; `is_fresh`/`recall`/`recall_all`/`fresh`
 read back; not capped per topic. Cleanup runs on every write: age-expired first, then, while over
 `capacity`, the oldest **expirable** events. **Permanent events (ttl ≤ 0) never age out and are
 never volume-evicted** (learned house knowledge, permanent hostility verdicts). Topics in use:
@@ -88,7 +90,8 @@ carries a `note` string is surfaced to Von automatically.
 
 ## Combat geometry
 
-Pure physics queries on `QUERY_MASK`, excluding the NPC and the target body:
+Pure physics queries via `agent_vision.gd`'s `blocked()` / `raycast()`, excluding the NPC and the
+target body:
 - `has_line_to(…, point)` — a clear line to the engaged contact's **last-known** position gates
   FIRING (vision gates whether it KNOWS a contact; a clear line gates whether it can HIT it).
 - `combat_spots(…)` — ring of candidate points classified `fire` (clear line to `tgt_pos`) vs

@@ -141,18 +141,18 @@ var rooms: Array = []
 ## shortest direct path to the entrance instead of circling. Cleared after first use.
 var entry_point: Vector2 = Vector2.ZERO
 
-var _perception: Node             ## SENSE sub-domain: knowledge, decision context, combat geometry.
-var _decision: Node               ## THINK sub-domain: the Von round-trip (decision/decision_client.gd).
-var _behavior: Node               ## ACT sub-domain: derives movement/actions + holds commitment state.
-var _acts := {}                   ## This tick's act options (from perception), brokered to the behaviour on decide.
-var _moves := {}                  ## This tick's move options.
-var _decide_timer := 0.0          ## Seconds until the next decision is allowed.
-var _force := false               ## Force a decision now (task resolved or salient event).
-var _salient_key := ""            ## Known-hostile set + engaged contact's inside state, for edge detection.
-var _salient_init := false        ## Whether _salient_key has been seeded.
+var _perception: Node ## SENSE sub-domain: knowledge, decision context, combat geometry.
+var _decision: Node ## THINK sub-domain: the Von round-trip (decision/decision_client.gd).
+var _behavior: Node ## ACT sub-domain: derives movement/actions + holds commitment state.
+var _acts := {} ## This tick's act options (from perception), brokered to the behaviour on decide.
+var _moves := {} ## This tick's move options.
+var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
+var _force := false ## Force a decision now (task resolved or salient event).
+var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
+var _salient_init := false ## Whether _salient_key has been seeded.
 # EventBus &"hit" events are queued here, then handed to perception on the next control() tick.
-var _character: Node              ## The character this controller drives, captured on first control.
-var _hit_queue: Array = []        ## Hit events awaiting processing once _character is known.
+var _character: Node ## The character this controller drives, captured on first control.
+var _hit_queue: Array = [] ## Hit events awaiting processing once _character is known.
 
 
 ## Build + configure the three AI sub-domains and wire them together. The controller is the single
@@ -229,7 +229,7 @@ func current_act() -> String:
 ## Read-only: a compact, human-readable summary of what the NPC is doing right now — for debug
 ## overlays/observers (the behaviour sub-domain builds it from its live act state).
 func debug_status() -> String:
-	return _behavior.debug_status() if _behavior != null else "IDLE"
+	return _behavior.debug_status() if _behavior != null else "HOLD"
 
 
 ## Called each physics frame by the character. Runs the SENSE → THINK → ACT loop: fold any hits in,
@@ -247,11 +247,11 @@ func control(character, delta: float) -> void:
 	_perception.observe(character, rooms)
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
-		_behavior.entry_point = entry_point  # Hand the injected entrance to the behaviour once.
+		_behavior.entry_point = entry_point # Hand the injected entrance to the behaviour once.
 		entry_point = Vector2.ZERO
 	var known: Array = _perception.contacts(character.global_position)
-	if _behavior.update_known(character, known, delta):
-		_force = true  # Lost the engaged contact mid-fight → reconsider.
+	if _behavior.update_known(known, delta):
+		_force = true # Lost the engaged contact mid-fight → reconsider.
 	_check_salient()
 	# An active interaction holds the tick; when it or a hold move resolves, re-decide at once.
 	if _behavior.service_interaction(character, delta, _force):
@@ -332,4 +332,3 @@ func _on_decided(act_id: String, move_id: String) -> void:
 ## The driven character's name, for log lines.
 func _npc_name() -> String:
 	return str(_character.name) if _character != null else "NPC"
-

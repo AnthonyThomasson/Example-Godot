@@ -26,8 +26,6 @@ extends Node
 ## objects. The controller configures it (all tunables live on the GoalController, the single
 ## authoring surface) via the config fields below, then calls `setup()` once.
 
-## Physics layer walls + solid furniture live on (matches CharacterInteraction.QUERY_MASK).
-const QUERY_MASK := 1
 ## Inventory slots of the combat items (ItemRegistry ids) the engage acts select.
 const PISTOL_SLOT := 3
 const FISTS_SLOT := 2
@@ -153,15 +151,11 @@ func under_fire() -> bool:
 ## categorized by `hostility`. `familiar` (used on the first call only) pre-seeds the house's rooms +
 ## objects into memory as already-known. People are never seeded — they are known only once seen.
 func observe(character, rooms: Array) -> void:
-	var vision: RefCounted = _vision
-	var hostility: RefCounted = _hostility
-	var memory: RefCounted = _memory
-	var familiar: bool = familiar_with_house
 	if not _post_set:
 		_post = character.global_position
 		_post_set = true
 	_ensure_interactables(character)
-	_seed_house(rooms, memory, familiar)
+	_seed_house(rooms)
 
 	var self_pos: Vector2 = character.global_position
 	var facing: Vector2 = character.facing
@@ -175,7 +169,7 @@ func observe(character, rooms: Array) -> void:
 	for other in _other_characters(character):
 		if other.get("is_dead") == true:
 			continue
-		if not vision.can_see_node(other, self_pos, facing, space, exclude):
+		if not _vision.can_see_node(other, self_pos, facing, space, exclude):
 			continue
 		var pos: Vector2 = other.global_position
 		var room := _room_at(pos, rooms)
@@ -192,18 +186,18 @@ func observe(character, rooms: Array) -> void:
 			"item": item.display_name if item != null else "nothing",
 		}
 		_visible_now[sighting["id"]] = true
-		memory.remember(&"saw_character", sighting, contact_memory_ttl)
-		hostility.classify(sighting, memory)
+		_memory.remember(&"saw_character", sighting, contact_memory_ttl)
+		_hostility.classify(sighting, _memory)
 
 	# An unfamiliar NPC learns rooms and objects by seeing them (permanent once learned).
-	if not familiar:
+	if not familiar_with_house:
 		for room in rooms:
 			var rect: Rect2 = room["rect"]
-			if rect.has_point(self_pos) or vision.can_see(self_pos, facing, rect.position + rect.size * 0.5, space, exclude):
-				_learn_room(room, memory)
+			if rect.has_point(self_pos) or _vision.can_see(self_pos, facing, rect.position + rect.size * 0.5, space, exclude):
+				_learn_room(room)
 		for obj in _interactables:
-			if is_instance_valid(obj) and vision.can_see_node(obj, self_pos, facing, space, exclude):
-				_learn_object(obj, memory)
+			if is_instance_valid(obj) and _vision.can_see_node(obj, self_pos, facing, space, exclude):
+				_learn_object(obj)
 
 
 ## BUILD pass — run each decision. Assemble this tick's decision context `{ state_text, moves, acts }`
@@ -211,14 +205,13 @@ func observe(character, rooms: Array) -> void:
 ## string Von ranks the menu against; `rooms` is Main's world-space room list; `memory` is the agent's
 ## event memory (sightings + hostility verdicts included).
 func sense(character, rooms: Array, goal: String) -> Dictionary:
-	var memory: RefCounted = _memory
 	var self_pos: Vector2 = character.global_position
 	var self_room := _room_at(self_pos, rooms)
 	var known := contacts(self_pos)
 	return {
-		"state_text": _state_text(character, self_room, goal, memory, known),
-		"moves": _moves(rooms, memory, known),
-		"acts": _acts(character, self_pos, rooms, memory, known),
+		"state_text": _state_text(character, self_room, goal, known),
+		"moves": _moves(rooms, known),
+		"acts": _acts(character, self_pos, rooms, known),
 	}
 
 
@@ -226,18 +219,16 @@ func sense(character, rooms: Array, goal: String) -> Dictionary:
 ## `hostile` / `reason` from the hostility verdicts and `visible` (seen on the latest tick) added.
 ## Hostiles first, then nearest to `self_pos`. Entries whose character no longer exists are dropped.
 func contacts(self_pos: Vector2) -> Array:
-	var memory: RefCounted = _memory
-	var hostility: RefCounted = _hostility
 	var out: Array = []
 	var seen := {}
-	for data in memory.recall_all(&"saw_character"):  # Newest first: the first per id is the freshest.
+	for data in _memory.recall_all(&"saw_character"):  # Newest first: the first per id is the freshest.
 		var id: int = data.get("id", 0)
 		var n: Variant = data.get("node")
 		if seen.has(id) or not is_instance_valid(n) or (n as Node).get("is_dead") == true:
 			continue
 		seen[id] = true
 		var c: Dictionary = data.duplicate()
-		c["reason"] = hostility.reason(id, memory)
+		c["reason"] = _hostility.reason(id, _memory)
 		c["hostile"] = c["reason"] != ""
 		c["visible"] = _visible_now.has(id)
 		out.append(c)
@@ -251,20 +242,20 @@ func contacts(self_pos: Vector2) -> Array:
 ## The state: the goal verbatim, then the situation line (where the NPC is, what it holds, whether it
 ## is mid-interaction), one line per known contact, then any combat-awareness lines (under fire / own
 ## injury). Kept short — Von middle-truncates long states.
-func _state_text(character, self_room: Dictionary, goal: String, memory: RefCounted, known: Array) -> String:
+func _state_text(character, self_room: Dictionary, goal: String, known: Array) -> String:
 	var self_where: String = self_room.get("type", "the grounds") if not self_room.is_empty() else "the grounds"
 	var activity := ("busy: %s" % character.interaction_label()) if character.is_busy() else "free to act"
 	var lines: Array = ["%s\nYou are in the %s, %s, holding a %s." % [
 		goal, self_where, activity, character.current_item().display_name]]
-	lines.append_array(_contact_lines(character.global_position, memory, known))
-	lines.append_array(_awareness_lines(character, memory))
+	lines.append_array(_contact_lines(character.global_position, known))
+	lines.append_array(_awareness_lines(character))
 	return "\n".join(lines)
 
 
 ## One line per known contact (up to `max_contacts_in_state`): who, whether hostile and why, where
 ## (live bearing if visible, else last-seen bearing + age), and what they hold. Reports when no one
 ## is known at all.
-func _contact_lines(self_pos: Vector2, memory: RefCounted, known: Array) -> Array:
+func _contact_lines(self_pos: Vector2, known: Array) -> Array:
 	if known.is_empty():
 		return ["You don't see anyone and don't know where anyone is."]
 	var out: Array = []
@@ -275,15 +266,15 @@ func _contact_lines(self_pos: Vector2, memory: RefCounted, known: Array) -> Arra
 			where += " (in the %s)" % c["room"]
 		var status := "HOSTILE (%s)" % c["reason"] if c["hostile"] else "not hostile"
 		var sight := "You can see %s" % c["name"] if c["visible"] else \
-			"You last saw %s %.0fs ago" % [c["name"], _sighting_age(memory, c["id"])]
+			"You last saw %s %.0fs ago" % [c["name"], _sighting_age(c["id"])]
 		out.append("%s — %s — %s, ~%dpx to your %s, holding a %s." % [
 			sight, status, where, int(to.length()), _compass(to), c.get("item", "nothing")])
 	return out
 
 
 ## Seconds since character `id` was last seen (INF if not remembered).
-func _sighting_age(memory: RefCounted, id: int) -> float:
-	for entry in memory.fresh():  # Newest first.
+func _sighting_age(id: int) -> float:
+	for entry in _memory.fresh():  # Newest first.
 		if entry["topic"] == &"saw_character" and entry["data"].get("id") == id:
 			return (Time.get_ticks_msec() - entry["at"]) / 1000.0
 	return INF
@@ -292,17 +283,17 @@ func _sighting_age(memory: RefCounted, id: int) -> float:
 ## The awareness lines drawn from memory + current condition: being under fire (hit or shot at, with
 ## the incoming direction when known), any other remembered event carrying a `note` (freshest per
 ## topic), and the NPC's own injury level. Empty when nothing is remembered and it is unharmed.
-func _awareness_lines(character, memory: RefCounted) -> Array:
+func _awareness_lines(character) -> Array:
 	var out: Array = []
-	if memory.is_fresh(&"under_fire"):
-		var from: Vector2 = memory.recall(&"under_fire").get("from", Vector2.ZERO)
+	if _memory.is_fresh(&"under_fire"):
+		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
 		if from != Vector2.ZERO:
 			out.append("You are under fire from the %s!" % _compass(from))
 		else:
 			out.append("You are under fire — shots are striking close to you!")
 	# Surface any other remembered event that carries a note, newest-per-topic (the log may hold many).
 	var seen := {&"under_fire": true}
-	for entry in memory.fresh():
+	for entry in _memory.fresh():
 		var topic = entry["topic"]
 		if seen.has(topic):
 			continue
@@ -321,9 +312,9 @@ func _awareness_lines(character, memory: RefCounted) -> Array:
 ## The move options: one named destination per KNOWN room, where each known hostile was last seen,
 ## and the NPC's starting position. Described by place (no step-ring/distance spam — those make Von
 ## pick randomly). Consulted by the controller only when the chosen act implies no movement of its own.
-func _moves(rooms: Array, memory: RefCounted, known: Array) -> Dictionary:
+func _moves(rooms: Array, known: Array) -> Dictionary:
 	var out := {}
-	var known_rooms := _known_room_keys(memory)
+	var known_rooms := _known_room_keys()
 	for room in rooms:
 		if not known_rooms.has(room["key"]):
 			continue
@@ -344,7 +335,7 @@ func _moves(rooms: Array, memory: RefCounted, known: Array) -> Dictionary:
 ## "interact" option per DISTINCT action offered by a KNOWN object (each pointing at the nearest known
 ## object that offers it). Deduping by label keeps the options distinct and the menu bounded.
 ## Item-gated. Engage options carry the contact's `target` id.
-func _acts(character, self_pos: Vector2, rooms: Array, memory: RefCounted, known: Array) -> Dictionary:
+func _acts(character, self_pos: Vector2, rooms: Array, known: Array) -> Dictionary:
 	var out := { "hold": { "desc": "wait and do nothing", "verb": "hold" } }
 	var any_hostile := false
 	for c in known:
@@ -358,7 +349,7 @@ func _acts(character, self_pos: Vector2, rooms: Array, memory: RefCounted, known
 			"verb": "punch", "slot": FISTS_SLOT, "target": c["id"] }
 	if not any_hostile:
 		out["search"] = { "desc": "search the house for hostiles", "verb": "search" }
-	var known_objs := _known_object_ids(memory)
+	var known_objs := _known_object_ids()
 	var nearest := {}  # action label -> nearest known object + its spec (+ squared distance).
 	for obj in _interactables:
 		if not is_instance_valid(obj) or not known_objs.has(obj.get_instance_id()):
@@ -385,42 +376,42 @@ func _acts(character, self_pos: Vector2, rooms: Array, memory: RefCounted, known
 ## Seed a familiar NPC's house knowledge once: remember every room and interactable as already-known
 ## (permanent ttl). An unfamiliar NPC skips this and learns by sight in observe(). Needs the rooms
 ## list, so it runs on the first observe() (not _ready).
-func _seed_house(rooms: Array, memory: RefCounted, familiar: bool) -> void:
-	if _seeded or not familiar:
+func _seed_house(rooms: Array) -> void:
+	if _seeded or not familiar_with_house:
 		return
 	_seeded = true
 	for room in rooms:
-		_learn_room(room, memory)
+		_learn_room(room)
 	for obj in _interactables:
 		if is_instance_valid(obj):
-			_learn_object(obj, memory)
+			_learn_object(obj)
 
 
 ## Remember a room as known (permanent). Idempotent-enough: duplicates are harmless and capped by the
 ## memory's capacity policy (which never volume-evicts permanent events).
-func _learn_room(room: Dictionary, memory: RefCounted) -> void:
-	if not _known_room_keys(memory).has(room["key"]):
-		memory.remember(&"saw_room", { "key": room["key"] }, 0.0)
+func _learn_room(room: Dictionary) -> void:
+	if not _known_room_keys().has(room["key"]):
+		_memory.remember(&"saw_room", { "key": room["key"] }, 0.0)
 
 
 ## Remember an interactable object as known (permanent), keyed by instance id.
-func _learn_object(obj: Object, memory: RefCounted) -> void:
-	if not _known_object_ids(memory).has(obj.get_instance_id()):
-		memory.remember(&"saw_object", { "id": obj.get_instance_id() }, 0.0)
+func _learn_object(obj: Object) -> void:
+	if not _known_object_ids().has(obj.get_instance_id()):
+		_memory.remember(&"saw_object", { "id": obj.get_instance_id() }, 0.0)
 
 
 ## The set of room keys the NPC currently knows (from `saw_room` memory), as a lookup dict.
-func _known_room_keys(memory: RefCounted) -> Dictionary:
+func _known_room_keys() -> Dictionary:
 	var out := {}
-	for data in memory.recall_all(&"saw_room"):
+	for data in _memory.recall_all(&"saw_room"):
 		out[data.get("key")] = true
 	return out
 
 
 ## The set of interactable instance ids the NPC currently knows (from `saw_object` memory).
-func _known_object_ids(memory: RefCounted) -> Dictionary:
+func _known_object_ids() -> Dictionary:
 	var out := {}
-	for data in memory.recall_all(&"saw_object"):
+	for data in _memory.recall_all(&"saw_object"):
 		out[data.get("id")] = true
 	return out
 
@@ -479,7 +470,7 @@ func has_line_to(character, target: Node2D, point: Vector2) -> bool:
 	var exclude := [character.get_rid()]
 	if target != null and is_instance_valid(target):
 		exclude.append(target.get_rid())
-	return not _blocked(space, character.global_position, point, exclude)
+	return not _vision.blocked(space, character.global_position, point, exclude)
 
 
 ## Candidate standing points on a ring around the NPC, classified for peek-and-cover against the
@@ -498,9 +489,9 @@ func combat_spots(character, target: Node2D, tgt_pos: Vector2, radius: float, co
 	var cover: Array = []
 	for i in count:
 		var p := self_pos + Vector2.RIGHT.rotated(TAU * i / count) * radius
-		if _blocked(space, self_pos, p, exclude):
+		if _vision.blocked(space, self_pos, p, exclude):
 			continue  # Can't step there — a wall is in the way.
-		if _blocked(space, p, tgt_pos, exclude):
+		if _vision.blocked(space, p, tgt_pos, exclude):
 			if _is_cover(space, p, tgt_pos, exclude):
 				cover.append(p)
 		else:
@@ -510,20 +501,9 @@ func combat_spots(character, target: Node2D, tgt_pos: Vector2, radius: float, co
 	return { "fire": fire, "cover": cover }
 
 
-## Whether the straight segment `from`→`to` hits a wall or solid object on the query layer.
-func _blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
-	var p := PhysicsRayQueryParameters2D.create(from, to)
-	p.collision_mask = QUERY_MASK
-	p.exclude = exclude
-	return not space.intersect_ray(p).is_empty()
-
-
 ## Whether the first object blocking `from`→`to` is high-coverage enough to count as cover.
 func _is_cover(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
-	var p := PhysicsRayQueryParameters2D.create(from, to)
-	p.collision_mask = QUERY_MASK
-	p.exclude = exclude
-	var hit: Dictionary = space.intersect_ray(p)
+	var hit: Dictionary = _vision.raycast(space, from, to, exclude)
 	if hit.is_empty():
 		return false
 	var obj = hit["collider"]

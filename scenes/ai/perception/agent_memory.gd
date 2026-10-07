@@ -33,7 +33,7 @@ func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0) -> vo
 		"at": Time.get_ticks_msec(),
 		"ttl": ttl if ttl >= 0.0 else default_ttl,
 	})
-	prune()
+	_prune()
 
 
 ## Whether any non-expired event of `topic` is remembered.
@@ -63,15 +63,6 @@ func recall_all(topic: StringName) -> Array:
 	return out
 
 
-## Seconds since the freshest non-expired event of `topic` was remembered, or INF when none is.
-func age(topic: StringName) -> float:
-	for i in range(_entries.size() - 1, -1, -1):
-		var entry: Dictionary = _entries[i]
-		if entry["topic"] == topic and not _expired(entry):
-			return (Time.get_ticks_msec() - entry["at"]) / 1000.0
-	return INF
-
-
 ## Every non-expired event (full entries), newest first — for rendering what the agent remembers.
 func fresh() -> Array:
 	var out: Array = []
@@ -81,15 +72,10 @@ func fresh() -> Array:
 	return out
 
 
-## Drop all events of `topic`.
-func forget(topic: StringName) -> void:
-	_entries = _entries.filter(func(entry): return entry["topic"] != topic)
-
-
 ## Apply the cleanup policy: drop age-expired events, then, while over `capacity`, drop the oldest
 ## EXPIRABLE events (positive ttl). Permanent events (ttl <= 0) are long-term facts and are never
-## volume-evicted — they persist until explicitly forgotten.
-func prune() -> void:
+## volume-evicted — they persist for the agent's lifetime.
+func _prune() -> void:
 	_entries = _entries.filter(func(entry): return not _expired(entry))
 	if capacity <= 0 or _entries.size() <= capacity:
 		return

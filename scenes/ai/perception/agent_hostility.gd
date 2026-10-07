@@ -40,7 +40,8 @@ func on_attacked(attacker: Node, memory: RefCounted) -> void:
 	if is_ally(f if f != null else &""):
 		return
 	var id := attacker.get_instance_id()
-	if not is_hostile(id, memory) or reason(id, memory) != "attacked you":
+	# An empty reason (not yet hostile) also fails this test, so it covers the not-hostile case too.
+	if reason(id, memory) != "attacked you":
 		_mark(id, "attacked you", memory)
 
 

@@ -132,9 +132,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 (baked in as a hole), so paths route around furniture; it also tags each solid furniture body
 	 with a dynamic avoidance `NavigationObstacle2D` for a piece shoved off its hole.
    `main.gd` calls it once after `WorldGen.generate`. Any `NavigationAgent2D` then pathfinds
-   against the global map automatically — the AI controller sets `target_position`, reads
-   `get_next_path_position()`, and enables the agent's RVO avoidance (feeding `velocity`, applying
-   the `velocity_computed` safe velocity) to steer around those obstacles.
+   against the global map automatically — the AI's locomotion sets `target_position` and steers at
+   `get_next_path_position()`. It does **not** enable RVO avoidance: a displaced piece of furniture is
+   simply bulldozed by the character's push physics, so the `NavigationObstacle2D` avoidance tags
+   currently have no consumer.
 
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.

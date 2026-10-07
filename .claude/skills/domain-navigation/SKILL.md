@@ -29,10 +29,12 @@ as a child of each solid body, so it follows the piece. Solid furniture is recog
 alone — a non-frozen `RigidBody2D` with a `CollisionShape2D` (walls are `StaticBody2D`; non-solid decor
 freezes itself) — so Navigation stays a leaf that imports nothing.
 
-Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically. The AI
-controller sets `target_position`, reads `get_next_path_position()`, and additionally turns on the
-agent's RVO **avoidance** (feeding `velocity` and applying the `velocity_computed` safe velocity) so it
-steers around the avoidance obstacles.
+Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically. The AI's
+locomotion sets `target_position` and steers at `get_next_path_position()`. It does **not** turn on
+the agent's RVO avoidance (that caused a visible slowdown near displaced furniture), so the
+`NavigationObstacle2D` avoiders above presently have **no consumer** — an NPC bulldozes a shoved piece
+with its own push physics instead. They are left in place for a future avoidance consumer; delete
+`_add_furniture_avoiders` if that never materializes.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
