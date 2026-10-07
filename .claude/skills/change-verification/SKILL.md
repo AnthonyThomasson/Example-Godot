@@ -39,6 +39,13 @@ Also read the `domain-<folder>/SKILL.md` for **every domain the diff touches** (
 `scenes/<folder>/…` file to `.claude/skills/domain-<folder>/SKILL.md`). That skill is the deep
 detail for the domain, and the change must leave it true (Step 3).
 
+The **AI domain is split into sub-domains** under `scenes/ai/`, each with its own skill: map a changed
+`scenes/ai/<sub>/…` file to `.claude/skills/domain-ai-<sub>/SKILL.md` (e.g. `scenes/ai/behavior/…` →
+`domain-ai-behavior`), and a change to `scenes/ai/goal_controller.gd` (the orchestrator) or to the
+set/role of sub-domains to the `domain-ai` overview. Keep both the touched sub-skill and the overview
+true. A cross-sub-domain coupling that doesn't flow through the published sub-domain interfaces is an
+isolation issue, flagged the same as cross-domain coupling.
+
 ## Step 1 — Domain isolation (highest priority)
 
 The whole design rests on domains that can each change on their own. That only holds if the
@@ -201,7 +208,7 @@ headless load check (run `--import` first if the change added a `class_name` or 
 a clean load, or the exact `SCRIPT ERROR` / `Parse Error` lines.
 
 If the change alters **behaviour** (movement, combat, items, interactions, world-gen), a clean
-load isn't enough — exercise it in the running game. Follow `godot-debug` Step 4: launch via
+load isn't enough — exercise it in the running game. Use the `godot-drive` skill: launch via
 `mcp__godot__run_project`, drive the player with the dev command server (`python3 tools/gcmd.py
 "<verb>"` — e.g. `tp`, `move`, `fire`, `punch`, `interact`, or raw GDScript through `eval`), and
 read the reaction back through `mcp__godot__get_debug_output` (each command echoes as `[cmd] …`).

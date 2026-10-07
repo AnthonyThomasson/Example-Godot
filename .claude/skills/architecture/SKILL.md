@@ -32,8 +32,8 @@ concise current-state comments.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, pre-game setup window, dev command server. |
-| **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC (with sensing, sight, hostility and event-memory helpers), plus the dev-only decision-server launcher. |
+| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, pre-game setup window, seed readout, dev command server. |
+| **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
 domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
@@ -110,8 +110,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory). Main
    injects only `rooms`; the AI finds and categorizes the characters it perceives by sight. Von
    picks WHAT to do from an act menu (engage a known hostile, search, hold, or a known object
-   interaction) ranked against the goal, and the controller derives the movement — no per-goal or
-   per-NPC-type code. See the `domain-ai` skill.
+   interaction) ranked against the goal, and the behaviour derives the movement — no per-goal or
+   per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split across four
+   isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai` overview and
+   its `domain-ai-<name>` sub-skills.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`) and exposes only
@@ -176,8 +178,8 @@ Two conventions hold across domains; the per-domain specifics live in each domai
 ## Running & verifying
 
 - Main scene `res://scenes/main.tscn`. Use the **`godot-debug` skill** for a headless load check
-  and for driving the running game via the dev command server (`tools/gcmd.py`); run `--import`
-  first when you add a `class_name`.
+  (run `--import` first when you add a `class_name`) and the **`godot-drive` skill** for driving the
+  running game via the dev command server (`tools/gcmd.py`).
 - Use the **`change-verification` skill** before committing (domain isolation, doc/skill sync,
   comment hygiene, load check).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house

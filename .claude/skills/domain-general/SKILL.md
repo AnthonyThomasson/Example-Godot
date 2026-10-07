@@ -36,7 +36,7 @@ next layout when a seed is given (stashed in `Engine` meta, which survives the r
 reads it) and sets the `skip_setup` Engine meta so the reloaded scene builds immediately instead of
 reopening the pre-game setup window — the harness never clicks it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
 commands, or `tools/match.py` to run and score N matches in a row; each command is echoed as a
-`[cmd] …` Output line. (The `godot-debug` skill covers driving it.)
+`[cmd] …` Output line. (The `godot-drive` skill covers driving it.)
 
 ## Event bus
 
@@ -58,20 +58,28 @@ and consumed by the AI for combat awareness and hostility.
   domains register spawns with it.
 - `debug_ui.gd` — the player HUD; attaches by exported node path, listens to `hit_landed`, shows
   the last hit + damage.
-- `match_hud.gd` — the spectator-match HUD (`MatchHUD` node). `begin(combatants)` wires it to the
-  two NPCs; per side it shows goal, current act, faction and a health bar, with a shared combat feed
-  (EventBus `&"hit"`), a running timer and the winner banner (on `died`). A decoupled observer: it
-  reads the Character public API/signals, each controller's `current_act()` + exported `goal`, and
-  the EventBus — never a domain's internals.
+- `match_hud.gd` — the spectator-match HUD (`MatchHUD` node). `begin(combatants)` wires it to any
+  number of NPCs; each combatant gets a compact panel (goal, current act, faction, health bar) that
+  **floats just above the NPC it describes** — its world position projected to screen each frame via
+  `get_global_transform_with_canvas()` (clamped on-screen), so panels track their NPCs and scale to any
+  count instead of two fixed corner panels. Plus a shared combat feed (EventBus `&"hit"`), a running
+  timer and the winner banner (on `died`). A decoupled observer: it reads the Character public
+  API/signals, each controller's `current_act()` + exported `goal`, and the EventBus — never a domain's
+  internals.
 - `setup_menu.gd` — the pre-game setup window (`SetupMenu` node, a `CanvasLayer` that builds its own
   UI in code like the other HUDs). `open(defaults)` shows a modal with a "Human player" checkbox,
-  a "Spawn doors" checkbox, defender/invader count spinboxes, and three debug-overlay checkboxes
+  a "Spawn doors" checkbox, a "Seed" text field (blank/0 = a fresh random seed each run),
+  defender/invader count spinboxes, and three debug-overlay checkboxes
   ("Agent labels", "Agent paths", "Vision cones"); pressing Start emits
-  `start_requested({ has_player, spawn_doors, defenders, invaders, show_agent_labels,
+  `start_requested({ has_player, seed, spawn_doors, defenders, invaders, show_agent_labels,
   show_agent_paths, show_vision })`. Main opens it on a fresh launch and builds the world only once
   Start is pressed; a scripted `restart` sets the Engine `skip_setup` meta so reloaded scenes build
   immediately and the headless match harness never has to click it. A decoupled piece: it knows
   nothing of the domains, only the parameter dict it emits.
+- `seed_display.gd` — the seed readout (`SeedDisplay` node, a `CanvasLayer`). `show_seed(level_seed)`
+  writes the run's seed into a small always-on label in the bottom-right corner, so a layout you
+  like can be read off and re-entered in the setup window. A decoupled piece: Main calls it once the
+  world is built; it knows nothing of the domains.
 
 ## Spectator match mode
 

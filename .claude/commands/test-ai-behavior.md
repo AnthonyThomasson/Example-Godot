@@ -1,4 +1,4 @@
-Load the `architecture` skill, then the `domain-ai` skill, then the `godot-debug` skill. Read all three before doing anything else — they are the source of truth for what the AI should do and how to drive the game.
+Load the `architecture` skill, then the `domain-ai` overview skill **and its sub-skills** (`domain-ai-perception`, `domain-ai-decision`, `domain-ai-behavior`, `domain-ai-debug`), then the `godot-drive` skill (and `godot-debug` for the headless load check). Read them before doing anything else — they are the source of truth for what the AI should do and how to drive the game. The deep behaviour detail lives in the sub-skills (e.g. combat/flanking/territory/patrol in `domain-ai-behavior`, vision/hostility/memory in `domain-ai-perception`); `domain-ai` is the map.
 
 You are going to run a structured test of every major AI behaviour variation in the game, drive results through `tools/match.py` and `tools/gcmd.py`, observe debug output, and produce a written report with findings and improvement recommendations.
 
@@ -24,7 +24,7 @@ Run each scenario in order. For each one:
 - Print the scenario name and the overrides you're applying.
 - Run the match, capture the win/loss/timeout summary.
 - Pull the last few lines of `mcp__godot__get_debug_output` after the rounds finish; look for `[von]` decision logs, NPC action labels, and any errors.
-- Note observed behaviours that differ from what the `domain-ai` skill says should happen.
+- Note observed behaviours that differ from what the `domain-ai` sub-skills say should happen.
 
 ### 1. Baseline — default config
 No overrides. 3 rounds, random seeds. Establishes the win rate for subsequent comparison.
@@ -185,7 +185,7 @@ After all tests, write a structured markdown report in `$ARGUMENTS`-scoped scope
 
 **Findings** — for each behaviour that deviated from the `domain-ai` spec or showed a clear weakness:
 - What was observed
-- What was expected (cite the domain-ai skill)
+- What was expected (cite the relevant `domain-ai-<name>` sub-skill)
 - Severity: **blocker** / **degraded** / **minor**
 
 **Recommendations** — concrete, scoped to the AI domain only (no cross-domain refactors). For each one specify:

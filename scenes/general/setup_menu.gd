@@ -11,7 +11,7 @@ extends CanvasLayer
 ## dict it emits.
 
 ## Emitted when the player presses Start, carrying the chosen parameters:
-## `{ has_player: bool, spawn_doors: bool, defenders: int, invaders: int,
+## `{ has_player: bool, seed: int, spawn_doors: bool, defenders: int, invaders: int,
 ##    show_agent_labels: bool, show_agent_paths: bool, show_vision: bool }`.
 ## Main applies these and builds the world.
 signal start_requested(config: Dictionary)
@@ -19,6 +19,7 @@ signal start_requested(config: Dictionary)
 const _MAX_COUNT := 8  ## Upper bound per side in the spinboxes; spawn spread handles any count in range.
 
 var _player_check: CheckBox         ## Checked = a human player; unchecked = the 2-AI spectator contest.
+var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
 var _doors_check: CheckBox          ## Checked = physical doors are placed; unchecked = open archways only.
 var _defender_spin: SpinBox         ## How many defenders to drop into the house.
 var _invader_spin: SpinBox          ## How many invaders to spawn outside the house.
@@ -27,7 +28,7 @@ var _agent_paths_check: CheckBox    ## Checked = draw the NPC's live navigation 
 var _vision_check: CheckBox         ## Checked = draw each NPC's line-of-sight / awareness overlay.
 
 
-## Build the window seeded from `defaults` (`{ has_player, spawn_doors, defenders, invaders,
+## Build the window seeded from `defaults` (`{ has_player, seed, spawn_doors, defenders, invaders,
 ## show_agent_labels, show_agent_paths, show_vision }`) and show it. Called by Main before the
 ## world is spawned.
 func open(defaults: Dictionary) -> void:
@@ -76,6 +77,8 @@ func _build_ui(defaults: Dictionary) -> void:
 	_doors_check.button_pressed = bool(defaults.get("spawn_doors", true))
 	box.add_child(_doors_check)
 
+	_seed_edit = _seed_row(box, int(defaults.get("seed", 0)))
+
 	_defender_spin = _spin_row(box, "Defenders", int(defaults.get("defenders", 1)))
 	_invader_spin = _spin_row(box, "Invaders", int(defaults.get("invaders", 1)))
 
@@ -106,6 +109,24 @@ func _build_ui(defaults: Dictionary) -> void:
 	box.add_child(start)
 
 
+## A labelled seed row (label + LineEdit), added to `parent`; returns the LineEdit so the caller can
+## read it on Start. Prefilled with `value` unless it is 0, which shows as blank (= random).
+func _seed_row(parent: VBoxContainer, value: int) -> LineEdit:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var label := Label.new()
+	label.text = "Seed"
+	label.custom_minimum_size = Vector2(120, 0)
+	row.add_child(label)
+	var edit := LineEdit.new()
+	edit.placeholder_text = "random"
+	edit.text = "" if value == 0 else str(value)
+	edit.custom_minimum_size = Vector2(160, 0)
+	row.add_child(edit)
+	parent.add_child(row)
+	return edit
+
+
 ## A labelled count row (label + SpinBox clamped to `0.._MAX_COUNT`), added to `parent`; returns the
 ## SpinBox so the caller can read its value on Start.
 func _spin_row(parent: VBoxContainer, label_text: String, value: int) -> SpinBox:
@@ -131,6 +152,7 @@ func _spin_row(parent: VBoxContainer, label_text: String, value: int) -> SpinBox
 func _on_start() -> void:
 	start_requested.emit({
 		"has_player": _player_check.button_pressed,
+		"seed": _seed_edit.text.strip_edges().to_int(),
 		"spawn_doors": _doors_check.button_pressed,
 		"defenders": int(_defender_spin.value),
 		"invaders": int(_invader_spin.value),

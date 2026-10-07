@@ -4,8 +4,9 @@ extends Node2D
 ## together. On start it asks the World Generation domain (WorldGen.generate) for a
 ## procedurally furnished house just ahead of the player, front door first.
 
-## Seed for the house layout; 0 = a new random house every run. The seed used is
-## printed at startup so a layout you like can be pinned here.
+## Seed for the house layout; 0 = a new random seed each run, resolved to a concrete value at
+## spawn so the whole run (house + NPC placement) reproduces from it. The seed is shown in the
+## corner (SeedDisplay) and can be re-entered in the setup window to pin a layout you like.
 @export var house_seed: int = 0
 ## Force a specific floorplan (a key in HouseDefinitions); "" = pick one at random.
 @export var force_plan: String = ""
@@ -59,6 +60,7 @@ func _ready() -> void:
 		_setup_menu.start_requested.connect(_on_setup_chosen)
 		_setup_menu.open({
 			"has_player": not spectator_mode,
+			"seed": house_seed,
 			"spawn_doors": spawn_doors,
 			"defenders": defender_count,
 			"invaders": invader_count,
@@ -72,6 +74,7 @@ func _ready() -> void:
 ## inverse of "has a human player": a player-less run is the 2-AI spectator contest.
 func _on_setup_chosen(config: Dictionary) -> void:
 	spectator_mode = not bool(config.get("has_player", not spectator_mode))
+	house_seed = int(config.get("seed", house_seed))
 	spawn_doors = bool(config.get("spawn_doors", spawn_doors))
 	defender_count = int(config.get("defenders", defender_count))
 	invader_count = int(config.get("invaders", invader_count))
@@ -93,11 +96,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		return_to_setup()
 
 
-## Reopen the pre-game setup window for a fresh match: drop any `skip_setup` flag a scripted restart
-## set (so the reloaded scene shows the window again) and reload the scene. Also the `menu` command verb.
+## Reopen the pre-game setup window for a fresh match: drop the `skip_setup` and `match_seed` metas a
+## scripted restart may have set (so the reloaded scene shows the window again and the window's own
+## seed choice — not a stale pin — decides the layout) and reload the scene. Also the `menu` command verb.
 func return_to_setup() -> void:
 	if Engine.has_meta("skip_setup"):
 		Engine.remove_meta("skip_setup")
+	if Engine.has_meta("match_seed"):
+		Engine.remove_meta("match_seed")
 	get_tree().reload_current_scene()
 
 
@@ -107,6 +113,13 @@ func _spawn_world() -> void:
 	# reload the `restart` command does); otherwise the exported seed (0 = random) stands.
 	if Engine.has_meta("match_seed"):
 		house_seed = Engine.get_meta("match_seed")
+	# Resolve 0 to a concrete seed here so the whole run (house AND NPC placement) is reproducible
+	# from it, and so it can be displayed and re-entered to pin this layout.
+	if house_seed == 0:
+		house_seed = randi()
+	var seed_display := get_node_or_null("SeedDisplay")
+	if seed_display and seed_display.has_method("show_seed"):
+		seed_display.show_seed(house_seed)
 	var front_door := _player.global_position + Vector2(0, -door_distance)
 	var house := WorldGen.generate(house_seed, force_plan, front_door, self, spawn_doors)
 	# Keep the house beneath the player in draw order.
@@ -115,7 +128,7 @@ func _spawn_world() -> void:
 	var rooms := WorldGen.get_rooms(house)
 	NavBuilder.build(house, rooms, self)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = house_seed if house_seed != 0 else randi()
+	rng.seed = house_seed
 	for i in defender_count:
 		_spawn_defender(rooms, rng, i)
 	for i in invader_count:

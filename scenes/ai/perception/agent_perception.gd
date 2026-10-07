@@ -19,6 +19,12 @@ extends Node
 ## (`has_line_to`, `combat_spots`) — pure sensing, not routed through Von. It holds NO policy and is
 ## behaviour-agnostic: it never decides, gates by goal or picks. Reads only published contracts (the
 ## character's public API, objects' get_interactions()/get_surface(), the room rects Main injects).
+##
+## This is the PERCEPTION sub-domain's public face: it OWNS the sight sense (agent_vision.gd), the
+## hostility rules (agent_hostility.gd) and the event memory (agent_memory.gd) as internal modules,
+## and surfaces knowledge only through its own methods — the rest of the AI never touches those
+## objects. The controller configures it (all tunables live on the GoalController, the single
+## authoring surface) via the config fields below, then calls `setup()` once.
 
 ## Physics layer walls + solid furniture live on (matches CharacterInteraction.QUERY_MASK).
 const QUERY_MASK := 1
@@ -27,6 +33,11 @@ const PISTOL_SLOT := 3
 const FISTS_SLOT := 2
 ## Compass names for an 8-wind direction, indexed clockwise from east (screen +y is south).
 const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
+
+## The internal sensing modules this sub-domain owns (built in setup() from the config fields).
+const AgentVision := preload("res://scenes/ai/perception/agent_vision.gd")
+const AgentHostility := preload("res://scenes/ai/perception/agent_hostility.gd")
+const AgentMemory := preload("res://scenes/ai/perception/agent_memory.gd")
 
 ## Surface coverage (0–100) at or above which a blocking object counts as usable cover.
 @export var cover_min: float = 40.0
@@ -41,7 +52,32 @@ const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-we
 ## Lifetime (s) of a character sighting in memory — the window the NPC keeps acting on a last-seen
 ## position after losing sight. Set by the controller from its matching export.
 var contact_memory_ttl: float = 4.0
+## Whether this NPC starts knowing the house (rooms + objects), else learns them by sight.
+var familiar_with_house: bool = true
 
+# --- Config fields the controller copies from its exports before calling setup(). ---
+# Vision (the sight sense).
+var vision_enabled: bool = true
+var view_distance: float = 2520.0
+var fov_degrees: float = 110.0
+var awareness_radius: float = 48.0
+# Hostility (the categorization rules).
+var hostile_on_sight: bool = false
+var hostile_on_trespass: bool = false
+var hostile_on_attack: bool = true
+var hostility_ttl: float = 0.0
+var allied_factions: Array[StringName] = []
+# Memory (the event log).
+var memory_capacity: int = 64
+var memory_default_ttl: float = 0.0
+# Combat awareness (how incoming fire is remembered — see process_hit()).
+var hit_awareness_radius: float = 160.0
+var under_fire_time: float = 3.0
+var engage_dwell: float = 3.0
+
+var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
+var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
+var _memory: RefCounted          ## The event memory (sightings, verdicts, under-fire…); see agent_memory.gd.
 var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the first observe() call.
 var _post_set := false           ## Whether _post has been captured yet.
 var _interactables: Array = []   ## Cached world objects that advertise interactions (static furniture).
@@ -50,11 +86,77 @@ var _seeded := false             ## Whether the familiar-NPC house-knowledge see
 var _visible_now := {}           ## Instance ids of characters visible on the latest observe() tick.
 
 
+## Build the owned sensing modules from the config fields. The controller calls this once in its
+## _ready(), after copying its exports onto the fields above.
+func setup() -> void:
+	_vision = AgentVision.new()
+	_vision.enabled = vision_enabled
+	_vision.view_distance = view_distance
+	_vision.fov_degrees = fov_degrees
+	_vision.awareness_radius = awareness_radius
+	_hostility = AgentHostility.new()
+	_hostility.on_sight = hostile_on_sight
+	_hostility.trespass = hostile_on_trespass
+	_hostility.retaliate = hostile_on_attack
+	_hostility.ttl = hostility_ttl
+	_hostility.allies = allied_factions
+	_memory = AgentMemory.new()
+	_memory.capacity = memory_capacity
+	_memory.default_ttl = memory_default_ttl
+
+
+## Tell the hostility rules this NPC's own faction (so allies are never hostile). The controller
+## calls this once it knows which character it drives.
+func set_faction(faction: StringName) -> void:
+	_hostility.faction = faction
+
+
+## Classify one world `&"hit"` event (interface 10) against this NPC and fold it into memory: a hit
+## ON the NPC, or any hit within `hit_awareness_radius` of it (a shot landing close), counts as being
+## attacked — the incoming direction is remembered (`under_fire`), the engagement is refreshed
+## (`engaged`), and the attacker is handed to the hostility rules. The NPC's own hits are ignored.
+## Returns true when it was a relevant attack, so the controller can kick off a fight.
+func process_hit(character, data: Dictionary) -> bool:
+	var attacker = data.get("attacker")
+	if attacker == character:
+		return false  # Our own shot or punch.
+	var self_pos: Vector2 = character.global_position
+	var hit_me: bool = data.get("victim") == character
+	if not hit_me and self_pos.distance_to(data.get("position", self_pos)) > hit_awareness_radius:
+		return false  # A hit too far away to notice.
+	var from: Vector2 = -(data.get("direction", Vector2.RIGHT) as Vector2)
+	_memory.remember(&"under_fire", {"from": from}, under_fire_time)
+	_memory.remember(&"engaged", {}, engage_dwell)
+	if attacker is Node and is_instance_valid(attacker):
+		_hostility.on_attacked(attacker, _memory)
+	return true
+
+
+## Refresh the combat engagement (called by the behaviour when it fires or adopts a fight), so an
+## active firefight stays committed between decisions.
+func note_engaged() -> void:
+	_memory.remember(&"engaged", {}, engage_dwell)
+
+
+## Whether the NPC is still committed to a fight (an `engaged` event is fresh).
+func engaged_fresh() -> bool:
+	return _memory.is_fresh(&"engaged")
+
+
+## Whether the NPC is currently under fire (a recent incoming/nearby hit).
+func under_fire() -> bool:
+	return _memory.is_fresh(&"under_fire")
+
+
 ## SEE pass — run every tick. Test what is visible via `vision` and remember it, so the agent's
 ## knowledge stays fresh while it can see and decays once it can't; each character sighting is also
 ## categorized by `hostility`. `familiar` (used on the first call only) pre-seeds the house's rooms +
 ## objects into memory as already-known. People are never seeded — they are known only once seen.
-func observe(character, rooms: Array, vision: RefCounted, hostility: RefCounted, memory: RefCounted, familiar: bool) -> void:
+func observe(character, rooms: Array) -> void:
+	var vision: RefCounted = _vision
+	var hostility: RefCounted = _hostility
+	var memory: RefCounted = _memory
+	var familiar: bool = familiar_with_house
 	if not _post_set:
 		_post = character.global_position
 		_post_set = true
@@ -108,10 +210,11 @@ func observe(character, rooms: Array, vision: RefCounted, hostility: RefCounted,
 ## from what the agent currently sees and remembers (NOT from ground truth). `goal` is the behaviour
 ## string Von ranks the menu against; `rooms` is Main's world-space room list; `memory` is the agent's
 ## event memory (sightings + hostility verdicts included).
-func sense(character, rooms: Array, goal: String, memory: RefCounted, hostility: RefCounted) -> Dictionary:
+func sense(character, rooms: Array, goal: String) -> Dictionary:
+	var memory: RefCounted = _memory
 	var self_pos: Vector2 = character.global_position
 	var self_room := _room_at(self_pos, rooms)
-	var known := contacts(self_pos, memory, hostility)
+	var known := contacts(self_pos)
 	return {
 		"state_text": _state_text(character, self_room, goal, memory, known),
 		"moves": _moves(rooms, memory, known),
@@ -122,7 +225,9 @@ func sense(character, rooms: Array, goal: String, memory: RefCounted, hostility:
 ## Every character the agent currently knows of — the freshest sighting per character, with
 ## `hostile` / `reason` from the hostility verdicts and `visible` (seen on the latest tick) added.
 ## Hostiles first, then nearest to `self_pos`. Entries whose character no longer exists are dropped.
-func contacts(self_pos: Vector2, memory: RefCounted, hostility: RefCounted) -> Array:
+func contacts(self_pos: Vector2) -> Array:
+	var memory: RefCounted = _memory
+	var hostility: RefCounted = _hostility
 	var out: Array = []
 	var seen := {}
 	for data in memory.recall_all(&"saw_character"):  # Newest first: the first per id is the freshest.
