@@ -1,21 +1,21 @@
 extends CanvasLayer
 
 ## General domain, spectator-match observer: the HUD for an N-AI contest (defenders vs invaders). Each
-## combatant gets a compact panel — goal, current act, faction and a health bar — that FLOATS in the
-## world just above the NPC it describes (its world position projected to screen each frame), so the
-## panels track their NPCs and scale to any count instead of two fixed corner panels. Across the top is
-## a running match timer; along the bottom a shared combat feed; and, once one side dies, the winner
-## banner.
+## combatant gets a compact panel — faction and a health bar — that FLOATS in the world just above the
+## NPC it describes (its world position projected to screen each frame), so the panels track their NPCs
+## and scale to any count instead of two fixed corner panels. Across the top is a running match timer;
+## top-left is a goal readout listing every NPC's goal; along the bottom a shared combat feed; and,
+## once one side dies, the winner banner.
 ##
 ## It is a decoupled observer, reading only published contracts — the Character public API/signals
-## (`faction`, `health`/`max_health`, the `died` signal), the AI controller's `current_act()` and
-## exported `goal`, and the EventBus `&"hit"` topic — so it never reaches into any domain's internals.
+## (`faction`, `health`/`max_health`, the `died` signal), the AI controller's exported `goal`, and
+## the EventBus `&"hit"` topic — so it never reaches into any domain's internals.
 ## Main calls `begin()` with the combatants when it sets up spectator mode.
 
 const _MAX_FEED := 6                ## Combat-feed lines kept on screen (newest last).
-const _PANEL_SIZE := Vector2(200, 112)  ## Size of a floating combatant panel.
-const _PANEL_FONT_SIZE := 13       ## Font size of a floating combatant panel.
-const _PANEL_GAP := 14.0           ## Pixels between the panel's bottom and the NPC's origin.
+const _PANEL_SIZE := Vector2(300, 175)  ## Size of a floating combatant panel.
+const _PANEL_FONT_SIZE := 28       ## Font size of a floating combatant panel.
+const _PANEL_GAP := 24.0           ## Pixels between the panel's bottom and the NPC's origin.
 const _PANEL_MARGIN := 8.0         ## Keep a floating panel this far inside the screen edges.
 
 var _combatants: Array = []        ## [{ character, controller, label }] for each side.
@@ -27,6 +27,7 @@ var _feed: Array[String] = []      ## Recent combat-feed lines.
 var _timer_label: Label           ## Top-centre running match time.
 var _verdict_label: Label         ## Centre winner banner, empty until the match is decided.
 var _feed_label: Label            ## Bottom-left combat feed.
+var _goal_label: Label            ## Top-left per-NPC goal readout.
 
 
 ## Begin observing a match between `combatants` (character nodes). Builds the UI, wires each side's
@@ -59,9 +60,18 @@ func _process(_delta: float) -> void:
 		_place_panel(label, c)
 	_verdict_label.text = _verdict
 	_feed_label.text = "\n".join(_feed)
+	var goal_lines: Array[String] = []
+	for entry in _combatants:
+		var c: Node = entry["character"]
+		if not is_instance_valid(c):
+			continue
+		var ctrl = entry["controller"]
+		var goal: String = str(ctrl.goal) if ctrl and "goal" in ctrl else "—"
+		goal_lines.append("%s: %s" % [c.name, goal])
+	_goal_label.text = "\n".join(goal_lines)
 
 
-## The text block for one combatant panel: name/faction, health bar, current act, and goal.
+## The text block for one combatant panel: name/faction, health bar, and current act.
 func _panel_text(entry: Dictionary) -> String:
 	var c: Node = entry["character"]
 	if not is_instance_valid(c):
@@ -70,10 +80,9 @@ func _panel_text(entry: Dictionary) -> String:
 	var faction: String = str(c.faction) if "faction" in c else "?"
 	var hp: float = c.health if "health" in c else 0.0
 	var max_hp: float = c.max_health if "max_health" in c else 0.0
-	var act: String = ctrl.current_act() if ctrl and ctrl.has_method("current_act") else "?"
-	var goal: String = str(ctrl.goal) if ctrl and "goal" in ctrl else ""
+	var act: String = ctrl.debug_status() if ctrl and ctrl.has_method("debug_status") else "?"
 	var state := "DEAD" if c.get("is_dead") == true else _health_bar(hp, max_hp)
-	return "%s  [%s]\n%s\nact: %s\ngoal: %s" % [c.name, faction, state, act, goal]
+	return "%s  [%s]\n%s\nact: %s" % [c.name, faction, state, act]
 
 
 ## A compact text health bar, e.g. "[######----] 30/50".
@@ -146,16 +155,18 @@ func _controller_of(character: Node) -> Node:
 
 # --- UI construction (labels anchored like the debug HUD; no scene-side layout) ----------
 
-## Build the shared chrome: the top timer, the centre verdict banner, and the bottom combat feed.
+## Build the shared chrome: the top timer, top-left goal readout, the centre verdict banner, and the
+## bottom combat feed.
 func _build_ui() -> void:
-	_timer_label = _add_label(0.5, 0.0, Vector2(-100, 16), Vector2(200, 36), 24, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
-	_verdict_label = _add_label(0.5, 0.4, Vector2(-300, 0), Vector2(600, 60), 44, Color.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
-	_feed_label = _add_label(0.0, 1.0, Vector2(24, -180), Vector2(420, 170), 18, Color.ORANGE, HORIZONTAL_ALIGNMENT_LEFT)
+	_timer_label = _add_label(0.5, 0.0, Vector2(-130, 16), Vector2(260, 52), 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
+	_goal_label = _add_label(0.0, 0.0, Vector2(24, 76), Vector2(560, 280), 28, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	_verdict_label = _add_label(0.5, 0.4, Vector2(-350, 0), Vector2(700, 88), 62, Color.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
+	_feed_label = _add_label(0.0, 1.0, Vector2(24, -250), Vector2(520, 240), 28, Color.ORANGE, HORIZONTAL_ALIGNMENT_LEFT)
 
 
 ## One combatant panel: a compact, centre-aligned label that `_place_panel` repositions each frame to
-## float just above its NPC. Text sits at the bottom of the fixed rect so it grows upward away from the
-## NPC; word-wrap plus a dark outline keep long goal strings readable over the busy world background.
+## float just above its NPC. Shows name/faction, health bar, and current act; a dark outline keeps
+## it readable over the busy world background.
 func _make_panel() -> Label:
 	var label := Label.new()
 	add_child(label)
@@ -163,7 +174,7 @@ func _make_panel() -> Label:
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
 	label.autowrap_mode = 3  # TextServer.AUTOWRAP_WORD_ARBITRARY
-	label.max_lines_visible = 6
+	label.max_lines_visible = 4
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", _PANEL_FONT_SIZE)
 	label.add_theme_color_override("font_color", Color.WHITE)
@@ -182,7 +193,9 @@ func _place_panel(label: Label, c: CanvasItem) -> void:
 	var view: Vector2 = get_viewport().get_visible_rect().size
 	pos.x = clampf(pos.x, _PANEL_MARGIN, maxf(_PANEL_MARGIN, view.x - size.x - _PANEL_MARGIN))
 	pos.y = clampf(pos.y, _PANEL_MARGIN, maxf(_PANEL_MARGIN, view.y - size.y - _PANEL_MARGIN))
-	label.position = pos
+	# Snap to whole pixels: a label tracked at a fractional position renders its text across pixel
+	# boundaries, which blurs it as the NPC moves.
+	label.position = pos.round()
 
 
 ## Create and return a Label anchored at (`ax`,`ay`) with the given offset, size, font size, colour

@@ -54,27 +54,29 @@ func _build_ui(defaults: Dictionary) -> void:
 
 	var margin := MarginContainer.new()
 	for side in ["left", "right", "top", "bottom"]:
-		margin.add_theme_constant_override("margin_" + side, 32)
+		margin.add_theme_constant_override("margin_" + side, 40)
 	panel.add_child(margin)
 
 	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 16)
+	box.add_theme_constant_override("separation", 20)
 	margin.add_child(box)
 
 	var title := Label.new()
 	title.text = "MATCH SETUP"
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 32)
+	title.add_theme_font_size_override("font_size", 64)
 	box.add_child(title)
 
 	_player_check = CheckBox.new()
 	_player_check.text = "Human player"
 	_player_check.button_pressed = bool(defaults.get("has_player", false))
+	_player_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_player_check)
 
 	_doors_check = CheckBox.new()
 	_doors_check.text = "Spawn doors"
 	_doors_check.button_pressed = bool(defaults.get("spawn_doors", true))
+	_doors_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_doors_check)
 
 	_seed_edit = _seed_row(box, int(defaults.get("seed", 0)))
@@ -84,27 +86,31 @@ func _build_ui(defaults: Dictionary) -> void:
 
 	var sep := Label.new()
 	sep.text = "Debug overlays"
-	sep.add_theme_font_size_override("font_size", 14)
+	sep.add_theme_font_size_override("font_size", 28)
 	sep.modulate = Color(1, 1, 1, 0.5)
 	box.add_child(sep)
 
 	_agent_labels_check = CheckBox.new()
 	_agent_labels_check.text = "Agent labels"
 	_agent_labels_check.button_pressed = bool(defaults.get("show_agent_labels", true))
+	_agent_labels_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_agent_labels_check)
 
 	_agent_paths_check = CheckBox.new()
 	_agent_paths_check.text = "Agent paths"
 	_agent_paths_check.button_pressed = bool(defaults.get("show_agent_paths", true))
+	_agent_paths_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_agent_paths_check)
 
 	_vision_check = CheckBox.new()
 	_vision_check.text = "Vision cones"
 	_vision_check.button_pressed = bool(defaults.get("show_vision", true))
+	_vision_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_vision_check)
 
 	var start := Button.new()
 	start.text = "Start"
+	start.add_theme_font_size_override("font_size", 32)
 	start.pressed.connect(_on_start)
 	box.add_child(start)
 
@@ -116,12 +122,14 @@ func _seed_row(parent: VBoxContainer, value: int) -> LineEdit:
 	row.add_theme_constant_override("separation", 12)
 	var label := Label.new()
 	label.text = "Seed"
-	label.custom_minimum_size = Vector2(120, 0)
+	label.custom_minimum_size = Vector2(160, 0)
+	label.add_theme_font_size_override("font_size", 30)
 	row.add_child(label)
 	var edit := LineEdit.new()
 	edit.placeholder_text = "random"
 	edit.text = "" if value == 0 else str(value)
-	edit.custom_minimum_size = Vector2(160, 0)
+	edit.custom_minimum_size = Vector2(200, 0)
+	edit.add_theme_font_size_override("font_size", 30)
 	row.add_child(edit)
 	parent.add_child(row)
 	return edit
@@ -134,14 +142,16 @@ func _spin_row(parent: VBoxContainer, label_text: String, value: int) -> SpinBox
 	row.add_theme_constant_override("separation", 12)
 	var label := Label.new()
 	label.text = label_text
-	label.custom_minimum_size = Vector2(120, 0)
+	label.custom_minimum_size = Vector2(160, 0)
+	label.add_theme_font_size_override("font_size", 30)
 	row.add_child(label)
 	var spin := SpinBox.new()
 	spin.min_value = 0
 	spin.max_value = _MAX_COUNT
 	spin.step = 1
 	spin.value = clampi(value, 0, _MAX_COUNT)
-	spin.custom_minimum_size = Vector2(100, 0)
+	spin.custom_minimum_size = Vector2(140, 0)
+	spin.add_theme_font_size_override("font_size", 30)
 	row.add_child(spin)
 	parent.add_child(row)
 	return spin

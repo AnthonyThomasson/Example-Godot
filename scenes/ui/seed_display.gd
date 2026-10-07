@@ -13,10 +13,11 @@ func _ready() -> void:
 	_label.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_label.grow_horizontal = Control.GROW_DIRECTION_BEGIN
 	_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
-	_label.offset_left = -16.0
-	_label.offset_top = -12.0
+	_label.offset_left = -20.0
+	_label.offset_top = -36.0
 	_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_label.modulate = Color(1, 1, 1, 0.6)
+	_label.add_theme_font_size_override("font_size", 32)
 	add_child(_label)
 
 

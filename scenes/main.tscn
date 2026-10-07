@@ -6,12 +6,12 @@
 [ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/character_visuals.gd" id="6_player_visuals"]
 [ext_resource type="Script" uid="uid://cfsgcam8gj2md" path="res://scenes/character/player_controller.gd" id="7_controller"]
 [ext_resource type="Script" uid="uid://duwls7ja25j7a" path="res://scenes/general/camera_controller.gd" id="9_camera"]
-[ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/general/debug_ui.gd" id="10_debug"]
+[ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/ui/debug_ui.gd" id="10_debug"]
 [ext_resource type="Script" uid="uid://cheoflbylqgpr" path="res://scenes/ai/decision/decision_server_launcher.gd" id="11_launcher"]
 [ext_resource type="Script" uid="uid://csdc7o645rrtb" path="res://scenes/general/command_server.gd" id="12_command"]
-[ext_resource type="Script" uid="uid://c0jc3adwnfrqb" path="res://scenes/general/match_hud.gd" id="13_match_hud"]
-[ext_resource type="Script" uid="uid://bce6x1yb7nhph" path="res://scenes/general/setup_menu.gd" id="14_setup_menu"]
-[ext_resource type="Script" path="res://scenes/general/seed_display.gd" id="15_seed_display"]
+[ext_resource type="Script" uid="uid://c0jc3adwnfrqb" path="res://scenes/ui/match_hud.gd" id="13_match_hud"]
+[ext_resource type="Script" uid="uid://bce6x1yb7nhph" path="res://scenes/ui/setup_menu.gd" id="14_setup_menu"]
+[ext_resource type="Script" uid="uid://ct26m8bebqup0" path="res://scenes/ui/seed_display.gd" id="15_seed_display"]
 
 [node name="Main" type="Node2D"]
 script = ExtResource("1_main")

@@ -20,7 +20,7 @@ isolated (cross-domain connections go only through the interfaces below), keeps 
 the domain skills* in sync when the architecture or a domain's internals change, and enforces
 concise current-state comments.
 
-## The ten domains (one folder each under `scenes/`)
+## The eleven domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
@@ -32,7 +32,8 @@ concise current-state comments.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Everything else: input (Keybinds), despawner, camera, debug + match HUD, pre-game setup window, seed readout, dev command server. |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server. |
+| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
@@ -154,7 +155,7 @@ Character ─▶ Interaction ──(get_interactions)──▶ Objects
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
-DebugUI / MatchHUD / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.current_act)
+UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.current_act)
 ```
 
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +

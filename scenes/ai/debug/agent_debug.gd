@@ -19,11 +19,11 @@ extends Node2D
 @export var label_color: Color = Color(1, 1, 1, 0.9)
 ## Colour of the movement-path line and markers.
 @export var path_color: Color = Color(0.4, 0.9, 1.0, 0.8)
-## Pixels above the NPC's origin to anchor the label.
-@export var label_offset: float = 26.0
+## Pixels below the NPC's origin to anchor the label (keeps it clear of the match HUD panel above).
+@export var label_offset: float = 28.0
 
 ## Point size of the label font.
-const FONT_SIZE := 11
+const FONT_SIZE := 16
 ## Radius (px) of a waypoint dot on the path.
 const WAYPOINT_RADIUS := 2.5
 ## Radius (px) of the ring drawn at the path's final target.
@@ -80,5 +80,5 @@ func _draw_label(text: String) -> void:
 		return
 	var font: Font = ThemeDB.fallback_font
 	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE).x
-	var pos := Vector2(-width / 2.0, -label_offset)
+	var pos := Vector2(-width / 2.0, label_offset)
 	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE, label_color)

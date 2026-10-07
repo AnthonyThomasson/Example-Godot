@@ -25,14 +25,14 @@ func _ready() -> void:
 	_label.anchor_top = 1.0
 	_label.anchor_right = 1.0
 	_label.anchor_bottom = 1.0
-	_label.offset_left = -400.0
-	_label.offset_top = -180.0
+	_label.offset_left = -440.0
+	_label.offset_top = -230.0
 	_label.offset_right = -10.0
 	_label.offset_bottom = -10.0
 	_label.text = ""
 
 	# Make text larger and readable.
-	_label.add_theme_font_size_override("font_size", 24)
+	_label.add_theme_font_size_override("font_size", 34)
 
 	# Create a label for hit display (top-left, below hint).
 	_hit_display_label = Label.new()
@@ -45,7 +45,7 @@ func _ready() -> void:
 	_hit_display_label.offset_bottom = 120.0
 	_hit_display_label.custom_minimum_size = Vector2(450, 40)
 	_hit_display_label.text = ""
-	_hit_display_label.add_theme_font_size_override("font_size", 22)
+	_hit_display_label.add_theme_font_size_override("font_size", 32)
 	_hit_display_label.add_theme_color_override("font_color", Color.YELLOW)
 
 	# One unified hit feed: melee punches (hand 0/1) and shots (hand -1), both with damage.
