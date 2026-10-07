@@ -33,7 +33,6 @@ var flank_weight: float = 140.0
 var flank_ally_radius: float = 500.0
 # Locomotion config (forwarded to the Locomotion child in setup()).
 var arrive_dist: float = 10.0
-var push_through_delay: float = 1.0
 var stuck_speed: float = 20.0
 var door_open_reach: float = 40.0
 
@@ -85,7 +84,6 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_perception = perception
 	_loco = Locomotion.new()
 	_loco.arrive_dist = arrive_dist
-	_loco.push_through_delay = push_through_delay
 	_loco.stuck_speed = stuck_speed
 	_loco.door_open_reach = door_open_reach
 	_loco.setup(nav_agent)
@@ -556,12 +554,14 @@ func _engage_act_for(contact_id: int, fallback_id: String, acts: Dictionary) -> 
 	return fallback_id
 
 
-## Adopt the chosen hold destination (used only when the act is "hold").
+## Adopt the chosen hold destination (used only when the act is "hold"). The point is snapped onto the
+## navmesh — a named destination like a room centre is often inside furniture (off the navmesh), which
+## would leave the agent with an unreachable target and send it shoving straight through walls.
 func set_move(id: String, moves: Dictionary) -> void:
 	_move_id = id
 	_has_move = id != "" and moves.has(id)
 	if _has_move:
-		_move_point = moves[id]["point"]
+		_move_point = _loco.reachable(moves[id]["point"])
 		if _intent == "hold":
 			_commit_timer = max_commit_time
 

@@ -127,9 +127,6 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var arrive_dist: float = 10.0
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
 @export var nav_agent_path: NodePath
-## How long (s) the NPC stays blocked against furniture before it shoves straight through as a last
-## resort (when no route around exists, or it is wedged and barely moving).
-@export var push_through_delay: float = 1.0
 ## Movement speed (px/s) under which the NPC counts as blocked while trying to follow a path.
 @export var stuck_speed: float = 20.0
 ## How close (px) a shut door must be, while the NPC is blocked on its path, for it to deliberately
@@ -206,7 +203,6 @@ func _ready() -> void:
 	_behavior.flank_weight = flank_weight
 	_behavior.flank_ally_radius = flank_ally_radius
 	_behavior.arrive_dist = arrive_dist
-	_behavior.push_through_delay = push_through_delay
 	_behavior.stuck_speed = stuck_speed
 	_behavior.door_open_reach = door_open_reach
 	var nav_agent: NavigationAgent2D = null

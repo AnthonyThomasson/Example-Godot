@@ -4,47 +4,34 @@ extends Node
 ## steering on the character: `move_to()` writes `character.move_input` to follow a navigated path
 ## around walls and furniture and through doorways. The navmesh (baked by the Navigation domain)
 ## carves out furniture and rings the house with a walkable outdoor strip, so paths route around a
-## piece and reroute through another doorway when one is blocked; RVO avoidance (fed each frame,
-## applied from the previous frame's safe velocity) smooths steering around a piece just shoved.
+## piece and reroute through another doorway when one is blocked.
 ##
-## When no route exists at all, or the NPC stays wedged for `push_through_delay`, it shoves straight
-## through the blocker as a last resort, using the character's own push physics — except that a shut
-## door within `door_open_reach` is deliberately OPENED instead (doorways stay walkable in the navmesh,
-## so the NPC paths up to the door and opens it). It is behaviour's movement tool only — it holds no
-## decision or combat state. Falls back to straight-line steering when there is no nav agent.
+## Steering always aims at the next navmesh waypoint, so the character's own push physics bulldoze
+## furniture sitting on the route without ever tunnelling a wall. A shut door within `door_open_reach`
+## that the NPC is wedged against is deliberately OPENED instead (doorways stay walkable in the
+## navmesh, so the NPC paths up to the door and opens it). It is behaviour's movement tool only — it
+## holds no decision or combat state. Falls back to straight-line steering when there is no nav agent.
 
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 var arrive_dist: float = 10.0
-## How long (s) the NPC stays blocked before it shoves straight through the blocker.
-var push_through_delay: float = 1.0
 ## Speed (px/s) under which the NPC counts as blocked while trying to follow a path.
 var stuck_speed: float = 20.0
-## How close (px) a shut door must be, while blocked, to be opened instead of shoved through. 0 = off.
+## How close (px) a shut door must be, while blocked, to be opened. 0 = off.
 var door_open_reach: float = 40.0
 
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
-var _safe_velocity := Vector2.ZERO ## Latest avoidance-adjusted velocity from the agent (RVO callback).
-var _avoid_ready := false          ## Whether the agent's avoidance (max_speed) has been configured.
 var _last_pos := Vector2.ZERO      ## Character position last path-move frame, for stuck detection.
-var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path.
-var _push_through := false         ## True while shoving straight through a blocker (the last resort).
+var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path (for door-opening).
 
 
 ## Resolve + wire the navigation agent. `agent` may be null (then everything falls back to straight
-## line steering). RVO avoidance steers the NPC around furniture (tagged with NavigationObstacle2D by
-## the Navigation domain); max_speed is set from the character on the first ensure_max_speed() call.
+## line steering).
 func setup(agent: NavigationAgent2D) -> void:
 	_agent = agent
-	if _agent != null:
-		_agent.avoidance_enabled = true
-		_agent.velocity_computed.connect(_on_avoidance_velocity)
 
 
-## Configure the agent's max_speed from the character on the first tick (avoidance needs it).
-func ensure_max_speed(character) -> void:
-	if _agent != null and not _avoid_ready:
-		_agent.max_speed = character.speed
-		_avoid_ready = true
+func ensure_max_speed(_character) -> void:
+	pass
 
 
 ## Snap a world point onto the navigation mesh so it is actually reachable — a room's geometric
@@ -68,9 +55,9 @@ func reached(character, point: Vector2) -> bool:
 
 
 ## Steer `character.move_input` toward `dest` along a navigated path (around walls and furniture,
-## through doorways). When no route exists at all (`is_target_reachable()` false) or the NPC stays
-## wedged for `push_through_delay`, it shoves straight through the blocker as a last resort, using the
-## character's own push physics. Falls back to plain straight-line steering when there is no agent.
+## through doorways) by heading for the next navmesh waypoint each frame. Furniture physically on the
+## route is shoved aside by the character's own push physics as it walks into it. Falls back to plain
+## straight-line steering when there is no agent.
 func move_to(character, dest: Vector2) -> void:
 	if _agent == null:
 		var straight: Vector2 = dest - character.global_position
@@ -84,27 +71,16 @@ func move_to(character, dest: Vector2) -> void:
 	var next := _agent.get_next_path_position()
 	var desired: Vector2 = next - character.global_position
 	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
-	_agent.velocity = desired * character.speed  # Request this frame's avoidance-safe velocity.
 	_update_stuck(character)
 	_open_blocking_door(character)
-	if _push_through:
-		# No route around (or wedged): drive straight at the blocker so the character shoves it.
-		var aim: Vector2 = dest if not _agent.is_target_reachable() else next
-		character.move_input = (aim - character.global_position).normalized()
-	elif character.speed > 0.0:
-		character.move_input = _safe_velocity / character.speed  # Length <= 1 (push-strength scaling).
-	else:
-		character.move_input = desired
+	# Always steer toward the next navmesh waypoint — never the raw destination, which can lie across a
+	# wall. `next` is wall-safe, and for an unreachable target it steps toward the closest reachable
+	# point, so the character's own push physics bulldoze furniture on the route without tunnelling walls.
+	character.move_input = desired
 
 
-## Store the agent's avoidance-adjusted velocity; `move_to` applies it the next frame (writing
-## move_input synchronously there, like every other act, rather than from this async callback).
-func _on_avoidance_velocity(safe_velocity: Vector2) -> void:
-	_safe_velocity = safe_velocity
-
-
-## Track whether the NPC is blocked while pathing and flip `_push_through` once it has been blocked
-## for `push_through_delay`. Blocked = the target is unreachable (furniture seals every route) or the
+## Track how long the NPC has been blocked while pathing, so `_open_blocking_door` can open a shut
+## door it is wedged against. Blocked = the target is unreachable (furniture seals every route) or the
 ## character advanced less than `stuck_speed` this frame.
 func _update_stuck(character) -> void:
 	var step := get_physics_process_delta_time()
@@ -114,13 +90,11 @@ func _update_stuck(character) -> void:
 		_stuck_time += step
 	else:
 		_stuck_time = 0.0
-	_push_through = _stuck_time >= push_through_delay
 
 
-## Clear stuck/push-through state when the NPC arrives or stops pathing.
+## Clear stuck state when the NPC arrives or stops pathing.
 func _reset_stuck(character) -> void:
 	_stuck_time = 0.0
-	_push_through = false
 	_last_pos = character.global_position
 
 

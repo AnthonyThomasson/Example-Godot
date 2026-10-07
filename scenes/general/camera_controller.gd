@@ -99,6 +99,6 @@ func _calculate_target_position() -> Vector2:
 	var edge_factor := minf(1.0, edge_offset.length() / threshold_pixels) if threshold_pixels > 0 else 0.0
 
 	# Offset camera toward the mouse.
-	var offset := dir_to_mouse * look_ahead_distance * edge_factor
+	var look_offset := dir_to_mouse * look_ahead_distance * edge_factor
 
-	return player_pos + offset
+	return player_pos + look_offset

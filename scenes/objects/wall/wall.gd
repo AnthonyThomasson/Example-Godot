@@ -48,7 +48,7 @@ func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: f
 	var segs := wall_segments()
 	var best_i := -1
 	var best_d := INF
-	var best_proj := Vector2.ZERO
+	var _best_proj := Vector2.ZERO
 	for i in segs.size():
 		var a: Vector2 = segs[i][0]
 		var b: Vector2 = segs[i][1]
@@ -59,7 +59,7 @@ func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: f
 		if d < best_d:
 			best_d = d
 			best_i = i
-			best_proj = proj
+			_best_proj = proj
 	if best_i < 0:
 		return
 

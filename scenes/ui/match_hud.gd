@@ -173,7 +173,7 @@ func _make_panel() -> Label:
 	label.size = _PANEL_SIZE
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.vertical_alignment = VERTICAL_ALIGNMENT_BOTTOM
-	label.autowrap_mode = 3  # TextServer.AUTOWRAP_WORD_ARBITRARY
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD
 	label.max_lines_visible = 4
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.add_theme_font_size_override("font_size", _PANEL_FONT_SIZE)
@@ -200,7 +200,7 @@ func _place_panel(label: Label, c: CanvasItem) -> void:
 
 ## Create and return a Label anchored at (`ax`,`ay`) with the given offset, size, font size, colour
 ## and horizontal alignment.
-func _add_label(ax: float, ay: float, pos: Vector2, size: Vector2, font_size: int, color: Color, align: int) -> Label:
+func _add_label(ax: float, ay: float, pos: Vector2, size: Vector2, font_size: int, color: Color, align: HorizontalAlignment) -> Label:
 	var label := Label.new()
 	add_child(label)
 	label.anchor_left = ax
