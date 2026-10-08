@@ -146,7 +146,7 @@ And a cautious variant:
 ```
 --invader 'scene().get_node("Invader/GoalController").contact_memory_ttl = 3.0'
 ```
-Expected: a lost contact quickly stops being a fight target and becomes an INVESTIGATE lead ("where you last saw …", "where … was heading"). Compare how often rounds time out vs baseline.
+Expected: a lost contact quickly stops being a fight target and becomes an INVESTIGATE lead ("where you last saw …", "where … was heading"). Compare how often rounds time out vs baseline. Note too that an enemy's gunfire DURING a fight does not spawn a separate "gunfire heard" lead (it is a known hostile, already covered by COMBAT / its last-seen lead) — only an UNKNOWN shooter's gunfire does (e.g. the player firing from range at an NPC that hasn't spotted them yet).
 
 **8b. Permanent hostility** (hostility_ttl = 0)
 Already the default for retaliation — verify by checking:
@@ -154,6 +154,13 @@ Already the default for retaliation — verify by checking:
 python3 tools/gcmd.py 'scene().get_node("Invader/GoalController").hostility_ttl'
 ```
 If it is > 0, run a round with it set to 0 and one with it set to 5 and compare whether the invader drops hostility mid-fight.
+
+**8c. Search dwell (look-around pause)** — don't re-decide the instant a room is entered
+```
+--invader 'scene().get_node("Invader/GoalController").pursue_hostiles = false'
+--invader 'scene().get_node("Invader/GoalController").search_dwell = 5.0'
+```
+Expected: with no hostile known, the invader SEARCHes — it walks all the way INTO a room (its interior, not the edge), then pauses ~5 s panning its aim to look around before choosing the next room, instead of re-deciding the moment it crosses a boundary and ping-ponging between two adjacent rooms. Check `python3 tools/gcmd.py ai`: a SEARCH `move` leaf's params carry `look_around` (and no `arrive_room`), and `debug_status()` reads "reached it" while it holds through the dwell.
 
 ### 9. Navigation and stuck recovery
 

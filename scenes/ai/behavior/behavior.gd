@@ -6,7 +6,8 @@ extends Node
 ## interaction in progress, and the COMMITMENT that keeps a choice running until it completes or a
 ## re-decision is due. The primitives:
 ##   move     — go to `point` (or until entering `arrive_room`), aiming along the way (`aim`: travel /
-##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`.
+##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`; a
+##              `look_around` search move pauses to scan the room on arrival.
 ##   engage   — go to `point`, then fight `target_id` from there: `peek_cover` (step out, shoot, duck)
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
@@ -25,10 +26,14 @@ const PISTOL_SLOT := 3
 const FISTS_SLOT := 2
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
+## Search-pause look-around: how fast the view pans (rad/s coefficient) and how far to each side (radians).
+const LOOK_SWEEP_RATE := 2.5
+const LOOK_SWEEP_ARC := 1.2
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
 var max_commit_time: float = 6.0
+var search_dwell: float = 2.5     ## Seconds to pause and look around after reaching a search/explore room.
 var tactic_interval: float = 3.0
 var shoot_range: float = 500.0
 var punch_range: float = 48.0
@@ -54,8 +59,11 @@ var _path: Array = []             ## The decision path ids (e.g. ["combat", "t_1
 var _labels: Array = []           ## The decision path as labels (e.g. ["COMBAT", "Intruder", "FLANK", "their left side (kitchen)"]).
 var _leaf_ms := 0                 ## When the running leaf was adopted.
 var _point := Vector2.ZERO        ## The leaf's destination, snapped onto the navmesh.
-var _arrive_room := ""            ## A move that completes on ENTERING this room ("" = on reaching `_point`).
+var _arrive_room := ""            ## A move that completes on ENTERING this room ("" = on reaching `_point`); ignored while looking around.
 var _arrived := false             ## Whether the destination has been reached.
+var _look_around := false         ## A search/explore move that pauses to look around on arrival (vs resolving at once).
+var _look_timer := 0.0            ## Seconds left in the look-around pause.
+var _look_base := 0.0             ## Facing angle (rad) the look-around sweep pans around.
 var _engage_id := 0               ## Instance id of the contact being fought (0 = none).
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
@@ -229,6 +237,8 @@ func set_leaf(leaf: Dictionary) -> void:
 	_act_armed = false
 	_commit_timer = max_commit_time
 	_arrive_room = str(_params.get("arrive_room", ""))
+	_look_around = bool(_params.get("look_around", false))
+	_look_timer = 0.0
 	_point = _loco.reachable(_params["point"]) if _params.has("point") else Vector2.ZERO
 	_target_obj = null
 	_engage_id = 0
@@ -348,7 +358,11 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 			return _tactic_timer <= 0.0 or not _perception.engaged_fresh()
 		&"melee":
 			return _tactic_timer <= 0.0 or not _perception.engaged_fresh()
-		&"move", &"interact":
+		&"move":
+			if _look_around and _arrived and _look_timer > 0.0:
+				return false  # Hold through the look-around pause; the move itself ends it when it elapses.
+			return _commit_timer <= 0.0
+		&"interact":
 			return _commit_timer <= 0.0
 	return decide_timer_elapsed
 
@@ -360,7 +374,7 @@ func apply(character, delta: float) -> void:
 	_fire_timer -= delta
 	match _primitive:
 		&"move":
-			_apply_move(character)
+			_apply_move(character, delta)
 		&"engage":
 			_apply_engage(character, delta)
 		&"melee":
@@ -372,20 +386,32 @@ func apply(character, delta: float) -> void:
 
 
 ## Move: walk to the destination (or into the destination room), aiming as the leaf asks, and — when
-## `fire_at_will` — shoot a known hostile the moment there is a clear line. On arrival it holds there
-## and flags the task resolved so the next step is decided.
-func _apply_move(character) -> void:
+## `fire_at_will` — shoot a known hostile the moment there is a clear line. A `look_around` move (search /
+## explore) walks all the way to the interior point and, on arrival, pauses `search_dwell` seconds sweeping
+## its view before flagging the task resolved; any other move flags resolved the moment it arrives.
+func _apply_move(character, delta: float) -> void:
 	if not _arrived:
-		if _arrive_room != "":
+		if _arrive_room != "" and not _look_around:
 			_arrived = _room_key_at(character.global_position) == _arrive_room
 		if not _arrived:
 			_arrived = _loco.reached(character, _point)
 		if _arrived:
-			_resolved = true
-	if _arrived:
-		character.move_input = Vector2.ZERO
-	else:
+			if _look_around:
+				_look_timer = search_dwell  # Pause and scan the room before deciding where to go next.
+				_look_base = character.facing.angle()
+			else:
+				_resolved = true
+	if not _arrived:
 		_loco.move_to(character, _point)
+	else:
+		character.move_input = Vector2.ZERO
+		if _look_around:
+			_look_timer -= delta
+			_scan_around(character)
+			if _look_timer <= 0.0:
+				_look_around = false
+				_resolved = true
+			return
 	_aim_move(character)
 	if _params.get("fire_at_will", false):
 		_fire_at_will(character)
@@ -408,6 +434,14 @@ func _aim_move(character) -> void:
 			return
 	if character.move_input != Vector2.ZERO:
 		character.aim_point = character.global_position + character.move_input * 100.0
+
+
+## During a search/explore pause, pan the aim — and so the view cone — from side to side around where the
+## NPC ended up facing, so it looks around the room instead of re-deciding the instant it arrives.
+func _scan_around(character) -> void:
+	var elapsed: float = search_dwell - _look_timer
+	var offset: float = sin(elapsed * LOOK_SWEEP_RATE) * LOOK_SWEEP_ARC
+	character.aim_point = character.global_position + Vector2.from_angle(_look_base + offset) * 100.0
 
 
 ## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the

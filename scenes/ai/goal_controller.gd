@@ -54,6 +54,9 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var interaction_dwell: float = 3.0
 ## Safety cap (s) on committing to a move or to reaching an object, so a blocked path still re-decides.
 @export var max_commit_time: float = 6.0
+## Seconds the NPC pauses to look around a room on reaching it while searching/exploring, before deciding
+## where to go next. Stops it re-deciding the instant it crosses a room's edge (and bouncing on the boundary).
+@export var search_dwell: float = 2.5
 ## Range (px) of the pistol: shots are taken within it, and distances are banded against it for Von.
 @export var shoot_range: float = 500.0
 ## Range (px) within which a punch lands.
@@ -296,6 +299,7 @@ func _apply_config() -> void:
 	_planner.inside_only = defend_territory
 	_behavior.interaction_dwell = interaction_dwell
 	_behavior.max_commit_time = max_commit_time
+	_behavior.search_dwell = search_dwell
 	_behavior.tactic_interval = tactic_interval
 	_behavior.shoot_range = shoot_range
 	_behavior.punch_range = punch_range

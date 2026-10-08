@@ -166,8 +166,11 @@ func set_faction(faction: StringName) -> void:
 ## the NPC, or any hit within `hit_awareness_radius` of it, counts as being attacked: the incoming
 ## direction (and whether it actually hit) is remembered (`under_fire`), the engagement is refreshed
 ## (`engaged`), and the attacker is handed to the hostility rules. A hit farther off but within
-## `hearing_radius` is gunfire heard (`heard_gunfire`) — an investigation lead. The NPC's own hits are
-## ignored. Returns true when it was a relevant attack, so the controller can kick off a fight.
+## `hearing_radius` is gunfire heard (`heard_gunfire`) — an investigation lead — but ONLY from a shooter
+## the NPC doesn't already know is hostile: gunfire from a character it is fighting (or any other known
+## hostile) is no mystery, already covered by COMBAT or that contact's last-seen lead, so it is not a lead
+## to chase. The NPC's own hits are ignored. Returns true when it was a relevant attack, so the controller
+## can kick off a fight.
 func process_hit(character, data: Dictionary) -> bool:
 	var attacker = data.get("attacker")
 	if attacker == character:
@@ -177,7 +180,9 @@ func process_hit(character, data: Dictionary) -> bool:
 	var from: Vector2 = -(data.get("direction", Vector2.RIGHT) as Vector2)
 	var hit_me: bool = data.get("victim") == character
 	if not hit_me and self_pos.distance_to(pos) > hit_awareness_radius:
-		if self_pos.distance_to(pos) <= hearing_radius:
+		var known_shooter: bool = attacker is Node and is_instance_valid(attacker) \
+			and _hostility.is_hostile(attacker.get_instance_id(), _memory)
+		if self_pos.distance_to(pos) <= hearing_radius and not known_shooter:
 			var cell := "%d,%d" % [floori(pos.x / 200.0), floori(pos.y / 200.0)]
 			_memory.remember(&"heard_gunfire", { "pos": pos, "from": from }, lead_memory_ttl, cell)
 		return false
@@ -997,7 +1002,7 @@ func _search_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Diction
 		options.append({ "id": "room_%s" % room["key"], "label": "the %s" % _room_name(room["type"]),
 			"desc": "the %s — %s — %s route" % [_room_name(room["type"]),
 				"unsearched" if c["stale"] else "searched %s" % _recency(c["age"]), _route_band(c["len"])],
-			"params": { "point": c["point"], "arrive_room": room["key"] }, "tags": { "inside": true } })
+			"params": { "point": c["point"], "look_around": true }, "tags": { "inside": true } })
 	var summary := "%d of %d known rooms unsearched" % [unsearched, known_rooms.size()]
 	if known_rooms.is_empty():
 		summary = "find your way into the house and explore it"
@@ -1025,7 +1030,7 @@ func _explore_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 		var dir := _compass(p["point"] - self_pos)
 		options.append({ "id": "explore_" + dir.replace("-", "_"), "label": "unexplored %s" % dir,
 			"desc": "an unexplored part of the house to the %s — %s route" % [dir, _route_band(_route_len(ctx, p["point"]))],
-			"params": { "point": p["point"], "arrive_room": p["room"]["key"] }, "tags": { "inside": true } })
+			"params": { "point": p["point"], "look_around": true }, "tags": { "inside": true } })
 	return { "summary": "explore the house", "options": options }
 
 

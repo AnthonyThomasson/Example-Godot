@@ -33,7 +33,10 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   with `hostile`/`reason`/`visible`/`age`. `lost_hostiles()` — hostiles last seen longer ago, within
   `lead_memory_ttl` (investigation leads).
 - `process_hit(character, data) -> bool` — a hit on/near the NPC → `under_fire` (direction + whether it
-  hit), `engaged`, hostility; a hit farther off within `hearing_radius` → `heard_gunfire` (a lead).
+  hit), `engaged`, hostility; a hit farther off within `hearing_radius` → `heard_gunfire` (a lead), but
+  ONLY from a shooter not already known hostile — gunfire from a character it is fighting (or any other
+  known hostile) is no mystery (COMBAT / that contact's last-seen lead already covers it), so it is not a
+  lead; only an UNKNOWN shooter is.
 - `process_callout(character, data)` — an ally's radio `&"callout"` within `callout_range` →
   `heard_callout` (keyed per speaker, ttl `callout_ttl`).
 - `check_lead(lead_id)` — the NPC reached an investigation lead: remember it as checked
