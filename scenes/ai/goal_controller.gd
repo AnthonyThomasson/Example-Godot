@@ -83,7 +83,7 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 
 @export_group("Decision")
 ## Decision-tree nodes never offered to this NPC (see scenes/ai/decision/decision_tree.gd), e.g.
-## [&"push"] for one that never rushes. `pursue_hostiles` adds &"idle".
+## [&"advance"] for one that never closes in. `pursue_hostiles` adds &"idle".
 @export var disabled_nodes: Array[StringName] = []
 ## Per-node overrides merged over the tree's defaults: { node_id: { field: value } } — e.g. a different
 ## `question` for &"flank".
@@ -125,6 +125,15 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## An ally within this distance (px) of a target holds the side it stands on, so this NPC is told that
 ## side is taken.
 @export var flank_ally_radius: float = 500.0
+## A route that comes within this distance (px) of a known hostile, nearer than the NPC already is,
+## passes them: such a flank side is never offered, nor is such a firing spot.
+@export var route_clearance: float = 120.0
+## Full width (degrees) of the cone around a hostile's front in which it counts as looking. A firing
+## spot in the open inside that cone, with a clear line from the hostile, is never offered.
+@export var watch_arc: float = 90.0
+## Distances (px) from a target at which firing spots around it are sampled (besides those a step or
+## two from the NPC).
+@export var fire_spot_distances: Array[float] = [200.0, 350.0]
 
 @export_group("Memory")
 ## Hard cap on remembered events (oldest expirable evicted past it); <= 0 = unlimited.
@@ -280,6 +289,9 @@ func _apply_config() -> void:
 	_perception.flank_ally_radius = flank_ally_radius
 	_perception.combat_ring_radius = combat_ring_radius
 	_perception.combat_ring_count = combat_ring_count
+	_perception.route_clearance = route_clearance
+	_perception.watch_arc = watch_arc
+	_perception.fire_spot_distances = fire_spot_distances
 	_perception.callout_range = callout_range
 	_perception.callout_ttl = callout_ttl
 	_perception.apply_config()

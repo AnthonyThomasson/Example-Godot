@@ -91,7 +91,7 @@ Expected: invader fires from outside and resists being drawn in.
 ```
 --invader 'scene().get_node("Invader/GoalController").disabled_nodes = [&"flank"]'
 ```
-Expected: no decision path contains FLANK; the invader engages, pushes or retreats instead. Compare win rate to baseline.
+Expected: no decision path contains FLANK; the invader engages, advances or retreats instead. Compare win rate to baseline.
 
 **5b. Multiple invaders — flank claims over the radio**
 Only run this if `main.gd` exposes `invader_count` via GDScript (check with `python3 tools/gcmd.py 'scene().get_node("Main").invader_count'`). If it does:
@@ -99,6 +99,25 @@ Only run this if `main.gd` exposes `invader_count` via GDScript (check with `pyt
 --invader 'scene().get_node("Main").invader_count = 3'
 ```
 During a round, dump `python3 tools/gcmd.py ai`: an invader's `flanks` state line should name sides "taken by InvaderN" (seen, or "(radio)" from a callout), and those sides must be absent from its FLANK options (`drop_tags`). The invaders' decision paths should name different sides. Repeat with `hear_callouts = false` on every invader and compare how often two pick the same side.
+
+**5c. FLANK never routes past a hostile** (`route_clearance`, default 120 px)
+Default config, 1 round. In `python3 tools/gcmd.py ai`, a side whose route there passes a known hostile reads "route passes <name>" in the `flanks` state line.
+Expected: no FLANK level's options include such a side (`drop_tags: crosses`); when every side passes a hostile, FLANK is absent from the COMBAT level. A rear flank in a fight across one room is usually blocked, because the shortest path runs right past the target. Then loosen the rule and compare how often FLANK is picked:
+```
+--invader 'scene().get_node("Invader/GoalController").route_clearance = 40.0'
+```
+
+**5d. ENGAGE fire spots: wide, but never in a hostile's open view** (`fire_spot_distances`, `watch_arc`)
+Default config, 1 round. At an ENGAGE level the options are where you stand, firing spots named by place and cover ("behind the sofa in the kitchen", "the hallway, north of them"), each with its route band, and an ambush.
+Expected: no option reads "in the open" for a spot inside a visible hostile's facing cone (`watch_arc`, default 90°) with a clear line from it. No spot's route passes a hostile. Spots can lie well beyond the 160 px ring around the NPC. Widen or narrow the sampling:
+```
+--invader 'scene().get_node("Invader/GoalController").fire_spot_distances = [150.0, 300.0, 450.0]'
+--invader 'scene().get_node("Invader/GoalController").watch_arc = 140.0'
+```
+A wider `watch_arc` should leave fewer "in the open" spots.
+
+**5e. ADVANCE and MELEE**
+Default config. Expected: an ADVANCE path (`COMBAT - X - ADVANCE - halfway to them / close to them / rush them`) runs the `move` primitive (aim at the target, fire at will) and re-decides on arrival. MELEE appears at the COMBAT level only while the target is point-blank (within `punch_range` × 1.5), and is then auto-picked to its single `punch` option.
 
 ### 6. Vision and knowledge
 

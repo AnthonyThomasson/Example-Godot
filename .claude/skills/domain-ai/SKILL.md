@@ -42,9 +42,10 @@ the running primitive.
 ## The decision tree
 
 ```
-root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a firing spot / ambush        (engage)
-      │                             ├─ FLANK   → a side of the target           (move)
-      │                             ├─ PUSH    → advance / rush, or MELEE       (move / melee)
+root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
+      │                             ├─ FLANK   → a side, route clear of hostiles (engage)
+      │                             ├─ ADVANCE → halfway / close / rush         (move)
+      │                             ├─ MELEE   → punch, only when point-blank   (melee)
       │                             ├─ RETREAT → a hidden / farther spot        (move)
       │                             └─ LOCATE  → toward an unseen shooter       (move)
       ├─ INVESTIGATE → a lead (last seen, heading, gunfire, ally's call)        (move)

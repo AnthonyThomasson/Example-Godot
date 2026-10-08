@@ -33,9 +33,12 @@ extends RefCounted
 ##   requires  — fact names that must be true ("!" negates); a binding name counts as a true fact.
 ##   confine   — this subtree is combat: a territorial NPC drops options outside the house.
 ##   drop_tags — options carrying any of these tags are never offered (e.g. a flank side an ally
-##               already holds: Von can't weigh "taken by Invader2" — the name matches the state).
+##               already holds: Von can't weigh "taken by Invader2" — the name matches the state; or
+##               one whose route passes a known hostile). A node whose options are all dropped is not
+##               offered at all.
 ##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold). FLANK
-##               and PUSH run `engage` anchored at the chosen spot: get there, then fight from it.
+##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
+##               `move`: it only closes the distance, then the NPC re-decides how to fight.
 ##   params    — default primitive params, merged under each option's own params.
 
 const NODES := {
@@ -54,9 +57,9 @@ const NODES := {
 		"bind_options": &"hostiles",
 		"bind_question": "Which hostile should you fight? Prefer the most dangerous one you can actually hit: close, armed, aiming at you or an ally.",
 		"bind_context": [&"situation", &"odds", &"awareness"],
-		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, push in when they are weak, fleeing or unarmed, or retreat when you are badly hurt, exposed or outnumbered.",
+		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered.",
 		"context": [&"situation", &"current", &"odds", &"exposure", &"contacts", &"allies", &"flanks", &"awareness"],
-		"children": [&"engage", &"flank", &"push", &"retreat", &"locate"],
+		"children": [&"engage", &"flank", &"advance", &"melee", &"retreat", &"locate"],
 	},
 	&"engage": {
 		"label": "ENGAGE",
@@ -74,26 +77,25 @@ const NODES := {
 		"question": "Which side should you flank {target} from? Prefer a free side behind or beside them, with cover and a short, hidden route.",
 		"context": [&"current", &"contacts", &"allies", &"flanks", &"exposure"],
 		"options": [&"flank_sides"],
-		"drop_tags": [&"held"],
+		"drop_tags": [&"held", &"crosses"],
 		"primitive": &"engage",
 		"params": { "style": &"peek_cover" },
 	},
-	&"push": {
-		"label": "PUSH",
+	&"advance": {
+		"label": "ADVANCE",
 		"desc": "{target} looks badly wounded, is unarmed, or is moving away from you ({summary})",
 		"requires": [&"target"],
-		"question": "How should you close in on {target}? Prefer cover close to them and a hidden route; rush or punch only when they are weak, fleeing or unarmed.",
+		"question": "How should you close in on {target}? Prefer cover close to them and a hidden route; rush only when they are weak, fleeing or unarmed.",
 		"context": [&"current", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"advance_positions"],
-		"children": [&"melee"],
-		"primitive": &"engage",
-		"params": { "style": &"peek_cover" },
+		"primitive": &"move",
+		"params": { "aim": &"target", "fire_at_will": true },
 	},
 	&"melee": {
 		"label": "MELEE",
 		"desc": "{target} is point-blank, right next to you ({summary})",
-		"summary": &"melee",
 		"requires": [&"target"],
+		"options": [&"melee"],
 		"primitive": &"melee",
 	},
 	&"retreat": {

@@ -99,6 +99,9 @@ var flank_arc: float = 60.0
 var flank_ally_radius: float = 500.0
 var combat_ring_radius: float = 80.0
 var combat_ring_count: int = 12
+var route_clearance: float = 120.0
+var watch_arc: float = 90.0
+var fire_spot_distances: Array[float] = [200.0, 350.0]
 # Callouts (allies' radio).
 var callout_range: float = 1500.0
 var callout_ttl: float = 6.0
@@ -152,6 +155,9 @@ func apply_config() -> void:
 	_tactics.combat_ring_radius = combat_ring_radius
 	_tactics.combat_ring_count = combat_ring_count
 	_tactics.still_speed = still_speed
+	_tactics.route_clearance = route_clearance
+	_tactics.watch_arc = watch_arc
+	_tactics.fire_spot_distances = fire_spot_distances
 
 
 ## Tell the hostility rules this NPC's own faction (so allies are never hostile). The controller
@@ -412,7 +418,12 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 		"hostiles": hostiles,
 		"allies": allies,
 		"callouts": _callouts(),
+		"fronts": {},
 	}
+	# Each hostile's front (its last-seen facing while recent, else toward this NPC): the frame its
+	# flanks are measured in, and where it is looking when a spot is judged watched.
+	for h in hostiles:
+		ctx["fronts"][h["id"]] = _tactics.front_angle(h, self_pos, h["visible"] or h["age"] <= recency_bands.y)
 	var known_rooms: Array = _known_rooms(rooms)
 
 	# Per known hostile: the combat geometry, the option groups and the sections that follow from it.
@@ -426,7 +437,7 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 			"fire_positions": _fire_group(ctx, t, a),
 			"flank_sides": _flank_group(t, a, rooms),
 			"advance_positions": _advance_group(ctx, t, a),
-			"melee": { "summary": "they are %s and hold a %s" % [_dist_band(self_pos.distance_to(t["pos"])), t.get("item", "nothing")] },
+			"melee": _melee_group(self_pos, t),
 		}
 		per_sections[t["id"]] = {
 			"exposure": _exposure_text(ctx, t, a),
@@ -483,7 +494,7 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 ## and the candidate fire / flank / advance positions.
 func _analyze(ctx: Dictionary, t: Dictionary) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
-	var front: float = _tactics.front_angle(t, self_pos, t["visible"] or t["age"] <= recency_bands.y)
+	var front: float = ctx["fronts"][t["id"]]
 	var ex: Array = ctx["exclude"] + _tactics.body_rid(t)
 	var obj = _tactics.blocker(ctx["space"], self_pos, t["pos"], ex)
 	return {
@@ -623,8 +634,7 @@ func _flanks_text(t: Dictionary, a: Dictionary) -> String:
 		return "Every side of %s is out of reach." % t["name"]
 	var parts: Array = []
 	for s in a["flanks"]:
-		parts.append("%s — %s, %s, %s, %s route" % [SIDE_WORDS[s["side"]],
-			("taken by %s" % s["held_by"]) if s["held_by"] != "" else "free",
+		parts.append("%s — %s, %s, %s, %s route" % [SIDE_WORDS[s["side"]], _side_status(s),
 			"clear shot" if s["clear_shot"] else "line blocked",
 			"cover" if s["cover"] != "" else "in the open",
 			_route_text(s["route_len"], s["route_exposed"])])
@@ -707,18 +717,23 @@ func _hostile_group(ctx: Dictionary, hostiles: Array, analyses: Dictionary) -> D
 	return { "summary": "", "options": options }
 
 
-## Where to fight hostile `t` from: this spot, nearby spots with a clear shot, and an ambush in cover.
+## Where to fight hostile `t` from: this spot, firing spots around them named by place and cover, and an
+## ambush in cover. Tactics has already dropped any spot the NPC would reach past a hostile or in the
+## open under a hostile's eye.
 func _fire_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 	var f: Dictionary = a["fire"]
 	var self_pos: Vector2 = ctx["self_pos"]
+	var tpos: Vector2 = t["pos"]
 	var options: Array = []
 	if not f["here"].is_empty():
-		options.append(_spot_option("fire_here", "where you stand", "fire from where you stand", f["here"], &"peek_cover"))
+		options.append(_spot_option("fire_here", "where you stand", "fire from where you stand" + _room_suffix(self_pos), f["here"], false))
 	for s in f["spots"]:
 		if options.size() >= max_options_per_level - (0 if f["ambush"].is_empty() else 1):
 			break
-		var dir := _compass(s["point"] - self_pos)
-		options.append(_spot_option("fire_" + dir.replace("-", "_"), "a step %s" % dir, "step %s" % dir, s, &"peek_cover"))
+		var dir := _compass(s["point"] - tpos)
+		var place := _spot_place(s, dir)
+		var lead := "fire from %s%s" % [place, (", %s of them" % dir) if s["cover"] != "" else ""]
+		options.append(_spot_option("fire_" + dir.replace("-", "_"), place, lead, s, true))
 	if not f["ambush"].is_empty():
 		var amb: Dictionary = f["ambush"]
 		var cover: String = amb["cover"] if amb["cover"] != "" else "cover"
@@ -731,7 +746,7 @@ func _fire_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 	if not f["here"].is_empty():
 		summary = "from where you stand"
 	elif not f["spots"].is_empty():
-		summary = "one step away"
+		summary = "from %s" % _spot_place(f["spots"][0], _compass(f["spots"][0]["point"] - tpos))
 	elif not f["ambush"].is_empty():
 		summary = "once they show, from an ambush behind cover"
 	if summary != "" and t.get("wound", "") != "":
@@ -739,15 +754,27 @@ func _fire_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 	return { "summary": summary, "options": options }
 
 
-## One fighting-spot option: its clear shot, cover, other exposure and place.
-func _spot_option(id: String, label: String, lead: String, s: Dictionary, style: StringName) -> Dictionary:
-	var parts: Array = [lead + _room_suffix(s["point"])]
+## One fighting-spot option: its place (`lead`), clear shot, cover, the route there (`moving`: a spot to
+## go to rather than where the NPC stands) and other exposure.
+func _spot_option(id: String, label: String, lead: String, s: Dictionary, moving: bool) -> Dictionary:
+	var parts: Array = [lead]
 	parts.append("clear shot" if s["clear_shot"] else "line blocked")
 	parts.append(("cover close by (the %s)" % s["cover"]) if s["cover"] != "" else "in the open")
+	if moving:
+		parts.append(_route_text(s["route_len"], s["route_exposed"]) + " route")
 	if not s["exposed_to"].is_empty():
 		parts.append("also exposed to %s" % ", ".join(s["exposed_to"]))
 	return { "id": id, "label": label, "desc": " — ".join(parts),
-		"params": { "point": s["point"], "style": style }, "tags": { "inside": _is_inside(s["point"]) } }
+		"params": { "point": s["point"], "style": &"peek_cover" }, "tags": { "inside": _is_inside(s["point"]) } }
+
+
+## A firing spot named by its place, `dir` being its bearing from the target: "behind the sofa in the
+## kitchen" with cover close by, else "the kitchen, north of them" / "outside, north of them".
+func _spot_place(s: Dictionary, dir: String) -> String:
+	var room := _room_at(s["point"], _rooms_cache)
+	if s["cover"] != "":
+		return "behind the %s %s" % [s["cover"], ("in the %s" % _room_name(room["type"])) if not room.is_empty() else "outside"]
+	return "%s, %s of them" % [("the %s" % _room_name(room["type"])) if not room.is_empty() else "outside", dir]
 
 
 ## Which side to flank hostile `t` from: one option per reachable side other than the NPC's own.
@@ -760,7 +787,7 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 		var place: String = ("in the %s" % _room_name(room["type"])) if not room.is_empty() else "outside the house"
 		var parts: Array = [
 			"%s — %s of them, %s" % [SIDE_WORDS[s["side"]], _compass(s["point"] - tpos), place],
-			("taken by %s" % s["held_by"]) if s["held_by"] != "" else "free",
+			_side_status(s),
 			"clear shot from there" if s["clear_shot"] else "line blocked from there",
 			("cover close by (the %s)" % s["cover"]) if s["cover"] != "" else "in the open",
 			_route_text(s["route_len"], s["route_exposed"]) + " route",
@@ -776,9 +803,9 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 			"label": "%s (%s)" % [SIDE_WORDS[s["side"]], _room_name(room["type"]) if not room.is_empty() else "outside"],
 			"desc": " — ".join(parts),
 			"params": { "point": s["point"] },
-			"tags": { "inside": not room.is_empty(), "held": s["held_by"] != "" },
+			"tags": { "inside": not room.is_empty(), "held": s["held_by"] != "", "crosses": s["crosses"] != "" },
 		})
-		if s["held_by"] == "":
+		if s["held_by"] == "" and s["crosses"] == "":
 			open.append(s)
 	var inside_open: Array = open.filter(func(s): return not _room_at(s["point"], rooms).is_empty())
 	var shot_here: bool = a["line"]["clear"] and a["line"]["in_range"]
@@ -807,9 +834,28 @@ func _flank_summary(t: Dictionary, flanks: Array, open: Array, rooms: Array, sho
 	return text
 
 
+## A flank side's status: "route passes X" when getting there walks past a known hostile, "taken by X"
+## when an ally holds it, else "free".
+func _side_status(s: Dictionary) -> String:
+	if s["crosses"] != "":
+		return "route passes %s" % s["crosses"]
+	return ("taken by %s" % s["held_by"]) if s["held_by"] != "" else "free"
+
+
 ## How good an open flank looks at a glance (for the summary's "best" only — Von makes the pick).
 func _flank_rank(s: Dictionary) -> int:
 	return int(s["clear_shot"]) * 4 + int(s["cover"] != "") * 2 + int(not s["route_exposed"]) + int(s["route_len"] <= route_buckets.x)
+
+
+## Punching hostile `t`: one option, offered only while they are point-blank (`_dist_band`'s band), so
+## MELEE is never chosen from across a room.
+func _melee_group(self_pos: Vector2, t: Dictionary) -> Dictionary:
+	var dist := self_pos.distance_to(t["pos"])
+	var summary := "they are %s and hold a %s" % [_dist_band(dist), t.get("item", "nothing")]
+	var options: Array = []
+	if dist <= punch_range * 1.5:
+		options.append({ "id": "punch", "label": "punch them", "desc": "punch them — " + summary })
+	return { "summary": summary, "options": options }
 
 
 ## How to close in on hostile `t`: part-way along the route (with cover if any) or a straight rush.

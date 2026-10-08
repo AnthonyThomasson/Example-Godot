@@ -5,8 +5,10 @@ extends RefCounted
 ## navigation map (Navigation interface 9): where it could flank a target from, which spots give a
 ## clear shot or cover, how to close in, where to fall back to — each candidate annotated with the
 ## facts a tactical choice turns on (clear shot, cover, route length and exposure, which ally already
-## holds a side, which other hostile would see it). It returns DATA only; the perception turns that
-## into the words Von reads. It holds no policy and never decides.
+## holds a side, which other hostile would see it, which hostile the route passes). It returns DATA
+## only; the perception turns that into the words Von reads. It holds no policy and never decides.
+## Firing spots are the one candidate set it screens: a spot whose route passes a known hostile, or
+## where a hostile would catch the NPC in the open, is not a place to fight from at all.
 ##
 ## A target's FLANKS are measured in its own frame: its front is where it was last seen facing (when
 ## recent), else the side facing this NPC. Left/right are the target's own left/right.
@@ -27,6 +29,9 @@ var shoot_range: float = 500.0       ## Pistol range (px): a spot beyond it give
 var combat_ring_radius: float = 80.0 ## Radius (px) of the ring of nearby candidate fighting spots.
 var combat_ring_count: int = 12      ## Points sampled on that ring.
 var still_speed: float = 20.0        ## Speed (px/s) under which a contact counts as standing still.
+var route_clearance: float = 120.0   ## A route coming this close (px) to a known hostile passes it.
+var watch_arc: float = 90.0          ## Full cone (degrees) around a hostile's front in which it is looking.
+var fire_spot_distances: Array[float] = [200.0, 350.0] ## Distances (px) from a target at which firing spots are sampled.
 
 
 # --- Ray + nav primitives --------------------------------------------------------------------
@@ -49,14 +54,17 @@ func is_cover(obj: Object) -> bool:
 	return float(obj.get_surface().get("coverage", 0.0)) >= cover_min
 
 
-## A readable name for a blocking object ("fridge", "wall").
+## A readable name for a blocking object: a furniture piece's own name ("fridge"), a character's name,
+## else "wall" — walls are named after their room, which would read as a place ("behind the kitchen").
 func object_label(obj: Object) -> String:
 	if obj == null:
 		return ""
 	var named = obj.get("object_name")
 	if named is String and named != "":
 		return named.to_lower()
-	return "wall" if str(obj.get("name")).to_lower().begins_with("wall") else str(obj.get("name")).to_lower()
+	if obj.has_method("current_item"):
+		return str(obj.get("name")).to_lower()
+	return "wall"
 
 
 ## `p` snapped onto the navmesh (unchanged while the map isn't ready).
@@ -192,10 +200,57 @@ func ally_lane(p: Vector2, target_pos: Vector2, allies: Array) -> String:
 	return ""
 
 
+# --- Route safety ----------------------------------------------------------------------------
+
+## The first known hostile a route passes, or "": its last-known position lies within `route_clearance`
+## of the route AND nearer than the route's start already is, so walking away from someone close by is
+## not passing them.
+func route_crosses(path: PackedVector2Array, hostiles: Array) -> String:
+	if path.size() < 2:
+		return ""
+	for h in hostiles:
+		var hpos: Vector2 = h["pos"]
+		var closest := INF
+		for i in range(1, path.size()):
+			closest = minf(closest, Geometry2D.get_closest_point_to_segment(hpos, path[i - 1], path[i]).distance_to(hpos))
+		if closest < route_clearance and closest < path[0].distance_to(hpos) - 1.0:
+			return h["name"]
+	return ""
+
+
+## The known hostile that would catch the NPC in the open, or "": one looking toward `p` (within
+## `watch_arc` of its front, from `ctx.fronts`) with a clear line to it in reach and no cover within a
+## step of `p` against it. With a `path`, also one looking along the route there while the NPC is now
+## hidden or covered from it, when most of that route is open to it — stepping out of cover under its eye.
+func watched_in_open(ctx: Dictionary, p: Vector2, path: PackedVector2Array = PackedVector2Array()) -> String:
+	var self_pos: Vector2 = ctx["self_pos"]
+	var half := deg_to_rad(watch_arc) * 0.5
+	var fronts: Dictionary = ctx.get("fronts", {})
+	for h in ctx["hostiles"]:
+		var hpos: Vector2 = h["pos"]
+		# Unknown facing counts as facing this NPC, the safe assumption.
+		var front: float = fronts.get(h["id"], (self_pos - hpos).angle())
+		var ex: Array = ctx["exclude"] + body_rid(h)
+		if _looking_at(hpos, front, p, half) and hpos.distance_to(p) <= shoot_range * 1.5 \
+				and not blocked(ctx["space"], hpos, p, ex) and cover_near(ctx["space"], p, hpos, ex) == "":
+			return h["name"]
+		if path.size() >= 2 and _looking_at(hpos, front, _along(path, path_length(path) * 0.5), half):
+			var covered := blocked(ctx["space"], hpos, self_pos, ex) or cover_near(ctx["space"], self_pos, hpos, ex) != ""
+			if covered and route_exposed(ctx["space"], path, hpos, ex):
+				return h["name"]
+	return ""
+
+
+## Whether a hostile at `hpos` facing `front` is looking toward `p` (within `half` radians).
+func _looking_at(hpos: Vector2, front: float, p: Vector2, half: float) -> bool:
+	return absf(angle_difference(front, (p - hpos).angle())) <= half
+
+
 # --- Candidate positions ---------------------------------------------------------------------
 
 ## The flanking spots around `target` (one per side, excluding the side this NPC is already on), each
-## annotated. `ctx` = { space, map, self_pos, exclude, hostiles, allies, callouts }.
+## annotated — `crosses` names a known hostile the route there passes. `ctx` = { space, map, self_pos,
+## exclude, hostiles, allies, callouts, fronts }.
 func flank_sides(ctx: Dictionary, target: Dictionary, front: float) -> Array:
 	var tpos: Vector2 = target["pos"]
 	var ex: Array = ctx["exclude"] + body_rid(target)
@@ -216,6 +271,7 @@ func flank_sides(ctx: Dictionary, target: Dictionary, front: float) -> Array:
 			"cover": cover_near(ctx["space"], p, tpos, ex),
 			"route_len": path_length(path),
 			"route_exposed": route_exposed(ctx["space"], path, tpos, ex),
+			"crosses": route_crosses(path, ctx["hostiles"]),
 			"held_by": side_holder(target, front, side, ctx["allies"], ctx["callouts"]),
 			"exposed_to": exposed_to(ctx["space"], p, ctx["hostiles"], target["id"], ctx["exclude"]),
 			"heading_toward": vel.length() >= still_speed and absf(vel.angle_to(p - tpos)) < PI / 3.0,
@@ -242,9 +298,11 @@ func _flank_point(ctx: Dictionary, tpos: Vector2, front: float, side: String, ex
 	return fallback
 
 
-## Where to fight `target` from: `here` (this spot, when it has a clear shot in range), nearby `spots`
-## with a clear shot (two rings, one per compass sector), and an `ambush` spot in cover. Each spot is
-## annotated with cover and exposure to other hostiles.
+## Where to fight `target` from: `here` (this spot, when it has a clear shot in range), firing `spots`
+## spread around the target, and an `ambush` spot in cover. Spot candidates come from rings around the
+## NPC (`combat_ring_radius`, ×2) and around the target (each of `fire_spot_distances`); each must have a
+## clear shot in range and pass `_safe_spot`, and the best is kept per 8-way sector around the target
+## (cover close by first, then the shortest step). `here` is never screened: staying put is not a move.
 func fire_positions(ctx: Dictionary, target: Dictionary) -> Dictionary:
 	var tpos: Vector2 = target["pos"]
 	var self_pos: Vector2 = ctx["self_pos"]
@@ -252,28 +310,66 @@ func fire_positions(ctx: Dictionary, target: Dictionary) -> Dictionary:
 	var out := { "here": {}, "spots": [], "ambush": {} }
 	if self_pos.distance_to(tpos) <= shoot_range and not blocked(ctx["space"], self_pos, tpos, ex):
 		out["here"] = _annotate(ctx, target, self_pos, ex)
-	var by_sector := {}
-	var ambush = null
+	var candidates: Array = []
+	var cover_spots: Array = []
 	for radius in [combat_ring_radius, combat_ring_radius * 2.0]:
 		var ring := combat_spots(ctx["space"], self_pos, tpos, ex, radius, combat_ring_count)
-		for p in ring["fire"]:
-			var sector := posmod(int(round((p - self_pos).angle() / (TAU / 8.0))), 8)
-			if not by_sector.has(sector) and p.distance_to(tpos) <= shoot_range:
-				by_sector[sector] = _annotate(ctx, target, p, ex)
-		if ambush == null and not ring["cover"].is_empty():
-			ambush = ring["cover"][0]
-	var spots: Array = by_sector.values()
-	# Spots with cover close by first, then the shortest step.
+		candidates.append_array(ring["fire"])
+		cover_spots.append_array(ring["cover"])
+	for dist in fire_spot_distances:
+		for i in combat_ring_count:
+			var raw: Vector2 = tpos + Vector2.RIGHT.rotated(TAU * i / combat_ring_count) * dist
+			var p := snap(ctx["map"], raw)
+			if p.distance_to(raw) <= SNAP_TOLERANCE and not blocked(ctx["space"], p, tpos, ex):
+				candidates.append(p)
+	# Cheap facts first (range, sector, cover); the route checks run only until a sector has its spot.
+	var sectors := {}
+	for p in candidates:
+		if p.distance_to(tpos) > shoot_range or p.distance_to(self_pos) < combat_ring_radius * 0.5:
+			continue
+		var sector := posmod(int(round((p - tpos).angle() / (TAU / 8.0))), 8)
+		if not sectors.has(sector):
+			sectors[sector] = []
+		sectors[sector].append({ "point": p, "cover": cover_near(ctx["space"], p, tpos, ex) })
+	var spots: Array = []
+	for sector in sectors:
+		var group: Array = sectors[sector]
+		group.sort_custom(func(a, b):
+			if (a["cover"] != "") != (b["cover"] != ""):
+				return a["cover"] != ""
+			return (a["point"] as Vector2).distance_squared_to(self_pos) < (b["point"] as Vector2).distance_squared_to(self_pos))
+		for c in group:
+			var spot = _safe_spot(ctx, target, c["point"], ex)
+			if spot != null:
+				spots.append(spot)
+				break
+	# Cover close by first, then a hidden route, then the shortest.
 	spots.sort_custom(func(a, b):
 		if (a["cover"] != "") != (b["cover"] != ""):
 			return a["cover"] != ""
-		return a["dist"] < b["dist"])
+		if a["route_exposed"] != b["route_exposed"]:
+			return not a["route_exposed"]
+		return a["route_len"] < b["route_len"])
 	out["spots"] = spots
-	if ambush != null:
-		var a := _annotate(ctx, target, ambush, ex)
-		a["cover"] = object_label(blocker(ctx["space"], ambush, tpos, ex))
-		out["ambush"] = a
+	for p in cover_spots:
+		var amb = _safe_spot(ctx, target, p, ex)
+		if amb != null:
+			amb["cover"] = object_label(blocker(ctx["space"], p, tpos, ex))
+			out["ambush"] = amb
+			break
 	return out
+
+
+## `p` annotated as a place to fight `target` from (with its route's exposure to the target), or null
+## when the route there passes a known hostile or a hostile would catch the NPC in the open on the way
+## or once there.
+func _safe_spot(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array):
+	var path := route(ctx["map"], ctx["self_pos"], p)
+	if route_crosses(path, ctx["hostiles"]) != "" or watched_in_open(ctx, p, path) != "":
+		return null
+	var a := _annotate(ctx, target, p, ex, path)
+	a["route_exposed"] = route_exposed(ctx["space"], path, target["pos"], ex)
+	return a
 
 
 ## Ways to close in on `target`: points part-way along the route to it (with any cover there) and its
@@ -343,10 +439,12 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	return out
 
 
-## The facts about standing at `p` to fight `target`: clear shot, cover, step length, exposure.
-func _annotate(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array) -> Dictionary:
+## The facts about standing at `p` to fight `target`: clear shot, cover, step length, exposure. `path`
+## is the route there when the caller already has it.
+func _annotate(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array, path := PackedVector2Array()) -> Dictionary:
 	var tpos: Vector2 = target["pos"]
-	var path := route(ctx["map"], ctx["self_pos"], p)
+	if path.is_empty():
+		path = route(ctx["map"], ctx["self_pos"], p)
 	return {
 		"point": p,
 		"clear_shot": not blocked(ctx["space"], p, tpos, ex),

@@ -61,8 +61,12 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile.
 - **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
   `threat` (summary only), `hostiles` (bind: one per hostile, only DISTINGUISHING facts), per target
-  `fire_positions` (here / a step away / ambush), `flank_sides` (tagged `held` when an ally — seen or
-  radioed — holds it), `advance_positions`, `melee`; globally `retreat_positions`, `shooter`, `leads`
+  `fire_positions` (where you stand, firing spots around the target named by place and cover — "behind
+  the sofa in the kitchen", "the hallway, north of them" — with their route, and an ambush),
+  `flank_sides` (tagged `held` when an ally — seen or radioed — holds it, `crosses` when the route
+  there passes a known hostile; described as "route passes X"), `advance_positions` (halfway / close /
+  rush), `melee` (one `punch` option, only while the target is point-blank); globally
+  `retreat_positions`, `shooter`, `leads`
   (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `search_rooms`
   (+ front entrance / approach the house while outside), `explore` (unknown rooms by direction only),
   `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
@@ -118,9 +122,23 @@ Pure queries over known contacts, the physics space (via the vision rays) and th
 last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,
 sampled across `flank_arc`, snapped to the navmesh, preferring a clear shot. Each spot is annotated
 with clear shot, cover within a step (`cover_min`), route length + exposure (share of route samples
-the target can see), `held_by` (ally within `flank_ally_radius` on that side, or a callout point
-there), `exposed_to` (other hostiles), `heading_toward` and `ally_lane`. Fire spots come from two
-rings (`combat_ring_radius`, ×2) deduped per sector; advance spots along the route; retreat spots
-from known rooms, nearby cover and allies, kept only if hidden from every threat or farther away
-(rays toward a threat exclude hostile bodies). A character is never cover.
+the target can see), `crosses` (a known hostile the route passes), `held_by` (ally within
+`flank_ally_radius` on that side, or a callout point there), `exposed_to` (other hostiles),
+`heading_toward` and `ally_lane`. Hostile fronts (`ctx.fronts`, built once per `sense()`) serve both
+the flank frames and the watch test below.
+
+Route safety: `route_crosses(path, hostiles)` names a hostile whose last-known position lies within
+`route_clearance` of the route AND nearer than the route's start (walking away from someone close by
+is not passing them). `watched_in_open(ctx, p, path)` names a hostile that would catch the NPC in the
+open: looking toward `p` (within `watch_arc` of its front; an unknown facing counts as facing the NPC)
+with a clear line and no cover within a step of `p`, or — while the NPC is now hidden or covered from it
+— looking along a mostly exposed route there.
+
+Fire spots are sampled on rings around the NPC (`combat_ring_radius`, ×2) and around the target (each of
+`fire_spot_distances`); a spot needs a clear shot in range and must pass both route-safety tests, and
+the best per 8-way sector around the target is kept (cover close by, then the shortest step). `here`
+is never screened; the ambush spot passes the same tests. Advance spots lie along the route; retreat
+spots come from known rooms, nearby cover and allies, kept only if hidden from every threat or farther
+away (rays toward a threat exclude hostile bodies). A character is never cover; a blocking object is
+named by its `object_name`, a character by its name, anything else as "wall".
 `combat_spots` (ring around the NPC: fire vs cover) also serves the behaviour's peek-and-cover.

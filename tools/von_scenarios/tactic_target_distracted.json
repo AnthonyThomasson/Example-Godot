@@ -1,17 +1,17 @@
 {
   "name": "tactic: unhurt, target aiming at an ally -> not RETREAT",
   "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the hallway, inside the house, holding a Pistol. You are unhurt.\nKnown hostiles: 1 (1 in sight). Allies near you: Invader2.\nYou have a clear shot at Defender from where you stand. You are exposed to their fire.\nDefender — HOSTILE (seen) — in sight — close, in pistol range, north of you, in the kitchen — standing still — aiming at Invader2 — holding a Pistol.\nInvader2 (ally) — in sight — east of you, in the dining room — on Defender's right side — standing still.\nDecided so far: COMBAT → Defender.",
-  "question": "How should you fight Defender? Shoot from where you have a clear line, flank to an open side, push in when they are weak, fleeing or unarmed, or retreat when you are badly hurt, exposed or outnumbered.",
+  "question": "How should you fight Defender? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered.",
   "options": {
     "engage": "You have a clear shot at Defender, and you are not badly wounded (from where you stand)",
     "flank": "Your line to Defender is blocked, or they are aiming at someone else (1 free side; best: their left side via the kitchen, short hidden route, cover)",
-    "push": "Defender looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, standing still, holding a Pistol)",
+    "advance": "Defender looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, standing still, holding a Pistol)",
     "retreat": "You are badly wounded and being hit (best: the bedroom, out of their sight; you are unhurt)"
   },
   "expect": [
     "engage",
     "flank",
-    "push"
+    "advance"
   ],
   "ablate": [
     " — aiming at Invader2"

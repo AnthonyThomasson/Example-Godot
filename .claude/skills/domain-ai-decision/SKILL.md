@@ -21,8 +21,9 @@ Files:
 
 ```
 root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
-      │                                         ├─ flank   [flank_sides, drop `held`]  → engage (anchored at the side)
-      │                                         ├─ push    [advance_positions] + melee → engage / melee
+      │                                         ├─ flank   [flank_sides, drop `held`, `crosses`] → engage (anchored at the side)
+      │                                         ├─ advance [advance_positions]         → move{aim target, fire_at_will}
+      │                                         ├─ melee   [melee: point-blank only]   → melee
       │                                         ├─ retreat [retreat_positions]         → move{aim threat, fire_at_will}
       │                                         └─ locate  [shooter]                   → move{aim point, fire_at_will}
       ├─ investigate [leads]               → move{aim travel, fire_at_will}
@@ -38,16 +39,17 @@ summary fills `{summary}`; `summary_inside` within a confined subtree), `bind` +
 `bind_question` + `bind_context` (pick and bind one option first, e.g. which hostile — with a leaner
 state, since the options carry each candidate's details), `requires` (fact names, `!` negates; a bound
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
-`drop_tags` (options carrying these tags are never offered — a flank side an ally holds), `primitive`,
-`params` (defaults merged under each option's own params). A node may mix `children` and `options`
-(PUSH offers advance spots and the MELEE node). Adding a mode or tactic = adding a node (+ a
-perception option group if it needs new places).
+`drop_tags` (options carrying these tags are never offered — a flank side an ally holds, or one whose
+route passes a known hostile), `primitive`, `params` (defaults merged under each option's own params).
+A node may mix `children` and `options`. A node whose option groups end up empty (every flank side
+dropped; MELEE while the target isn't point-blank) has no leaf, so it isn't offered at all. Adding a
+mode or tactic = adding a node (+ a perception option group if it needs new places).
 
 **How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
 state (`criteria` in its API are classification criteria). A branch's desc therefore states the
 SITUATION in which it is right, in the phrases perception writes into the state, plus specifics in
 parentheses: ENGAGE "You have a clear shot at {target}, and you are not badly wounded ({summary})",
-RETREAT "You are badly wounded and being hit ({summary})", PUSH "{target} looks badly wounded, is
+RETREAT "You are badly wounded and being hit ({summary})", ADVANCE "{target} looks badly wounded, is
 unarmed, or is moving away from you ({summary})". No action labels (they pull toward the goal's
 verbs), no negated attributes, no option repeating a dominated choice (drop it instead). These
 phrasings were chosen by measurement with `tools/von_probe.py` — re-run it after rewording.
