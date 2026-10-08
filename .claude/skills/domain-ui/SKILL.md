@@ -6,8 +6,9 @@ description: Deep implementation detail for the UI domain (scenes/ui/) — debug
 # UI domain (`scenes/ui/`)
 
 Four `CanvasLayer` nodes, all built entirely in code (no scene-side layout), all decoupled observers
-that read only published contracts — Character public API/signals, the AI controller's `current_act()`
-and `goal`, and the EventBus `&"hit"` topic. They know nothing of the domains.
+that read only published contracts — Character public API/signals, the AI controller's
+`debug_status()` / `current_act()` and `goal`, and the EventBus `&"hit"` topic. They know nothing of
+the domains.
 
 ## Files
 
@@ -18,7 +19,8 @@ and `goal`, and the EventBus `&"hit"` topic. They know nothing of the domains.
 
 - `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants)` wires it to
   any number of NPCs; each combatant gets a compact floating panel (300×145 px, 28pt font) — name,
-  faction, health bar, current act — whose bottom-centre is placed 24 px above the NPC's on-screen origin each
+  faction, health bar, current act (the controller's `debug_status()` — the full decision path,
+  word-wrapped) — whose bottom-centre is placed 24 px above the NPC's on-screen origin each
   frame via `get_global_transform_with_canvas()` (clamped inside the viewport). Also: a top-centre
   running timer (34pt), a top-left goal readout listing every NPC's name and goal (28pt), a centre
   winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus

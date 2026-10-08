@@ -1,46 +1,95 @@
 ---
 name: domain-ai-decision
-description: Deep implementation detail for the AI DECISION sub-domain (scenes/ai/decision/) — the external-model boundary. The round-trip to the local Von "System One" server: the act-centric protocol (two `choice` questions in one request — WHAT to do, and, only if holding, WHERE), argmax/top-pick selection, the decided/failed signals, and the dev-only server launcher. Use when editing scenes/ai/decision/ or working on the Von request/response, the choice questions, how a pick is chosen, the server-down fallback, or auto-starting/reusing the Von server. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI DECISION sub-domain (scenes/ai/decision/) — the decision tree (broad mode → tactic → option → primitive) as GDScript data, the planner that walks it with Von one `choice` request per level (entry rules, gating, territorial filter, auto-picked single options, continuity cue, per-level state), the single-question Von transport with argmax/top-pick, and the dev-only server launcher. Use when editing scenes/ai/decision/ or working on the decision tree, adding a mode/tactic, entry rules (under fire → combat), what Von is asked at each level, how a pick is chosen, the server-down fallback, or auto-starting/reusing the Von server. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Decision sub-domain (`scenes/ai/decision/`)
 
-The THINK half: the only place the AI talks to the outside model. Von is a stateless single-shot
-ranker, so this sub-domain holds no reasoning — it formats the request, POSTs it, and reports the top
-pick. The decision context it sends is BUILT by the perception sub-domain; the chosen ids are
-INTERPRETED by the behaviour sub-domain. This folder is purely the round-trip + the dev server.
+The THINK half: the decision POLICY as data, and the only place the AI talks to the outside model. Von
+is a stateless single-shot ranker that scores every question independently (one encoder pass each, no
+conditioning between questions in a request), so a drill-down is **sequential requests, one per
+level**, each conditioned on the path chosen so far. The knowledge a walk decides over is BUILT by the
+perception sub-domain (the snapshot); the chosen leaf is RUN by the behaviour sub-domain.
 
 Files:
-- `decision_client.gd` — the Von HTTP client (a `Node` owning its `HTTPRequest`).
+- `decision_tree.gd` — the tree, `const NODES` (data only).
+- `decision_planner.gd` — the walk (a `Node`): gating, entry rules, per-level state, Von calls.
+- `decision_client.gd` — the Von HTTP transport (a `Node` owning its `HTTPRequest`).
 - `decision_server_launcher.gd` — dev-only `von serve` launcher (a node in `main.tscn`).
 
-## `decision_client.gd`
+## `decision_tree.gd` — the tree as data
 
-Configured once by the controller: `configure(server_url, model, timeout)`.
+```
+root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
+      │                                         ├─ flank   [flank_sides, drop `held`]  → engage (anchored at the side)
+      │                                         ├─ push    [advance_positions] + melee → engage / melee
+      │                                         ├─ retreat [retreat_positions]         → move{aim threat, fire_at_will}
+      │                                         └─ locate  [shooter]                   → move{aim point, fire_at_will}
+      ├─ investigate [leads]               → move{aim travel, fire_at_will}
+      ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
+      └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
+```
 
-- `request(ctx, npc_name) -> bool` — POST the perception context `{ state_text, acts, moves }` as two
-  `choice` questions in one request to `/v1/systemone`:
-  - `act` — "What should you do right now?" over the act menu (the real choice).
-  - `move` — "If you are just holding, which place should you go to?" over the move menu; the
-    behaviour consults the move pick **only** when the chosen act is `hold`.
-  It keeps the menus only to validate the pick, and returns whether the request started.
-- `is_pending() -> bool` — true while a request is in flight (the controller issues no new decision
-  until it completes).
-- `signal decided(act_id, move_id)` — emitted with Von's TOP pick for each question. The pick is the
-  argmax `choice` when that id is one of this tick's offered options, else the highest-probability
-  offered id (ids not offered this tick are ignored, so a stale/foreign id can never be chosen).
-  Von's distributions are flat (low confidence), so taking the top pick — not sampling — keeps the NPC
-  decisive and goal-coherent instead of jittering.
-- `signal failed()` — emitted when a request can't start, the transport fails, the server answers
-  non-200, or the response is malformed. The controller wires this to the behaviour's steady-stance
-  `fallback()`. **A transport failure and an HTTP error answer are reported as different faults**: a
-  4xx/5xx prints the server's own `{"detail": …}` ("server refused the decision: HTTP 422 — Failed to
-  load … weights"), never "unreachable" — mislabelling a configuration fault as a connection problem
-  sends you hunting the wrong thing. An identical failure is logged only ONCE per client (every NPC
-  re-asks about once a second, so a persistent fault would otherwise bury the log); a success clears
-  that, so a relapse is reported again. The adopted decision log line
-  (`<NPC> (Von) act=… move=… intent=…`) is printed by the controller, which shows
-  `act=<von's pick>→<final> [why]` whenever a policy override rewrote the choice.
+Node fields: `label` (path tag), `desc`, `question` (what Von answers when choosing AMONG its
+children/options — it names the trade-off), `context` (which perception sections Von sees at that
+level; the goal is always shown), `children` (static node ids), `options` (perception option-group
+names → leaves; looked up under the bound target first, then globally), `summary` (group whose
+summary fills `{summary}`; `summary_inside` within a confined subtree), `bind` + `bind_options` +
+`bind_question` + `bind_context` (pick and bind one option first, e.g. which hostile — with a leaner
+state, since the options carry each candidate's details), `requires` (fact names, `!` negates; a bound
+name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
+`drop_tags` (options carrying these tags are never offered — a flank side an ally holds), `primitive`,
+`params` (defaults merged under each option's own params). A node may mix `children` and `options`
+(PUSH offers advance spots and the MELEE node). Adding a mode or tactic = adding a node (+ a
+perception option group if it needs new places).
+
+**How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
+state (`criteria` in its API are classification criteria). A branch's desc therefore states the
+SITUATION in which it is right, in the phrases perception writes into the state, plus specifics in
+parentheses: ENGAGE "You have a clear shot at {target}, and you are not badly wounded ({summary})",
+RETREAT "You are badly wounded and being hit ({summary})", PUSH "{target} looks badly wounded, is
+unarmed, or is moving away from you ({summary})". No action labels (they pull toward the goal's
+verbs), no negated attributes, no option repeating a dominated choice (drop it instead). These
+phrasings were chosen by measurement with `tools/von_probe.py` — re-run it after rewording.
+
+## `decision_planner.gd` — the walk
+
+Config (pushed in from the controller): `disabled_nodes`, `node_overrides` (per-node field merge),
+`entry_rules` (ordered fact → start node), `skip_single_option`, `inside_only` (territory). The
+controller maps `pursue_hostiles` → `idle` disabled + `hostile_known → combat`; `defend_territory` →
+`inside_only`. All but `node_overrides` are re-pushed each decision, so retuning them at runtime takes
+effect; `node_overrides` is baked into the tree at `setup()` and is construction-time only.
+
+- `begin(snapshot, continuing)` — starts a walk (abandoning any in flight) at the first entry rule
+  whose fact holds and whose node has a leaf, else `root`. Per level: list what's on offer (bind
+  options, or gated children whose subtree still holds a leaf, plus the node's option groups through
+  the territorial + `drop_tags` filters); when `continuing` (the behaviour's last choice is still in
+  progress) mark the option continuing it "(your current plan)" — never a finished one, or Von
+  re-picks a completed tactic (a flank it already reached); take a lone option without asking; else
+  `client.ask(state, question, criteria)` where state = the goal + the node's `context` sections (the
+  bound target's own version first) + "Decided so far: COMBAT → Intruder → FLANK.". A bind level with
+  nothing to bind (under fire, shooter unseen) falls through to the node's unbound children (RETREAT
+  / LOCATE). An empty entry node falls back to `root`; an empty root fails.
+- `signal decided(leaf)` — `{ path (ids), labels, primitive, params (node params ⊕ option params +
+  target_id + confine_inside), desc, entry }`. `signal failed()` — transport failure or nothing to
+  choose; the controller wires it to the behaviour's `fallback()`.
+- `entry_for(facts)` / `current_entry()` — the cheap check the controller uses to interrupt a walk
+  in flight when the situation now calls for a different start (e.g. came under fire mid-search).
+- `cancel()`, `is_pending()`, `debug_state()` (per level: node, question, state, offered, Von's
+  probabilities and pick, `auto`, `ms` — enough to replay offline), `walk_digest()` for the log line.
+
+## `decision_client.gd` — the transport
+
+`configure(url, model, timeout)`; `ask(state_text, instructions, options) -> bool` POSTs ONE `choice`
+question (`pick`) to `/v1/systemone`; `cancel()`; `is_pending()`.
+- `signal answered(pick, probabilities)` — Von's top pick: the argmax `choice` when it is one of the
+  offered ids, else the highest-probability offered id (a stale/foreign id can never be chosen). Von's
+  distributions are flat, so taking the top pick — not sampling — keeps the NPC decisive.
+- `signal failed()` — request couldn't start, transport failure, non-200, malformed or no offered id.
+  **A transport failure and an HTTP error answer are reported as different faults**: a 4xx/5xx prints
+  the server's own `{"detail": …}`, never "unreachable". An identical failure is logged only ONCE per
+  client; a success clears that. The adopted decision log line (`<NPC> (Von) COMBAT - Intruder -
+  FLANK - their left side (kitchen)  [combat auto, combat 112ms, flank 96ms]`) is the controller's.
 
 ## `decision_server_launcher.gd`
 
@@ -80,3 +129,9 @@ Note: `mcp__godot__stop_project` hard-kills Godot, so `_exit_tree` doesn't run a
 spawned is orphaned on port 8000 — `pkill -f "von serve"` clears it, and you should always do so. An
 orphaned server's stdout pipe is dead, so it can never load weights again (`EPIPE` kills the fetch)
 while still answering HTTP; the readiness probe above is what stops it being mistaken for a live one.
+
+## Checking Von's decisions offline
+
+`tools/von_probe.py` replays scenario levels (`tools/von_scenarios/*.json`: state, question, options,
+expected pick) against the running server and, with `--ablate`, drops one fact at a time to show
+which facts actually move the pick. `--capture <gcmd ai dump>` turns live levels into scenario stubs.

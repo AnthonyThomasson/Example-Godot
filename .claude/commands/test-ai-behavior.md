@@ -12,7 +12,7 @@ If `$ARGUMENTS` names a specific behaviour (e.g. "flanking", "hostility", "visio
 2. Run a headless smoke test first (sandbox disabled). If it fails, stop and report the errors — do not proceed with a broken build.
 3. Launch the game with `mcp__godot__run_project` on project path `/Users/athomasson/Documents/projects.nosync/Example_Godot`. Wait for `[cmd] listening` to appear in `mcp__godot__get_debug_output` before continuing. Retry once if the launch hangs (empty output after ~10 s).
 4. Send `python3 tools/gcmd.py help` (sandbox disabled) to confirm the command server is up.
-5. Note whether the Von decision server is running. If it is not (the log shows `[von] server not found` or the NPCs hold permanently), note this and continue — behaviours that don't need Von (hostility, vision, navigation, territory gating) are still testable; Von-dependent ranking tests (act selection quality) will be marked **"Von offline — skipped"**.
+5. Note whether the Von decision server is running. If it is not (the log shows `[von] server not found` or the NPCs hold permanently), note this and continue — behaviours that don't need Von (hostility, vision, navigation, territory gating) are still testable; Von-dependent tests (decision quality, section 10) will be marked **"Von offline — skipped"**.
 
 Keep the game running across all tests. Use `python3 tools/match.py` with `--rounds 3 --timeout 90` for each scenario unless noted. Pipe all match output to a variable so you can quote it in the report. After all tests, `mcp__godot__stop_project`, then `pkill -f "von serve"` to clean up.
 
@@ -23,7 +23,7 @@ Keep the game running across all tests. Use `python3 tools/match.py` with `--rou
 Run each scenario in order. For each one:
 - Print the scenario name and the overrides you're applying.
 - Run the match, capture the win/loss/timeout summary.
-- Pull the last few lines of `mcp__godot__get_debug_output` after the rounds finish; look for `[von]` decision logs, NPC action labels, and any errors.
+- Pull the last few lines of `mcp__godot__get_debug_output` after the rounds finish; look for the `(Von)` decision lines (`<NPC> (Von) COMBAT - Defender - FLANK - their left side (kitchen)  [combat auto, combat 312ms, flank 96ms]` — the full path plus per-level timing), NPC action labels, and any errors.
 - Note observed behaviours that differ from what the `domain-ai` sub-skills say should happen.
 
 ### 1. Baseline — default config
@@ -59,17 +59,17 @@ Expected: invader enters the house and only then begins combat. Observe whether 
 
 ### 3. Pursuit on vs off
 
-**3a. Invader: pursuit off**
+**3a. Invader: pursuit off** (normally on)
 ```
 --invader 'scene().get_node("Invader/GoalController").pursue_hostiles = false'
 ```
-Expected: invader does not patrol; after losing sight of the defender it holds its last chosen `move` destination rather than hunting.
+Expected: IDLE becomes available at the root, and a merely seen hostile no longer sends every decision straight to COMBAT (only being under fire / engaged does) — Von ranks COMBAT against INVESTIGATE / SEARCH / IDLE. Watch the decision paths for IDLE picks.
 
-**3b. Defender: pursuit on** (normally off — defender is territory-focused)
+**3b. Defender: pursuit off** (normally on)
 ```
---defender 'scene().get_node("Defender/GoalController").pursue_hostiles = true'
+--defender 'scene().get_node("Defender/GoalController").pursue_hostiles = false'
 ```
-Expected: defender leaves the house to chase the invader. Watch for conflict with `defend_territory` — the skill says pursuit overrides the `interact`/`hold`/`search` act but territory restricts fire-spot candidates; observe whether the defender exits the house entirely.
+Expected: as 3a; with `defend_territory` still on, any COMBAT it picks keeps its options inside the house.
 
 ### 4. Territory defence
 
@@ -85,26 +85,20 @@ Expected: defender advances outside the house to close range rather than holding
 ```
 Expected: invader fires from outside and resists being drawn in.
 
-### 5. Flanking
+### 5. Flanking and team callouts
 
-**5a. Invader: flanking off** (normally on)
+**5a. Invader: FLANK disabled** (a decision-tree node)
 ```
---invader 'scene().get_node("Invader/GoalController").flank = false'
+--invader 'scene().get_node("Invader/GoalController").disabled_nodes = [&"flank"]'
 ```
-Expected: invader picks nearest clear fire spot rather than working around to the side/rear. Compare win rate to baseline.
+Expected: no decision path contains FLANK; the invader engages, pushes or retreats instead. Compare win rate to baseline.
 
-**5b. Defender: flanking on** (normally off)
-```
---defender 'scene().get_node("Defender/GoalController").flank = true'
-```
-Observe whether the defender attempts to circle.
-
-**5c. Multiple invaders — stigmergic spread**
+**5b. Multiple invaders — flank claims over the radio**
 Only run this if `main.gd` exposes `invader_count` via GDScript (check with `python3 tools/gcmd.py 'scene().get_node("Main").invader_count'`). If it does:
 ```
 --invader 'scene().get_node("Main").invader_count = 3'
 ```
-Restart a single round with flanking on and observe the action labels on each invader. They should spread around the defender rather than stacking.
+During a round, dump `python3 tools/gcmd.py ai`: an invader's `flanks` state line should name sides "taken by InvaderN" (seen, or "(radio)" from a callout), and those sides must be absent from its FLANK options (`drop_tags`). The invaders' decision paths should name different sides. Repeat with `hear_callouts = false` on every invader and compare how often two pick the same side.
 
 ### 6. Vision and knowledge
 
@@ -129,7 +123,7 @@ Expected: invader is nearly blind to its sides and has no ambient awareness bubb
 
 ### 7. Peek-and-cover timing
 
-Run 1 round with the default config, then use `gcmd.py` to read the debug log for the invader's action labels during combat. Look for the sequence: `shoot_*` → `cover` → `shoot_*`. Count how many times each phase appears in the output.
+Run 1 round with the default config and watch the invader's action label during an ENGAGE: its progress should alternate `in position, looking for a shot` → `in position, ducking behind cover` → `looking for a shot`. Count how many times each phase appears.
 
 ```bash
 python3 tools/gcmd.py 'scene().get_node("Invader/GoalController").cover_time'
@@ -152,7 +146,7 @@ And a cautious variant:
 ```
 --invader 'scene().get_node("Invader/GoalController").contact_memory_ttl = 3.0'
 ```
-Expected: invader gives up pursuit very quickly and transitions to search. Compare how often rounds time out vs baseline.
+Expected: a lost contact quickly stops being a fight target and becomes an INVESTIGATE lead ("where you last saw …", "where … was heading"). Compare how often rounds time out vs baseline.
 
 **8b. Permanent hostility** (hostility_ttl = 0)
 Already the default for retaliation — verify by checking:
@@ -170,6 +164,24 @@ sleep 8  # let the round start
 python3 tools/gcmd.py 'tp 300 300'  # move into a tight room
 ```
 Watch `get_debug_output` for `push_through` log lines. Note any rounds that time out — these are the strongest indicator of navigation failure.
+
+### 10. Decision quality (Von)
+
+Von is a classifier: whether it picks well depends on how the state and options are worded (see the
+wording rules in `domain-ai-perception`). Check it directly:
+```bash
+python3 tools/von_probe.py --ablate        # clear-cut scenarios in tools/von_scenarios/
+```
+Expected: every scenario PASSes, and ablating a scenario's decisive fact changes the pick (a fact whose
+removal never changes anything is not being used).
+
+During a live round, capture real levels and inspect them:
+```bash
+python3 tools/gcmd.py ai > /tmp/ai.json && python3 tools/von_probe.py --capture /tmp/ai.json --out /tmp/von_captured
+```
+Read each level's state, question, options and probabilities. Expected: under fire the walk starts at
+COMBAT (`decision.entry == "combat"`); single-option levels are `auto`; per-level Von latency (in the
+`(Von)` log lines) keeps a whole decision under ~1 s.
 
 ---
 

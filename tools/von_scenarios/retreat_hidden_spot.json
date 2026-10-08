@@ -1,0 +1,13 @@
+{
+  "name": "retreat: hidden + cover beats farther-but-in-sight",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the hallway, inside the house, holding a Pistol. You are badly wounded.\nYou have a clear shot at Defender from where you stand. You are exposed to their fire.\nDecided so far: COMBAT → Defender → RETREAT.",
+  "question": "Where should you fall back to? Prefer a spot out of every hostile's sight, with cover, toward allies, and close by.",
+  "options": {
+    "fall_bedroom": "fall back to the bedroom — out of every hostile's sight — cover close by (the bed) — short hidden route",
+    "fall_garage": "fall back to the garage — farther from them, still in their sight — in the open — medium exposed route"
+  },
+  "expect": [
+    "fall_bedroom"
+  ],
+  "ablate": []
+}

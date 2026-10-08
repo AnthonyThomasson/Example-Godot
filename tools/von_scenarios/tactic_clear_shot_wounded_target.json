@@ -1,0 +1,19 @@
+{
+  "name": "tactic: hurt, clear shot at a badly wounded target -> ENGAGE or PUSH (the live flank-loop case)",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the kitchen living, inside the house, holding a Pistol. You are hurt.\nKnown hostiles: 1 (0 in sight). Allies near you: none.\nYou have a clear shot at Defender from where you stand. You are exposed to their fire.\nDefender — HOSTILE (attacked you) — last seen just now — close, in pistol range, north-west of you, in the kitchen living — was moving west, away from you — holding a Pistol — looks badly wounded.\nFlanks on Defender (you are on their front): their left side — free, clear shot, cover, short exposed route; their right side — free, clear shot, cover, short exposed route; behind them — free, clear shot, in the open, medium exposed route.\nYou are under fire: shots are landing near you, from the east!\nDecided so far: COMBAT → Defender.",
+  "question": "How should you fight Defender? Shoot from where you have a clear line, flank to an open side, push in when they are weak, fleeing or unarmed, or retreat when you are badly hurt, exposed or outnumbered.",
+  "options": {
+    "engage": "You have a clear shot at Defender, and you are not badly wounded (from where you stand; they look badly wounded)",
+    "flank": "Your line to Defender is blocked, or they are aiming at someone else (3 free sides; best: their left side via the kitchen living, short exposed route, cover)",
+    "push": "Defender looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, was moving west, away from you, holding a Pistol, looks badly wounded)",
+    "retreat": "You are badly wounded and being hit (best: behind the dining close by, out of their sight; you are hurt)"
+  },
+  "expect": [
+    "engage",
+    "push"
+  ],
+  "ablate": [
+    "You have a clear shot at Defender from where you stand.",
+    " — looks badly wounded"
+  ]
+}

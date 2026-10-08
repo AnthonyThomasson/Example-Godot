@@ -33,9 +33,10 @@ keyboard/mouse uses — so no game domain is coupled to it. `match` prints a one
 status of both spectator combatants (`Defender`/`Invader`): each one's health, current act and
 alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
 controller's `current_act()`. `ai` is the diagnostic counterpart: it dumps every AI combatant's
-`debug_state()` as JSON (what Von was told, the menu offered, its pick vs. any policy override, the
-known contacts, the pathing state), duck-typed the same way so the server stays a decoupled
-observer. `restart [seed]` reloads the scene for a fresh matchup, pinning the
+`debug_state()` as JSON (every level of its last decision walk — the state and question Von saw,
+the options, Von's probabilities and pick — plus the facts gated on, the known contacts, the running
+primitive and the pathing state), duck-typed the same way so the server stays a decoupled
+observer. `tools/von_probe.py --capture` turns such a dump into replayable Von scenarios. `restart [seed]` reloads the scene for a fresh matchup, pinning the
 next layout when a seed is given (stashed in `Engine` meta, which survives the reload; `main.gd`
 reads it) and sets the `skip_setup` Engine meta so the reloaded scene builds immediately instead of
 reopening the pre-game setup window — the harness never clicks it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
@@ -47,9 +48,11 @@ commands, or `tools/match.py` to run and score N matches in a row; each command 
 `event_bus.gd` (autoload `EventBus`) — a minimal generic publish/subscribe bus for decoupled
 cross-domain notifications: `post(topic, data)` broadcasts and the `posted(topic, data)` signal
 delivers to any listener, which filters by `topic`. Emitters and listeners never reference each
-other. The only topic in use is `&"hit"`, posted by the Projectile System for each damaging hit and
+other. Two topics are in use: `&"hit"`, posted by the Projectile System for each damaging hit and
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`)
-and consumed by the AI for combat awareness and hostility.
+and consumed by the AI for combat awareness, hostility and gunfire heard; and `&"callout"`, an AI
+controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
+consumed by allied AIs.
 
 ## Camera and despawner
 

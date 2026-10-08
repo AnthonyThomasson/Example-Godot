@@ -1,0 +1,16 @@
+{
+  "name": "search: near-equal rooms, one is the current plan -> keep it",
+  "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the hallway, inside the house, holding a Pistol. You are unhurt.\nCurrent activity: SEARCH - the kitchen (en route, for 2s).\nDecided so far: SEARCH.",
+  "question": "Where should you search next? Prefer unsearched rooms and unexplored areas, nearest first.",
+  "options": {
+    "room_kitchen": "the kitchen — unsearched — short route (your current plan)",
+    "room_bathroom": "the bathroom — unsearched — short route",
+    "room_bedroom": "the bedroom — searched recently — short route"
+  },
+  "expect": [
+    "room_kitchen"
+  ],
+  "ablate": [
+    " (your current plan)"
+  ]
+}

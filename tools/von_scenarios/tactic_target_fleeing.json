@@ -1,0 +1,18 @@
+{
+  "name": "tactic: target badly wounded, unarmed and fleeing -> PUSH",
+  "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the living room, inside the house, holding a Pistol. You are unhurt.\nKnown hostiles: 1 (0 in sight). Allies near you: none.\nA wall is between you and Invader: your line to them is blocked.\nInvader — HOSTILE (trespassing) — last seen just now — in pistol range, west of you, in the hallway — was moving west, away from you — holding a Fists — looks badly wounded.\nDecided so far: COMBAT → Invader.",
+  "question": "How should you fight Invader? Shoot from where you have a clear line, flank to an open side, push in when they are weak, fleeing or unarmed, or retreat when you are badly hurt, exposed or outnumbered.",
+  "options": {
+    "engage": "You have a clear shot at Invader, and you are not badly wounded (once they show, from an ambush behind cover; they look badly wounded)",
+    "flank": "Your line to Invader is blocked, or they are aiming at someone else (2 free sides; best: behind them via the hallway, medium exposed route, in the open)",
+    "push": "Invader looks badly wounded, is unarmed, or is moving away from you (they are in pistol range, was moving west, away from you, holding a Fists, looks badly wounded)",
+    "retreat": "You are badly wounded and being hit (best: the bedroom, out of their sight; you are unhurt)"
+  },
+  "expect": [
+    "push"
+  ],
+  "ablate": [
+    "looks badly wounded",
+    "was moving west, away from you"
+  ]
+}

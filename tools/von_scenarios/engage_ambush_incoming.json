@@ -1,0 +1,16 @@
+{
+  "name": "engage: line blocked, target coming this way -> ambush",
+  "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the living room, inside the house, holding a Pistol. You are unhurt.\nA wall is between you and Invader: your line to them is blocked.\nInvader — HOSTILE (trespassing) — last seen just now — close, in pistol range, west of you, in the hallway — was moving east, toward you — holding a Pistol.\nDecided so far: COMBAT → Invader → ENGAGE.",
+  "question": "Where should you fight Invader from? Prefer a clear shot with cover close by, hidden from other hostiles; wait in ambush when they are coming to you.",
+  "options": {
+    "fire_east": "step east (in the living room) — clear shot — in the open — also exposed to Invader2",
+    "ambush": "wait in ambush behind the sofa — you shoot when they show — they are coming this way"
+  },
+  "expect": [
+    "ambush"
+  ],
+  "ablate": [
+    " — they are coming this way",
+    "was moving east, toward you"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "name": "root: gunfire heard just now -> INVESTIGATE",
+  "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the bedroom, inside the house, holding a Pistol. You are unhurt.\nCurrent activity: SEARCH - the bathroom (en route, for 2s).\nThere is trouble nearby, out of your sight. Allies near you: none.\nNobody else is in sight or known.\nGunfire heard to the north, just now.",
+  "question": "What should you do right now? Choose what best serves your goal, given any threat and what you know.",
+  "options": {
+    "investigate": "You heard gunfire or lost sight of a hostile recently and know where to look (1 lead (freshest: gunfire heard to the north))",
+    "search": "All is quiet and there are rooms left to search (5 of 7 known rooms unsearched)"
+  },
+  "expect": [
+    "investigate"
+  ],
+  "ablate": [
+    "Gunfire heard to the north, just now.",
+    "There is trouble nearby, out of your sight."
+  ]
+}

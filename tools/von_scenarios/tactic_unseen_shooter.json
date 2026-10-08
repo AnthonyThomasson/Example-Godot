@@ -1,0 +1,13 @@
+{
+  "name": "tactic: unhurt, shot at by an unseen shooter -> LOCATE",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the hallway, inside the house, holding a Pistol. You are unhurt.\nSomeone you cannot see is shooting at you. Allies near you: none.\nYou are being shot at by someone you cannot see, from the north; you are exposed to their fire.\nYou are under fire: shots are landing near you, from the north!\nDecided so far: COMBAT.",
+  "question": "How should you fight the hostile? Shoot from where you have a clear line, flank to an open side, push in when they are weak, fleeing or unarmed, or retreat when you are badly hurt, exposed or outnumbered.",
+  "options": {
+    "retreat": "You are badly wounded and being hit (best: the bedroom, out of their sight; you are unhurt)",
+    "locate": "You are being shot at by someone you cannot see (shots from the north)"
+  },
+  "expect": [
+    "locate"
+  ],
+  "ablate": []
+}

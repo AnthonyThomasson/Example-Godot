@@ -1,98 +1,123 @@
 ---
 name: domain-ai-perception
-description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows. The sight sense (field of view / range / line of sight), the hostility rules, the generic event memory, the merged known-contacts view, the decision context it builds for Von (state text + act/move menus), per-NPC house familiarity, and the combat-geometry queries (clear line of fire, peek/cover spots). Use when editing scenes/ai/perception/ or working on vision, what an NPC sees vs. remembers, hostility categorization, memory/eviction, the act/move menus, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows and how it is worded for Von. The sight sense, hostility rules, the generic event memory (with keyed supersede), movement tracks/facing/visible wounds, gunfire heard, allies' radio callouts, leads, searched rooms, the tactics geometry (flank sides, fire/advance/retreat spots, route length + exposure, cover) and the decision SNAPSHOT (state sections, facts, option groups) — plus the measured wording rules Von needs (situation phrases, bands, no negations). Use when editing scenes/ai/perception/ or working on vision, memory/eviction, what Von is told, option groups, flanking geometry, callouts, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Perception sub-domain (`scenes/ai/perception/`)
 
-The SENSE half of the NPC brain: it turns the world into what the NPC *knows*, and knows nothing of
-policy — it never decides, picks or gates by goal. It owns three internal modules and presents one
-public face, `agent_perception.gd` (a `Node`), to the orchestrator and behaviour sub-domains.
+The SENSE half of the NPC brain: it turns the world into what the NPC *knows*, and turns that into the
+snapshot the decision planner walks. It holds no policy — it never decides, picks or gates by goal. It
+owns four internal modules and presents one public face, `agent_perception.gd` (a `Node`).
 
 Files:
-- `agent_perception.gd` — the sub-domain's public face (the perception/sensor Node).
-- `agent_vision.gd` — the sight sense (pure, stateless geometry).
+- `agent_perception.gd` — the public face: SEE (observe), the contacts view, event intake, BUILD (sense).
+- `agent_vision.gd` — the sight sense and the single owner of the ray query (`blocked` / `raycast`).
 - `agent_hostility.gd` — the hostility rules (categorization).
 - `agent_memory.gd` — a generic, behaviour-agnostic event log.
+- `agent_tactics.gd` — combat geometry: flank sides, fire/advance/retreat spots, routes, cover.
 
-The controller (`ai/goal_controller.gd`) is the single authoring surface: it copies its exports onto
-`agent_perception.gd`'s config fields and calls `setup()` once, which builds + configures the three
-internal modules. Nothing outside this folder holds a vision/hostility/memory reference — all access
-goes through the perception methods below.
+The controller (`ai/goal_controller.gd`) sets `agent_perception.gd`'s config fields from its exports,
+calls `setup()` once to BUILD the internal modules, then `apply_config()` to configure them — and
+re-calls `apply_config()` each decision, so a tunable retuned at runtime reaches the modules without a
+rebuild that would wipe the event memory. Nothing outside this folder holds a reference to them.
 
 ## Public interface (what the orchestrator / behaviour call)
 
-- `setup()` — build the owned vision/hostility/memory from the config fields; `set_faction(f)` — tell
-  the hostility rules this NPC's own faction (allies are never hostile).
-- `observe(character, rooms)` — the SEE pass, run every tick. Tests what is currently visible via the
-  vision sense, deposits sightings into memory (`saw_character` for every other character, the player
-  included; `saw_room`/`saw_object` for an NPC learning its surroundings), and runs each character
-  sighting through the hostility rules. Dead characters are skipped.
-- `contacts(self_pos) -> Array` — the merged known-contacts view: the freshest sighting per character
-  + `hostile`/`reason` + `visible` (seen this tick), hostiles first then nearest. Dead/freed drop out.
-- `sense(character, rooms, goal) -> { state_text, acts, moves }` — the BUILD pass, run each decision:
-  the compact text state Von ranks against, plus the act and move menus (below).
-- `has_line_to(character, target, point) -> bool`, `combat_spots(character, target, tgt_pos, radius,
-  count) -> { fire, cover }`, `contact_visible(id) -> bool` — combat geometry for the behaviour
-  (pure sensing, never routed through Von).
-- `process_hit(character, data) -> bool` — fold one world `&"hit"` event into memory + hostility
-  (`under_fire`, `engaged`, `on_attacked`); true when it was a relevant attack. `note_engaged()`,
-  `engaged_fresh() -> bool`, `under_fire() -> bool` — the thin engagement/under-fire memory queries.
+- `setup()` (build the modules), `apply_config()` (push the config fields into them; re-callable each
+  decision), `set_faction(f)`.
+- `observe(character, rooms)` — the SEE pass, every tick: one `saw_character` sighting per visible
+  character (keyed, superseded while visible) carrying `pos`, a smoothed velocity track (`vel`),
+  `facing`, a visible wound band, `ally`, inside/room, held item; the room the NPC stands in is
+  remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight.
+- `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),
+  with `hostile`/`reason`/`visible`/`age`. `lost_hostiles()` — hostiles last seen longer ago, within
+  `lead_memory_ttl` (investigation leads).
+- `process_hit(character, data) -> bool` — a hit on/near the NPC → `under_fire` (direction + whether it
+  hit), `engaged`, hostility; a hit farther off within `hearing_radius` → `heard_gunfire` (a lead).
+- `process_callout(character, data)` — an ally's radio `&"callout"` within `callout_range` →
+  `heard_callout` (keyed per speaker, ttl `callout_ttl`).
+- `check_lead(lead_id)` — the NPC reached an investigation lead: remember it as checked
+  (`checked_lead`), so it is not offered again until something newer happens there.
+- `quick_facts(character)` — cheap facts (under fire, engaged, hostile known) between decisions.
+- `sense(character, rooms, goal, activity) -> { facts, sections, sections_per_target, options }` — the
+  BUILD pass (below). `activity` is the behaviour's current-activity line.
+- Combat geometry for the behaviour: `has_line_to`, `combat_spots`, `contact_visible`,
+  `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` for debug.
+
+## The snapshot (what the planner walks)
+
+- **facts** — named booleans the tree gates on: `threat_known`, `hostile_known`, `hostile_visible`,
+  `has_pistol`, `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`, `inside`,
+  `exposed`, `in_cover`.
+- **sections** — named state-text blocks; each tree level shows the ones it lists: `goal`,
+  `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
+  (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
+  (clear shot / exposed to their fire / behind cover / line blocked, plus other hostiles that can see
+  you), `allies` (each ally's side of the target + their radio callouts), `flanks` (one-line digest),
+  `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
+  `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile.
+- **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
+  `threat` (summary only), `hostiles` (bind: one per hostile, only DISTINGUISHING facts), per target
+  `fire_positions` (here / a step away / ambush), `flank_sides` (tagged `held` when an ally — seen or
+  radioed — holds it), `advance_positions`, `melee`; globally `retreat_positions`, `shooter`, `leads`
+  (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `search_rooms`
+  (+ front entrance / approach the house while outside), `explore` (unknown rooms by direction only),
+  `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
+  Options are places and things, never verbs; `tags.inside` drives the territorial filter.
+
+## Wording rules for Von (measured with `tools/von_probe.py`)
+
+Von is a CLASSIFIER: it picks the option whose text best matches the state. It can't do arithmetic or
+compare numbers, and an encoder reads "no cover" as "cover". So:
+1. **Bands, not numbers** — distance from `punch_range`/`shoot_range` ("point-blank", "close, in pistol
+   range", "too far to shoot"), route length (`route_buckets`: short/medium/long, plus hidden/exposed),
+   recency (`recency_bands`: just now / recently / a while ago).
+2. **Canonical phrases** — the state uses the exact phrases the tree's situation descriptions are
+   written in ("You have a clear shot at X from where you stand.", "You are exposed to their fire.",
+   "You are badly wounded.", "looks badly wounded", "moving away from you"), so a fact lights up the
+   option it argues for.
+3. **No negated attributes** — "in the open", "line blocked", "free", "taken by X", "unsearched",
+   "neutral", "too far to shoot".
+4. **Only distinguishing facts in options** — common facts (every hostile is hostile and has a pistol)
+   and the contacts section on a bind level blur the match.
+5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
+Room types are humanized ("kitchen_living" → "kitchen living").
 
 ## Contacts and hostility
 
-**The NPC perceives characters, not "the player".** Each `saw_character` sighting is
-`{ id, node, name, faction, pos, inside, room, item }` (ttl `contact_memory_ttl`). The hostility rules
-(`agent_hostility.gd`, configured from the controller's Hostility exports) then categorize it:
-- **Allies are never hostile**: same faction as the NPC's character, or listed in `allied_factions`.
-- `on_sight` — any other character seen is hostile (`reason "seen"`).
-- `trespass` — any other character seen *inside the house* is hostile (`"trespassing"`).
-- `retaliate` — a character that attacks the NPC is hostile (`"attacked you"`), fed from
-  `process_hit` (a hit on the NPC, or within `hit_awareness_radius`, whose attacker isn't itself).
-
-A verdict is remembered as `&"hostile"` `{ id, reason }` with ttl `hostility_ttl` (≤ 0 = permanent
-grudge), so it persists after the trigger ends.
-
-## The decision context (what Von is asked)
-
-`sense()` builds, from what the NPC sees AND remembers:
-- **state** — the goal verbatim; where the NPC is / what it holds / whether mid-interaction; one line
-  per known contact (up to `max_contacts_in_state`: live or "last saw … Ns ago", HOSTILE(reason) or
-  not, inside/outside + room, bearing, held item); then combat-awareness lines (under fire from a
-  direction, any remembered event with a `note`, own injury level).
-- **act menu** — `hold`; per **known hostile** `shoot_<id>` (if carrying the pistol) and `punch_<id>`;
-  `search` when none is known; plus one **interact** option per *distinct* action offered by a
-  **known** object (deduped by label → nearest known object offering it; item-gated).
-- **move menu** — named destinations only: each **known** room, `last_seen_<id>` per known hostile,
-  and the starting position (`post`). Consulted by the behaviour only when the act is `hold`.
+The NPC perceives characters, not "the player". The hostility rules categorize each sighting: allies
+(same faction or `allied_factions`) are never hostile; `on_sight` / `trespass` (seen inside the house)
+/ `retaliate` (attacked it, via `process_hit`). A verdict is remembered as `&"hostile"` with ttl
+`hostility_ttl` (≤ 0 = permanent grudge).
 
 ## Vision & knowledge
 
-`agent_vision.gd.can_see(from, facing, point, space, exclude)` is true when `point` is within
-`view_distance`, AND either within the 360° `awareness_radius` bubble or inside the forward cone of
-half-angle `fov_degrees/2` around facing, AND reachable by a clear line on the physics query layer
-(`QUERY_MASK = 1` — walls + solid furniture). `enabled = false` = omniscient. `agent_vision.gd` is
-the sub-domain's single owner of that ray query: it also exposes `blocked(…)` / `raycast(…)` (pure
-geometry, ignoring `enabled`), which the combat-geometry tests below use instead of repeating it.
-
-**Per-NPC knowledge** is a memory seed: `familiar_with_house` (on) seeds every room/object as
-permanent on the first observe (`_seed_house`); (off) the NPC must *see* each room/object first.
-People are never pre-known — known only once seen, forgotten after `contact_memory_ttl` out of sight.
+`agent_vision.gd.can_see` is true within `view_distance`, AND within the `awareness_radius` bubble or
+the forward cone (`fov_degrees`), AND with a clear line on `QUERY_MASK = 1` (walls + solid furniture).
+`enabled = false` = omniscient. `familiar_with_house` seeds every room/object as permanently known on
+the first observe; otherwise each must be seen. People are never pre-known.
 
 ## Memory (`agent_memory.gd`)
 
-A generic event log: `remember(topic, data, ttl)`; `is_fresh`/`recall`/`recall_all`/`fresh`
-read back; not capped per topic. Cleanup runs on every write: age-expired first, then, while over
-`capacity`, the oldest **expirable** events. **Permanent events (ttl ≤ 0) never age out and are
-never volume-evicted** (learned house knowledge, permanent hostility verdicts). Topics in use:
-`saw_character`, `saw_room`, `saw_object`, `hostile`, `under_fire`, `engaged`. An event whose `data`
-carries a `note` string is surfaced to Von automatically.
+A generic event log: `remember(topic, data, ttl, key := "")`; `is_fresh` / `recall` / `recall_all` /
+`recall_aged` / `age_of` / `fresh` read back. A write with a `key` (the event's subject) SUPERSEDES the
+live event with the same topic + key — something re-observed every tick stays one entry instead of
+flooding the log and volume-evicting every other expirable event. Cleanup on every write: age-expired
+first, then, while over `capacity`, the oldest expirable. Permanent events (ttl ≤ 0) never age out
+and are never volume-evicted. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
+`hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
+carries a `note` string is surfaced to Von.
 
-## Combat geometry
+## Tactics (`agent_tactics.gd`)
 
-Pure physics queries via `agent_vision.gd`'s `blocked()` / `raycast()`, excluding the NPC and the
-target body:
-- `has_line_to(…, point)` — a clear line to the engaged contact's **last-known** position gates
-  FIRING (vision gates whether it KNOWS a contact; a clear line gates whether it can HIT it).
-- `combat_spots(…)` — ring of candidate points classified `fire` (clear line to `tgt_pos`) vs
-  `cover` (shielded by a ≥ `cover_min` coverage solid), each nearest-first, for the behaviour to pick.
+Pure queries over known contacts, the physics space (via the vision rays) and the nav map
+(`NavigationServer2D` closest point + path). A target's flanks are measured in its own frame (its
+last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,
+sampled across `flank_arc`, snapped to the navmesh, preferring a clear shot. Each spot is annotated
+with clear shot, cover within a step (`cover_min`), route length + exposure (share of route samples
+the target can see), `held_by` (ally within `flank_ally_radius` on that side, or a callout point
+there), `exposed_to` (other hostiles), `heading_toward` and `ally_lane`. Fire spots come from two
+rings (`combat_ring_radius`, ×2) deduped per sector; advance spots along the route; retreat spots
+from known rooms, nearby cover and allies, kept only if hidden from every threat or farther away
+(rays toward a threat exclude hostile bodies). A character is never cover.
+`combat_spots` (ring around the NPC: fire vs cover) also serves the behaviour's peek-and-cover.

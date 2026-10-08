@@ -6,55 +6,57 @@ extends Node
 ## controller contract (`control(character, delta)`) and writes only the intent the player controller
 ## writes (`move_input`/`aim_point`) plus the same public actions — all of that done by the behaviour
 ## sub-domain. It is the single authoring surface: every tunable below is an export here (so a defender
-## or invader preset is all data on this one node), copied into the sub-modules it builds.
+## or invader preset is all data on this one node), pushed into the sub-modules it builds — and
+## re-pushed each decision, so a tunable retuned at runtime (a behaviour test, the dev command server)
+## takes effect without a rebuild.
 ##
 ## The three sub-domains (see their `domain-ai-<name>` skills):
-##   • PERCEPTION (perception/) — SENSE. What the NPC knows: the sight sense, hostility rules and event
-##     memory, the known-contacts view, the decision context (state + act/move menus) and combat
-##     geometry. The NPC is NOT omniscient — it acts on last-KNOWN positions and forgets what decays.
-##   • DECISION (decision/) — THINK. The round-trip to the local Von "System One" server: it POSTs the
-##     context as two `choice` questions (WHAT to do, and — only if holding — WHERE), and reports Von's
-##     top pick back via `decided` / `failed`.
-##   • BEHAVIOUR (behavior/) — ACT. Turns the chosen act into movement + actions, and holds the
-##     System-Two state Von lacks: the engaged contact, peek-and-cover, patrol, the interaction in
-##     progress, and the COMMITMENT timers that let multi-step goals advance instead of oscillating.
+##   • PERCEPTION (perception/) — SENSE. What the NPC knows: sight, hostility, event memory, the
+##     known-contacts view, combat geometry, and the decision SNAPSHOT (state sections, facts and
+##     option groups). The NPC is NOT omniscient — it acts on last-KNOWN positions and forgets what decays.
+##   • DECISION (decision/) — THINK. The decision TREE and its planner: Von picks top-down, one `choice`
+##     request per level — a broad mode (combat / investigate / search / idle), the hostile, a tactic
+##     (engage / flank / push / retreat …), then a concrete option — ending in one behaviour primitive.
+##   • BEHAVIOUR (behavior/) — ACT. Runs the chosen primitive (move / engage / melee / interact / hold) as
+##     movement + actions, and holds the System-Two state Von lacks: the engaged contact,
+##     peek-and-cover, the interaction in progress, and the commitment that keeps a choice running.
 ##
 ## This file keeps only the ORCHESTRATION: the control loop, the decide cadence, forcing a re-decision
-## on a salient event (the known-hostile set changing) or a resolved task, and the EventBus hit intake.
-## The behaviour is pure DATA — `goal` plus the generic primitives exported below (hostility, pursuit,
-## territory, flanking); a house defender and a house invader are the same code with different data.
+## on a salient event or a finished task (interrupting a walk in flight when the situation now calls for
+## a different starting point — e.g. under fire → straight to combat), the EventBus intake (hits and
+## allies' radio callouts) and posting this NPC's own callouts. The behaviour is pure DATA — `goal` plus
+## the generic primitives and decision config exported below; a house defender and a house invader are
+## the same code with different data.
 
 const AgentPerception := preload("res://scenes/ai/perception/agent_perception.gd")
 const DecisionClient := preload("res://scenes/ai/decision/decision_client.gd")
+const DecisionPlanner := preload("res://scenes/ai/decision/decision_planner.gd")
 const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 
-## The behaviour to pursue, in plain language — what Von ranks the act menu against.
+## The behaviour to pursue, in plain language — what Von ranks every level of the decision against.
 @export_multiline var goal: String = ("Deal with hostile characters: shoot them with your pistol. " +
 	"Otherwise go about your business.")
-## Pursuit primitive: when true this NPC actively hunts hostiles instead of doing chores. While no
-## hostile is known it patrols the house to search (rather than settling into a passive interaction,
-## which freezes its facing and blinds it); once one is known it ENGAGES rather than picking an
-## unrelated interaction — the large object-interaction menu otherwise dilutes Von's choice. Turn off
-## for an NPC whose goal is unrelated to fighting (e.g. "watch tv"). Like the other primitives, this
-## is a controller policy Von (a single-shot ranker) can't apply itself.
+## Pursuit primitive: when true this NPC actively hunts hostiles instead of doing chores. Once a hostile
+## is known every decision starts at COMBAT, and IDLE (chores) is never offered — a passive interaction
+## freezes the NPC's facing and blinds it. Turn off for an NPC whose goal is unrelated to fighting.
 @export var pursue_hostiles: bool = true
-## Territory primitive: when true, while engaging a contact that is OUTSIDE the house the NPC returns
-## fire from inside (fire/cover spots restricted to the house, no advancing out) instead of chasing it.
+## Territory primitive: when true the NPC fights from inside the house — combat options outside it are
+## never offered, and it won't chase a contact out of the house.
 @export var defend_territory: bool = false
 ## The `/v1/systemone` endpoint to ask.
 @export var server_url: String = "http://127.0.0.1:8000/v1/systemone"
 ## Model name sent with each request.
 @export var model: String = "von-1.2.0"
-## Minimum seconds between decisions (the re-decide cadence once free to change).
+## Minimum seconds between decisions while holding (the re-decide cadence once free to change).
 @export var decide_interval: float = 1.0
 ## Seconds to stay in a chosen interaction before ending it and re-deciding (covers Von's
 ## statelessness so multi-step goals advance).
 @export var interaction_dwell: float = 3.0
-## Safety cap (s) on committing to reach a chosen object, so a blocked path still re-decides.
+## Safety cap (s) on committing to a move or to reaching an object, so a blocked path still re-decides.
 @export var max_commit_time: float = 6.0
-## Range (px) within which a chosen shot is fired instead of advancing on the engaged contact.
+## Range (px) of the pistol: shots are taken within it, and distances are banded against it for Von.
 @export var shoot_range: float = 500.0
-## Range (px) within which a chosen punch lands instead of advancing on the engaged contact.
+## Range (px) within which a punch lands.
 @export var punch_range: float = 48.0
 ## Radius (px) of the ring of candidate fire/cover positions sampled during combat.
 @export var combat_ring_radius: float = 80.0
@@ -67,32 +69,79 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## Seconds a chosen fire/cover position is committed to before a new one may be picked. Prevents
 ## per-frame re-selection of the nearest spot (which makes the NPC vibrate).
 @export var reposition_interval: float = 0.5
-## Flanking primitive: when true, firing spots are chosen to attack from the target's side/rear and
-## to spread allied attackers around it (a pincer), rather than always taking the nearest spot. It
-## re-ranks the peek fire spots by angular openness — distance from the bearings the NPC should avoid
-## (where a visible target is FACING, and where each nearby ally already stands) — traded against
-## travel distance. Off, or with no such bearings to avoid, it reverts to nearest-spot (the old
-## behaviour), so flanking is purely additive.
-@export var flank: bool = true
-## How far (px) the NPC will travel for a fully-open flanking angle: the px-value of going from the
-## worst angle (right on an avoided bearing) to the best (opposite it). Higher = flanks harder.
-@export var flank_weight: float = 140.0
-## An ally within this distance (px) of the engaged target counts as holding an angle on it, so this
-## NPC spreads to a different bearing instead of stacking alongside the ally.
-@export var flank_ally_radius: float = 500.0
 ## Radius (px) within which a hit on something else still registers as gunfire near the NPC.
 @export var hit_awareness_radius: float = 160.0
 ## Seconds an incoming/nearby hit keeps the NPC on "under fire" alert (reported to Von, which
 ## re-decides at once).
 @export var under_fire_time: float = 3.0
 ## Seconds the NPC stays committed to a fight after the last shot it fired or took, before it
-## re-asks Von. Stops it dropping out of combat between the once-a-cadence decisions.
+## re-asks Von. Stops it dropping out of combat between decisions.
 @export var engage_dwell: float = 3.0
-## Memory cleanup: hard cap on remembered events (oldest evicted past it); <= 0 = unlimited.
-@export var memory_capacity: int = 64
-## Memory cleanup: fallback lifetime (s) for remembered events given no explicit ttl; <= 0 = no age
-## expiry (events then persist until evicted by capacity).
+
+@export_group("Decision")
+## Decision-tree nodes never offered to this NPC (see scenes/ai/decision/decision_tree.gd), e.g.
+## [&"push"] for one that never rushes. `pursue_hostiles` adds &"idle".
+@export var disabled_nodes: Array[StringName] = []
+## Per-node overrides merged over the tree's defaults: { node_id: { field: value } } — e.g. a different
+## `question` for &"flank".
+@export var node_overrides: Dictionary = {}
+## Ordered fact → node: a decision starts at the first rule's node whose fact holds, skipping the
+## broader levels above it (e.g. under fire → straight to COMBAT). `pursue_hostiles` adds
+## hostile_known → combat. Facts: see the perception snapshot.
+@export var entry_rules: Dictionary = { &"under_fire": &"combat", &"engaged": &"combat" }
+## Take a level's only option without asking Von (saves a round-trip per auto-picked level).
+@export var skip_single_option: bool = true
+## Most options offered at one level (positions, rooms, leads); interactions are not capped.
+@export var max_options_per_level: int = 4
+## Seconds a fight runs before Von re-chooses its tactic (it re-chooses sooner if the fight lapses).
+@export var tactic_interval: float = 3.0
+
+@export_group("Context")
+## Ages (s) up to which something counts as "just now" (x) and "recently" (y); older is "a while ago".
+@export var recency_bands: Vector2 = Vector2(2.0, 8.0)
+## Route lengths (px) up to which a route is "short" (x) and "medium" (y); longer is "long".
+@export var route_buckets: Vector2 = Vector2(400.0, 900.0)
+## Half-angle (degrees) within which a seen character's facing counts as aiming at someone.
+@export var aim_cone: float = 20.0
+## Speed (px/s) under which a seen character counts as standing still.
+@export var still_speed: float = 20.0
+## Smoothing (0–1) of a seen character's tracked velocity; higher follows changes faster.
+@export var track_smoothing: float = 0.3
+## Radius (px) within which a hit elsewhere is heard as gunfire (an investigation lead).
+@export var hearing_radius: float = 900.0
+## Most seconds a lost hostile's last-seen velocity is projected forward ("where they were heading").
+@export var extrapolate_cap: float = 3.0
+## Distance (px) toward unseen gunfire the "where the shots came from" lead points.
+@export var investigate_distance: float = 300.0
+
+@export_group("Tactics")
+## Distance (px) from a target at which a flanking spot is sought.
+@export var flank_distance: float = 220.0
+## Angular spread (degrees) sampled around each flank side's bearing.
+@export var flank_arc: float = 60.0
+## An ally within this distance (px) of a target holds the side it stands on, so this NPC is told that
+## side is taken.
+@export var flank_ally_radius: float = 500.0
+
+@export_group("Memory")
+## Hard cap on remembered events (oldest expirable evicted past it); <= 0 = unlimited.
+@export var memory_capacity: int = 128
+## Fallback lifetime (s) for remembered events given no explicit ttl; <= 0 = no age expiry.
 @export var memory_default_ttl: float = 0.0
+## Seconds a lost hostile's last sighting stays an investigation lead.
+@export var lead_memory_ttl: float = 20.0
+## Seconds a visited room counts as recently searched.
+@export var search_memory_ttl: float = 60.0
+
+@export_group("Callouts")
+## Broadcast this NPC's combat and investigation decisions to allies over the EventBus.
+@export var send_callouts: bool = true
+## Listen to allies' callouts (their tactic, target and destination).
+@export var hear_callouts: bool = true
+## How far (px) a callout carries; <= 0 = unlimited.
+@export var callout_range: float = 1500.0
+## Seconds a heard callout stays current.
+@export var callout_ttl: float = 6.0
 
 @export_group("Vision")
 ## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
@@ -107,7 +156,7 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## first. People are never pre-known either way — they are known only once seen.
 @export var familiar_with_house: bool = true
 ## Lifetime (s) of a character sighting — the window the NPC keeps acting on a last-seen position
-## after losing sight before it forgets that contact.
+## after losing sight before the contact becomes a mere investigation lead.
 @export var contact_memory_ttl: float = 4.0
 
 @export_group("Hostility")
@@ -136,33 +185,64 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 
 ## World-space room rects (`{ key, type, rect }`) from Main — the sensor's map of the house.
 var rooms: Array = []
-## The house entrance in world space, injected by Main for NPCs that start outside (e.g. the
-## invader). When set, the patrol heads here first while the NPC is outside all rooms, giving the
-## shortest direct path to the entrance instead of circling. Cleared after first use.
+## The house entrance in world space, injected by Main for NPCs that start outside. Handed to the
+## perception once (it offers "the front entrance" as a search option while outside).
 var entry_point: Vector2 = Vector2.ZERO
 
-var _perception: Node ## SENSE sub-domain: knowledge, decision context, combat geometry.
-var _decision: Node ## THINK sub-domain: the Von round-trip (decision/decision_client.gd).
-var _behavior: Node ## ACT sub-domain: derives movement/actions + holds commitment state.
-var _acts := {} ## This tick's act options (from perception), brokered to the behaviour on decide.
-var _moves := {} ## This tick's move options.
-var _last_state := "" ## The state text Von was last shown, retained for `debug_state()`.
+var _perception: Node ## SENSE sub-domain: knowledge, the decision snapshot, combat geometry.
+var _client: Node ## THINK transport: the Von round-trip (decision/decision_client.gd).
+var _planner: Node ## THINK policy: the decision-tree walk (decision/decision_planner.gd).
+var _behavior: Node ## ACT sub-domain: runs the chosen primitive + holds commitment state.
+var _last_facts := {} ## The facts of the last decision snapshot, retained for `debug_state()`.
 var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
 var _force := false ## Force a decision now (task resolved or salient event).
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
 var _salient_init := false ## Whether _salient_key has been seeded.
-# EventBus &"hit" events are queued here, then handed to perception on the next control() tick.
+# EventBus events are queued here, then handed to perception on the next control() tick.
 var _character: Node ## The character this controller drives, captured on first control.
-var _hit_queue: Array = [] ## Hit events awaiting processing once _character is known.
+var _event_queue: Array = [] ## [topic, data] pairs awaiting processing once _character is known.
 
 
-## Build + configure the three AI sub-domains and wire them together. The controller is the single
-## authoring surface: every tunable lives as an export here and is copied onto the sub-module it belongs
-## to (perception owns the senses, decision the Von endpoint, behaviour the combat/movement + its
-## locomotion).
+## Build the AI sub-domains and wire them together, then push every export into them with
+## _apply_config(). The sub-domains each own internal modules (perception's sight/hostility/memory/
+## tactics, the behaviour's locomotion), so building and configuring are separate: _ready() builds
+## once, _apply_config() configures (here and again each decision, so a tunable retuned at runtime
+## still takes effect without a rebuild that would wipe memory or in-flight state).
 func _ready() -> void:
-	# SENSE: the perception sub-domain owns the sight sense, hostility rules and event memory internally.
+	# SENSE: the perception sub-domain owns sight, hostility, memory and the combat geometry internally.
 	_perception = AgentPerception.new()
+	add_child(_perception)
+	_perception.setup()
+	# THINK: the Von transport, and the planner that walks the decision tree through it. node_overrides
+	# is baked into the tree at setup() (construction-time only); the rest of the planner's config is
+	# applied by _apply_config(), which turns the policy primitives into tree config (pursuit starts at
+	# COMBAT once a hostile is known and never idles; territory keeps combat options inside the house).
+	_client = DecisionClient.new()
+	_client.configure(server_url, model, 3.0)
+	add_child(_client)
+	_planner = DecisionPlanner.new()
+	_planner.node_overrides = node_overrides
+	add_child(_planner)
+	# ACT: the behaviour sub-domain (owns its own locomotion). It reads the world via perception and
+	# falls back to a steady stance when no decision can be had.
+	_behavior = Behavior.new()
+	var nav_agent: NavigationAgent2D = null
+	if nav_agent_path != NodePath():
+		nav_agent = get_node_or_null(nav_agent_path) as NavigationAgent2D
+	add_child(_behavior)
+	_behavior.setup(_perception, nav_agent)
+	_apply_config()
+	_planner.setup(_client)
+	_planner.decided.connect(_on_decided)
+	_planner.failed.connect(_behavior.fallback)
+	EventBus.posted.connect(_on_event)
+
+
+## Push every export into the sub-domains it configures. The controller is the single authoring surface
+## — every tunable lives as an export here — and this is where they reach the sub-modules. It only SETS
+## config on already-built sub-domains (never rebuilds), so it is safe to call each decision: a tunable
+## retuned at runtime (e.g. by the dev command server for a behaviour test) takes effect on the next one.
+func _apply_config() -> void:
 	_perception.contact_memory_ttl = contact_memory_ttl
 	_perception.familiar_with_house = familiar_with_house
 	_perception.vision_enabled = vision_enabled
@@ -176,23 +256,47 @@ func _ready() -> void:
 	_perception.allied_factions = allied_factions
 	_perception.memory_capacity = memory_capacity
 	_perception.memory_default_ttl = memory_default_ttl
+	_perception.lead_memory_ttl = lead_memory_ttl
+	_perception.search_memory_ttl = search_memory_ttl
 	_perception.hit_awareness_radius = hit_awareness_radius
+	_perception.hearing_radius = hearing_radius
 	_perception.under_fire_time = under_fire_time
 	_perception.engage_dwell = engage_dwell
-	_perception.setup()
-	add_child(_perception)
-	# THINK: the decision sub-domain, the Von round-trip. It reports its pick via `decided` / `failed`.
-	_decision = DecisionClient.new()
-	_decision.configure(server_url, model, 3.0)
-	add_child(_decision)
-	_decision.decided.connect(_on_decided)
-	# ACT: the behaviour sub-domain (owns its own locomotion). It reads the world via perception and
-	# falls back to a steady stance when the decision request fails.
-	_behavior = Behavior.new()
-	_behavior.pursue_hostiles = pursue_hostiles
-	_behavior.defend_territory = defend_territory
+	_perception.shoot_range = shoot_range
+	_perception.punch_range = punch_range
+	_perception.recency_bands = recency_bands
+	_perception.route_buckets = route_buckets
+	_perception.aim_cone = aim_cone
+	_perception.still_speed = still_speed
+	_perception.track_smoothing = track_smoothing
+	_perception.extrapolate_cap = extrapolate_cap
+	_perception.investigate_distance = investigate_distance
+	_perception.max_options_per_level = max_options_per_level
+	_perception.flank_distance = flank_distance
+	_perception.flank_arc = flank_arc
+	_perception.flank_ally_radius = flank_ally_radius
+	_perception.combat_ring_radius = combat_ring_radius
+	_perception.combat_ring_count = combat_ring_count
+	_perception.callout_range = callout_range
+	_perception.callout_ttl = callout_ttl
+	_perception.apply_config()
+	# The pursuit/territory primitives become planner config: pursuit disables IDLE and starts a walk at
+	# COMBAT once a hostile is known; territory confines combat options inside the house.
+	var disabled: Array[StringName] = []
+	disabled.assign(disabled_nodes)
+	var rules := entry_rules.duplicate()
+	if pursue_hostiles:
+		if not disabled.has(&"idle"):
+			disabled.append(&"idle")
+		if not rules.has(&"hostile_known") and not rules.has("hostile_known"):
+			rules[&"hostile_known"] = &"combat"
+	_planner.disabled_nodes = disabled
+	_planner.entry_rules = rules
+	_planner.skip_single_option = skip_single_option
+	_planner.inside_only = defend_territory
 	_behavior.interaction_dwell = interaction_dwell
 	_behavior.max_commit_time = max_commit_time
+	_behavior.tactic_interval = tactic_interval
 	_behavior.shoot_range = shoot_range
 	_behavior.punch_range = punch_range
 	_behavior.combat_ring_radius = combat_ring_radius
@@ -200,60 +304,50 @@ func _ready() -> void:
 	_behavior.cover_time = cover_time
 	_behavior.fire_cooldown = fire_cooldown
 	_behavior.reposition_interval = reposition_interval
-	_behavior.flank = flank
-	_behavior.flank_weight = flank_weight
-	_behavior.flank_ally_radius = flank_ally_radius
 	_behavior.arrive_dist = arrive_dist
 	_behavior.stuck_speed = stuck_speed
 	_behavior.door_open_reach = door_open_reach
-	var nav_agent: NavigationAgent2D = null
-	if nav_agent_path != NodePath():
-		nav_agent = get_node_or_null(nav_agent_path) as NavigationAgent2D
-	_behavior.setup(_perception, nav_agent)
-	add_child(_behavior)
-	_decision.failed.connect(_behavior.fallback)
-	EventBus.posted.connect(_on_event)
+	_behavior.apply_config()
 
 
-## Buffer a world hit event for processing on the next control() tick (the signal can fire before
-## the controller knows which character it drives).
+## Buffer a world event for processing on the next control() tick (the signal can fire before the
+## controller knows which character it drives): hits (combat awareness, gunfire heard) and allies'
+## radio callouts.
 func _on_event(topic: StringName, data: Dictionary) -> void:
-	if topic == &"hit":
-		_hit_queue.append(data)
+	if topic == &"hit" or topic == &"callout":
+		_event_queue.append([topic, data])
 
 
-## Read-only: the act the NPC is currently carrying out (its last decision), for observers/HUD.
+## Read-only: the decision path the NPC is carrying out, as ids ("combat/t_12/flank/side_left").
 func current_act() -> String:
 	return _behavior.current_act() if _behavior != null else "hold"
 
 
-## Read-only: a compact, human-readable summary of what the NPC is doing right now — for debug
-## overlays/observers (the behaviour sub-domain builds it from its live act state).
+## Read-only: the full decision path the NPC is carrying out, every level ("COMBAT - Intruder - FLANK -
+## their left side (kitchen)"), plus its progress — for debug overlays/observers.
 func debug_status() -> String:
 	return _behavior.debug_status() if _behavior != null else "HOLD"
 
 
 ## Read-only: the WHOLE AI state as structured data — the deep counterpart to `debug_status()`'s
-## one-line label, for an observer (the dev command server) to inspect on demand. It answers the
-## questions a log line can't: what Von was actually TOLD (`state`), what it was allowed to pick from
-## (`acts_offered`), what it picked versus what policy overrode (`act_raw` / `act_override`), what the
-## NPC currently knows (`contacts`), and where pathing stands (`loco`). Assembled here because the
-## orchestrator is the only place that sees all three sub-domains; each reports its own state. Pure
-## reads — calling this never perturbs the loop.
+## one-line label, for an observer (the dev command server) to inspect on demand. It answers what a log
+## line can't: the facts the last decision gated on, every level of the last walk (the exact state and
+## question Von saw, the options, its probabilities and pick, auto-picks and timings), what the NPC
+## knows (`contacts`), the running primitive and pathing. Pure reads — never perturbs the loop.
 func debug_state() -> Dictionary:
 	var out := {
 		"npc": _npc_name(),
 		"goal": goal,
-		"state": _last_state,
-		"acts_offered": _acts.keys(),
-		"moves_offered": _moves.keys(),
 		"decide_in": _decide_timer,
 		"forced": _force,
-		"request_pending": _decision != null and _decision.is_pending(),
+		"facts": _last_facts,
 	}
+	if _planner != null:
+		out["decision"] = _planner.debug_state()
 	if _perception != null:
 		out["under_fire"] = _perception.under_fire()
 		out["engaged_fresh"] = _perception.engaged_fresh()
+		out["memory_size"] = _perception.memory_size()
 		out["contacts"] = _contact_digest()
 	if _behavior != null:
 		out.merge(_behavior.debug_state())
@@ -279,68 +373,90 @@ func _contact_digest() -> Array:
 	return out
 
 
-## Called each physics frame by the character. Runs the SENSE → THINK → ACT loop: fold any hits in,
-## perceive, let the behaviour resolve what it knows + honour its commitments, ask Von for a new
-## decision only when free to, then let the behaviour carry out the current act.
+## Called each physics frame by the character. Runs the SENSE → THINK → ACT loop: fold queued events
+## in, perceive, let the behaviour resolve what it knows + honour its commitments, start a decision
+## walk only when free to (or restart one a new situation has overtaken), then let the behaviour carry
+## out the running primitive.
 func control(character, delta: float) -> void:
 	if character.is_dead:
 		return
 	if _character == null:
 		_character = character
 		_perception.set_faction(character.faction)
+		_client.set_npc_name(_npc_name())
 	_decide_timer -= delta
 	# SENSE.
-	_process_hits(character)
+	_process_events(character)
 	_perception.observe(character, rooms)
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
-		_behavior.entry_point = entry_point # Hand the injected entrance to the behaviour once.
+		_perception.entry_point = entry_point # Hand the injected entrance to the perception once.
 		entry_point = Vector2.ZERO
 	var known: Array = _perception.contacts(character.global_position)
 	if _behavior.update_known(known, delta):
 		_force = true # Lost the engaged contact mid-fight → reconsider.
 	_check_salient()
-	# An active interaction holds the tick; when it or a hold move resolves, re-decide at once.
+	# An active interaction holds the tick; when it or a move resolves, re-decide at once.
 	if _behavior.service_interaction(character, delta, _force):
 		return
 	if _behavior.take_resolved():
 		_force = true
+		var lead: String = _behavior.reached_lead()
+		if lead != "":
+			_perception.check_lead(lead) # Reached it and found nothing: don't send it back there.
 	# THINK.
-	if _should_decide():
-		_force = false
-		_decide_timer = decide_interval
-		_request_decision(character)
+	if _planner.is_pending():
+		if _force:
+			_maybe_interrupt(character)
+	elif _should_decide():
+		_start_decision(character)
 	# ACT.
 	_behavior.apply(character, delta)
 
 
-## Whether a new decision may be issued now: never while one is in flight; always when forced;
-## otherwise the behaviour decides whether its current commitment still holds (a fight, an approach, a
-## search patrol, a hold move) or the decide cadence has elapsed.
+## Whether a new decision may start now: always when forced; otherwise the behaviour decides whether
+## its current commitment still holds (a fight, a move, an approach) or the decide cadence has elapsed.
 func _should_decide() -> bool:
-	if _decision.is_pending():
-		return false
 	if _force:
 		return true
 	return _behavior.wants_decision(_character, _decide_timer <= 0.0)
 
 
-## Classify buffered hit events against the character and remember them: a hit on the NPC itself, or
-## a hit on anything within `hit_awareness_radius` (a shot landing close — being shot at and missed),
-## both count as being attacked: the incoming direction is remembered, the attacker is handed to the
-## hostility rules, and the combat engagement is refreshed so sustained fire keeps the NPC fighting.
-## The NPC's own hits are ignored. A hit forces an immediate re-decision only when it is NOT already
-## in combat (to kick off a fight); while fighting it just refreshes the engagement, so a firefight
-## doesn't re-ask Von every frame.
-func _process_hits(character) -> void:
-	if _hit_queue.is_empty():
+## A salient event arrived while a walk is in flight: restart the walk only when the situation now
+## calls for a different starting node (e.g. it came under fire mid-way through choosing a room to
+## search → straight to COMBAT). Otherwise the walk in flight already fits; let it finish.
+func _maybe_interrupt(character) -> void:
+	if _planner.entry_for(_perception.quick_facts(character)) != _planner.current_entry():
+		_start_decision(character)
+	else:
+		_force = false
+
+
+## Sense the situation and start a decision walk over it. The planner answers asynchronously via
+## `decided` / `failed` (the latter wired to the behaviour's steady-stance fallback).
+func _start_decision(character) -> void:
+	_force = false
+	_decide_timer = decide_interval
+	_apply_config()  # Pick up any export retuned at runtime before sensing + deciding.
+	var snapshot: Dictionary = _perception.sense(character, rooms, goal, _behavior.activity_text())
+	_last_facts = snapshot["facts"]
+	_planner.begin(snapshot, _behavior.ongoing())
+
+
+## Hand buffered EventBus events to the perception. A hit that is a relevant attack forces an
+## immediate re-decision only when the NPC is NOT already fighting (to kick off a fight); while
+## fighting it just refreshes the engagement, so a firefight doesn't re-ask Von every frame. Allies'
+## callouts are folded in when this NPC listens to them.
+func _process_events(character) -> void:
+	if _event_queue.is_empty():
 		return
-	for data in _hit_queue:
-		# Perception folds the hit into memory + hostility; a relevant attack kicks off a fight when
-		# not already in one (while fighting it only refreshes the engagement, no re-ask every frame).
-		if _perception.process_hit(character, data) and not _behavior.in_combat():
-			_force = true
-	_hit_queue.clear()
+	for ev in _event_queue:
+		if ev[0] == &"hit":
+			if _perception.process_hit(character, ev[1]) and not _behavior.in_combat():
+				_force = true
+		elif hear_callouts:
+			_perception.process_callout(character, ev[1])
+	_event_queue.clear()
 
 
 ## Force a re-decision when the NPC's BELIEF about hostiles changes: one is spotted, lost or newly
@@ -358,27 +474,38 @@ func _check_salient() -> void:
 		_force = true
 
 
-## Sense the situation and hand the decision context to the Von client. It answers asynchronously via
-## `decided` / `failed` (the latter wired to the behaviour's steady-stance fallback). The menus are
-## kept so the chosen ids can be resolved back into acts/moves by the behaviour when the answer arrives.
-func _request_decision(character) -> void:
-	var ctx: Dictionary = _perception.sense(character, rooms, goal)
-	_moves = ctx["moves"]
-	_acts = ctx["acts"]
-	_last_state = ctx["state_text"]  # Kept so `debug_state()` can show what Von was actually told.
-	_decision.request(ctx, _npc_name())
+## Adopt the planner's leaf: hand it to the behaviour, log the full decision path, and tell allies
+## (a combat or investigation decision) over the radio.
+func _on_decided(leaf: Dictionary) -> void:
+	_behavior.set_leaf(leaf)
+	print("%s (Von) %s  [%s]" % [_npc_name(), " - ".join(leaf["labels"]), _planner.walk_digest()])
+	if send_callouts and _character != null and not leaf["path"].is_empty() \
+			and str(leaf["path"][0]) in ["combat", "investigate"]:
+		_post_callout(leaf)
 
 
-## Adopt Von's top pick (relayed by the decision client): hand the chosen act + move to the behaviour
-## sub-domain and log the resulting intent.
-func _on_decided(act_id: String, move_id: String) -> void:
-	_behavior.set_act(act_id, _acts)
-	_behavior.set_move(move_id, _moves)
-	# Report Von's OWN pick whenever a policy rewrote it, so an override is never read as Von's choice.
-	var final_act: String = _behavior.current_act()
-	var override: String = _behavior.act_override()
-	var act_text: String = final_act if override == "" else "%s→%s [%s]" % [act_id, final_act, override]
-	print("%s (Von) act=%s move=%s intent=%s" % [_npc_name(), act_text, move_id, _behavior.intent()])
+## Broadcast this NPC's decision as an `&"callout"` EventBus event (interface 10): who is speaking and
+## where, its state, the decision path, its target and destination. Allies within range hear it.
+func _post_callout(leaf: Dictionary) -> void:
+	var params: Dictionary = leaf["params"]
+	var status: Array = []
+	if _perception.under_fire():
+		status.append("under fire")
+	var dmg: float = _character.damage_taken()
+	if dmg >= _perception.critical_threshold:
+		status.append("badly wounded")
+	elif dmg >= _perception.hurt_threshold:
+		status.append("hurt")
+	EventBus.post(&"callout", {
+		"speaker": _character,
+		"faction": _character.faction,
+		"position": _character.global_position,
+		"status": ", ".join(status),
+		"path": "/".join(leaf["path"]),
+		"label": " - ".join(leaf["labels"]),
+		"target_id": params.get("target_id", 0),
+		"point": params.get("point", _character.global_position),
+	})
 
 
 ## The driven character's name, for log lines.

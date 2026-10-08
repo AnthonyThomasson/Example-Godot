@@ -1,0 +1,16 @@
+{
+  "name": "target: close + aiming at you + clear shot beats far + unseen",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the kitchen, inside the house, holding a Pistol. You are hurt.\nKnown hostiles: 2 (1 in sight). Allies near you: none.\nDecided so far: COMBAT.",
+  "question": "Which hostile should you fight? Prefer the most dangerous one you can actually hit: close, armed, aiming at you or an ally.",
+  "options": {
+    "t_1": "Defender — in sight — close, in pistol range, south of you — aiming at you — you have a clear shot at them",
+    "t_2": "Defender2 — last seen recently — too far to shoot, north-east of you — your line to them is blocked"
+  },
+  "expect": [
+    "t_1"
+  ],
+  "ablate": [
+    " — aiming at you",
+    " — you have a clear shot at them"
+  ]
+}

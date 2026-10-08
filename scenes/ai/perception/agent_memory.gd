@@ -13,6 +13,11 @@ extends RefCounted
 ## oldest EXPIRABLE event (one with a positive ttl). Permanent events (ttl <= 0 — long-term facts
 ## like learned house knowledge) never age out and are never volume-evicted. So memory self-cleans
 ## its volatile events by age and by volume, both tunable per NPC, while keeping what it has learned.
+##
+## A write may name a `key` (the event's SUBJECT — a character id, a room key): it then supersedes
+## the live event with the same topic + key instead of piling up beside it. Something re-observed every
+## tick (a visible character) stays one entry per subject rather than flooding the log and volume-
+## evicting every other expirable event. Unkeyed writes always append.
 
 ## Fallback lifetime (seconds) for events remembered without an explicit ttl; <= 0 = no age expiry.
 var default_ttl: float = 0.0
@@ -25,15 +30,46 @@ var _entries: Array = []
 
 ## Record that something happened: append an event under `topic` with optional `data` (which may
 ## carry a `note` string for the decision state). `ttl` is its lifetime in seconds; a negative ttl
-## falls back to `default_ttl`. Evicts expired/overflow events afterward.
-func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0) -> void:
+## falls back to `default_ttl`. A non-empty `key` supersedes any earlier event with the same topic +
+## key (see the class note). Evicts expired/overflow events afterward.
+func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0, key: String = "") -> void:
+	if key != "":
+		_entries = _entries.filter(func(e): return e["topic"] != topic or e["key"] != key)
 	_entries.append({
 		"topic": topic,
+		"key": key,
 		"data": data,
 		"at": Time.get_ticks_msec(),
 		"ttl": ttl if ttl >= 0.0 else default_ttl,
 	})
 	_prune()
+
+
+## Seconds since the freshest live `topic` event whose data field `field` equals `value` was written
+## (INF when none is remembered) — how long ago something was last observed.
+func age_of(topic: StringName, field: String, value: Variant) -> float:
+	for i in range(_entries.size() - 1, -1, -1):
+		var entry: Dictionary = _entries[i]
+		if entry["topic"] == topic and not _expired(entry) and entry["data"].get(field) == value:
+			return (Time.get_ticks_msec() - entry["at"]) / 1000.0
+	return INF
+
+
+## Every live `topic` event as `{ data, age }` (age in seconds), newest first — for readers that grade
+## knowledge by how fresh it is (a sighting is a live contact, then an investigation lead).
+func recall_aged(topic: StringName) -> Array:
+	var out: Array = []
+	var now := Time.get_ticks_msec()
+	for i in range(_entries.size() - 1, -1, -1):
+		var entry: Dictionary = _entries[i]
+		if entry["topic"] == topic and not _expired(entry):
+			out.append({ "data": entry["data"], "age": (now - entry["at"]) / 1000.0 })
+	return out
+
+
+## Number of stored events (live or awaiting cleanup) — for the debug snapshot.
+func size() -> int:
+	return _entries.size()
 
 
 ## Whether any non-expired event of `topic` is remembered.

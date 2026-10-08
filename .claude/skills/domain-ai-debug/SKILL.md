@@ -26,8 +26,10 @@ only the area that would actually trigger a detection. It reads the controller's
 ## `agent_debug.gd` (toggles `show_actions`, `show_path`)
 
 Draws, next to the NPC:
-- a floating **action label** — the controller's `debug_status()` (intent, act verb + target, combat
-  phase, under-fire alert), which the controller forwards from the behaviour sub-domain.
+- a floating **action label** — the controller's `debug_status()`: the full decision path, every
+  level from the broad mode to the concrete option joined with " - " (`COMBAT - Intruder - FLANK -
+  their left side (kitchen)`), then the running primitive's progress and an under-fire alert. The
+  controller forwards it from the behaviour sub-domain.
 - the NPC's current **movement path** — the `NavigationAgent2D`'s remaining path as a polyline +
   waypoint dots + a target ring.
 

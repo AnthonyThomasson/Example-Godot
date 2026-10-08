@@ -1,0 +1,16 @@
+{
+  "name": "flank: (taken side dropped) cover + short hidden route beats in the open + long exposed",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nCurrent activity: COMBAT - Defender - ENGAGE - where you stand (in position, looking for a shot, for 3s).\nDefender — HOSTILE (seen) — in sight — in pistol range, north of you, in the kitchen — standing still — aiming at Invader2 — holding a Pistol.\nInvader2 (ally) — in sight — north-west of you, in the dining room — on Defender's left side — standing still.\nInvader2 (radio, just now): COMBAT - Defender - FLANK - their left side (dining room).\nFlanks on Defender (you are on their front): their left side — taken by Invader2, clear shot, cover, short hidden route; their right side — free, clear shot, cover, short hidden route; behind them — free, line blocked, in the open, long exposed route.\nDecided so far: COMBAT → Defender → FLANK.",
+  "question": "Which side should you flank Defender from? Prefer a free side behind or beside them, with cover and a short, hidden route.",
+  "options": {
+    "side_right": "their right side — east of them, in the kitchen — free — clear shot from there — cover close by (the fridge) — short hidden route",
+    "side_rear": "behind them — north of them, outside the house — free — line blocked from there — in the open — long exposed route"
+  },
+  "expect": [
+    "side_right"
+  ],
+  "ablate": [
+    "cover close by (the fridge)",
+    "short hidden route"
+  ]
+}

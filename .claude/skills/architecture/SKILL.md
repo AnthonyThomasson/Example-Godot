@@ -105,22 +105,28 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
    character's action API: `melee()` (F), `shoot()` (LMB), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing) and `faction` (allegiance tag, for AI hostility).
+   damage, for injury sensing) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   another character's `facing` and `damage_taken()` — but only while it can SEE that character
+   (aim and visible wounds are things it perceives).
    `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
    and `interaction_changed(active, label)`. Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
-   `current_act()` (its live decision) for those observers to show. Every NPC is the same generic goal-driven agent
+   `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
+   `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
+   side (kitchen)`) for those observers to show. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
    (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
-   a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory). Main
-   injects only `rooms`; the AI finds and categorizes the characters it perceives by sight. Von
-   picks WHAT to do from an act menu (engage a known hostile, search, hold, or a known object
-   interaction) ranked against the goal, and the behaviour derives the movement — no per-goal or
-   per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split across four
-   isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai` overview and
-   its `domain-ai-<name>` sub-skills.
+   a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
+   decision-tree config. Main injects only `rooms` (and `entry_point`); the AI finds and categorizes
+   the characters it perceives by sight. Von walks a data-driven DECISION TREE ranked against the
+   goal — a broad mode (combat / investigate / search / idle), then a tactic (engage / flank / push /
+   retreat / locate …), then a concrete option (a place, a firing spot, an object) — one `choice`
+   request per level, ending in a behaviour primitive (move / engage / melee / interact / hold) — no
+   per-goal or per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split
+   across four isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai`
+   overview and its `domain-ai-<name>` sub-skills.
 
 8. **Interaction ↔ Character & Objects** (kept deliberately isolated so it iterates alone)
    The character composes a `CharacterInteraction` component (`interaction/`) and exposes only
@@ -144,10 +150,16 @@ interface(s) and describes how they're implemented; this list is authoritative f
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.
     - `signal posted(topic, data)` — listeners connect and filter by `topic`.
-    The one topic in use is `&"hit"`: the Projectile System posts one per damaging hit and the
-    Character one per landed punch (`{ position, victim, source, direction, damage, attacker }`;
-    `attacker` = the striking character or null), and the AI controller consumes it for combat
-    awareness and hostility ("attacked me"). Emitters and listeners never reference each other (like `Despawner`).
+    Two topics are in use:
+    - `&"hit"`: the Projectile System posts one per damaging hit and the Character one per landed
+      punch (`{ position, victim, source, direction, damage, attacker }`; `attacker` = the striking
+      character or null). The AI controller consumes it for combat awareness, hostility ("attacked
+      me") and gunfire heard farther off; the match HUD for its combat feed.
+    - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
+      its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`). Allied
+      AI controllers within `callout_range` consume it (which flank an ally holds, whom it fights,
+      where to support it).
+    Emitters and listeners never reference each other (like `Despawner`).
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
@@ -157,10 +169,11 @@ main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
-AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input)
+AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
-UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.current_act)
+AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
+UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
 ```
 
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
