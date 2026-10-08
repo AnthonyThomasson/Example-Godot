@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the ten isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Example_Godot) — the eleven isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Example_Godot architecture
@@ -8,14 +8,14 @@ description: The architecture map for this Godot project (Example_Godot) — the
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a pistol that
 fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
-organized into **ten isolated domains** so each can be changed on its own.
+organized into **eleven isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
 through the interfaces listed here. **When working *inside* a domain, also load its
 `domain-<name>` skill** — that is where the deep implementation detail lives.
 
-**Before committing a change, run the `change-verification` skill**: it checks that domains stay
+**Before committing a change, run the `analysis-change-verification` skill**: it checks that domains stay
 isolated (cross-domain connections go only through the interfaces below), keeps this skill *and
 the domain skills* in sync when the architecture or a domain's internals change, and enforces
 concise current-state comments.
@@ -135,13 +135,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
 	 one `NavigationRegion2D` whose walkable area is the house footprint plus an outdoor ring minus the house's
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
-	 (baked in as a hole), so paths route around furniture; it also tags each solid furniture body
-	 with a dynamic avoidance `NavigationObstacle2D` for a piece shoved off its hole.
+	 (baked in as a hole), so paths route around furniture.
    `main.gd` calls it once after `WorldGen.generate`. Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
    `get_next_path_position()`. It does **not** enable RVO avoidance: a displaced piece of furniture is
-   simply bulldozed by the character's push physics, so the `NavigationObstacle2D` avoidance tags
-   currently have no consumer.
+   simply bulldozed by the character's push physics.
 
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.
@@ -188,7 +186,7 @@ Two conventions hold across domains; the per-domain specifics live in each domai
 - Main scene `res://scenes/main.tscn`. Use the **`godot-debug` skill** for a headless load check
   (run `--import` first when you add a `class_name`) and the **`godot-drive` skill** for driving the
   running game via the dev command server (`tools/gcmd.py`).
-- Use the **`change-verification` skill** before committing (domain isolation, doc/skill sync,
+- Use the **`analysis-change-verification` skill** before committing (domain isolation, doc/skill sync,
   comment hygiene, load check).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
   generation, movement/pushing, items, interactions, combat).

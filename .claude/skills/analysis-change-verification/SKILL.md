@@ -1,5 +1,5 @@
 ---
-name: change-verification
+name: analysis-change-verification
 description: Verify staged changes to this Godot project before they are committed. Use this whenever changes have been staged, a piece of work is being wrapped up, or the user asks to verify / review / check / sanity-check a change before committing — even if they don't say "verify". It audits domain isolation (cross-domain coupling must be minimal and flow only through the published interfaces in the `architecture` skill; a concern whose complexity bleeds across several domains should be pulled out into its own), keeps the `architecture` skill AND each domain's `domain-<name>` skill in sync when domains, interfaces, or a domain's internals change, and enforces concise current-state comments. Produces a checklist of issues, each with a specific file:line recommendation.
 ---
 

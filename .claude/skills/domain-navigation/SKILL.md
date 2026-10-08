@@ -22,19 +22,15 @@ only route leaves the far side unreachable — the AI's cue to shove through). T
 house's local frame and the region is offset by `house.position`, so the map lands in world space.
 `main.gd` calls it once after `WorldGen.generate`.
 
-Baked holes are a **static snapshot** taken at build time. To cover a piece that gets shoved off its
-hole during play, `_add_furniture_avoiders` also attaches a dynamic **avoidance** `NavigationObstacle2D`
-(a circle of the piece's inscribed half-extent, `avoidance_enabled`, `affect_navigation_mesh = false`)
-as a child of each solid body, so it follows the piece. Solid furniture is recognised by engine type
-alone — a non-frozen `RigidBody2D` with a `CollisionShape2D` (walls are `StaticBody2D`; non-solid decor
-freezes itself) — so Navigation stays a leaf that imports nothing.
+Baked holes are a **static snapshot** taken at build time. A piece shoved off its hole during play is
+not re-baked and gets no dynamic avoidance — the NPC bulldozes it with its own push physics instead.
+Solid furniture is recognised by engine type alone — a non-frozen `RigidBody2D` with a
+`CollisionShape2D` (walls are `StaticBody2D`; non-solid decor freezes itself) — so Navigation stays a
+leaf that imports nothing.
 
 Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automatically. The AI's
-locomotion sets `target_position` and steers at `get_next_path_position()`. It does **not** turn on
-the agent's RVO avoidance (that caused a visible slowdown near displaced furniture), so the
-`NavigationObstacle2D` avoiders above presently have **no consumer** — an NPC bulldozes a shoved piece
-with its own push physics instead. They are left in place for a future avoidance consumer; delete
-`_add_furniture_avoiders` if that never materializes.
+locomotion sets `target_position` and steers at `get_next_path_position()`; it does **not** turn on
+the agent's RVO avoidance.
 
 ## Interface recap (authoritative in the `architecture` skill)
 

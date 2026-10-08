@@ -7,20 +7,18 @@ extends RefCounted
 ## (the walls) are parsed as obstructions, so doorways — gaps in the walls — stay open. It also bakes
 ## each solid furniture footprint in as a hole (_add_furniture_holes), so paths route AROUND furniture
 ## and reroute through another doorway when the near one is blocked (and a piece sealing the only
-## route leaves the far side unreachable). Baked holes are a static snapshot; to cover a piece shoved
-## off its hole during play, each solid body also gets a dynamic avoidance NavigationObstacle2D
-## (_add_furniture_avoiders) that agents with avoidance on steer around. Any NavigationAgent2D
-## pathfinds against this map automatically. Imports nothing from other domains — it reads a plain
-## `rooms` array and a Node, and recognises furniture by engine type (RigidBody2D) alone.
+## route leaves the far side unreachable). Any NavigationAgent2D pathfinds against this map
+## automatically. Imports nothing from other domains — it reads a plain `rooms` array and a Node, and
+## recognises furniture by engine type (RigidBody2D) alone.
 
 ## Extra clearance (px) baked around walls, on top of the agent radius, so paths don't hug walls.
 const WALL_MARGIN := 4.0
 ## Padding (px) added around the room-union footprint: a walkable outdoor ring around the house, so
 ## characters outside (e.g. an invader) can path around it to a door.
 const BOUNDS_PAD := 160.0
-## Padding (px) grown around a furniture footprint for its nav obstacle, so paths clear the piece.
+## Padding (px) grown around a furniture footprint before it is baked in as a hole, so paths clear it.
 const OBSTACLE_MARGIN := 6.0
-## Segment count approximating a circular footprint as an obstacle polygon.
+## Segment count approximating a circular furniture footprint as an obstruction polygon.
 const CIRCLE_SEGMENTS := 10
 
 
@@ -60,8 +58,6 @@ static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float
 	region.position = house.position
 	region.navigation_polygon = nav_poly
 	parent.add_child(region)
-
-	_add_furniture_avoiders(house)
 	return region
 
 
@@ -86,25 +82,6 @@ static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, hou
 		for p in outline:
 			local.append(p - house.position)
 		source.add_obstruction_outline(local)
-
-
-## Attach a dynamic circular NavigationObstacle2D to each solid furniture body for RVO avoidance, so
-## an agent that has avoidance on steers around a piece that got shoved off its baked hole. The
-## obstacle is a child of the body, so it follows the piece. It does not carve the navmesh (the baked
-## holes do that); its radius is the piece's inscribed half-extent, so it only nudges a nearby agent.
-static func _add_furniture_avoiders(house: Node2D) -> void:
-	for node in _descendants(house):
-		var body := node as RigidBody2D
-		if body == null or body.freeze:
-			continue
-		var col := _collision_shape(body)
-		if col == null:
-			continue
-		var obstacle := NavigationObstacle2D.new()
-		obstacle.affect_navigation_mesh = false
-		obstacle.avoidance_enabled = true
-		obstacle.radius = _avoid_radius(col)
-		body.add_child(obstacle)
 
 
 ## Every descendant node of `root`, depth-first (so furniture nested under room containers is found).
@@ -145,18 +122,6 @@ static func _footprint_world(col: CollisionShape2D) -> PackedVector2Array:
 	for p in local:
 		out.append(xform * p)
 	return out
-
-
-## A circular avoidance radius for a piece: its inscribed half-extent plus OBSTACLE_MARGIN, so RVO
-## only nudges an agent that gets close to a displaced piece (the baked holes handle the rest).
-static func _avoid_radius(col: CollisionShape2D) -> float:
-	var shape := col.shape
-	if shape is RectangleShape2D:
-		var s := (shape as RectangleShape2D).size
-		return minf(s.x, s.y) * 0.5 + OBSTACLE_MARGIN
-	if shape is CircleShape2D:
-		return (shape as CircleShape2D).radius + OBSTACLE_MARGIN
-	return 0.0
 
 
 ## The union of every room's world-space rect (zero-size Rect2 if `rooms` is empty).

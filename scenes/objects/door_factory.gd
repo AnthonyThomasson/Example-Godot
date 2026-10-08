@@ -8,6 +8,7 @@ class_name DoorFactory
 const DoorScript = preload("res://scenes/objects/door/door.gd")
 const DoorVisualsScript = preload("res://scenes/objects/door/door_visuals.gd")
 
+## Build a Door entity from doorway geometry and add it under `parent`; returns the node.
 static func spawn(hinge_world: Vector2, closed_dir: Vector2, length: float, thickness: float,
 		swing_sign: float, parent: Node) -> Node:
 	var door := RigidBody2D.new()

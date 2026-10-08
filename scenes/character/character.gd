@@ -283,6 +283,7 @@ func take_damage(amount: float) -> void:
 	_apply_damage(amount)
 
 
+## Apply `amount` of damage to health (shared by the punch and projectile paths), dying at zero.
 func _apply_damage(amount: float) -> void:
 	if is_dead:
 		return
@@ -291,6 +292,7 @@ func _apply_damage(amount: float) -> void:
 		_die()
 
 
+## Mark the character dead and halt its motion, emitting `died` for observers.
 func _die() -> void:
 	is_dead = true
 	velocity = Vector2.ZERO
