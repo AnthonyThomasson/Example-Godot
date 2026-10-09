@@ -554,6 +554,24 @@ func has_line_to(character, target: Node2D, point: Vector2) -> bool:
 	return not _tactics.blocked(space, character.global_position, point, exclude)
 
 
+## Of world `points`, the subset the NPC can SEE right now from where it stands — view cone + clear
+## line of sight over low cover, the same sight rule used to spot characters (agent_vision.gd). The
+## behaviour uses it to track which parts of a room a searcher has covered. Builds the sight query
+## from the character; the NPC excludes itself.
+func visible_points(character, points: Array) -> Array:
+	if points.is_empty():
+		return []
+	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
+	var exclude := [character.get_rid()]
+	var self_pos: Vector2 = character.global_position
+	var facing: Vector2 = character.facing
+	var seen: Array = []
+	for p in points:
+		if _vision.can_see(self_pos, facing, p, space, exclude):
+			seen.append(p)
+	return seen
+
+
 ## Candidate standing points on a ring around the NPC, classified for peek-and-cover against the
 ## engaged contact's KNOWN position `tgt_pos`: `fire` points have a clear line to it; `cover` points
 ## are shielded from it by a high-coverage solid. Both nearest-first (see agent_tactics.gd).

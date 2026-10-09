@@ -1,6 +1,6 @@
 ---
 name: domain-ai-debug
-description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the three draw-only overlays on an NPC. The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), and the tactics overlay (the candidate navigation zones it weighed). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, or the tactical-zone overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the four draw-only overlays on an NPC. The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), the tactics overlay (the candidate navigation zones it weighed), and the search overlay (room-coverage points a searcher is seeing / still to see). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, the tactical-zone overlay, or the search-coverage overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Debug sub-domain (`scenes/ai/debug/`)
@@ -14,6 +14,7 @@ Files:
 - `vision_debug.gd` — the NPC's actual visible area.
 - `agent_debug.gd` — the NPC's current decision + path.
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
+- `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
 
 ## `vision_debug.gd` (toggle `show_vision`)
 
@@ -67,10 +68,24 @@ recently), `unknown` grey (not yet seen). This is the room reasoning the search 
 are placed against, and it is per-NPC: a familiar defender knows every room from the start while an
 invader's rooms turn from `unknown` to known as it sees them. Drawn behind the point zones.
 
+## `search_debug.gd` (toggle `show_search` — off by default; shown for the SELECTED NPC)
+
+Visualizes how a `look_around` search move is covering the room by sight (see the behaviour skill).
+Defaults off like the tactics overlay: in spectator mode the inspector turns it on only for the
+clicked NPC (it is one of the `_flags`), and in player mode `main.gd`'s `show_search` drives it.
+From the controller's `debug_search_coverage()` (`{ active, points, unseen, target, budget }`) it
+draws, **only while the NPC is actively covering a room** (`active`): every room sample point dim,
+the still-UNSEEN ones bright gold on top (so coverage visibly fills in as they wink out), a red line +
+ring to the point the NPC is looking at / walking to right now (`target`), and a `searched N/total`
+count beside the NPC. Nothing is drawn once the room is covered (the move resolves) or when the NPC
+isn't searching. Like the others it draws on its own child Node2D, reads only the controller's public
+API, and runs `PROCESS_MODE_ALWAYS`.
+
 ## Note on the controller's observer getters
 
-All three overlays depend on the controller keeping its observer getters and the Vision exports public.
+All four overlays depend on the controller keeping its observer getters and the Vision exports public.
 The controller is the single authoring/observer surface: it forwards `debug_status()` (and
 `current_act()`) from the behaviour sub-domain, builds `debug_zones()` from the last perception snapshot
-it holds, forwards `debug_room_zones()` from the perception's `room_status()`, and holds the Vision
-group exports — so these overlays need no reference into the perception/behaviour internals.
+it holds, forwards `debug_room_zones()` from the perception's `room_status()` and
+`debug_search_coverage()` from the behaviour's `debug_coverage()`, and holds the Vision group exports —
+so these overlays need no reference into the perception/behaviour internals.

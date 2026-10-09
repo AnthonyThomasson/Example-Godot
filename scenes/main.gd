@@ -33,6 +33,8 @@ extends Node2D
 @export var show_tactics: bool = true
 ## When false, the tactical room-zone overlay (each room tinted by how the NPC regards it) is hidden.
 @export var show_room_zones: bool = true
+## When false, the search-coverage overlay (room sample points a searcher is seeing / still to see) is hidden.
+@export var show_search: bool = true
 ## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
 @export var show_nav_holes: bool = true
 
@@ -206,6 +208,7 @@ func _setup_spectator() -> void:
 		"show_vision": show_vision,
 		"show_tactics": show_tactics,
 		"show_room_zones": show_room_zones,
+		"show_search": show_search,
 	})
 	var debug := get_node_or_null("DebugUI")
 	if debug:
@@ -286,7 +289,7 @@ func _bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> 
 
 ## Apply the current debug-overlay toggles to every spawned NPC. Duck-typed by property name so
 ## Main doesn't depend on the debug nodes' class or path — any child with show_actions / show_path /
-## show_vision / show_tactics / show_room_zones gets the matching toggle value.
+## show_vision / show_tactics / show_room_zones / show_search gets the matching toggle value.
 func _configure_debug() -> void:
 	for npc in _combatants:
 		for child in npc.get_children():
@@ -300,3 +303,5 @@ func _configure_debug() -> void:
 				child.show_tactics = show_tactics
 			if "show_room_zones" in child:
 				child.show_room_zones = show_room_zones
+			if "show_search" in child:
+				child.show_search = show_search

@@ -7,7 +7,7 @@ extends Node
 ## re-decision is due. The primitives:
 ##   move     — go to `point` (or until entering `arrive_room`), aiming along the way (`aim`: travel /
 ##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`; a
-##              `look_around` search move pauses on arrival and sweeps its gaze back and forth to scan the room.
+##              `look_around` search move covers the room by sight: it turns and relocates until it has seen all of it.
 ##   engage   — go to `point`, then fight `target_id` from there: `peek_cover` (step out, shoot, duck)
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
@@ -26,18 +26,16 @@ const PISTOL_SLOT := 3
 const FISTS_SLOT := 2
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
-## How near (radians) the gaze must be to a look-around swing's goal to count as reached.
-const LOOK_REACHED := 0.05
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
 var max_commit_time: float = 6.0
-var search_dwell: float = 2.5     ## Seconds to pause and look around after reaching a search/explore room.
-var search_look_arc: float = 1.2  ## Base half-arc (rad) the look-around gaze swings to either side of the arrival facing.
-var search_look_rate: float = 2.5 ## Base gaze turn speed (rad/s) during a look-around swing.
-var search_look_pause: float = 0.5 ## Base seconds the gaze dwells at each swing's extreme before reversing.
-var search_look_jitter: float = 0.15 ## Random angle (rad, ±) added to each swing's goal so it isn't perfectly symmetric.
-var search_look_variance: float = 0.5 ## Fraction (0..1) the arc/rate/pause are randomized per swing (0 = uniform metronome).
+var search_look_rate: float = 2.5 ## Gaze turn speed (rad/s) while a searcher looks around a room it is covering.
+var search_coverage_spacing: float = 64.0 ## Room sample-grid spacing (px): smaller = finer coverage, more sight rays.
+var search_coverage_target: float = 1.0 ## Fraction of sampled points that must be SEEN to call a room covered (1 = all).
+var search_coverage_budget: float = 8.0 ## Max seconds spent covering one room before giving up and re-deciding (safety cap).
+var search_coverage_approach: float = 300.0 ## Walk toward an unseen point beyond this range (or whose line is blocked); else just turn to it.
+var search_coverage_margin: float = 24.0 ## Inset (px) from the room's walls where sampling starts, so points sit off the walls.
 var tactic_interval: float = 3.0
 var shoot_range: float = 500.0
 var punch_range: float = 48.0
@@ -63,13 +61,13 @@ var _leaf_ms := 0                 ## When the running leaf was adopted.
 var _point := Vector2.ZERO        ## The leaf's destination, snapped onto the navmesh.
 var _arrive_room := ""            ## A move that completes on ENTERING this room ("" = on reaching `_point`); ignored while looking around.
 var _arrived := false             ## Whether the destination has been reached.
-var _look_around := false         ## A search/explore move that pauses to look around on arrival (vs resolving at once).
-var _look_timer := 0.0            ## Seconds left in the look-around pause.
-var _look_base := 0.0             ## Facing angle (rad) the look-around sweep pans around.
-var _look_angle := 0.0            ## Current gaze offset (rad) from `_look_base` during the look-around.
-var _look_goal := 0.0             ## The current swing's goal offset (rad) from `_look_base`.
-var _look_speed := 0.0            ## This swing's gaze turn speed (rad/s), randomized per swing.
-var _look_hold := 0.0             ## Seconds left dwelling at the current swing's extreme (>0 = holding, not turning).
+var _look_around := false         ## A search/explore move that covers the room by sight on arrival (vs resolving at once).
+var _look_angle := 0.0            ## Current gaze angle (rad), eased toward the nearest unseen point so looking is smooth.
+var _cover_points: Array = []     ## All room sample points this search (kept whole for the coverage fraction + debug).
+var _cover_unseen: Array = []     ## The subset of `_cover_points` not yet SEEN (view cone + line of sight).
+var _cover_target := Vector2.ZERO ## The unseen point currently being looked at / walked to (for the debug overlay).
+var _cover_room := ""             ## Key of the room being covered, locked on arrival.
+var _cover_budget := 0.0          ## Seconds left before the coverage gives up on unseeable nooks and re-decides.
 var _engage_id := 0               ## Instance id of the contact being fought (0 = none).
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
@@ -213,6 +211,19 @@ func debug_state() -> Dictionary:
 	}
 
 
+## Read-only: the running search-coverage state, for the search debug overlay. `active` is true only
+## while a `look_around` move is actually covering a room (arrived, not yet resolved); `points` are all
+## the room's sample points, `unseen` the ones still to be seen, `target` the one being looked at now.
+func debug_coverage() -> Dictionary:
+	return {
+		"active": _primitive == &"move" and _look_around and _arrived and not _resolved,
+		"points": _cover_points,
+		"unseen": _cover_unseen,
+		"target": _cover_target,
+		"budget": _cover_budget,
+	}
+
+
 ## A params dict with points as [x, y] and objects as names, so an observer can serialize it.
 func _json_safe(d: Dictionary) -> Dictionary:
 	var out := {}
@@ -242,7 +253,10 @@ func set_leaf(leaf: Dictionary) -> void:
 	_commit_timer = max_commit_time
 	_arrive_room = str(_params.get("arrive_room", ""))
 	_look_around = bool(_params.get("look_around", false))
-	_look_timer = 0.0
+	_cover_points = []          # Room sample points, built on arrival once we know which room we're in.
+	_cover_unseen = []
+	_cover_target = Vector2.ZERO
+	_cover_room = ""
 	_point = _loco.reachable(_params["point"]) if _params.has("point") else Vector2.ZERO
 	_target_obj = null
 	_engage_id = 0
@@ -363,8 +377,8 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 		&"melee":
 			return _tactic_timer <= 0.0 or not _perception.engaged_fresh()
 		&"move":
-			if _look_around and _arrived and _look_timer > 0.0:
-				return false  # Hold through the look-around pause; the move itself ends it when it elapses.
+			if _look_around and _arrived and not _resolved:
+				return false  # Hold through room coverage; it ends itself (all seen, or the budget runs out).
 			return _commit_timer <= 0.0
 		&"interact":
 			return _commit_timer <= 0.0
@@ -391,8 +405,9 @@ func apply(character, delta: float) -> void:
 
 ## Move: walk to the destination (or into the destination room), aiming as the leaf asks, and — when
 ## `fire_at_will` — shoot a known hostile the moment there is a clear line. A `look_around` move (search /
-## explore) walks all the way to the interior point and, on arrival, pauses `search_dwell` seconds sweeping
-## its view before flagging the task resolved; any other move flags resolved the moment it arrives.
+## explore) walks all the way to the interior point and, on arrival, COVERS the room by sight — turning
+## and relocating until it has seen (near-)every sampled point (see `_cover_room_step`) — before flagging
+## the task resolved; any other move flags resolved the moment it arrives.
 func _apply_move(character, delta: float) -> void:
 	if not _arrived:
 		if _arrive_room != "" and not _look_around:
@@ -401,27 +416,53 @@ func _apply_move(character, delta: float) -> void:
 			_arrived = _loco.reached(character, _point)
 		if _arrived:
 			if _look_around:
-				_look_timer = search_dwell  # Pause and scan the room before deciding where to go next.
-				_look_base = character.facing.angle()
-				_look_angle = 0.0
-				_look_hold = 0.0
-				_next_look_swing(1.0)  # Kick off the first swing to one side.
+				_begin_coverage(character)
 			else:
 				_resolved = true
 	if not _arrived:
 		_loco.move_to(character, _point)
-	else:
-		character.move_input = Vector2.ZERO
-		if _look_around:
-			_look_timer -= delta
-			_scan_around(character, delta)
-			if _look_timer <= 0.0:
-				_look_around = false
-				_resolved = true
-			return
+	elif _look_around:
+		_cover_room_step(character, delta)  # Look around until the room is covered by sight.
+		return
 	_aim_move(character)
 	if _params.get("fire_at_will", false):
 		_fire_at_will(character)
+
+
+## Start covering the room on arrival: lock the room, sample it into points to be seen, and begin the
+## time budget. `_room_key_at` may be "" (an explore point in no room); then the sample is empty and
+## coverage resolves at once (a single look), which is the graceful fallback.
+func _begin_coverage(character) -> void:
+	_cover_room = _room_key_at(character.global_position)
+	_cover_points = _sample_room(_cover_room)
+	_cover_unseen = _cover_points.duplicate()
+	_cover_target = character.global_position
+	_cover_budget = search_coverage_budget
+	_look_angle = character.facing.angle()
+
+
+## One tick of room coverage: drop every sample point now in sight, then — if the room isn't covered
+## yet and the budget holds — turn the gaze toward the nearest unseen point and, when it is far or its
+## line is blocked (behind furniture), walk toward it so a new vantage reveals it. Resolves (forcing a
+## re-decision) once `search_coverage_target` of the points are seen or the budget runs out.
+func _cover_room_step(character, delta: float) -> void:
+	for p in _perception.visible_points(character, _cover_unseen):
+		_cover_unseen.erase(p)
+	_cover_budget -= delta
+	if _cover_unseen.size() <= floori(_cover_points.size() * (1.0 - search_coverage_target)) or _cover_budget <= 0.0:
+		_look_around = false
+		_resolved = true
+		return
+	var self_pos: Vector2 = character.global_position
+	var target: Vector2 = _nearest(self_pos, _cover_unseen)
+	_cover_target = target
+	var desired := (target - self_pos).angle()
+	_look_angle = rotate_toward(_look_angle, desired, search_look_rate * delta)
+	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
+	if self_pos.distance_to(target) > search_coverage_approach or not _perception.has_line_to(character, null, target):
+		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
+	else:
+		character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.
 
 
 ## Where a moving NPC looks: its target, the nearest known threat, the destination, or (default) the
@@ -441,36 +482,6 @@ func _aim_move(character) -> void:
 			return
 	if character.move_input != Vector2.ZERO:
 		character.aim_point = character.global_position + character.move_input * 100.0
-
-
-## During a search/explore pause, sweep the aim — and so the view cone — back and forth around where
-## the NPC ended up facing, so it looks around the room instead of re-deciding the instant it arrives.
-## Each swing eases the gaze to one extreme, dwells there a beat, then reverses; the arc, turn speed
-## and dwell are randomized per swing (by `search_look_variance`) so it reads as scanning, not a wiper.
-func _scan_around(character, delta: float) -> void:
-	if _look_hold > 0.0:
-		_look_hold -= delta  # Dwelling at an extreme; reverse once the beat elapses.
-		if _look_hold <= 0.0:
-			_next_look_swing(-signf(_look_goal))
-	else:
-		_look_angle = move_toward(_look_angle, _look_goal, _look_speed * delta)
-		if absf(_look_angle - _look_goal) <= LOOK_REACHED:
-			_look_hold = search_look_pause * _look_rand_factor()  # Reached this side; pause before reversing.
-	character.aim_point = character.global_position + Vector2.from_angle(_look_base + _look_angle) * 100.0
-
-
-## Begin the next look-around swing toward side `dir` (+1 / −1): pick its goal offset, randomized arc
-## and jitter, and a randomized turn speed. Randomness here is cosmetic gaze variation, so it uses the
-## global RNG and is deliberately NOT tied to the run's seeded world-gen RNG.
-func _next_look_swing(dir: float) -> void:
-	var jitter: float = randf_range(-search_look_jitter, search_look_jitter)
-	_look_goal = dir * search_look_arc * _look_rand_factor() + jitter
-	_look_speed = search_look_rate * _look_rand_factor()
-
-
-## A per-swing random multiplier `1 ± search_look_variance`, so variance 0 collapses to a uniform sweep.
-func _look_rand_factor() -> float:
-	return 1.0 + randf_range(-search_look_variance, search_look_variance)
 
 
 ## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the
@@ -647,6 +658,45 @@ func _room_key_at(p: Vector2) -> String:
 		if (room["rect"] as Rect2).has_point(p):
 			return str(room["key"])
 	return ""
+
+
+## Grid-sample room `room_key` into the points a searcher must SEE to have covered it: the rect inset
+## by `search_coverage_margin` (to keep points off the walls), stepped by `search_coverage_spacing`,
+## dropping any point not on the navmesh — i.e. inside a carved furniture footprint — so search points
+## sit on open floor, not on furniture (which also keeps unseeable points out of the coverage set).
+## Deterministic (no RNG). Empty when the room is unknown (coverage then resolves at once).
+func _sample_room(room_key: String) -> Array:
+	var points: Array = []
+	for room in rooms:
+		if str(room["key"]) != room_key:
+			continue
+		var r: Rect2 = (room["rect"] as Rect2).grow(-search_coverage_margin)
+		if r.size.x <= 0.0 or r.size.y <= 0.0:
+			r = room["rect"]  # Too small to inset; use the whole rect.
+		var step: float = maxf(search_coverage_spacing, 8.0)
+		var x: float = r.position.x + step * 0.5
+		while x < r.end.x:
+			var y: float = r.position.y + step * 0.5
+			while y < r.end.y:
+				var p := Vector2(x, y)
+				if _loco.on_navmesh(p):  # Skip furniture holes / off-walkable so points land on open floor.
+					points.append(p)
+				y += step
+			x += step
+		break
+	return points
+
+
+## The point in `points` nearest `from` (world space); `from` when the list is empty.
+func _nearest(from: Vector2, points: Array) -> Vector2:
+	var best: Vector2 = from
+	var best_d := INF
+	for p in points:
+		var d: float = from.distance_squared_to(p)
+		if d < best_d:
+			best_d = d
+			best = p
+	return best
 
 
 ## Whether the chosen interaction on `_target_obj` is currently reachable (lets the approach stop and

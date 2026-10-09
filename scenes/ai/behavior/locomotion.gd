@@ -35,6 +35,20 @@ func reachable(p: Vector2) -> Vector2:
 	return NavigationServer2D.map_get_closest_point(map, p)
 
 
+## Whether world point `p` lies ON the baked navmesh — i.e. walkable floor, not inside a carved
+## furniture hole or outside the walkable area — true when the closest navmesh point is within `tol`
+## px of `p`. Returns true when there is no agent or the map isn't baked yet (nothing to test against),
+## so callers don't over-filter during the first frames. Used to keep search-coverage points off
+## furniture.
+func on_navmesh(p: Vector2, tol: float = 8.0) -> bool:
+	if _agent == null:
+		return true
+	var map: RID = _agent.get_navigation_map()
+	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
+		return true
+	return NavigationServer2D.map_get_closest_point(map, p).distance_to(p) <= tol
+
+
 ## Read-only: the pathing state behind the current move, for the AI's `debug_state()` snapshot. Uses
 ## only side-effect-free agent reads — notably NOT `get_next_path_position()`, which advances the
 ## agent's path index and so would perturb movement if called out of band by an observer. `next` is

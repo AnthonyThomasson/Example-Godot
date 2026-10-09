@@ -51,6 +51,9 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
   `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
+- `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
+  cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
+  room and asks each tick which sampled points it has now seen).
 
 ## The snapshot (what the planner walks) — built by `agent_snapshot.gd`
 

@@ -54,21 +54,21 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var interaction_dwell: float = 3.0
 ## Safety cap (s) on committing to a move or to reaching an object, so a blocked path still re-decides.
 @export var max_commit_time: float = 6.0
-## Seconds the NPC pauses to look around a room on reaching it while searching/exploring, before deciding
-## where to go next. Stops it re-deciding the instant it crosses a room's edge (and bouncing on the boundary).
-@export var search_dwell: float = 2.5
-## Look-around sweep during a search pause: base half-arc (rad) the gaze swings to either side of the
-## facing the NPC arrived with.
-@export var search_look_arc: float = 1.2
-## Base gaze turn speed (rad/s) during a look-around swing.
+## When searching a room the NPC looks around until it has SEEN (near-)every part of it (view cone +
+## line of sight). These tune that coverage. Gaze turn speed (rad/s) as it looks from point to point.
 @export var search_look_rate: float = 2.5
-## Base seconds the gaze dwells at each swing's extreme before reversing.
-@export var search_look_pause: float = 0.5
-## Random angle (rad, ±) added to each swing's goal so the sweep isn't perfectly symmetric.
-@export var search_look_jitter: float = 0.15
-## Fraction (0..1) the look-around arc/rate/pause are randomized per swing, so it reads as scanning
-## rather than a metronome (0 = uniform sweep).
-@export var search_look_variance: float = 0.5
+## Room sample-grid spacing (px): smaller = finer coverage but more sight rays per tick.
+@export var search_coverage_spacing: float = 64.0
+## Fraction (0..1) of sampled points that must be seen to call a room covered (1 = all; < 1 tolerates
+## nooks it can never see into).
+@export var search_coverage_target: float = 1.0
+## Max seconds spent covering one room before giving up on unseeable spots and re-deciding (safety cap).
+@export var search_coverage_budget: float = 8.0
+## If the nearest unseen point is farther than this (px) or its line is blocked, the NPC walks toward
+## it to get a view; otherwise it just turns to look.
+@export var search_coverage_approach: float = 300.0
+## Inset (px) from a room's walls where coverage sampling starts, so search points sit off the walls.
+@export var search_coverage_margin: float = 24.0
 ## Range (px) of the pistol: shots are taken within it, and distances are banded against it for Von.
 @export var shoot_range: float = 500.0
 ## Range (px) within which a punch lands.
@@ -335,12 +335,12 @@ func _apply_config() -> void:
 	_planner.inside_only = defend_territory
 	_behavior.interaction_dwell = interaction_dwell
 	_behavior.max_commit_time = max_commit_time
-	_behavior.search_dwell = search_dwell
-	_behavior.search_look_arc = search_look_arc
 	_behavior.search_look_rate = search_look_rate
-	_behavior.search_look_pause = search_look_pause
-	_behavior.search_look_jitter = search_look_jitter
-	_behavior.search_look_variance = search_look_variance
+	_behavior.search_coverage_spacing = search_coverage_spacing
+	_behavior.search_coverage_target = search_coverage_target
+	_behavior.search_coverage_budget = search_coverage_budget
+	_behavior.search_coverage_approach = search_coverage_approach
+	_behavior.search_coverage_margin = search_coverage_margin
 	_behavior.tactic_interval = tactic_interval
 	_behavior.shoot_range = shoot_range
 	_behavior.punch_range = punch_range
@@ -431,6 +431,13 @@ func debug_room_zones() -> Array:
 	if _character == null or _perception == null:
 		return []
 	return _perception.room_status(rooms, _character.global_position)
+
+
+## Read-only: the behaviour's running search-coverage state (which room sample points it has seen vs.
+## still needs to, and the one it is looking at now), for the search debug overlay. Empty/inactive when
+## the NPC isn't currently covering a room.
+func debug_search_coverage() -> Dictionary:
+	return _behavior.debug_coverage() if _behavior != null else {}
 
 
 ## Non-room go-to options the room/search groups carry: the NPC's starting post, the front entrance,
