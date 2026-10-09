@@ -142,7 +142,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 one `NavigationRegion2D` whose walkable area is the house footprint plus an outdoor ring minus the house's
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
 	 (baked in as a hole), so paths route around furniture.
-   `main.gd` calls it once after `WorldGen.generate`. Any `NavigationAgent2D` then pathfinds
+   - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
+	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
+   `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay right
+   after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
    `get_next_path_position()`. It does **not** enable RVO avoidance: a displaced piece of furniture is
    simply bulldozed by the character's push physics.

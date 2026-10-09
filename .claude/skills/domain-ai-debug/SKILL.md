@@ -1,6 +1,6 @@
 ---
 name: domain-ai-debug
-description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the two draw-only overlays on an NPC. The vision overlay (LoS-masked FOV cone + awareness bubble) and the agent overlay (floating action label + current navigation path). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, or the movement-path overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the three draw-only overlays on an NPC. The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), and the tactics overlay (the candidate navigation zones it weighed). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, or the tactical-zone overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Debug sub-domain (`scenes/ai/debug/`)
@@ -13,6 +13,7 @@ preset scene (`character/npc.tscn`).
 Files:
 - `vision_debug.gd` — the NPC's actual visible area.
 - `agent_debug.gd` — the NPC's current decision + path.
+- `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
 
 ## `vision_debug.gd` (toggle `show_vision`)
 
@@ -35,9 +36,32 @@ Draws, next to the NPC:
 
 `label_color` / `path_color` are set per side in the preset scenes to match the body colour.
 
+## `tactics_debug.gd` (toggles `show_tactics`, `show_room_zones` — both off by default)
+
+The tactical-geometry overlay, in two independent aspects (both draw on the NPC's own child Node2D,
+reading the controller's public API; both default off — they are dense).
+
+**Point zones (`show_tactics`)** — the candidate positions the NPC's perception laid out for its last
+decision, from the controller's `debug_zones()`: a flat list of `{ point, category }`, one per option
+in the last snapshot's option groups that carries a world location (its `point` param, or an
+interactable's current position). Each is a translucent disc + outline + a dot at the exact point,
+coloured by `category` (`fire` red, `flank` orange, `advance` yellow, `retreat` blue, `lead` purple,
+`search` green, `room` teal, `interaction` white — `ZONE_COLORS`); each category is labelled once
+beside its first marker, so the palette reads as an in-world legend. Options with no location (a
+point-blank punch, the hostile picks) are skipped. These refresh each decision (the decide cadence).
+
+**Room zones (`show_room_zones`)** — every room of the house drawn as a rectangle (faint fill + 2px
+outline + a `type · status` tag in the corner), from the controller's `debug_room_zones()`: a list of
+`{ rect, type, status }`, tinted by how THIS NPC regards the room right now (`ROOM_COLORS`) —
+`current` gold (the room it stands in), `searched` green, `unsearched` orange (seen but not searched
+recently), `unknown` grey (not yet seen). This is the room reasoning the search / room / flank points
+are placed against, and it is per-NPC: a familiar defender knows every room from the start while an
+invader's rooms turn from `unknown` to known as it sees them. Drawn behind the point zones.
+
 ## Note on the controller's observer getters
 
-Both overlays depend on the controller keeping `debug_status()` and the Vision exports public. The
-controller is the single authoring/observer surface: it forwards `debug_status()` (and `current_act()`)
-from the behaviour sub-domain and holds the Vision group exports, so these overlays need no reference
-into the perception/behaviour internals.
+All three overlays depend on the controller keeping its observer getters and the Vision exports public.
+The controller is the single authoring/observer surface: it forwards `debug_status()` (and
+`current_act()`) from the behaviour sub-domain, builds `debug_zones()` from the last perception snapshot
+it holds, forwards `debug_room_zones()` from the perception's `room_status()`, and holds the Vision
+group exports — so these overlays need no reference into the perception/behaviour internals.

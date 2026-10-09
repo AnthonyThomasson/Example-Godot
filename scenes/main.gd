@@ -31,11 +31,20 @@ extends Node2D
 @export var show_agent_paths: bool = true
 ## When false, the line-of-sight / awareness overlay drawn around each NPC is hidden.
 @export var show_vision: bool = true
+## When false, the tactical navigation-zone overlay drawn around each NPC is hidden (off by default —
+## it is the densest overlay).
+@export var show_tactics: bool = false
+## When false, the tactical room-zone overlay (each room tinted by how the NPC regards it) is hidden.
+@export var show_room_zones: bool = false
+## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
+@export var show_nav_holes: bool = false
 
 ## The house defender, dropped into one of the generated rooms.
 const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
 ## The house invader, dropped just outside the house. Same AI, different data.
 const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
+## Draw-only overlay for the baked navmesh's furniture holes (Navigation domain).
+const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
@@ -70,6 +79,9 @@ func _ready() -> void:
 			"show_agent_labels": show_agent_labels,
 			"show_agent_paths": show_agent_paths,
 			"show_vision": show_vision,
+			"show_tactics": show_tactics,
+			"show_room_zones": show_room_zones,
+			"show_nav_holes": show_nav_holes,
 		})
 
 
@@ -84,6 +96,9 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	show_agent_labels = bool(config.get("show_agent_labels", show_agent_labels))
 	show_agent_paths = bool(config.get("show_agent_paths", show_agent_paths))
 	show_vision = bool(config.get("show_vision", show_vision))
+	show_tactics = bool(config.get("show_tactics", show_tactics))
+	show_room_zones = bool(config.get("show_room_zones", show_room_zones))
+	show_nav_holes = bool(config.get("show_nav_holes", show_nav_holes))
 	# Hold the start until the decision server is live, so the NPCs' first decisions don't fail
 	# against a booting server and leave them holding steady. The window stays up (showing why)
 	# until then; this returns immediately when a server is already up or none is coming.
@@ -151,6 +166,13 @@ func _spawn_world() -> void:
 	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
 	var rooms := WorldGen.get_rooms(house)
 	NavBuilder.build(house, rooms, self)
+	# Debug overlay (world-space, single node): snapshot the furniture holes carved into the navmesh
+	# right after the bake, before any piece can be shoved — so it matches the static baked holes.
+	var nav_debug: Node2D = NAV_DEBUG.new()
+	nav_debug.name = "NavDebug"
+	add_child(nav_debug)
+	nav_debug.setup(house)
+	nav_debug.show_holes = show_nav_holes
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed
 	for i in defender_count:
@@ -253,7 +275,7 @@ func _bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> 
 
 ## Apply the current debug-overlay toggles to every spawned NPC. Duck-typed by property name so
 ## Main doesn't depend on the debug nodes' class or path — any child with show_actions / show_path /
-## show_vision gets the matching toggle value.
+## show_vision / show_tactics / show_room_zones gets the matching toggle value.
 func _configure_debug() -> void:
 	for npc in _combatants:
 		for child in npc.get_children():
@@ -263,3 +285,7 @@ func _configure_debug() -> void:
 				child.show_path = show_agent_paths
 			if "show_vision" in child:
 				child.show_vision = show_vision
+			if "show_tactics" in child:
+				child.show_tactics = show_tactics
+			if "show_room_zones" in child:
+				child.show_room_zones = show_room_zones

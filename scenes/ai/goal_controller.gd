@@ -206,6 +206,7 @@ var _client: Node ## THINK transport: the Von round-trip (decision/decision_clie
 var _planner: Node ## THINK policy: the decision-tree walk (decision/decision_planner.gd).
 var _behavior: Node ## ACT sub-domain: runs the chosen primitive + holds commitment state.
 var _last_facts := {} ## The facts of the last decision snapshot, retained for `debug_state()`.
+var _last_options := {} ## The option groups of the last snapshot, retained for `debug_zones()`.
 var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
 var _force := false ## Force a decision now (task resolved or salient event).
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
@@ -370,6 +371,50 @@ func debug_state() -> Dictionary:
 	return out
 
 
+## Read-only: the tactical navigation ZONES the NPC's perception laid out for its last decision —
+## every candidate position it weighed, flattened to world points tagged by the kind of zone each is
+## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `room` / `interaction`), for the
+## tactics debug overlay to draw. A pure read of the last snapshot's option groups; empty until the
+## first decision. Options with no world location (a point-blank punch, the hostile picks) are skipped.
+func debug_zones() -> Array:
+	var out: Array = []
+	if _last_options.is_empty():
+		return out
+	for groups in _last_options.get("per_target", {}).values():
+		_collect_zones(out, groups.get("fire_positions", {}), &"fire")
+		_collect_zones(out, groups.get("flank_sides", {}), &"flank")
+		_collect_zones(out, groups.get("advance_positions", {}), &"advance")
+	_collect_zones(out, _last_options.get("retreat_positions", {}), &"retreat")
+	_collect_zones(out, _last_options.get("leads", {}), &"lead")
+	_collect_zones(out, _last_options.get("shooter", {}), &"lead")
+	_collect_zones(out, _last_options.get("search_rooms", {}), &"search")
+	_collect_zones(out, _last_options.get("explore", {}), &"search")
+	_collect_zones(out, _last_options.get("rooms", {}), &"room")
+	_collect_zones(out, _last_options.get("interactions", {}), &"interaction")
+	return out
+
+
+## Read-only: the tactical ROOM zones — every room of the house tagged by how this NPC regards it now
+## (`current` / `searched` / `unsearched` / `unknown`), each as a world-space `rect` with its `type`,
+## for the tactics debug overlay to draw. It is the room reasoning the search / room / flank options are
+## placed against. Empty until the controller knows its character. A pure read of the perception.
+func debug_room_zones() -> Array:
+	if _character == null or _perception == null:
+		return []
+	return _perception.room_status(rooms, _character.global_position)
+
+
+## Append each option in `group` that has a world location to `out`, tagged `category`: its `point`
+## param, or an interactable's current position. Options with neither (a punch, a hostile bind) are skipped.
+func _collect_zones(out: Array, group: Dictionary, category: StringName) -> void:
+	for opt in group.get("options", []):
+		var params: Dictionary = opt.get("params", {})
+		if params.has("point"):
+			out.append({ "point": params["point"], "category": category })
+		elif params.get("object") is Node2D and is_instance_valid(params["object"]):
+			out.append({ "point": (params["object"] as Node2D).global_position, "category": category })
+
+
 ## The known-contacts list flattened to the fields worth reading in a snapshot (who, whether hostile
 ## and why, whether seen this tick, and how far off). Empty until the controller knows its character.
 func _contact_digest() -> Array:
@@ -456,6 +501,7 @@ func _start_decision(character) -> void:
 	_apply_config()  # Pick up any export retuned at runtime before sensing + deciding.
 	var snapshot: Dictionary = _perception.sense(character, rooms, goal, _behavior.activity_text())
 	_last_facts = snapshot["facts"]
+	_last_options = snapshot["options"]
 	_planner.begin(snapshot, _behavior.ongoing())
 
 

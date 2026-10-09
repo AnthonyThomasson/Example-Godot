@@ -12,7 +12,8 @@ extends CanvasLayer
 
 ## Emitted when the player presses Start, carrying the chosen parameters:
 ## `{ has_player: bool, seed: int, spawn_doors: bool, defenders: int, invaders: int,
-##    show_agent_labels: bool, show_agent_paths: bool, show_vision: bool }`.
+##    show_agent_labels: bool, show_agent_paths: bool, show_vision: bool, show_tactics: bool,
+##    show_room_zones: bool, show_nav_holes: bool }`.
 ## Main applies these and builds the world.
 signal start_requested(config: Dictionary)
 
@@ -26,13 +27,16 @@ var _invader_spin: SpinBox          ## How many invaders to spawn outside the ho
 var _agent_labels_check: CheckBox   ## Checked = draw the floating action-status label above each NPC.
 var _agent_paths_check: CheckBox    ## Checked = draw the NPC's live navigation path in the world.
 var _vision_check: CheckBox         ## Checked = draw each NPC's line-of-sight / awareness overlay.
+var _tactics_check: CheckBox        ## Checked = draw each NPC's tactical navigation-zone overlay.
+var _room_zones_check: CheckBox     ## Checked = draw each NPC's tactical room-zone overlay.
+var _nav_holes_check: CheckBox      ## Checked = draw the navmesh's furniture holes.
 var _start_button: Button           ## Disabled on press, so holding the start can't be triggered twice.
 var _status: Label                  ## Status line Main shows while it holds the start (hidden when blank).
 
 
 ## Build the window seeded from `defaults` (`{ has_player, seed, spawn_doors, defenders, invaders,
-## show_agent_labels, show_agent_paths, show_vision }`) and show it. Called by Main before the
-## world is spawned.
+## show_agent_labels, show_agent_paths, show_vision, show_tactics }`) and show it. Called by Main
+## before the world is spawned.
 func open(defaults: Dictionary) -> void:
 	_build_ui(defaults)
 
@@ -109,6 +113,24 @@ func _build_ui(defaults: Dictionary) -> void:
 	_vision_check.button_pressed = bool(defaults.get("show_vision", true))
 	_vision_check.add_theme_font_size_override("font_size", 30)
 	box.add_child(_vision_check)
+
+	_tactics_check = CheckBox.new()
+	_tactics_check.text = "Tactics zones"
+	_tactics_check.button_pressed = bool(defaults.get("show_tactics", false))
+	_tactics_check.add_theme_font_size_override("font_size", 30)
+	box.add_child(_tactics_check)
+
+	_room_zones_check = CheckBox.new()
+	_room_zones_check.text = "Room zones"
+	_room_zones_check.button_pressed = bool(defaults.get("show_room_zones", false))
+	_room_zones_check.add_theme_font_size_override("font_size", 30)
+	box.add_child(_room_zones_check)
+
+	_nav_holes_check = CheckBox.new()
+	_nav_holes_check.text = "Furniture holes"
+	_nav_holes_check.button_pressed = bool(defaults.get("show_nav_holes", false))
+	_nav_holes_check.add_theme_font_size_override("font_size", 30)
+	box.add_child(_nav_holes_check)
 
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 24)
@@ -189,4 +211,7 @@ func _on_start() -> void:
 		"show_agent_labels": _agent_labels_check.button_pressed,
 		"show_agent_paths": _agent_paths_check.button_pressed,
 		"show_vision": _vision_check.button_pressed,
+		"show_tactics": _tactics_check.button_pressed,
+		"show_room_zones": _room_zones_check.button_pressed,
+		"show_nav_holes": _nav_holes_check.button_pressed,
 	})

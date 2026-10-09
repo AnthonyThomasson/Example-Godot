@@ -32,8 +32,22 @@ Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automa
 locomotion sets `target_position` and steers at `get_next_path_position()`; it does **not** turn on
 the agent's RVO avoidance.
 
+## Debug overlay (`nav_debug.gd`)
+
+`nav_debug.gd` is an optional, draw-only overlay (a single world-space `Node2D`, since the map is
+global — not per-NPC) that draws the furniture HOLES carved out of the navmesh as filled polygons +
+outlines. `main.gd` builds it once right after the bake: `nav_debug.setup(house)` snapshots the holes
+via `NavBuilder.furniture_holes(house)`, and `show_holes` toggles it (wired from the setup window's
+"Furniture holes" checkbox, off by default). `furniture_holes(house) -> Array` returns each solid
+piece's grown footprint as a closed WORLD-space polygon, using the exact same selection and footprint
+helpers the bake feeds the obstruction baker (`_add_furniture_holes` now calls it), so the overlay
+cannot drift from what was carved. Like the baked holes it is a **static snapshot**: it does not follow
+a piece shoved off its spot afterwards (that piece gets no dynamic avoidance anyway). The overlay reads
+nothing back and feeds nothing in.
+
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Main / AI → Navigation** (interface 9): `NavBuilder.build(house, rooms, parent,
   agent_radius)` bakes the region; consumers only set a `NavigationAgent2D`'s `target_position`
-  and read `get_next_path_position()`.
+  and read `get_next_path_position()`. `NavBuilder.furniture_holes(house) -> Array` is the debug read
+  Main snapshots for the `nav_debug.gd` overlay.

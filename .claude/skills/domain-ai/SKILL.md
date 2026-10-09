@@ -31,7 +31,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 | **Perception** | `ai/perception/` | `domain-ai-perception` | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von. |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
 | **Behaviour** | `ai/behavior/` | `domain-ai-behavior` | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold) and the commitment state Von lacks; owns a locomotion layer for pathing. |
-| **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, and the decision-path label + movement path. |
+| **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, and the tactical navigation zones it weighed. |
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
@@ -92,6 +92,10 @@ The AI's external surface is all the orchestrator's:
   Dictionary` — the deep snapshot (every level of the last walk: the state and question Von saw, the
   options, its probabilities and pick; the facts; the contacts; the running primitive; pathing). The
   dev command server's `ai` verb dumps it; `tools/von_probe.py` replays captured levels against Von.
+  `debug_zones() -> Array` flattens the last snapshot's option groups to world points tagged by zone
+  kind (fire / flank / advance / retreat / lead / search / room / interaction), and `debug_room_zones()
+  -> Array` returns each room `{ rect, type, status }` tagged by how the NPC regards it (current /
+  searched / unsearched / unknown) — both for the tactics overlay.
 - **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s
   `target_position` and reads `get_next_path_position()`; perception's tactics query the nav map
   (closest point, path) to judge routes.

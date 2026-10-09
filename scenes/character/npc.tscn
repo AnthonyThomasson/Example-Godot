@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://d2vjx5ny4i4kv"]
+[gd_scene load_steps=8 format=3 uid="uid://d2vjx5ny4i4kv"]
 
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_character"]
 [ext_resource type="Script" path="res://scenes/ai/goal_controller.gd" id="2_controller"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/character_visuals.gd" id="4_visuals"]
 [ext_resource type="Script" path="res://scenes/ai/debug/vision_debug.gd" id="5_vision"]
 [ext_resource type="Script" path="res://scenes/ai/debug/agent_debug.gd" id="6_agent"]
+[ext_resource type="Script" path="res://scenes/ai/debug/tactics_debug.gd" id="7_tactics"]
 
 [node name="NPC" type="CharacterBody2D"]
 script = ExtResource("1_character")
@@ -34,3 +35,6 @@ script = ExtResource("5_vision")
 
 [node name="AgentDebug" type="Node2D" parent="."]
 script = ExtResource("6_agent")
+
+[node name="TacticsDebug" type="Node2D" parent="."]
+script = ExtResource("7_tactics")

@@ -258,6 +258,29 @@ func memory_size() -> int:
 	return _memory.size()
 
 
+## Debug read: every room tagged by how this NPC regards it right now — the one it stands in
+## (`current`), a room it has seen and searched recently (`searched`) or seen but not searched
+## (`unsearched`), or one it has not yet seen at all (`unknown`). This is the room reasoning the
+## search/room/flank options are placed against, exposed for the tactics debug overlay to draw as
+## zones. A pure read of knowledge + the visited-room memory; never perturbs it.
+func room_status(rooms: Array, self_pos: Vector2) -> Array:
+	var known := _known_room_keys()
+	var here := _room_at(self_pos, rooms)
+	var out: Array = []
+	for room in rooms:
+		var status: StringName
+		if not here.is_empty() and room["key"] == here["key"]:
+			status = &"current"
+		elif not known.has(room["key"]):
+			status = &"unknown"
+		elif _memory.age_of(&"visited_room", "key", room["key"]) > search_memory_ttl:
+			status = &"unsearched"
+		else:
+			status = &"searched"
+		out.append({ "rect": room["rect"], "type": _room_name(room["type"]), "status": status })
+	return out
+
+
 # --- SEE -------------------------------------------------------------------------------------
 
 ## SEE pass — run every tick. Test what is visible via `vision` and remember it, so the agent's

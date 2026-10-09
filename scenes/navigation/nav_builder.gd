@@ -61,13 +61,13 @@ static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float
 	return region
 
 
-## Add each solid furniture footprint to `source` as an obstruction outline, so the baked navmesh has
-## a hole there and paths route AROUND the piece (rerouting through another doorway when the near one
-## is blocked, or leaving it unreachable when a piece seals the only route). Footprints are converted
-## into the house-local frame the bake runs in (world minus the house position). Solid furniture is a
-## non-frozen RigidBody2D (non-solid decor freezes itself) with a CollisionShape2D; walls are
-## StaticBody2D and already parsed.
-static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D) -> void:
+## The furniture footprint holes a bake of `house` carves, each a closed WORLD-space polygon — the
+## same solid-furniture selection and grown footprints `_add_furniture_holes` feeds the baker, so a
+## debug overlay drawing these shows exactly what was carved out. Snapshot it right after the bake:
+## like the baked holes themselves it is a static picture of where the furniture stood, not re-measured
+## as pieces are shoved around in play.
+static func furniture_holes(house: Node2D) -> Array:
+	var out: Array = []
 	for node in _descendants(house):
 		var body := node as RigidBody2D
 		if body == null or body.freeze:
@@ -76,8 +76,19 @@ static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, hou
 		if col == null:
 			continue
 		var outline := _footprint_world(col)
-		if outline.size() < 3:
-			continue
+		if outline.size() >= 3:
+			out.append(outline)
+	return out
+
+
+## Add each solid furniture footprint to `source` as an obstruction outline, so the baked navmesh has
+## a hole there and paths route AROUND the piece (rerouting through another doorway when the near one
+## is blocked, or leaving it unreachable when a piece seals the only route). Footprints are converted
+## into the house-local frame the bake runs in (world minus the house position). Solid furniture is a
+## non-frozen RigidBody2D (non-solid decor freezes itself) with a CollisionShape2D; walls are
+## StaticBody2D and already parsed.
+static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D) -> void:
+	for outline in furniture_holes(house):
 		var local := PackedVector2Array()
 		for p in outline:
 			local.append(p - house.position)

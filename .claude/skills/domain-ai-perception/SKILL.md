@@ -45,7 +45,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `sense(character, rooms, goal, activity) -> { facts, sections, sections_per_target, options }` — the
   BUILD pass (below). `activity` is the behaviour's current-activity line.
 - Combat geometry for the behaviour: `has_line_to`, `combat_spots`, `contact_visible`,
-  `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` for debug.
+  `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` and
+  `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
 
 ## The snapshot (what the planner walks)
 
