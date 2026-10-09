@@ -17,7 +17,8 @@ a typed helper. `player_controller.gd` (Character domain) is the one gameplay co
 Keybinds; the only other is `command_server.gd` (dev-only), which reads the action *names* to
 inject real input when driving the game from outside. `rebind()` / `rebind_mouse()` remap at
 runtime (basis for a future config UI). `project.godot [input]` just keeps the editor's Input Map
-panel in sync.
+panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it shares
+Space with `INTERACT`, harmless because the spectator match has no player to interact.
 
 ## Dev command server
 
@@ -79,4 +80,5 @@ wiring lives in `main.gd`; the General observers only read published contracts.
 
 - Observers (debug HUD, match HUD, camera) attach by exported node path and read only the Character
   public API/signals plus the AI controller's observer reads `current_act()` / `goal` (interface 7).
-  `player_controller.gd` and `command_server.gd` are the only files that touch `Keybinds`.
+  `player_controller.gd` and `command_server.gd` are the gameplay consumers of `Keybinds`; `main.gd`
+  (`MENU`) and `spectator_inspector.gd` (`PAUSE`) read one action each for top-level/spectator control.

@@ -372,9 +372,12 @@ func debug_state() -> Dictionary:
 
 
 ## Read-only: the tactical navigation ZONES the NPC's perception laid out for its last decision —
-## every candidate position it weighed, flattened to world points tagged by the kind of zone each is
-## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `room` / `interaction`), for the
-## tactics debug overlay to draw. A pure read of the last snapshot's option groups; empty until the
+## every candidate position it weighed, flattened to world points (each with its `label` + `desc`)
+## tagged by the kind of zone each is
+## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `room` / `interaction`, plus
+## `waypoint` for the non-room go-to points — your starting post, the front entrance, approaching the
+## house — which the room/search groups carry but which aren't rooms and often sit outside one), for
+## the tactics debug overlay to draw. A pure read of the last snapshot's option groups; empty until the
 ## first decision. Options with no world location (a point-blank punch, the hostile picks) are skipped.
 func debug_zones() -> Array:
 	var out: Array = []
@@ -404,15 +407,29 @@ func debug_room_zones() -> Array:
 	return _perception.room_status(rooms, _character.global_position)
 
 
-## Append each option in `group` that has a world location to `out`, tagged `category`: its `point`
-## param, or an interactable's current position. Options with neither (a punch, a hostile bind) are skipped.
+## Non-room go-to options the room/search groups carry: the NPC's starting post, the front entrance,
+## and approaching the house. They aren't rooms (and an outside NPC's often sit well outside one), so
+## the overlay tags them `waypoint` instead of `room`/`search` rather than letting them read as rooms.
+const WAYPOINT_IDS := ["post", "entrance", "approach"]
+
+
+## Append each option in `group` that has a world location to `out`, tagged `category` — except the
+## non-room waypoints (WAYPOINT_IDS), re-tagged `waypoint`. Each entry also carries the option's `label`
+## and `desc` (the human text Von reads, which spells out the deciding facts: cover, route, range) so an
+## inspector can expose a clicked point's details. The location is the option's `point` param, or an
+## interactable's current position. Options with neither (a punch, a hostile bind) are skipped.
 func _collect_zones(out: Array, group: Dictionary, category: StringName) -> void:
 	for opt in group.get("options", []):
 		var params: Dictionary = opt.get("params", {})
+		var cat: StringName = &"waypoint" if str(opt.get("id", "")) in WAYPOINT_IDS else category
+		var point = null
 		if params.has("point"):
-			out.append({ "point": params["point"], "category": category })
+			point = params["point"]
 		elif params.get("object") is Node2D and is_instance_valid(params["object"]):
-			out.append({ "point": (params["object"] as Node2D).global_position, "category": category })
+			point = (params["object"] as Node2D).global_position
+		if point != null:
+			out.append({ "point": point, "category": cat,
+				"label": opt.get("label", ""), "desc": opt.get("desc", "") })
 
 
 ## The known-contacts list flattened to the fields worth reading in a snapshot (who, whether hostile

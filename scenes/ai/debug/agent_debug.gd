@@ -38,6 +38,9 @@ func _ready() -> void:
 	_controller = get_node_or_null(controller_path)
 	_agent = get_node_or_null(agent_path) as NavigationAgent2D
 	_character = get_parent() as Node2D
+	# Keep drawing while the tree is paused, so the spectator inspector can reveal a clicked NPC's label
+	# and path during a Space-pause.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 ## Redraw every frame so the label and path track the NPC's live decision and movement.

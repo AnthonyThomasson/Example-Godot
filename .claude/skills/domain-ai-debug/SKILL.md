@@ -42,13 +42,20 @@ The tactical-geometry overlay, in two independent aspects (both draw on the NPC'
 reading the controller's public API; both default off — they are dense).
 
 **Point zones (`show_tactics`)** — the candidate positions the NPC's perception laid out for its last
-decision, from the controller's `debug_zones()`: a flat list of `{ point, category }`, one per option
-in the last snapshot's option groups that carries a world location (its `point` param, or an
-interactable's current position). Each is a translucent disc + outline + a dot at the exact point,
+decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc }`, one
+per option in the last snapshot's option groups that carries a world location (its `point` param, or an
+interactable's current position); the spectator inspector reads `label`/`desc` to detail a clicked
+point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()`. Each is a translucent disc + outline + a dot at the exact point,
 coloured by `category` (`fire` red, `flank` orange, `advance` yellow, `retreat` blue, `lead` purple,
-`search` green, `room` teal, `interaction` white — `ZONE_COLORS`); each category is labelled once
-beside its first marker, so the palette reads as an in-world legend. Options with no location (a
-point-blank punch, the hostile picks) are skipped. These refresh each decision (the decide cadence).
+`search` green, `room` teal, `interaction` white, `waypoint` magenta — `ZONE_COLORS`); each category
+is labelled once beside its first marker, so the palette reads as an in-world legend. `waypoint` covers
+the non-room go-to options the room/search groups carry (the NPC's starting post, the front entrance,
+approaching the house) — re-tagged out of `room`/`search` so these, which often sit well outside any
+room, don't read as misplaced room zones. Options with no location (a point-blank punch, the hostile
+picks) are skipped. These refresh each decision (the decide cadence). The overlay runs
+`PROCESS_MODE_ALWAYS` so it still redraws while the tree is paused — the spectator inspector
+(`scenes/ui/spectator_inspector.gd`) flips `show_tactics`/`show_room_zones` per NPC when you click one
+during a Space-pause, the usual way to study the zones.
 
 **Room zones (`show_room_zones`)** — every room of the house drawn as a rectangle (faint fill + 2px
 outline + a `type · status` tag in the corner), from the controller's `debug_room_zones()`: a list of

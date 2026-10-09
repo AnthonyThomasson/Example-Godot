@@ -43,6 +43,21 @@ the domains.
   run's seed into a 32pt label anchored to the bottom-right corner (semi-transparent), so a layout
   you like can be re-entered in the setup window.
 
+- `spectator_inspector.gd` — the **spectator inspector** (`SpectatorInspector` node), built by `main.gd`
+  only in spectator mode via `setup(combatants, flags)` (`flags` = the setup menu's overlay toggles).
+  **Space** toggles `get_tree().paused`. A **left-click** on an NPC (nearest within `PICK_RADIUS` of the
+  cursor's world point, via the framing camera) selects it — revealing ONLY that NPC's *enabled* overlays
+  (each toggle set from `flags`) and hiding every other NPC's; clicking it again or empty ground clears
+  it. No NPC shows any overlay until clicked (the view stays focused on one NPC). With an NPC selected, a
+  left-click on one of its tactical points (nearest zone within `ZONE_PICK_RADIUS`, from its
+  `debug_zones()`) highlights that point (overlay `set_focus`) and fills a detail panel — top-left,
+  directly beneath the match HUD's goal readout — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
+  paused (freeze the match, then inspect). Decoupled like the other observers: reads the combatants'
+  public `global_position`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
+  toggles (`show_actions` / `show_path` / `show_vision` / `show_tactics` / `show_room_zones`) by the same
+  duck-typed names `main.gd`'s `_configure_debug` uses. Reads `Keybinds.PAUSE` (Space; shares it with
+  `INTERACT`, unused in the player-less match). Mouse-ignoring hint + detail labels (with text shadow).
+
 ## Interface recap
 
 - UI observers attach by exported node path (or node name duck-typed in `main.gd`) and read only the

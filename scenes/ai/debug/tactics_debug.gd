@@ -27,6 +27,7 @@ const ZONE_COLORS := {
 	&"search": Color(0.5, 0.9, 0.5),     # green — a room or unexplored area to search
 	&"room": Color(0.4, 0.8, 0.8),       # teal — a known room to go to
 	&"interaction": Color(0.9, 0.9, 0.9),# white — an object to use
+	&"waypoint": Color(0.9, 0.3, 0.8),   # magenta — a non-room go-to (starting post / entrance / approach)
 }
 ## Outline / tint colour per room status (how the NPC regards each room), from `debug_room_zones()`.
 const ROOM_COLORS := {
@@ -44,13 +45,17 @@ const FONT_SIZE := 11
 ## Inset (px) of a room's tag from its top-left corner.
 const ROOM_LABEL_INSET := 6.0
 
-var _controller: Node   ## The GoalController read for the zones.
-var _character: Node2D  ## The NPC body this overlay is a child of.
+var _controller: Node       ## The GoalController read for the zones.
+var _character: Node2D      ## The NPC body this overlay is a child of.
+var _focus := Vector2.INF   ## A tactical point the inspector asked to highlight, or INF for none.
 
 
 func _ready() -> void:
 	_controller = get_node_or_null(controller_path)
 	_character = get_parent() as Node2D
+	# Keep drawing while the tree is paused, so the spectator inspector can reveal a clicked NPC's zones
+	# during a pause (the usual way to study them). Static while paused — the NPC isn't moving.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 ## Redraw every frame so the zones track the NPC's latest decision and room knowledge.
@@ -67,6 +72,8 @@ func _draw() -> void:
 		_draw_room_zones()
 	if show_tactics and _controller.has_method("debug_zones"):
 		_draw_point_zones()
+	if _focus != Vector2.INF:
+		_draw_focus()
 
 
 ## Draw each room as a rectangle tinted and outlined by how the NPC regards it (current / searched /
@@ -83,6 +90,26 @@ func _draw_room_zones() -> void:
 		draw_rect(local, color, false, 2.0)
 		draw_string(font, local.position + Vector2(ROOM_LABEL_INSET, ROOM_LABEL_INSET + FONT_SIZE),
 			"%s · %s" % [room["type"], String(status)], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
+
+
+## Highlight the inspector's clicked tactical point with a bright double ring, so which point the detail
+## panel describes is unmistakable. Set via `set_focus` / cleared via `clear_focus`.
+func _draw_focus() -> void:
+	var p := to_local(_focus)
+	draw_arc(p, ZONE_RADIUS + 5.0, 0.0, TAU, 24, Color.WHITE, 2.0)
+	draw_arc(p, ZONE_RADIUS + 8.0, 0.0, TAU, 24, Color(1, 1, 1, 0.5), 1.0)
+
+
+## Highlight the tactical point at world `point` (the inspector's clicked zone).
+func set_focus(point: Vector2) -> void:
+	_focus = point
+	queue_redraw()
+
+
+## Clear the highlighted tactical point.
+func clear_focus() -> void:
+	_focus = Vector2.INF
+	queue_redraw()
 
 
 ## Draw each candidate zone as a translucent disc + outline + a dot at its exact point, and label each

@@ -92,8 +92,10 @@ The AI's external surface is all the orchestrator's:
   Dictionary` — the deep snapshot (every level of the last walk: the state and question Von saw, the
   options, its probabilities and pick; the facts; the contacts; the running primitive; pathing). The
   dev command server's `ai` verb dumps it; `tools/von_probe.py` replays captured levels against Von.
-  `debug_zones() -> Array` flattens the last snapshot's option groups to world points tagged by zone
-  kind (fire / flank / advance / retreat / lead / search / room / interaction), and `debug_room_zones()
+  `debug_zones() -> Array` flattens the last snapshot's option groups to world points (each with its
+  `label` + `desc`, for an inspector to expose a clicked point) tagged by zone kind (fire / flank /
+  advance / retreat / lead / search / room / interaction, plus waypoint for the non-room go-to points —
+  post / entrance / approach), and `debug_room_zones()
   -> Array` returns each room `{ rect, type, status }` tagged by how the NPC regards it (current /
   searched / unsearched / unknown) — both for the tactics overlay.
 - **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s

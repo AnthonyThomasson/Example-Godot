@@ -19,6 +19,9 @@ const OPERATE_DOOR := "operate_door"
 ## Return to the pre-game setup window to start a fresh match (handled by main.gd, works in both
 ## player and spectator mode).
 const MENU := "menu"
+## Pause/resume the game (spectator inspector only — shares Space with INTERACT, which is unused in the
+## player-less spectator match).
+const PAUSE := "pause"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -40,6 +43,7 @@ const DEFAULTS := {
 	INTERACT: KEY_SPACE,
 	OPERATE_DOOR: KEY_E,
 	MENU: KEY_ESCAPE,
+	PAUSE: KEY_SPACE,
 	ITEM_1: KEY_1,
 	ITEM_2: KEY_2,
 	ITEM_3: KEY_3,

@@ -33,6 +33,9 @@ var _exclude: Array = []
 func _ready() -> void:
 	_controller = get_node_or_null(controller_path)
 	_character = get_parent() as Node2D
+	# Keep rebuilding/drawing while the tree is paused, so the spectator inspector can reveal a clicked
+	# NPC's vision during a Space-pause (otherwise the visibility polygons wouldn't be built).
+	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 ## Rebuild the visibility polygons every frame so they track the NPC's movement and facing.

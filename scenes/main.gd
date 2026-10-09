@@ -45,6 +45,8 @@ const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
 const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
 ## Draw-only overlay for the baked navmesh's furniture holes (Navigation domain).
 const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
+## Spectator inspector (UI): Space-pause + click an NPC to show its tactical zones.
+const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
@@ -185,8 +187,9 @@ func _spawn_world() -> void:
 
 
 ## Turn the scene into a pure 2-AI spectator match: drop the human player and its player-HUD, point
-## the camera at both NPCs, and activate the match HUD. Composition-root wiring only — each observer
-## reads the characters' public API/signals, never their internals.
+## the camera at both NPCs, activate the match HUD, and add the Space-pause / click-to-inspect
+## inspector. Composition-root wiring only — each observer reads the characters' public API/signals,
+## never their internals.
 func _setup_spectator() -> void:
 	var combatants := _combatants.filter(func(c): return is_instance_valid(c))
 	var cam := get_node_or_null("MainCamera")
@@ -195,6 +198,20 @@ func _setup_spectator() -> void:
 	var hud := get_node_or_null("MatchHUD")
 	if hud and hud.has_method("begin"):
 		hud.begin(combatants)
+	# Space pauses the match; a click selects one NPC (showing only its enabled overlays) and a click on
+	# one of its tactical points shows that point's details. Spectator-only (in player mode Space is the
+	# player's INTERACT), so it is wired here, not on a gameplay node. It is handed the same overlay
+	# toggles the setup menu chose, and reveals exactly those on the clicked NPC.
+	var inspector := SPECTATOR_INSPECTOR.new()
+	inspector.name = "SpectatorInspector"
+	add_child(inspector)
+	inspector.setup(combatants, {
+		"show_actions": show_agent_labels,
+		"show_path": show_agent_paths,
+		"show_vision": show_vision,
+		"show_tactics": show_tactics,
+		"show_room_zones": show_room_zones,
+	})
 	var debug := get_node_or_null("DebugUI")
 	if debug:
 		debug.queue_free()
@@ -267,8 +284,7 @@ func _bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> 
 		if child.has_method("control"):
 			if "rooms" in child:
 				child.rooms = rooms
-			if "entry_point" in child and entry_point != Vector2.ZERO \
-					and child.get("familiar_with_house") == true:
+			if "entry_point" in child and entry_point != Vector2.ZERO:
 				child.entry_point = entry_point
 			return
 
