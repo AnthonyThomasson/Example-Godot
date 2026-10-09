@@ -31,13 +31,12 @@ extends Node2D
 @export var show_agent_paths: bool = true
 ## When false, the line-of-sight / awareness overlay drawn around each NPC is hidden.
 @export var show_vision: bool = true
-## When false, the tactical navigation-zone overlay drawn around each NPC is hidden (off by default —
-## it is the densest overlay).
-@export var show_tactics: bool = false
+## When false, the tactical navigation-zone overlay drawn around each NPC is hidden.
+@export var show_tactics: bool = true
 ## When false, the tactical room-zone overlay (each room tinted by how the NPC regards it) is hidden.
-@export var show_room_zones: bool = false
+@export var show_room_zones: bool = true
 ## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
-@export var show_nav_holes: bool = false
+@export var show_nav_holes: bool = true
 
 ## The house defender, dropped into one of the generated rooms.
 const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
