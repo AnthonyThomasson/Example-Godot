@@ -297,6 +297,9 @@ func _die() -> void:
 	is_dead = true
 	velocity = Vector2.ZERO
 	_knockback = Vector2.ZERO
+	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
+	# punches and sight lines, all on layer 1) pass right over it instead of being blocked.
+	collision_layer = 0
 	died.emit()
 
 
