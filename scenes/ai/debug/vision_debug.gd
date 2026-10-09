@@ -3,8 +3,10 @@ extends Node2D
 ## AI domain: an optional debug overlay that draws the NPC's *actual* visible area — the portions
 ## of the forward FOV cone and the 360° near-awareness bubble that have a direct, unobstructed line
 ## of sight back to the NPC. A ray fan samples the physics space each frame (same QUERY_MASK as
-## agent_vision.gd) and builds a visibility polygon so walls and furniture cast proper shadows,
-## showing only the area that would trigger a detection. Toggle with `show_vision`. Draw-only —
+## agent_vision.gd) and builds a visibility polygon so walls and TALL furniture cast proper shadows,
+## showing only the area that would trigger a detection. It mirrors agent_vision's "look over low
+## cover" rule: a ray passes through furniture whose coverage is at or below the controller's
+## `see_over_coverage`, so low pieces (tables, beds) cast no shadow. Toggle with `show_vision`. Draw-only —
 ## it senses nothing and feeds nothing back (follows the "draw on its own child Node2D" convention).
 
 ## Must match agent_vision.QUERY_MASK — walls + solid furniture that block sight.
@@ -55,15 +57,31 @@ func _draw() -> void:
 		draw_polygon(_cone_poly, [cone_color])
 
 
-## Cast a ray from `from` in `dir` up to `max_dist` on QUERY_MASK; returns the hit position or
-## the full-distance endpoint when the path is clear.
+## Cast a ray from `from` in `dir` up to `max_dist` on QUERY_MASK; returns the first SIGHT-blocking
+## hit position or the full-distance endpoint when the path is clear. Like agent_vision, it looks over
+## low cover: a collider whose coverage is at or below the controller's `see_over_coverage` is skipped
+## and the ray continues past it (each skip grows the exclude list, so the walk always terminates).
 func _cast(space: PhysicsDirectSpaceState2D, from: Vector2, dir: Vector2, max_dist: float) -> Vector2:
 	var to := from + dir * max_dist
-	var p := PhysicsRayQueryParameters2D.create(from, to)
-	p.collision_mask = QUERY_MASK
-	p.exclude = _exclude
-	var result := space.intersect_ray(p)
-	return result["position"] if not result.is_empty() else to
+	var see_over: float = _controller.see_over_coverage
+	var ex := _exclude
+	while true:
+		var p := PhysicsRayQueryParameters2D.create(from, to)
+		p.collision_mask = QUERY_MASK
+		p.exclude = ex
+		var result := space.intersect_ray(p)
+		if result.is_empty():
+			return to
+		var collider = result.get("collider")
+		var cov := 100.0
+		if collider != null and collider.has_method("get_surface"):
+			cov = float(collider.get_surface().get("coverage", 100.0))
+		if cov > see_over:
+			return result["position"]
+		if ex == _exclude:
+			ex = _exclude.duplicate()
+		ex.append(result.get("rid"))
+	return to  # unreachable; satisfies the parser
 
 
 ## Rebuild the LoS-masked visibility polygons for both the cone and the bubble.

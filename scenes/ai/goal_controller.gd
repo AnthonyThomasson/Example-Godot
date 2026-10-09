@@ -57,6 +57,18 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## Seconds the NPC pauses to look around a room on reaching it while searching/exploring, before deciding
 ## where to go next. Stops it re-deciding the instant it crosses a room's edge (and bouncing on the boundary).
 @export var search_dwell: float = 2.5
+## Look-around sweep during a search pause: base half-arc (rad) the gaze swings to either side of the
+## facing the NPC arrived with.
+@export var search_look_arc: float = 1.2
+## Base gaze turn speed (rad/s) during a look-around swing.
+@export var search_look_rate: float = 2.5
+## Base seconds the gaze dwells at each swing's extreme before reversing.
+@export var search_look_pause: float = 0.5
+## Random angle (rad, ±) added to each swing's goal so the sweep isn't perfectly symmetric.
+@export var search_look_jitter: float = 0.15
+## Fraction (0..1) the look-around arc/rate/pause are randomized per swing, so it reads as scanning
+## rather than a metronome (0 = uniform sweep).
+@export var search_look_variance: float = 0.5
 ## Range (px) of the pistol: shots are taken within it, and distances are banded against it for Von.
 @export var shoot_range: float = 500.0
 ## Range (px) within which a punch lands.
@@ -172,6 +184,10 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var fov_degrees: float = 110.0
 ## Radius (px) of a 360° near-awareness bubble: things this close are sensed regardless of facing.
 @export var awareness_radius: float = 48.0
+## Coverage rating (0–100 height proxy) at or below which furniture is low enough to see OVER —
+## tables, beds, islands, counters. Taller pieces (cabinets, wardrobes, fridges) and walls still
+## block sight. Sight-only: line-of-fire and cover still treat every solid piece as an obstacle.
+@export var see_over_coverage: float = 60.0
 ## Whether this NPC starts already knowing the house (its rooms + objects). Off = it must see them
 ## first. People are never pre-known either way — they are known only once seen.
 @export var familiar_with_house: bool = true
@@ -264,6 +280,7 @@ func _apply_config() -> void:
 	_perception.view_distance = view_distance
 	_perception.fov_degrees = fov_degrees
 	_perception.awareness_radius = awareness_radius
+	_perception.see_over_coverage = see_over_coverage
 	_perception.hostile_on_sight = hostile_on_sight
 	_perception.hostile_on_trespass = hostile_on_trespass
 	_perception.hostile_on_attack = hostile_on_attack
@@ -319,6 +336,11 @@ func _apply_config() -> void:
 	_behavior.interaction_dwell = interaction_dwell
 	_behavior.max_commit_time = max_commit_time
 	_behavior.search_dwell = search_dwell
+	_behavior.search_look_arc = search_look_arc
+	_behavior.search_look_rate = search_look_rate
+	_behavior.search_look_pause = search_look_pause
+	_behavior.search_look_jitter = search_look_jitter
+	_behavior.search_look_variance = search_look_variance
 	_behavior.tactic_interval = tactic_interval
 	_behavior.shoot_range = shoot_range
 	_behavior.punch_range = punch_range

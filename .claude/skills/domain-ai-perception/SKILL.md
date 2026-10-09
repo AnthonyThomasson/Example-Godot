@@ -112,7 +112,12 @@ The NPC perceives characters, not "the player". The hostility rules categorize e
 ## Vision & knowledge
 
 `agent_vision.gd.can_see` is true within `view_distance`, AND within the `awareness_radius` bubble or
-the forward cone (`fov_degrees`), AND with a clear line on `QUERY_MASK = 1` (walls + solid furniture).
+the forward cone (`fov_degrees`), AND with a clear SIGHT line on `QUERY_MASK = 1` (walls + solid
+furniture). The sight line looks OVER low cover: it walks the ray, skipping any collider whose
+`coverage` (the Objects height proxy) is at or below `see_over_coverage` (default 60 — tables, beds,
+islands, counters) and continuing past it, so only walls (coverage 100) and tall furniture (cabinets,
+wardrobes, fridges) break the line. This is sight-only — `blocked()` / `raycast()` stay fully physical
+(every solid collider counts) for line-of-fire and cover, so a bullet is still stopped by a table.
 `enabled = false` = omniscient. `familiar_with_house` seeds every room/object as permanently known on
 the first observe; otherwise each must be seen. People are never pre-known.
 

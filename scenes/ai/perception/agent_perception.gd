@@ -42,6 +42,7 @@ var vision_enabled: bool = true
 var view_distance: float = 2520.0
 var fov_degrees: float = 110.0
 var awareness_radius: float = 48.0
+var see_over_coverage: float = 60.0
 # Hostility (the categorization rules).
 var hostile_on_sight: bool = false
 var hostile_on_trespass: bool = false
@@ -122,6 +123,7 @@ func apply_config() -> void:
 	_vision.view_distance = view_distance
 	_vision.fov_degrees = fov_degrees
 	_vision.awareness_radius = awareness_radius
+	_vision.see_over_coverage = see_over_coverage
 	_hostility.on_sight = hostile_on_sight
 	_hostility.trespass = hostile_on_trespass
 	_hostility.retaliate = hostile_on_attack

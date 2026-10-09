@@ -19,9 +19,11 @@ Files:
 
 Draws the portions of the forward FOV cone and the 360° near-awareness bubble that have a clear line
 of sight back to the NPC. A ray fan samples the physics space each frame (same `QUERY_MASK = 1` as
-the vision sense) and builds visibility polygons, so walls and furniture cast proper shadows — showing
-only the area that would actually trigger a detection. It reads the controller's live vision params
-(`vision_enabled`, `view_distance`, `fov_degrees`, `awareness_radius`). When vision is disabled
+the vision sense) and builds visibility polygons, so walls and TALL furniture cast proper shadows —
+showing only the area that would actually trigger a detection. It mirrors the sense's "look over low
+cover" rule: a ray skips furniture whose coverage is at or below the controller's `see_over_coverage`,
+so low pieces (tables, beds) cast no shadow. It reads the controller's live vision params
+(`vision_enabled`, `view_distance`, `fov_degrees`, `awareness_radius`, `see_over_coverage`). When vision is disabled
 (omniscient), the bubble is drawn as a plain circle and the cone is skipped.
 
 ## `agent_debug.gd` (toggles `show_actions`, `show_path`)

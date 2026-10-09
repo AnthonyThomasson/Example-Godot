@@ -7,7 +7,7 @@ extends Node
 ## re-decision is due. The primitives:
 ##   move     — go to `point` (or until entering `arrive_room`), aiming along the way (`aim`: travel /
 ##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`; a
-##              `look_around` search move pauses to scan the room on arrival.
+##              `look_around` search move pauses on arrival and sweeps its gaze back and forth to scan the room.
 ##   engage   — go to `point`, then fight `target_id` from there: `peek_cover` (step out, shoot, duck)
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
@@ -26,14 +26,18 @@ const PISTOL_SLOT := 3
 const FISTS_SLOT := 2
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
-## Search-pause look-around: how fast the view pans (rad/s coefficient) and how far to each side (radians).
-const LOOK_SWEEP_RATE := 2.5
-const LOOK_SWEEP_ARC := 1.2
+## How near (radians) the gaze must be to a look-around swing's goal to count as reached.
+const LOOK_REACHED := 0.05
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
 var max_commit_time: float = 6.0
 var search_dwell: float = 2.5     ## Seconds to pause and look around after reaching a search/explore room.
+var search_look_arc: float = 1.2  ## Base half-arc (rad) the look-around gaze swings to either side of the arrival facing.
+var search_look_rate: float = 2.5 ## Base gaze turn speed (rad/s) during a look-around swing.
+var search_look_pause: float = 0.5 ## Base seconds the gaze dwells at each swing's extreme before reversing.
+var search_look_jitter: float = 0.15 ## Random angle (rad, ±) added to each swing's goal so it isn't perfectly symmetric.
+var search_look_variance: float = 0.5 ## Fraction (0..1) the arc/rate/pause are randomized per swing (0 = uniform metronome).
 var tactic_interval: float = 3.0
 var shoot_range: float = 500.0
 var punch_range: float = 48.0
@@ -62,6 +66,10 @@ var _arrived := false             ## Whether the destination has been reached.
 var _look_around := false         ## A search/explore move that pauses to look around on arrival (vs resolving at once).
 var _look_timer := 0.0            ## Seconds left in the look-around pause.
 var _look_base := 0.0             ## Facing angle (rad) the look-around sweep pans around.
+var _look_angle := 0.0            ## Current gaze offset (rad) from `_look_base` during the look-around.
+var _look_goal := 0.0             ## The current swing's goal offset (rad) from `_look_base`.
+var _look_speed := 0.0            ## This swing's gaze turn speed (rad/s), randomized per swing.
+var _look_hold := 0.0             ## Seconds left dwelling at the current swing's extreme (>0 = holding, not turning).
 var _engage_id := 0               ## Instance id of the contact being fought (0 = none).
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
@@ -395,6 +403,9 @@ func _apply_move(character, delta: float) -> void:
 			if _look_around:
 				_look_timer = search_dwell  # Pause and scan the room before deciding where to go next.
 				_look_base = character.facing.angle()
+				_look_angle = 0.0
+				_look_hold = 0.0
+				_next_look_swing(1.0)  # Kick off the first swing to one side.
 			else:
 				_resolved = true
 	if not _arrived:
@@ -403,7 +414,7 @@ func _apply_move(character, delta: float) -> void:
 		character.move_input = Vector2.ZERO
 		if _look_around:
 			_look_timer -= delta
-			_scan_around(character)
+			_scan_around(character, delta)
 			if _look_timer <= 0.0:
 				_look_around = false
 				_resolved = true
@@ -432,12 +443,34 @@ func _aim_move(character) -> void:
 		character.aim_point = character.global_position + character.move_input * 100.0
 
 
-## During a search/explore pause, pan the aim — and so the view cone — from side to side around where the
-## NPC ended up facing, so it looks around the room instead of re-deciding the instant it arrives.
-func _scan_around(character) -> void:
-	var elapsed: float = search_dwell - _look_timer
-	var offset: float = sin(elapsed * LOOK_SWEEP_RATE) * LOOK_SWEEP_ARC
-	character.aim_point = character.global_position + Vector2.from_angle(_look_base + offset) * 100.0
+## During a search/explore pause, sweep the aim — and so the view cone — back and forth around where
+## the NPC ended up facing, so it looks around the room instead of re-deciding the instant it arrives.
+## Each swing eases the gaze to one extreme, dwells there a beat, then reverses; the arc, turn speed
+## and dwell are randomized per swing (by `search_look_variance`) so it reads as scanning, not a wiper.
+func _scan_around(character, delta: float) -> void:
+	if _look_hold > 0.0:
+		_look_hold -= delta  # Dwelling at an extreme; reverse once the beat elapses.
+		if _look_hold <= 0.0:
+			_next_look_swing(-signf(_look_goal))
+	else:
+		_look_angle = move_toward(_look_angle, _look_goal, _look_speed * delta)
+		if absf(_look_angle - _look_goal) <= LOOK_REACHED:
+			_look_hold = search_look_pause * _look_rand_factor()  # Reached this side; pause before reversing.
+	character.aim_point = character.global_position + Vector2.from_angle(_look_base + _look_angle) * 100.0
+
+
+## Begin the next look-around swing toward side `dir` (+1 / −1): pick its goal offset, randomized arc
+## and jitter, and a randomized turn speed. Randomness here is cosmetic gaze variation, so it uses the
+## global RNG and is deliberately NOT tied to the run's seeded world-gen RNG.
+func _next_look_swing(dir: float) -> void:
+	var jitter: float = randf_range(-search_look_jitter, search_look_jitter)
+	_look_goal = dir * search_look_arc * _look_rand_factor() + jitter
+	_look_speed = search_look_rate * _look_rand_factor()
+
+
+## A per-swing random multiplier `1 ± search_look_variance`, so variance 0 collapses to a uniform sweep.
+func _look_rand_factor() -> float:
+	return 1.0 + randf_range(-search_look_variance, search_look_variance)
 
 
 ## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the
