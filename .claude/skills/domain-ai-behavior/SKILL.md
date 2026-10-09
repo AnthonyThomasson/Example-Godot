@@ -50,7 +50,7 @@ house, the peek fallback holds instead of advancing, and melee won't chase out.
 - `ongoing()` — the running choice is still in progress (en route, fighting, using an object): only
   then does the planner mark the option continuing it "(your current plan)" — a finished move must
   not be re-picked just because it was the last plan.
-- Read-only: `current_act()` (path ids), `intent()` (the broad mode), `in_combat()`, `debug_status()`
+- Read-only: `current_act()` (path ids), `in_combat()`, `debug_status()`
   — **the full decision path, every level, joined with " - "** (`COMBAT - Intruder - FLANK - their
   left side (kitchen)  · in position, looking for a shot  ⚠ under fire`), `activity_text()` (the same
   path + progress + how long, for Von's "current activity" line), `debug_state()` (JSON-safe).

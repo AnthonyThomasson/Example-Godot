@@ -42,9 +42,3 @@ func _closed(poly: PackedVector2Array) -> PackedVector2Array:
 	var out := poly.duplicate()
 	out.append(poly[0])
 	return out
-
-
-## Runtime toggle setter so Main (and the setup menu) can flip the overlay like the AI debug ones.
-func set_show_holes(on: bool) -> void:
-	show_holes = on
-	queue_redraw()

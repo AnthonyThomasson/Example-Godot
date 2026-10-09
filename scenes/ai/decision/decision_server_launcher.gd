@@ -64,7 +64,6 @@ var _waiting_ready := false  ## True once we launched and are polling for the se
 var _ready_deadline_ms := 0  ## When to stop polling a launched server (see `ready_timeout`).
 var _start_ms := 0  ## Scene-load time, so the ready line can report how long the brain took.
 var _resolved := false  ## Whether the server question has settled (see `resolved`).
-var _live := false  ## Whether that settled answer was "a server is up".
 
 
 ## Whether the server question has settled. Main checks this BEFORE awaiting `resolved`, because a
@@ -74,17 +73,11 @@ func is_resolved() -> bool:
 	return _resolved
 
 
-## Whether a decision server is up. Only meaningful once `is_resolved()`.
-func is_live() -> bool:
-	return _live
-
-
 ## Settle the server question once and tell anyone gating on it. Idempotent: the first answer wins.
 func _resolve(live: bool) -> void:
 	if _resolved:
 		return
 	_resolved = true
-	_live = live
 	_waiting_ready = false
 	_end_probing()
 	resolved.emit(live)

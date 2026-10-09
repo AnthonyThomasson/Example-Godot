@@ -16,7 +16,7 @@ extends Node
 
 const DecisionTree := preload("res://scenes/ai/decision/decision_tree.gd")
 
-## The walk finished: `leaf` = { path, labels, primitive, params, desc, entry }.
+## The walk finished: `leaf` = { path, labels, primitive, params }.
 signal decided(leaf: Dictionary)
 ## The walk could not finish (Von unreachable, or nothing to choose from).
 signal failed()
@@ -149,7 +149,7 @@ func _enter(id: StringName) -> void:
 		_steps.append({ "id": String(id), "label": node["label"] })
 	_confine = _confine or (inside_only and node.get("confine", false))
 	if _is_leaf_node(node):
-		_finish(id, { "id": String(id), "label": node.get("label", String(id)), "desc": _fill(node.get("desc", ""), id) })
+		_finish(id, { "id": String(id), "label": node.get("label", String(id)) })
 		return
 	_step()
 
@@ -237,8 +237,6 @@ func _finish(node_id: StringName, option: Dictionary) -> void:
 		"labels": _steps.map(func(s): return s["label"]),
 		"primitive": node.get("primitive", &"hold"),
 		"params": params,
-		"desc": option.get("desc", ""),
-		"entry": String(_entry),
 	}
 	_pending = false
 	_last_levels = _levels

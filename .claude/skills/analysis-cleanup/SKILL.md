@@ -64,9 +64,12 @@ cd "$(git rev-parse --show-toplevel)"
 for f in $(find scenes tools -name '*.gd'); do
   grep -oE '^[[:space:]]*(static )?func [a-z_][a-zA-Z0-9_]*' "$f" | sed -E 's/.*func //' | while read -r fn; do
     case "$fn" in _ready|_process|_physics_process|_draw|_init|_input|_exit_tree|_unhandled_input|_notification|_integrate_forces) continue;; esac
+    # `calls` also matches the `func NAME(` declaration itself, so compare against the declaration
+    # count — not 0 — or every function looks called and the scan never reports a thing.
     calls=$(grep -rhoE "[^a-zA-Z0-9_]$fn\(" scenes tools --include='*.gd' | wc -l | tr -d ' ')
+    decls=$(grep -rhoE "^[[:space:]]*(static )?func $fn\(" scenes tools --include='*.gd' | wc -l | tr -d ' ')
     refs=$(grep -rhoE "\"$fn\"|&\"$fn\"|'$fn'" scenes tools --include='*.gd' --include='*.tscn' | wc -l | tr -d ' ')
-    [ "$calls" -eq 0 ] && [ "$refs" -eq 0 ] && echo "UNCALLED $f: $fn"
+    [ "$calls" -le "$decls" ] && [ "$refs" -eq 0 ] && echo "UNCALLED $f: $fn"
   done
 done
 ```
@@ -83,8 +86,11 @@ for f in $(find scenes tools -name '*.gd'); do
   }' "$f"
 done | while IFS=: read -r f ln sym; do
   uses=$(grep -rnwF -- "$sym" scenes tools --include='*.gd' 2>/dev/null | grep -cv "^$f:$ln:")
+  # A copy of the SAME declaration in another file (e.g. a const duplicated in two scene scripts) is
+  # not a use — subtract other-file declaration lines, or a file-local symbol looks read via its twin.
+  dups=$(grep -rnE "^[[:space:]]*(@export[^ ]*[[:space:]]+)?(const|var|signal)[[:space:]]+$sym\b" scenes tools --include='*.gd' 2>/dev/null | grep -cv "^$f:$ln:")
   tscn=$(grep -rlwF -- "$sym" scenes --include='*.tscn' 2>/dev/null | wc -l | tr -d ' ')
-  [ "$uses" -eq 0 ] && [ "$tscn" -eq 0 ] && echo "UNUSED $f:$ln  $sym"
+  [ "$((uses - dups))" -le 0 ] && [ "$tscn" -eq 0 ] && echo "UNUSED $f:$ln  $sym"
 done
 ```
 
@@ -115,24 +121,25 @@ A producer whose consumer was removed. The code runs, so nothing flags it, and i
 confidently explain a purpose the codebase no longer has. Find these by tracing each *mechanism*
 end to end: who writes this, and who still reads it?
 
-**A worked example that is live in the tree right now.** `navigation/nav_builder.gd:95`
-(`_add_furniture_avoiders`) attaches a dynamic `NavigationObstacle2D` with `avoidance_enabled` to
-every solid furniture body, and `build()` calls it on every house. But RVO avoidance was removed
-from the AI's locomotion, and `grep -rn "avoidance_enabled\|set_velocity\|velocity_computed"` now
-matches **only `nav_builder.gd` itself** — no agent anywhere turns avoidance on, so not one of
-those obstacles can affect any path. The function, its call, and the three skill passages
-describing it are all dead weight that every scan in 1a calls reachable.
-
-That is the shape to hunt. The generalisable probe: for a mechanism, grep the symbols that make it
-*work* (not its own name) and check whether every match is inside the producing file.
+**The canonical shape, from a real find.** `character/character.gd` declared
+`signal item_changed(item)` and emitted it on every slot switch "for the HUD" — but nothing
+connected it: the debug HUD reads `current_item()` by polling each frame instead. The emit ran
+forever, feeding no one. The 1a scans all call it reachable (a signal is "used" at its emit site),
+so only end-to-end tracing catches it: for a signal, grep its `connect` / `await` separately from
+its `emit`.
 
 ```bash
-# For each suspected mechanism, the matches should NOT all share one file.
-grep -rn "avoidance_enabled\|NavigationObstacle2D\|velocity_computed\|set_velocity" scenes --include='*.gd'
+# A signal whose only matches are its declaration + `.emit` — no `.connect`, no `await` — has no listener.
+grep -rn "item_changed" scenes --include='*.gd' --include='*.tscn'
 ```
 
-Candidates: anything an export still configures but no code branches on; signals emitted but
-connected nowhere; metadata written but never read; a cache or log nothing queries.
+That is the shape to hunt for any mechanism: grep the symbols that make it *work* (the keys a
+producer writes and a consumer would read, a signal's connections, an obstacle's enable flag) —
+**not** the mechanism's own name — and check whether every match sits inside the producing file. If
+it does, the consumer is gone. Candidates: a dict field written on every option but read nowhere
+(this audit found several — `dist`, `to_target`, `nearby`, `farther` in the tactics geometry); a
+leaf/record key the emitter fills that no handler destructures; anything an export still configures
+but no code branches on; signals emitted but connected nowhere; a cache or log nothing queries.
 
 ### 1c. Vestigial configuration
 
@@ -227,16 +234,16 @@ ls -d scenes/*/ | wc -l    # the real number
 grep -rn "domains" AGENTS.md .claude/skills/architecture/SKILL.md | grep -iE "ten|eleven|twelve|nine|[0-9]+ domains"
 ```
 
-*This is currently drifted:* there are **eleven** domain folders, and `architecture/SKILL.md:23`
-says "The eleven domains" — but its `description` (line 3) and its intro (line 11) both still say
-"ten", as does `AGENTS.md` twice (lines 3 and 6). Verify and fix all five.
+There are **eleven** domain folders; `AGENTS.md` (×2) and `architecture/SKILL.md` (the
+`description`, the intro, the table heading) must all agree. Re-run the grep each audit — the three
+assertions in the skill drift independently when a domain is added or removed.
 
 **3. Each `domain-<name>` skill (the deep detail)** — it must describe the domain's internals *as
 they are*. Read it against the code and flag every passage that is no longer true. Interface
 changes land in two places: the `architecture` list **and** that skill's own recap. Where a
-mechanism was removed (Step 1b), the skill passages describing it must go too — the
-`NavigationObstacle2D` avoidance text in `domain-navigation` and interface 9 of `architecture`
-is the open instance.
+mechanism or method was removed (Step 1a/1b), the skill passages describing it must go too — a
+deleted read-only accessor still listed as a sub-domain interface, or a removed signal still in the
+Character interface recap, is the usual instance.
 
 **4. `.claude/commands/test-ai-behavior.md`** — it passes real GDScript into the game, so stale
 content actively breaks. A removed or renamed export leaves dead `--defender`/`--invader` override
@@ -283,10 +290,10 @@ actually checked.
 ## Codebase cleanup
 
 ### Dead code
-- [ ] `scenes/navigation/nav_builder.gd:95` — `_add_furniture_avoiders` attaches avoidance
-      obstacles, but no agent enables avoidance any more (all `avoidance_enabled` matches are in
-      this file). Fix: delete the function, its call at :64, and the header text at :11.
-- [x] No unreferenced functions or unread declarations (417 funcs, 1235 declarations scanned).
+- [ ] `scenes/character/character.gd:56,156` — `signal item_changed` is emitted on every slot
+      switch but nothing connects it (the debug HUD polls `current_item()`). Fix: delete the
+      signal + emit; remove it from `architecture` and `domain-character` interface recaps.
+- [x] No unreferenced functions or unread declarations (scan corrected per 1a; N funcs scanned).
 
 ### Redundancy
 - [x] No duplicated logic found across domains.
@@ -298,11 +305,10 @@ actually checked.
 - [x] No domain warrants a split; `ai/` is already sub-divided.
 
 ### Documentation
-- [ ] `architecture/SKILL.md:3,11` + `AGENTS.md:3,6` — say "ten domains"; there are eleven
-      (the table at :23 already says eleven). Fix: "eleven" in all four.
-- [ ] `domain-navigation/SKILL.md:28` — describes RVO avoidance that no longer runs. Fix: drop it.
+- [ ] `domain-navigation/SKILL.md:NN` — says the furniture-holes overlay is "off by default"; the
+      effective default is `main.gd`'s `show_nav_holes` export (on). Fix: state the real default.
 
-**Verdict:** 3 items to clear; isolation and redundancy clean.
+**Verdict:** 2 items to clear; isolation and redundancy clean.
 ```
 
 A clean codebase is the goal, not a long list — **don't manufacture findings to look thorough.** If

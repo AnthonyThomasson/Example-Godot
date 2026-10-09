@@ -44,7 +44,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `quick_facts(character)` — cheap facts (under fire, engaged, hostile known) between decisions.
 - `sense(character, rooms, goal, activity) -> { facts, sections, sections_per_target, options }` — the
   BUILD pass (below). `activity` is the behaviour's current-activity line.
-- Combat geometry for the behaviour: `has_line_to`, `combat_spots`, `contact_visible`,
+- Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
   `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
 

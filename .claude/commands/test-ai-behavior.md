@@ -94,7 +94,6 @@ Expected: invader fires from outside and resists being drawn in.
 Expected: no decision path contains FLANK; the invader engages, advances or retreats instead. Compare win rate to baseline.
 
 **5b. Multiple invaders — flank claims over the radio**
-Only run this if `main.gd` exposes `invader_count` via GDScript (check with `python3 tools/gcmd.py 'scene().get_node("Main").invader_count'`). If it does:
 ```
 --invader 'scene().get_node("Main").invader_count = 3'
 ```

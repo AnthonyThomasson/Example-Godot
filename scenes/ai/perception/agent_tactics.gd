@@ -412,7 +412,7 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	if not threats.is_empty():
 		var nearest: Vector2 = threats[0]
 		for p in combat_spots(ctx["space"], self_pos, nearest, ex, combat_ring_radius * 2.0, combat_ring_count)["cover"]:
-			candidates.append({ "point": p, "room": "" , "nearby": true })
+			candidates.append({ "point": p, "room": "" })
 	for a in ctx["allies"]:
 		candidates.append({ "point": snap(ctx["map"], a["pos"]), "room": "", "ally": a["name"] })
 	var out: Array = []
@@ -431,7 +431,6 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 		if not threats.is_empty():
 			cover = cover_near(ctx["space"], p, threats[0], ex)
 		c["hidden"] = hidden
-		c["farther"] = gap > here_gap
 		c["cover"] = cover
 		c["route_len"] = path_length(path)
 		c["route_exposed"] = not threats.is_empty() and route_exposed(ctx["space"], path, threats[0], ex)
@@ -439,8 +438,8 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	return out
 
 
-## The facts about standing at `p` to fight `target`: clear shot, cover, step length, exposure. `path`
-## is the route there when the caller already has it.
+## The facts about standing at `p` to fight `target`: clear shot, cover, route length, exposure.
+## `path` is the route there when the caller already has it.
 func _annotate(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array, path := PackedVector2Array()) -> Dictionary:
 	var tpos: Vector2 = target["pos"]
 	if path.is_empty():
@@ -449,11 +448,9 @@ func _annotate(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array, path 
 		"point": p,
 		"clear_shot": not blocked(ctx["space"], p, tpos, ex),
 		"cover": cover_near(ctx["space"], p, tpos, ex),
-		"dist": (ctx["self_pos"] as Vector2).distance_to(p),
 		"route_len": path_length(path),
 		"route_exposed": false,
 		"exposed_to": exposed_to(ctx["space"], p, ctx["hostiles"], target["id"], ctx["exclude"]),
-		"to_target": p.distance_to(tpos),
 	}
 
 

@@ -52,8 +52,6 @@ var _blood_pool: Node
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
 ## is told apart by `hand`, not by the damage value.
 signal hit_landed(body: Node, damage: float, hand: int)
-## Emitted when the held item changes (slot switch), for the HUD.
-signal item_changed(item: Item)
 ## Re-emitted from the interaction component: true + label when an interaction starts, false + ""
 ## when it ends. For the HUD; the character itself stays unaware of what an interaction means.
 signal interaction_changed(active: bool, label: String)
@@ -147,13 +145,13 @@ func shoot() -> void:
 	current_item().secondary(self)
 
 
-## Switch to inventory slot `slot`, emitting item_changed if it changed. Ignored while locked.
+## Switch to inventory slot `slot`. Ignored while locked. The held item is read on demand via
+## current_item() (the debug HUD polls it), so no change signal is emitted.
 func select_slot(slot: int) -> void:
 	if is_busy():
 		return
 	if slot in _items and slot != _current_slot:
 		_current_slot = slot
-		item_changed.emit(current_item())
 
 
 ## Toggle an object interaction: start the best one in reach, or end the active one.

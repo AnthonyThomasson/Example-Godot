@@ -30,9 +30,8 @@ extends Node
 ## holds NO policy: it never decides, gates by goal or picks. The controller configures it (all
 ## tunables live on the GoalController, the single authoring surface) then calls `setup()` once.
 
-## Inventory slots of the combat items (ItemRegistry ids).
+## Inventory slot of the pistol (ItemRegistry id), tested for the `has_pistol` fact.
 const PISTOL_SLOT := 3
-const FISTS_SLOT := 2
 ## Compass names for an 8-wind direction, indexed clockwise from east (screen +y is south).
 const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
 ## How each flank side of a target is named to Von.
@@ -43,15 +42,6 @@ const AgentVision := preload("res://scenes/ai/perception/agent_vision.gd")
 const AgentHostility := preload("res://scenes/ai/perception/agent_hostility.gd")
 const AgentMemory := preload("res://scenes/ai/perception/agent_memory.gd")
 const AgentTactics := preload("res://scenes/ai/perception/agent_tactics.gd")
-
-## Surface coverage (0–100) at or above which a blocking object counts as usable cover.
-@export var cover_min: float = 40.0
-## Accumulated damage (see Character.damage_taken) at or above which a character is hurt.
-@export var hurt_threshold: float = 15.0
-## Accumulated damage at or above which a character is badly wounded.
-@export var critical_threshold: float = 35.0
-## Most contacts described in the decision state (hostiles first, then nearest).
-@export var max_contacts_in_state: int = 4
 
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
 var contact_memory_ttl: float = 4.0
@@ -93,7 +83,11 @@ var track_smoothing: float = 0.3
 var extrapolate_cap: float = 3.0
 var investigate_distance: float = 300.0
 var max_options_per_level: int = 4
+var hurt_threshold: float = 15.0       ## Accumulated damage at/above which a character reads as hurt.
+var critical_threshold: float = 35.0   ## Accumulated damage at/above which a character reads as badly wounded.
+var max_contacts_in_state: int = 4     ## Most contacts described in the decision state (hostiles first).
 # Tactics (the combat geometry).
+var cover_min: float = 40.0            ## Surface coverage at/above which a blocking object counts as cover.
 var flank_distance: float = 220.0
 var flank_arc: float = 60.0
 var flank_ally_radius: float = 500.0
@@ -362,50 +356,45 @@ func _track(id: int, pos: Vector2, now: int) -> Vector2:
 	return vel
 
 
-## Every character in memory regardless of contact_memory_ttl — all non-expired sightings (up to
-## lead_memory_ttl, typically 20 s). Same dict shape as contacts() but covers stale sightings too,
-## so external observers (e.g. the spectator inspector) can see the NPC's full knowledge window.
-func all_seen_characters(self_pos: Vector2) -> Array:
-	var out: Array = []
-	for rec in _memory.recall_aged(&"saw_character"):
-		var c := _live_sighting(rec)
-		if not c.is_empty():
-			out.append(c)
-	out.sort_custom(func(a, b):
-		if a["hostile"] != b["hostile"]:
-			return a["hostile"]
-		return (a["pos"] as Vector2).distance_squared_to(self_pos) < (b["pos"] as Vector2).distance_squared_to(self_pos))
-	return out
-
-
 ## Every character the agent currently knows of (seen within `contact_memory_ttl`) — the latest
 ## sighting per character, with `hostile` / `reason`, `visible` (seen on the latest tick) and `age`.
 ## Hostiles first, then nearest to `self_pos`. Dead or freed characters are dropped.
 func contacts(self_pos: Vector2) -> Array:
-	var out: Array = []
-	for rec in _memory.recall_aged(&"saw_character"):
-		if rec["age"] > contact_memory_ttl:
-			continue
-		var c := _live_sighting(rec)
-		if not c.is_empty():
-			out.append(c)
-	out.sort_custom(func(a, b):
-		if a["hostile"] != b["hostile"]:
-			return a["hostile"]
-		return (a["pos"] as Vector2).distance_squared_to(self_pos) < (b["pos"] as Vector2).distance_squared_to(self_pos))
-	return out
+	return _sightings(self_pos, contact_memory_ttl)
+
+
+## Every character in memory regardless of contact_memory_ttl — all non-expired sightings (up to
+## lead_memory_ttl, typically 20 s). Same dict shape as contacts() but covers stale sightings too,
+## so external observers (e.g. the spectator inspector) can see the NPC's full knowledge window.
+func all_seen_characters(self_pos: Vector2) -> Array:
+	return _sightings(self_pos)
 
 
 ## Hostiles the NPC has lost track of — last seen longer ago than `contact_memory_ttl` but within
 ## `lead_memory_ttl` — newest first: where to investigate.
 func lost_hostiles() -> Array:
+	return _sightings(null, INF, contact_memory_ttl, true)
+
+
+## The live character sightings in memory as contact dicts — the one source behind contacts(),
+## all_seen_characters() and lost_hostiles(). Keeps sightings with age in (`min_age`, `max_age`];
+## `hostile_only` drops non-hostiles; dead or freed characters are always dropped. Given a
+## `self_pos` (a Vector2) the result is sorted hostiles-first then nearest to it, else it keeps the
+## memory's newest-first order.
+func _sightings(self_pos, max_age := INF, min_age := -1.0, hostile_only := false) -> Array:
 	var out: Array = []
 	for rec in _memory.recall_aged(&"saw_character"):
-		if rec["age"] <= contact_memory_ttl:
+		if rec["age"] > max_age or rec["age"] <= min_age:
 			continue
 		var c := _live_sighting(rec)
-		if not c.is_empty() and c["hostile"]:
-			out.append(c)
+		if c.is_empty() or (hostile_only and not c["hostile"]):
+			continue
+		out.append(c)
+	if self_pos is Vector2:
+		out.sort_custom(func(a, b):
+			if a["hostile"] != b["hostile"]:
+				return a["hostile"]
+			return (a["pos"] as Vector2).distance_squared_to(self_pos) < (b["pos"] as Vector2).distance_squared_to(self_pos))
 	return out
 
 
@@ -932,8 +921,7 @@ func _advance_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary
 func _retreat_group(ctx: Dictionary, hostiles: Array, known_rooms: Array, dmg: float) -> Dictionary:
 	var threats: Array = hostiles.map(func(h): return h["pos"])
 	if threats.is_empty() and under_fire():
-		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
-		threats.append((ctx["self_pos"] as Vector2) + from.normalized() * investigate_distance)
+		threats.append(_shot_origin(ctx, false))
 	if threats.is_empty():
 		return { "summary": "", "options": [] }
 	var spots: Array = _tactics.retreat_positions(ctx, threats, known_rooms)
@@ -1010,7 +998,7 @@ func _lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 			"point": _tactics.snap(ctx["map"], pos) })
 	if under_fire() and hostiles.is_empty():
 		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
-		var origin: Vector2 = _tactics.snap(ctx["map"], self_pos + from.normalized() * investigate_distance)
+		var origin: Vector2 = _shot_origin(ctx)
 		leads.append({ "age": 0.0, "id": "lead_shooter", "label": "where the shots came from",
 			"desc": "where the shots at you came from — the %s, just now" % _compass(from), "point": origin })
 	for c in ctx["callouts"]:
@@ -1041,12 +1029,21 @@ func _shooter_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 	if not under_fire() or not hostiles.is_empty():
 		return { "summary": "", "options": [] }
 	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
-	var origin: Vector2 = _tactics.snap(ctx["map"], (ctx["self_pos"] as Vector2) + from.normalized() * investigate_distance)
+	var origin: Vector2 = _shot_origin(ctx)
 	var dir := _compass(from)
 	return { "summary": "the shots came from the %s" % dir, "options": [{
 		"id": "toward_shots", "label": "toward the shots",
 		"desc": "move toward where the shots came from — the %s%s — %s route" % [dir, _room_suffix(origin), _route_band(_route_len(ctx, origin))],
 		"params": { "point": origin }, "tags": { "inside": _is_inside(origin) } }] }
+
+
+## The world point to investigate when under fire from an unseen shooter: `investigate_distance` px
+## from the NPC toward where the shots came from, snapped onto the navmesh unless `snapped` is false
+## (the retreat group wants the raw direction as a threat position, not a reachable spot).
+func _shot_origin(ctx: Dictionary, snapped := true) -> Vector2:
+	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
+	var p: Vector2 = (ctx["self_pos"] as Vector2) + from.normalized() * investigate_distance
+	return _tactics.snap(ctx["map"], p) if snapped else p
 
 
 ## Which known room to search next: not-recently-searched first, then nearest; plus the entrance or
@@ -1388,11 +1385,6 @@ func _collect_characters(node: Node, self_char, out: Array) -> void:
 
 
 # --- Combat geometry for the behaviour -------------------------------------------------------
-
-## Whether character `id` was visible (in cone/range with a clear line) on the latest observe() tick.
-func contact_visible(id: int) -> bool:
-	return _visible_now.has(id)
-
 
 ## Whether the NPC has a clear line (no wall or solid furniture between) to a world `point` — the
 ## engaged contact's last-known position. The behaviour gates FIRING on this: once a contact is known,

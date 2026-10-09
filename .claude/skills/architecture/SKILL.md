@@ -110,8 +110,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    (aim and visible wounds are things it perceives).
    `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
-   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot), `item_changed(item)`
-   and `interaction_changed(active, label)`. Observers (debug HUD, match HUD, camera) attach by
+   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot) and
+   `interaction_changed(active, label)`. Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left

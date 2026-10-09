@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## General domain, spectator-match observer: the HUD for an N-AI contest (defenders vs invaders). Each
+## UI domain, spectator-match observer: the HUD for an N-AI contest (defenders vs invaders). Each
 ## combatant gets a compact panel — faction and a health bar — that FLOATS in the world just above the
 ## NPC it describes (its world position projected to screen each frame), so the panels track their NPCs
 ## and scale to any count instead of two fixed corner panels. Across the top is a running match timer;

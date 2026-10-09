@@ -36,7 +36,7 @@ Draws, next to the NPC:
 
 `label_color` / `path_color` are set per side in the preset scenes to match the body colour.
 
-## `tactics_debug.gd` (toggles `show_tactics`, `show_room_zones` — both off by default)
+## `tactics_debug.gd` (toggles `show_tactics`, `show_room_zones` — `main.gd` drives both, on by default)
 
 The tactical-geometry overlay, in two independent aspects (both draw on the NPC's own child Node2D,
 reading the controller's public API; both default off — they are dense).

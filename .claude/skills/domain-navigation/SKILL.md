@@ -38,10 +38,10 @@ the agent's RVO avoidance.
 global — not per-NPC) that draws the furniture HOLES carved out of the navmesh as filled polygons +
 outlines. `main.gd` builds it once right after the bake: `nav_debug.setup(house)` snapshots the holes
 via `NavBuilder.furniture_holes(house)`, and `show_holes` toggles it (wired from the setup window's
-"Furniture holes" checkbox, off by default). `furniture_holes(house) -> Array` returns each solid
-piece's grown footprint as a closed WORLD-space polygon, using the exact same selection and footprint
-helpers the bake feeds the obstruction baker (`_add_furniture_holes` now calls it), so the overlay
-cannot drift from what was carved. Like the baked holes it is a **static snapshot**: it does not follow
+"Furniture holes" checkbox, whose starting state is `main.gd`'s `show_nav_holes` export — on).
+`furniture_holes(house) -> Array` returns each solid piece's grown footprint as a closed WORLD-space
+polygon, using the exact same selection and footprint helpers the bake feeds the obstruction baker
+(`_add_furniture_holes` calls it), so the overlay cannot drift from what was carved. Like the baked holes it is a **static snapshot**: it does not follow
 a piece shoved off its spot afterwards (that piece gets no dynamic avoidance anyway). The overlay reads
 nothing back and feeds nothing in.
 

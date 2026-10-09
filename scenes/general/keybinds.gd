@@ -111,12 +111,6 @@ func is_interact_just_pressed() -> bool:
 	return Input.is_action_just_pressed(INTERACT)
 
 
-## True on the frame the menu key (Escape) is pressed — main.gd uses it to return to the setup window.
-## Rebindable like the others via rebind().
-func is_menu_just_pressed() -> bool:
-	return Input.is_action_just_pressed(MENU)
-
-
 ## Item selection (1-9). Returns the item number (1-9) if an item key was pressed
 ## on this frame, or -1 if none. Only the first pressed item is returned.
 func get_selected_item() -> int:

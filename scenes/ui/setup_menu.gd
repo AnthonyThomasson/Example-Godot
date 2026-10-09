@@ -1,9 +1,9 @@
 extends CanvasLayer
 
-## General domain, pre-game setup window: a modal shown before the match starts so a human can choose
+## UI domain, pre-game setup window: a modal shown before the match starts so a human can choose
 ## the run's parameters — whether there is a human player, and how many defenders and invaders spawn —
 ## then hands them back to Main, which builds the world with them. Built entirely in code (no
-## scene-side layout), like the other General HUDs.
+## scene-side layout), like the other UI HUDs.
 ##
 ## Main opens it on a fresh launch and spawns the world only once the player presses Start; scripted
 ## restarts (the dev command server) set an Engine `skip_setup` meta and bypass it, so the headless
@@ -40,7 +40,7 @@ func open(defaults: Dictionary) -> void:
 	_build_ui(defaults)
 
 
-# --- UI construction (built in code like the other General HUDs; no scene-side layout) ----------
+# --- UI construction (built in code like the other UI HUDs; no scene-side layout) ----------
 
 ## Lay out the dimmer, the centred panel and its controls, seeded from `defaults`.
 func _build_ui(defaults: Dictionary) -> void:

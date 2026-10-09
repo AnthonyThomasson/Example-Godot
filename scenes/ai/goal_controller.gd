@@ -116,8 +116,16 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var extrapolate_cap: float = 3.0
 ## Distance (px) toward unseen gunfire the "where the shots came from" lead points.
 @export var investigate_distance: float = 300.0
+## Accumulated damage (see Character.damage_taken) at or above which a character reads as "hurt".
+@export var hurt_threshold: float = 15.0
+## Accumulated damage at or above which a character reads as "badly wounded".
+@export var critical_threshold: float = 35.0
+## Most contacts described in the decision state (hostiles first, then nearest).
+@export var max_contacts_in_state: int = 4
 
 @export_group("Tactics")
+## Surface coverage (0–100) at or above which a blocking object counts as usable cover.
+@export var cover_min: float = 40.0
 ## Distance (px) from a target at which a flanking spot is sought.
 @export var flank_distance: float = 220.0
 ## Angular spread (degrees) sampled around each flank side's bearing.
@@ -280,6 +288,10 @@ func _apply_config() -> void:
 	_perception.track_smoothing = track_smoothing
 	_perception.extrapolate_cap = extrapolate_cap
 	_perception.investigate_distance = investigate_distance
+	_perception.hurt_threshold = hurt_threshold
+	_perception.critical_threshold = critical_threshold
+	_perception.max_contacts_in_state = max_contacts_in_state
+	_perception.cover_min = cover_min
 	_perception.max_options_per_level = max_options_per_level
 	_perception.flank_distance = flank_distance
 	_perception.flank_arc = flank_arc

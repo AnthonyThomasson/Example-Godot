@@ -2,7 +2,7 @@ extends CanvasLayer
 
 ## Debug UI showing the held item, attack state and last-hit info. Talks to the character
 ## only through its public API + signals (hit_landed / current_item / is_attacking), never
-## its internals — so it stays a General-domain observer.
+## its internals — so it stays a UI-domain observer.
 
 ## The character to observe.
 @export var character_path: NodePath = ^"../Player"

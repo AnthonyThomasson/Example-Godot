@@ -117,7 +117,8 @@ things keep that head start honest:
   `[von] Decision server live on port N, Xs after scene load` — so readiness means a LIVE brain, not
   merely a spawned process.
 
-**`resolved(live)` + `is_resolved()` / `is_live()`** is the gate contract. It fires EXACTLY once when
+**`resolved(live)` + `is_resolved()`** is the gate contract (the live/not-live answer rides the
+`resolved` signal). It fires EXACTLY once when
 the question settles, and every terminal path reaches `_resolve()` — server answered (`true`), or
 none is coming (`false`: exported build, blank `von_path`, failed spawn, `ready_timeout` elapsed).
 `main.gd` awaits it before `_spawn_world()` so no NPC ever makes its first decision against a cold

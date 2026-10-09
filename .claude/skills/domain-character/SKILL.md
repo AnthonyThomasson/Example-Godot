@@ -68,7 +68,7 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
   damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`
-  (hand 0/1 = melee, −1 = shot), `item_changed(item)`, `interaction_changed(active, label)`.
+  (hand 0/1 = melee, −1 = shot), `interaction_changed(active, label)`.
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
