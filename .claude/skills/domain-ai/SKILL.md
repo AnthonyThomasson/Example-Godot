@@ -28,7 +28,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 
 | Sub-domain | Folder | Skill | Owns (role) |
 |---|---|---|---|
-| **Perception** | `ai/perception/` | `domain-ai-perception` | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von. |
+| **Perception** | `ai/perception/` | `domain-ai-perception` | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
 | **Behaviour** | `ai/behavior/` | `domain-ai-behavior` | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold) and the commitment state Von lacks; owns a locomotion layer for pathing. |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, and the tactical navigation zones it weighed. |

@@ -7,14 +7,18 @@ description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes
 
 The SENSE half of the NPC brain: it turns the world into what the NPC *knows*, and turns that into the
 snapshot the decision planner walks. It holds no policy — it never decides, picks or gates by goal. It
-owns four internal modules and presents one public face, `agent_perception.gd` (a `Node`).
+owns five internal modules and presents one public face, `agent_perception.gd` (a `Node`).
 
 Files:
-- `agent_perception.gd` — the public face: SEE (observe), the contacts view, event intake, BUILD (sense).
+- `agent_perception.gd` — the public face: SEE (observe), the contacts view, event intake, and the
+  BUILD entry (`sense`) that gathers knowledge and delegates to the snapshot author.
 - `agent_vision.gd` — the sight sense and the single owner of the ray query (`blocked` / `raycast`).
 - `agent_hostility.gd` — the hostility rules (categorization).
 - `agent_memory.gd` — a generic, behaviour-agnostic event log.
 - `agent_tactics.gd` — combat geometry: flank sides, fire/advance/retreat spots, routes, cover.
+- `agent_snapshot.gd` — the BUILD half: turns the gathered knowledge + the tactics geometry into the
+  decision SNAPSHOT (facts / sections / option groups), and owns the measured wording Von reads. Pure
+  transform — reads the memory and tactics modules, holds no state between calls, never writes or decides.
 
 The controller (`ai/goal_controller.gd`) sets `agent_perception.gd`'s config fields from its exports,
 calls `setup()` once to BUILD the internal modules, then `apply_config()` to configure them — and
@@ -48,7 +52,14 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
 
-## The snapshot (what the planner walks)
+## The snapshot (what the planner walks) — built by `agent_snapshot.gd`
+
+The face's `sense(character, rooms, goal, activity)` gathers the knowledge (contacts, callouts,
+learned rooms/objects, lost hostiles) and hands it to `agent_snapshot.gd`'s
+`build(character, rooms, goal, activity, known, callouts, knowledge)`, which assembles the snapshot
+below from that knowledge + the tactics geometry. The author reads the memory and tactics modules
+only; it writes no memory and holds no policy. Everything in this section and the wording rules below
+lives in `agent_snapshot.gd`.
 
 - **facts** — named booleans the tree gates on: `threat_known`, `hostile_known`, `hostile_visible`,
   `has_pistol`, `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`, `inside`,
