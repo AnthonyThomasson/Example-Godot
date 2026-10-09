@@ -196,8 +196,6 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var arrive_dist: float = 10.0
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
 @export var nav_agent_path: NodePath
-## Movement speed (px/s) under which the NPC counts as blocked while trying to follow a path.
-@export var stuck_speed: float = 20.0
 
 ## World-space room rects (`{ key, type, rect }`) from Main — the sensor's map of the house.
 var rooms: Array = []
@@ -330,7 +328,6 @@ func _apply_config() -> void:
 	_behavior.fire_cooldown = fire_cooldown
 	_behavior.reposition_interval = reposition_interval
 	_behavior.arrive_dist = arrive_dist
-	_behavior.stuck_speed = stuck_speed
 	_behavior.apply_config()
 
 

@@ -13,12 +13,8 @@ extends Node
 
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 var arrive_dist: float = 10.0
-## Speed (px/s) under which the NPC counts as blocked while trying to follow a path.
-var stuck_speed: float = 20.0
 
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
-var _last_pos := Vector2.ZERO      ## Character position last path-move frame, for stuck detection.
-var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path (surfaced in debug_state).
 
 
 ## Resolve + wire the navigation agent. `agent` may be null (then everything falls back to straight
@@ -58,7 +54,6 @@ func debug_state() -> Dictionary:
 		"next": _point(path[idx]) if idx < path.size() else [],
 		"path_points": path.size(),
 		"path_index": idx,
-		"stuck_time": _stuck_time,
 	}
 
 
@@ -87,32 +82,11 @@ func move_to(character, dest: Vector2) -> void:
 	_agent.target_position = dest
 	if _agent.is_navigation_finished():
 		character.move_input = Vector2.ZERO
-		_reset_stuck(character)
 		return
 	var next := _agent.get_next_path_position()
 	var desired: Vector2 = next - character.global_position
 	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
-	_update_stuck(character)
 	# Always steer toward the next navmesh waypoint — never the raw destination, which can lie across a
 	# wall. `next` is wall-safe, and for an unreachable target it steps toward the closest reachable
 	# point, so the character's own push physics bulldoze furniture on the route without tunnelling walls.
 	character.move_input = desired
-
-
-## Track how long the NPC has been blocked while pathing, surfaced in `debug_state()`. Blocked = the
-## target is unreachable (furniture seals every route) or the character advanced less than
-## `stuck_speed` this frame.
-func _update_stuck(character) -> void:
-	var step := get_physics_process_delta_time()
-	var moved: float = character.global_position.distance_to(_last_pos)
-	_last_pos = character.global_position
-	if not _agent.is_target_reachable() or moved < stuck_speed * step:
-		_stuck_time += step
-	else:
-		_stuck_time = 0.0
-
-
-## Clear stuck state when the NPC arrives or stops pathing.
-func _reset_stuck(character) -> void:
-	_stuck_time = 0.0
-	_last_pos = character.global_position

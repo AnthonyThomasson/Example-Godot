@@ -180,15 +180,15 @@ If it is > 0, run a round with it set to 0 and one with it set to 5 and compare 
 ```
 Expected: with no hostile known, the invader SEARCHes — it walks all the way INTO a room (its interior, not the edge), then pauses ~5 s panning its aim to look around before choosing the next room, instead of re-deciding the moment it crosses a boundary and ping-ponging between two adjacent rooms. Check `python3 tools/gcmd.py ai`: a SEARCH `move` leaf's params carry `look_around` (and no `arrive_room`), and `debug_status()` reads "reached it" while it holds through the dwell.
 
-### 9. Navigation and stuck recovery
+### 9. Navigation through furniture
 
-Teleport the player into a furniture-dense room during a live round, then observe whether NPCs path around it or enter push-through mode:
+Teleport the player into a furniture-dense room during a live round, then observe whether NPCs path around the furniture or bulldoze through it with their push physics:
 ```bash
 python3 tools/match.py --rounds 1 --timeout 90 &
 sleep 8  # let the round start
 python3 tools/gcmd.py 'tp 300 300'  # move into a tight room
 ```
-Watch `get_debug_output` for `push_through` log lines. Note any rounds that time out — these are the strongest indicator of navigation failure.
+Dump `python3 tools/gcmd.py ai` and check an NPC's pathing state: `reachable` should stay true and `path_index` should keep advancing while it moves. Note any rounds that time out — these are the strongest indicator of navigation failure.
 
 ### 10. Decision quality (Von)
 

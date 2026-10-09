@@ -83,7 +83,7 @@ aim X Y, match, ai, restart [seed], menu, eval EXPR`. Port resolves as `--port` 
 **`ai` is the AI diagnostic verb**: it dumps every NPC's full brain state as JSON — the state text
 Von was actually shown, the act/move menus it chose from, its raw pick vs. any policy override, the
 known contacts (hostile + why + visible + distance), the commitment timers, and the pathing state
-(nav target, reachable, stuck time). Prefer it over guessing from log lines when an NPC misbehaves.
+(nav target, reachable, path index). Prefer it over guessing from log lines when an NPC misbehaves.
 
 ## 3. Read the reaction
 
