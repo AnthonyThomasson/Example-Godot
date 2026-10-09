@@ -2,8 +2,8 @@ class_name HouseDefinitions
 
 ## House floorplans, in house-local coordinates (walls run along the rect edges).
 ##   rooms: key, type (a recipe in ArrangementDefinitions), rect.
-##   doors: `pos` is the doorway center ON a wall line; every room whose wall passes
-##          through it gets that gap cut. Exactly one door is `front` (the exterior
+##   openings: `pos` is the doorway center ON a wall line; every room whose wall passes
+##          through it gets that gap cut. Exactly one opening is `front` (the exterior
 ##          entrance the house is positioned by).
 
 const PLANS := {
@@ -15,7 +15,7 @@ const PLANS := {
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 350, 520, 350) },
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(520, 350, 380, 350) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(260, 700), "width": 110.0, "front": true },  # living room, exterior
 			{ "pos": Vector2(520, 525), "width": 100.0 },  # living room <-> kitchen
 			{ "pos": Vector2(400, 350), "width": 100.0 },  # living room <-> bedroom
@@ -29,7 +29,7 @@ const PLANS := {
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(520, 0, 380, 350) },
 			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(0, 350, 900, 380) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(300, 730), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(400, 350), "width": 100.0 },  # great room <-> bedroom
 			{ "pos": Vector2(520, 175), "width": 90.0 },  # bedroom <-> bathroom (en-suite)
@@ -42,7 +42,7 @@ const PLANS := {
 			{ "key": "studio", "type": "studio", "rect": Rect2(0, 0, 620, 480) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(620, 0, 300, 480) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(310, 480), "width": 110.0, "front": true },
 			{ "pos": Vector2(620, 240), "width": 90.0 },  # studio <-> bathroom
 		],
@@ -56,7 +56,7 @@ const PLANS := {
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 340, 400, 320) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(400, 340, 400, 320) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(200, 660), "width": 110.0, "front": true },  # bedroom, exterior
 			{ "pos": Vector2(400, 170), "width": 100.0 },  # living <-> kitchen
 			{ "pos": Vector2(200, 340), "width": 100.0 },  # living <-> bedroom
@@ -74,7 +74,7 @@ const PLANS := {
 			{ "key": "bedroom_2", "type": "bedroom", "rect": Rect2(300, 340, 300, 340) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(600, 340, 200, 340) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(150, 680), "width": 110.0, "front": true },  # bedroom, exterior
 			{ "pos": Vector2(440, 170), "width": 100.0 },  # living <-> kitchen
 			{ "pos": Vector2(150, 340), "width": 100.0 },  # living <-> bedroom
@@ -95,7 +95,7 @@ const PLANS := {
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(640, 300, 360, 210) },
 			{ "key": "kids_room", "type": "kids_room", "rect": Rect2(640, 510, 360, 210) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(300, 720), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(130, 300), "width": 100.0 },  # entry <-> great
 			{ "pos": Vector2(260, 150), "width": 100.0 },  # entry <-> bedroom
@@ -113,7 +113,7 @@ const PLANS := {
 			{ "key": "home_office", "type": "home_office", "rect": Rect2(660, 0, 340, 240) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(660, 240, 340, 200) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(330, 440), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(660, 120), "width": 100.0 },  # great <-> office
 			{ "pos": Vector2(660, 340), "width": 90.0 },  # great <-> bathroom
@@ -130,7 +130,7 @@ const PLANS := {
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(340, 340, 340, 360) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(680, 340, 220, 360) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(170, 700), "width": 110.0, "front": true },  # dining, exterior
 			{ "pos": Vector2(450, 170), "width": 100.0 },  # living <-> kitchen
 			{ "pos": Vector2(170, 340), "width": 100.0 },  # living <-> dining
@@ -150,7 +150,7 @@ const PLANS := {
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(360, 340, 260, 320) },
 			{ "key": "laundry_room", "type": "laundry_room", "rect": Rect2(620, 340, 240, 320) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(180, 660), "width": 110.0, "front": true },  # bedroom, exterior
 			{ "pos": Vector2(430, 170), "width": 100.0 },  # living <-> kitchen
 			{ "pos": Vector2(180, 340), "width": 100.0 },  # living <-> bedroom
@@ -170,7 +170,7 @@ const PLANS := {
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(0, 400, 400, 360) },
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(400, 400, 600, 360) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(700, 760), "width": 120.0, "front": true },  # living, exterior
 			{ "pos": Vector2(200, 400), "width": 100.0 },  # garage <-> kitchen
 			{ "pos": Vector2(420, 200), "width": 90.0 },  # garage <-> bedroom
@@ -188,7 +188,7 @@ const PLANS := {
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(600, 0, 340, 240) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(600, 240, 340, 200) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(300, 440), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(600, 120), "width": 100.0 },  # great <-> bedroom
 			{ "pos": Vector2(600, 340), "width": 90.0 },  # great <-> bathroom
@@ -208,7 +208,7 @@ const PLANS := {
 			{ "key": "home_office", "type": "home_office", "rect": Rect2(920, 340, 280, 200) },
 			{ "key": "bathroom_2", "type": "bathroom", "rect": Rect2(920, 540, 280, 240) },
 		],
-		"doors": [
+		"openings": [
 			{ "pos": Vector2(310, 780), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(130, 340), "width": 100.0 },  # entry <-> great
 			{ "pos": Vector2(260, 170), "width": 100.0 },  # entry <-> bedroom

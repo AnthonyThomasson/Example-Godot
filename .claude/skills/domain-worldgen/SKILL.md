@@ -16,14 +16,15 @@ plain definition dict into a node — World-Gen never touches an object's fields
 
 ```
 HouseDefinitions (floorplans) ─┐
-categories/*  (catalogues)  ───┼─▶ HouseSpawner ─▶ WallFactory (walls, doors cut in)
+categories/*  (catalogues)  ───┼─▶ HouseSpawner ─▶ WallFactory (walls, doorway openings cut in)
 ObjectDefinitions / ───────────┘                └▶ RoomFurnisher ─▶ ObjectFactory
 ArrangementDefinitions
 ```
 
 - **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a `type`;
-  doors are points on wall lines. `HouseSpawner` cuts each door into every wall through it,
-  keeps door clearances free of furniture, and mirrors the plan L/R 50% of the time.
+  `openings` are doorway points on wall lines. `HouseSpawner` cuts each opening into every wall
+  through it, keeps opening clearances free of furniture, and mirrors the plan L/R 50% of the time.
+  Openings are plain archways — there are no physical door objects.
 - **Catalogues** (`worldgen/categories/*.gd`, one `<Name>Catalog` per room type; `general.gd`
   holds shared entries + the `WOOD`/`FABRIC` palettes + combined recipes). Hold `OBJECTS`,
   `ARRANGEMENTS`, `RECIPES`. `ObjectDefinitions` / `ArrangementDefinitions` are thin
@@ -43,11 +44,11 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
-  front_door_world, parent, spawn_doors=true) -> Node2D` seeds one RNG for the whole run (plan
-  pick is its first draw), prints `House: <plan>  seed: N`, builds the house. `spawn_doors` false
-  skips placing door objects so every doorway is an open archway. `WorldGen.get_rooms(house) -> Array`
+  front_entrance_world, parent) -> Node2D` seeds one RNG for the whole run (plan
+  pick is its first draw), prints `House: <plan>  seed: N`, builds the house; every doorway is an
+  open archway. `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
-  `rooms` metadata. `main.gd` positions the front door, fixes draw order, builds the nav map, and
+  `rooms` metadata. `main.gd` positions the front entrance, fixes draw order, builds the nav map, and
   drops the NPC in — all via `get_rooms`; it never touches world-gen internals.
 - **World Generation → Objects** (interface 2, the only way world-gen makes entities):
   `ObjectFactory.spawn(definition, position, parent, opts) -> Node`,

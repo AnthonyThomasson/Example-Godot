@@ -7,21 +7,18 @@ extends Node
 ## piece and reroute through another doorway when one is blocked.
 ##
 ## Steering always aims at the next navmesh waypoint, so the character's own push physics bulldoze
-## furniture sitting on the route without ever tunnelling a wall. A shut door within `door_open_reach`
-## that the NPC is wedged against is deliberately OPENED instead (doorways stay walkable in the
-## navmesh, so the NPC paths up to the door and opens it). It is behaviour's movement tool only — it
-## holds no decision or combat state. Falls back to straight-line steering when there is no nav agent.
+## furniture sitting on the route without ever tunnelling a wall. It is behaviour's movement tool
+## only — it holds no decision or combat state. Falls back to straight-line steering when there is
+## no nav agent.
 
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 var arrive_dist: float = 10.0
 ## Speed (px/s) under which the NPC counts as blocked while trying to follow a path.
 var stuck_speed: float = 20.0
-## How close (px) a shut door must be, while blocked, to be opened. 0 = off.
-var door_open_reach: float = 40.0
 
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
 var _last_pos := Vector2.ZERO      ## Character position last path-move frame, for stuck detection.
-var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path (for door-opening).
+var _stuck_time := 0.0             ## Seconds the NPC has been blocked while following a path (surfaced in debug_state).
 
 
 ## Resolve + wire the navigation agent. `agent` may be null (then everything falls back to straight
@@ -96,16 +93,15 @@ func move_to(character, dest: Vector2) -> void:
 	var desired: Vector2 = next - character.global_position
 	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
 	_update_stuck(character)
-	_open_blocking_door(character)
 	# Always steer toward the next navmesh waypoint — never the raw destination, which can lie across a
 	# wall. `next` is wall-safe, and for an unreachable target it steps toward the closest reachable
 	# point, so the character's own push physics bulldoze furniture on the route without tunnelling walls.
 	character.move_input = desired
 
 
-## Track how long the NPC has been blocked while pathing, so `_open_blocking_door` can open a shut
-## door it is wedged against. Blocked = the target is unreachable (furniture seals every route) or the
-## character advanced less than `stuck_speed` this frame.
+## Track how long the NPC has been blocked while pathing, surfaced in `debug_state()`. Blocked = the
+## target is unreachable (furniture seals every route) or the character advanced less than
+## `stuck_speed` this frame.
 func _update_stuck(character) -> void:
 	var step := get_physics_process_delta_time()
 	var moved: float = character.global_position.distance_to(_last_pos)
@@ -120,19 +116,3 @@ func _update_stuck(character) -> void:
 func _reset_stuck(character) -> void:
 	_stuck_time = 0.0
 	_last_pos = character.global_position
-
-
-## While blocked on a path, deliberately open a shut door within `door_open_reach` instead of
-## shoving through it: the doorway is walkable in the navmesh, so the NPC simply walks up to the
-## closed door and opens it. Generic over every NPC — the invader opening the front door and the
-## defender opening interior doors as it searches are the same code. A closed door still blocks
-## movement and line-of-fire until opened (or shot out).
-func _open_blocking_door(character) -> void:
-	if door_open_reach <= 0.0 or _stuck_time <= 0.0:
-		return
-	for door in get_tree().get_nodes_in_group("doors"):
-		if not is_instance_valid(door) or door.is_open():
-			continue
-		if door.operate_distance(character.global_position) <= door_open_reach:
-			door.open()
-			return

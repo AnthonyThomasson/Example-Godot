@@ -27,11 +27,11 @@ the domains.
   `&"hit"`). Declares the winner once an entire faction is eliminated.
 
 - `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open(defaults)` shows a
-  full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox, "Spawn doors"
-  checkbox, "Seed" text field (blank = random), Defenders/Invaders spinboxes, six debug-overlay
+  full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox,
+  "Seed" text field (blank = random), Defenders/Invaders spinboxes, six debug-overlay
   checkboxes ("Agent labels", "Agent paths", "Vision cones", "Tactics zones", "Room zones",
   "Furniture holes"), and a Start button. Pressing Start emits `start_requested({ has_player, seed,
-  spawn_doors, defenders, invaders, show_agent_labels, show_agent_paths, show_vision, show_tactics,
+  defenders, invaders, show_agent_labels, show_agent_paths, show_vision, show_tactics,
   show_room_zones, show_nav_holes })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. Pressing Start also **disables the button**, because Main may hold the start

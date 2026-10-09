@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold) and the System-Two state Von lacks: engagement + retargeting, peek-and-cover and ambush, fire-at-will on the move, territorial confinement, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, furniture bulldozing, stuck detection, door-opening). Use when editing scenes/ai/behavior/ or working on how a chosen option becomes movement and shooting, combat maneuvering, holding ground, commitment/dwell timers, or pathing/stuck recovery. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold) and the System-Two state Von lacks: engagement + retargeting, peek-and-cover and ambush, fire-at-will on the move, territorial confinement, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, furniture bulldozing, stuck detection). Use when editing scenes/ai/behavior/ or working on how a chosen option becomes movement and shooting, combat maneuvering, holding ground, commitment/dwell timers, or pathing/stuck recovery. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -62,7 +62,7 @@ domain bakes furniture in as navmesh holes and rings the house with a walkable o
 Steering always aims at `get_next_path_position()` — a navmesh waypoint, so it is wall-safe, and for
 an unreachable target it steps toward the closest reachable point. Furniture physically on the route
 (a piece shoved off its baked hole) is bulldozed by the character's own push physics; there is no RVO
-avoidance and no straight-at-the-destination fallback. A shut door within `door_open_reach` that the
-NPC is wedged against (advancing < `stuck_speed`) is OPENED instead. `reachable(p)` snaps a point onto
+avoidance and no straight-at-the-destination fallback. Stuck time (advancing < `stuck_speed`, or an
+unreachable target) is tracked and surfaced in `debug_state()`. `reachable(p)` snaps a point onto
 the navmesh (every leaf destination goes through it); `reached(character, point)` reports arrival.
 Falls back to straight-line steering with no agent.

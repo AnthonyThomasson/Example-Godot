@@ -14,7 +14,7 @@ extends RefCounted
 ## Extra clearance (px) baked around walls, on top of the agent radius, so paths don't hug walls.
 const WALL_MARGIN := 4.0
 ## Padding (px) added around the room-union footprint: a walkable outdoor ring around the house, so
-## characters outside (e.g. an invader) can path around it to a door.
+## characters outside (e.g. an invader) can path around it to the front entrance.
 const BOUNDS_PAD := 160.0
 ## Padding (px) grown around a furniture footprint before it is baked in as a hole, so paths clear it.
 const OBSTACLE_MARGIN := 6.0

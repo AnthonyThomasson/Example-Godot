@@ -190,10 +190,6 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var nav_agent_path: NodePath
 ## Movement speed (px/s) under which the NPC counts as blocked while trying to follow a path.
 @export var stuck_speed: float = 20.0
-## How close (px) a shut door must be, while the NPC is blocked on its path, for it to deliberately
-## open the door instead of shoving through. Doorways stay walkable in the navmesh (doors are
-## nav-invisible), so the NPC paths up to a closed door and opens it. 0 disables door-opening.
-@export var door_open_reach: float = 40.0
 
 ## World-space room rects (`{ key, type, rect }`) from Main — the sensor's map of the house.
 var rooms: Array = []
@@ -323,7 +319,6 @@ func _apply_config() -> void:
 	_behavior.reposition_interval = reposition_interval
 	_behavior.arrive_dist = arrive_dist
 	_behavior.stuck_speed = stuck_speed
-	_behavior.door_open_reach = door_open_reach
 	_behavior.apply_config()
 
 

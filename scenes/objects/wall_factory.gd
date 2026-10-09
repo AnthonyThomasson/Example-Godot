@@ -1,6 +1,6 @@
 class_name WallFactory
 
-## Objects-domain factory: turns a plain rect + door openings into a runtime Wall entity
+## Objects-domain factory: turns a plain rect + doorway openings into a runtime Wall entity
 ## (a StaticBody2D that builds its own colliders and is hittable/deformable). World-Gen
 ## calls this with geometry only — it never touches the Wall's fields directly.
 

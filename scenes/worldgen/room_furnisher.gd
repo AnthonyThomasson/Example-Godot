@@ -3,12 +3,12 @@ class_name RoomFurnisher
 ## Fills a room's interior with arrangements from its recipe (ArrangementDefinitions).
 ## Arrangements are placed as whole blocks: each one's footprint is fitted against a
 ## wall (or free-standing for "center" placement) without overlapping other placed
-## blocks or any blocked area (door clearances), then its items are spawned.
+## blocks or any blocked area (doorway-opening clearances), then its items are spawned.
 
 ## Which wall an arrangement's local "top wall" frame is mapped onto.
 enum Orient { TOP, BOTTOM, LEFT, RIGHT }
 
-const PADDING := 8.0       ## Minimum gap between arrangements (and door clearances).
+const PADDING := 8.0       ## Minimum gap between arrangements (and doorway-opening clearances).
 const STEP := 10.0         ## Spacing of candidate offsets along a wall.
 const CENTER_TRIES := 40   ## Random spots tried for free-standing arrangements.
 

@@ -2,7 +2,7 @@ extends Node2D
 
 ## Top-down demo scene and composition root: the one place that wires the domains
 ## together. On start it asks the World Generation domain (WorldGen.generate) for a
-## procedurally furnished house just ahead of the player, front door first.
+## procedurally furnished house just ahead of the player, front entrance first.
 
 ## Seed for the house layout; 0 = a new random seed each run, resolved to a concrete value at
 ## spawn so the whole run (house + NPC placement) reproduces from it. The seed is shown in the
@@ -10,8 +10,8 @@ extends Node2D
 @export var house_seed: int = 0
 ## Force a specific floorplan (a key in HouseDefinitions); "" = pick one at random.
 @export var force_plan: String = ""
-## Distance from the player to the front door's center, straight up the screen.
-@export var door_distance: float = 70.0
+## Distance from the player to the front entrance's center, straight up the screen.
+@export var entrance_distance: float = 70.0
 ## How many defender NPCs to drop into the house (0 = none). Raise it to exercise coordinated
 ## flanking from the defending side.
 @export var defender_count: int = 1
@@ -23,8 +23,6 @@ extends Node2D
 ## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
 ## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
 @export var spectator_mode: bool = true
-## When false, door objects are not placed; every doorway becomes an open archway.
-@export var spawn_doors: bool = false
 ## When false, the floating action-status label drawn above each NPC is hidden.
 @export var show_agent_labels: bool = true
 ## When false, the navigation-path polyline drawn under each NPC is hidden.
@@ -74,7 +72,6 @@ func _ready() -> void:
 		_setup_menu.open({
 			"has_player": not spectator_mode,
 			"seed": house_seed,
-			"spawn_doors": spawn_doors,
 			"defenders": defender_count,
 			"invaders": invader_count,
 			"show_agent_labels": show_agent_labels,
@@ -91,7 +88,6 @@ func _ready() -> void:
 func _on_setup_chosen(config: Dictionary) -> void:
 	spectator_mode = not bool(config.get("has_player", not spectator_mode))
 	house_seed = int(config.get("seed", house_seed))
-	spawn_doors = bool(config.get("spawn_doors", spawn_doors))
 	defender_count = int(config.get("defenders", defender_count))
 	invader_count = int(config.get("invaders", invader_count))
 	show_agent_labels = bool(config.get("show_agent_labels", show_agent_labels))
@@ -147,7 +143,7 @@ func return_to_setup() -> void:
 	get_tree().reload_current_scene()
 
 
-## Ask World-Gen for a house placed so its front door sits just above the player.
+## Ask World-Gen for a house placed so its front entrance sits just above the player.
 func _spawn_world() -> void:
 	# A dev/headless harness can pin the next match's layout via Engine meta (it survives the scene
 	# reload the `restart` command does); otherwise the exported seed (0 = random) stands.
@@ -160,8 +156,8 @@ func _spawn_world() -> void:
 	var seed_display := get_node_or_null("SeedDisplay")
 	if seed_display and seed_display.has_method("show_seed"):
 		seed_display.show_seed(house_seed)
-	var front_door := _player.global_position + Vector2(0, -door_distance)
-	var house := WorldGen.generate(house_seed, force_plan, front_door, self, spawn_doors)
+	var front_entrance := _player.global_position + Vector2(0, -entrance_distance)
+	var house := WorldGen.generate(house_seed, force_plan, front_entrance, self)
 	# Keep the house beneath the player in draw order.
 	move_child(house, _player.get_index())
 	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
@@ -179,7 +175,7 @@ func _spawn_world() -> void:
 	for i in defender_count:
 		_spawn_defender(rooms, rng, i)
 	for i in invader_count:
-		_spawn_invader(rooms, rng, i, invader_count, front_door)
+		_spawn_invader(rooms, rng, i, invader_count, front_entrance)
 	_configure_debug()
 	if spectator_mode:
 		_setup_spectator()
@@ -232,9 +228,9 @@ func _spawn_defender(rooms: Array, rng: RandomNumberGenerator, index: int) -> vo
 ## Drop invader number `index` (of `count`) just outside the house (the rooms' bounding box),
 ## `invader_margin` px out. Invaders are spread evenly around the perimeter (one even fraction per
 ## index, plus a little jitter) so several attackers start on different sides and flank a shared
-## target rather than stacking on one side. `front_door_world` is injected so the controller heads
+## target rather than stacking on one side. `front_entrance_world` is injected so the controller heads
 ## straight for the entrance rather than circling.
-func _spawn_invader(rooms: Array, rng: RandomNumberGenerator, index: int, count: int, front_door_world: Vector2) -> void:
+func _spawn_invader(rooms: Array, rng: RandomNumberGenerator, index: int, count: int, front_entrance_world: Vector2) -> void:
 	if rooms.is_empty():
 		return
 	var bounds: Rect2 = rooms[0]["rect"]
@@ -242,7 +238,7 @@ func _spawn_invader(rooms: Array, rng: RandomNumberGenerator, index: int, count:
 		bounds = bounds.merge(room["rect"])
 	bounds = bounds.grow(invader_margin)
 	var frac := fposmod((index + 0.5) / maxi(count, 1) + rng.randf_range(-0.05, 0.05), 1.0)
-	_add_npc(INVADER_SCENE, _npc_name("Invader", index), _perimeter_point(bounds, frac), rooms, front_door_world)
+	_add_npc(INVADER_SCENE, _npc_name("Invader", index), _perimeter_point(bounds, frac), rooms, front_entrance_world)
 
 
 ## A point at fraction `frac` (0..1, clockwise from the top-left) around the perimeter of `rect`.

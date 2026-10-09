@@ -45,7 +45,6 @@ var reposition_interval: float = 0.5
 # Locomotion config (forwarded to the Locomotion child in setup()).
 var arrive_dist: float = 10.0
 var stuck_speed: float = 20.0
-var door_open_reach: float = 40.0
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
 var rooms: Array = []
@@ -99,7 +98,6 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 func apply_config() -> void:
 	_loco.arrive_dist = arrive_dist
 	_loco.stuck_speed = stuck_speed
-	_loco.door_open_reach = door_open_reach
 
 
 # --- Read-only views -------------------------------------------------------------------------

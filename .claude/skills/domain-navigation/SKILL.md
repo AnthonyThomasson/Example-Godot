@@ -13,7 +13,7 @@ domains (a plain `rooms` array + a Node), depending only on Godot's `NavigationS
 `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` bakes one
 `NavigationRegion2D` whose walkable area is the house footprint (union of `rooms` rects, grown by
 `BOUNDS_PAD` = 160 px so a walkable **outdoor ring** surrounds the house — characters that start
-outside, like the invader NPC, can path around it to a door) minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways — gaps in the
+outside, like the invader NPC, can path around it to the front entrance) minus the house's **static** wall colliders (parsed via `NavigationServer2D`), so doorways — gaps in the
 walls — stay open. It also **bakes each solid furniture footprint in as a hole**
 (`_add_furniture_holes`): the piece's collider shape (`RectangleShape2D` / `CircleShape2D`), grown by
 `OBSTACLE_MARGIN`, is added to the source geometry as an obstruction outline, so paths route **around**

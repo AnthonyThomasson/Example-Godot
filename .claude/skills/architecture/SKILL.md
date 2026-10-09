@@ -52,12 +52,12 @@ Everything not listed here is private to its domain. Each domain's skill recaps 
 interface(s) and describes how they're implemented; this list is authoritative for signatures.
 
 1. **Main → World Generation**
-   - `WorldGen.generate(seed, force_plan, front_door_world, parent, spawn_doors=true) -> Node2D` — seeds one RNG
+   - `WorldGen.generate(seed, force_plan, front_entrance_world, parent) -> Node2D` — seeds one RNG
 	 for the whole run (plan pick is its first draw), prints `House: <plan>  seed: N`, builds
-	 the house.
+	 the house; every doorway is an open archway.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
-   `main.gd` positions the front door, fixes draw order, builds the nav map from the rooms
+   `main.gd` positions the front entrance, fixes draw order, builds the nav map from the rooms
    (interface 9), drops the defender NPC into a random room and the invader NPC just outside the
    house (all via `get_rooms`); it never touches
    world-gen internals.

@@ -1,43 +1,43 @@
 class_name HouseSpawner
 
 ## Builds a house from a HouseDefinitions floorplan: walls per room (via the Objects
-## domain's WallFactory, with every door cut into each wall it lies on) and furniture per
-## room (via RoomFurnisher). The house is positioned so its front door lands on a point.
+## domain's WallFactory, with every doorway opening cut into each wall it lies on) and furniture
+## per room (via RoomFurnisher). The house is positioned so its front entrance lands on a point.
 
 const Wall = preload("res://scenes/objects/wall/wall.gd")
 
-const DOOR_CLEARANCE := 50.0   ## Kept free of furniture on each side of a doorway.
+const OPENING_CLEARANCE := 50.0  ## Kept free of furniture on each side of a doorway opening.
 const INTERIOR_MARGIN := 6.0   ## Gap between wall faces and furniture.
 
 
-## Build the named floorplan under `parent`, positioned so its front door lands on
-## `front_door_world`. `rng` drives every random choice. `spawn_doors` false skips placing door
-## objects so every doorway is a plain open archway. Returns the house root.
-static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumberGenerator, parent: Node, spawn_doors: bool = true) -> Node2D:
+## Build the named floorplan under `parent`, positioned so its front entrance lands on
+## `front_entrance_world`. `rng` drives every random choice. Every doorway is left as a plain open
+## archway. Returns the house root.
+static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNumberGenerator, parent: Node) -> Node2D:
 	var plan := HouseDefinitions.get_plan(plan_key)
 	if plan.is_empty():
 		push_error("Unknown house plan: ", plan_key)
 		return null
 
 	var rooms: Array = plan["rooms"].duplicate(true)
-	var doors: Array = plan["doors"].duplicate(true)
+	var openings: Array = plan["openings"].duplicate(true)
 	if rng.randf() < 0.5:
-		_mirror_x(rooms, doors)
+		_mirror_x(rooms, openings)
 
-	var front: Array = doors.filter(func(d: Dictionary) -> bool: return d.get("front", false))
+	var front: Array = openings.filter(func(o: Dictionary) -> bool: return o.get("front", false))
 	if front.size() != 1:
-		push_error("House plan needs exactly one front door: ", plan_key)
+		push_error("House plan needs exactly one front entrance: ", plan_key)
 		return null
 
-	_validate(rooms, doors, plan_key)
+	_validate(rooms, openings, plan_key)
 
 	var house := Node2D.new()
 	house.name = "House"
-	house.position = front_door_world - (front[0]["pos"] as Vector2)
+	house.position = front_entrance_world - (front[0]["pos"] as Vector2)
 	parent.add_child(house)
 
 	var wall_thickness: float = plan["wall_thickness"]
-	var blocked := _door_clearances(rooms, doors)
+	var blocked := _opening_clearances(rooms, openings)
 
 	# Room rects in WORLD space (captured after mirroring), for callers that spawn entities
 	# into rooms. Exposed via WorldGen.get_rooms(house).
@@ -46,7 +46,7 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 	for room in rooms:
 		var rect: Rect2 = room["rect"]
 		var room_name := (room["key"] as String).capitalize()
-		WallFactory.spawn(rect, wall_thickness, _openings_for(rect, doors), room_name, house)
+		WallFactory.spawn(rect, wall_thickness, _openings_for(rect, openings), room_name, house)
 
 		var furniture := Node2D.new()
 		furniture.name = room_name + " Furniture"
@@ -59,60 +59,13 @@ static func spawn(plan_key: String, front_door_world: Vector2, rng: RandomNumber
 			"rect": Rect2(house.position + rect.position, rect.size),
 		})
 
-	if spawn_doors:
-		_place_doors(rooms, doors, wall_thickness, house)
-
 	house.set_meta("rooms", rooms_world)
 	return house
 
 
-## Spawn a swinging door in each doorway the policy calls for: every exterior (front) door, and
-## interior doors bordering a private room (see DoorPolicy). Runs once per door, after walls are
-## built, so an interior door shared by two rooms is placed a single time. Doors are children of
-## `house` like walls; being frozen bodies they are invisible to the nav bake (the doorway stays
-## walkable) yet still block movement and line-of-sight until opened or destroyed.
-static func _place_doors(rooms: Array, doors: Array, wall_thickness: float, house: Node2D) -> void:
-	for door in doors:
-		var is_front: bool = door.get("front", false)
-		if not DoorPolicy.wants_door(_adjoining_types(rooms, door), is_front):
-			continue
-		var p: Vector2 = door["pos"]
-		var width: float = door["width"]
-		# A door on a horizontal (top/bottom) wall spans along x and hinges at its left jamb; one on a
-		# vertical wall spans along y and hinges at its top jamb. closed_dir points along the gap.
-		var hinge: Vector2
-		var closed_dir: Vector2
-		if _on_horizontal_wall(rooms, p):
-			hinge = Vector2(p.x - width * 0.5, p.y)
-			closed_dir = Vector2.RIGHT
-		else:
-			hinge = Vector2(p.x, p.y - width * 0.5)
-			closed_dir = Vector2.DOWN
-		DoorFactory.spawn(hinge, closed_dir, width, wall_thickness, 1.0, house)
-
-
-## The room types a door borders: one entry for a front/exterior door, two for an interior door
-## (the rooms on either side). Uses the same wall-membership test as _validate / placement.
-static func _adjoining_types(rooms: Array, door: Dictionary) -> Array:
-	var types: Array = []
-	for room in rooms:
-		if not _openings_for(room["rect"], [door]).is_empty():
-			types.append(room["type"])
-	return types
-
-
-## Whether the doorway at `p` sits on a horizontal (top/bottom) room wall (so it spans along x).
-## Mirrors the detection in _door_clearances.
-static func _on_horizontal_wall(rooms: Array, p: Vector2) -> bool:
-	return rooms.any(func(room: Dictionary) -> bool:
-		var r: Rect2 = room["rect"]
-		var on_edge := is_equal_approx(p.y, r.position.y) or is_equal_approx(p.y, r.end.y)
-		return on_edge and p.x > r.position.x and p.x < r.end.x)
-
-
-## Author-error checks (warnings only): overlapping rooms, a door not on a shared
-## wall, and rooms unreachable from the front door.
-static func _validate(rooms: Array, doors: Array, plan_key: String) -> void:
+## Author-error checks (warnings only): overlapping rooms, an opening not on a shared
+## wall, and rooms unreachable from the front entrance.
+static func _validate(rooms: Array, openings: Array, plan_key: String) -> void:
 	for i in range(rooms.size()):
 		for j in range(i + 1, rooms.size()):
 			var a: Rect2 = rooms[i]["rect"]
@@ -124,18 +77,18 @@ static func _validate(rooms: Array, doors: Array, plan_key: String) -> void:
 	for i in range(rooms.size()):
 		adj.append([])
 	var front_idx := -1
-	for door in doors:
+	for opening in openings:
 		var touching: Array = []
 		for i in range(rooms.size()):
-			if not _openings_for(rooms[i]["rect"], [door]).is_empty():
+			if not _openings_for(rooms[i]["rect"], [opening]).is_empty():
 				touching.append(i)
-		if door.get("front", false):
+		if opening.get("front", false):
 			if touching.size() != 1:
-				push_warning("House %s: front door at %s is not on exactly one room wall" % [plan_key, door["pos"]])
+				push_warning("House %s: front entrance at %s is not on exactly one room wall" % [plan_key, opening["pos"]])
 			elif front_idx == -1:
 				front_idx = touching[0]
 		elif touching.size() < 2:
-			push_warning("House %s: interior door at %s is not on a shared wall" % [plan_key, door["pos"]])
+			push_warning("House %s: interior opening at %s is not on a shared wall" % [plan_key, opening["pos"]])
 		else:
 			for a in touching:
 				for b in touching:
@@ -154,53 +107,53 @@ static func _validate(rooms: Array, doors: Array, plan_key: String) -> void:
 				stack.append(m)
 	for i in range(rooms.size()):
 		if not seen.has(i):
-			push_warning("House %s: room %s is unreachable from the front door" % [plan_key, rooms[i]["key"]])
+			push_warning("House %s: room %s is unreachable from the front entrance" % [plan_key, rooms[i]["key"]])
 
 
 ## Flip the floorplan left-to-right for extra layout variety.
-static func _mirror_x(rooms: Array, doors: Array) -> void:
+static func _mirror_x(rooms: Array, openings: Array) -> void:
 	var width := 0.0
 	for room in rooms:
 		width = maxf(width, (room["rect"] as Rect2).end.x)
 	for room in rooms:
 		var r: Rect2 = room["rect"]
 		room["rect"] = Rect2(width - r.end.x, r.position.y, r.size.x, r.size.y)
-	for door in doors:
-		var p: Vector2 = door["pos"]
-		door["pos"] = Vector2(width - p.x, p.y)
+	for opening in openings:
+		var p: Vector2 = opening["pos"]
+		opening["pos"] = Vector2(width - p.x, p.y)
 
 
-## Openings (Wall.Side format) for every door lying on one of `rect`'s walls.
-static func _openings_for(rect: Rect2, doors: Array) -> Array:
-	var openings: Array = []
-	for door in doors:
-		var p: Vector2 = door["pos"]
-		var width: float = door["width"]
+## Openings (Wall.Side format) for every doorway lying on one of `rect`'s walls.
+static func _openings_for(rect: Rect2, openings: Array) -> Array:
+	var cut: Array = []
+	for opening in openings:
+		var p: Vector2 = opening["pos"]
+		var width: float = opening["width"]
 		var within_x := p.x > rect.position.x and p.x < rect.end.x
 		var within_y := p.y > rect.position.y and p.y < rect.end.y
 		if within_x and is_equal_approx(p.y, rect.position.y):
-			openings.append({ "side": Wall.Side.TOP, "offset": p.x - rect.position.x, "width": width })
+			cut.append({ "side": Wall.Side.TOP, "offset": p.x - rect.position.x, "width": width })
 		elif within_x and is_equal_approx(p.y, rect.end.y):
-			openings.append({ "side": Wall.Side.BOTTOM, "offset": p.x - rect.position.x, "width": width })
+			cut.append({ "side": Wall.Side.BOTTOM, "offset": p.x - rect.position.x, "width": width })
 		elif within_y and is_equal_approx(p.x, rect.position.x):
-			openings.append({ "side": Wall.Side.LEFT, "offset": p.y - rect.position.y, "width": width })
+			cut.append({ "side": Wall.Side.LEFT, "offset": p.y - rect.position.y, "width": width })
 		elif within_y and is_equal_approx(p.x, rect.end.x):
-			openings.append({ "side": Wall.Side.RIGHT, "offset": p.y - rect.position.y, "width": width })
-	return openings
+			cut.append({ "side": Wall.Side.RIGHT, "offset": p.y - rect.position.y, "width": width })
+	return cut
 
 
-## A box straddling each doorway that furniture must stay out of.
-static func _door_clearances(rooms: Array, doors: Array) -> Array:
+## A box straddling each doorway opening that furniture must stay out of.
+static func _opening_clearances(rooms: Array, openings: Array) -> Array:
 	var blocked: Array = []
-	for door in doors:
-		var p: Vector2 = door["pos"]
-		var width: float = door["width"]
+	for opening in openings:
+		var p: Vector2 = opening["pos"]
+		var width: float = opening["width"]
 		var on_horizontal_wall := rooms.any(func(room: Dictionary) -> bool:
 			var r: Rect2 = room["rect"]
 			var on_edge := is_equal_approx(p.y, r.position.y) or is_equal_approx(p.y, r.end.y)
 			return on_edge and p.x > r.position.x and p.x < r.end.x)
 		if on_horizontal_wall:
-			blocked.append(Rect2(p.x - width * 0.5, p.y - DOOR_CLEARANCE, width, DOOR_CLEARANCE * 2.0))
+			blocked.append(Rect2(p.x - width * 0.5, p.y - OPENING_CLEARANCE, width, OPENING_CLEARANCE * 2.0))
 		else:
-			blocked.append(Rect2(p.x - DOOR_CLEARANCE, p.y - width * 0.5, DOOR_CLEARANCE * 2.0, width))
+			blocked.append(Rect2(p.x - OPENING_CLEARANCE, p.y - width * 0.5, OPENING_CLEARANCE * 2.0, width))
 	return blocked
