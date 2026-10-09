@@ -432,6 +432,14 @@ func _collect_zones(out: Array, group: Dictionary, category: StringName) -> void
 				"label": opt.get("label", ""), "desc": opt.get("desc", "") })
 
 
+## Full contact data for display in the spectator inspector: each entry has `node`, `pos` (last-known
+## world position), `name`, `hostile`, `visible` (seen this tick) and `age` (seconds since last seen).
+func known_contacts_for_display() -> Array:
+	if _character == null or _perception == null:
+		return []
+	return _perception.all_seen_characters(_character.global_position)
+
+
 ## The known-contacts list flattened to the fields worth reading in a snapshot (who, whether hostile
 ## and why, whether seen this tick, and how far off). Empty until the controller knows its character.
 func _contact_digest() -> Array:

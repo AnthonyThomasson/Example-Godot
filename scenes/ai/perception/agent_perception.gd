@@ -362,6 +362,22 @@ func _track(id: int, pos: Vector2, now: int) -> Vector2:
 	return vel
 
 
+## Every character in memory regardless of contact_memory_ttl — all non-expired sightings (up to
+## lead_memory_ttl, typically 20 s). Same dict shape as contacts() but covers stale sightings too,
+## so external observers (e.g. the spectator inspector) can see the NPC's full knowledge window.
+func all_seen_characters(self_pos: Vector2) -> Array:
+	var out: Array = []
+	for rec in _memory.recall_aged(&"saw_character"):
+		var c := _live_sighting(rec)
+		if not c.is_empty():
+			out.append(c)
+	out.sort_custom(func(a, b):
+		if a["hostile"] != b["hostile"]:
+			return a["hostile"]
+		return (a["pos"] as Vector2).distance_squared_to(self_pos) < (b["pos"] as Vector2).distance_squared_to(self_pos))
+	return out
+
+
 ## Every character the agent currently knows of (seen within `contact_memory_ttl`) — the latest
 ## sighting per character, with `hostile` / `reason`, `visible` (seen on the latest tick) and `age`.
 ## Hostiles first, then nearest to `self_pos`. Dead or freed characters are dropped.

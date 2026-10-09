@@ -25,11 +25,14 @@ const GOAL_LEFT := 24.0
 const GOAL_WIDTH := 560.0
 const GOAL_BOTTOM := 356.0
 
+const ContactMarkers := preload("res://scenes/ui/contact_markers.gd")
+
 var _combatants: Array = []  ## The NPCs to pick from (public nodes), handed in by Main.
 var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from the setup menu).
 var _selected: Node = null   ## The NPC whose overlays are shown, or null.
-var _hint: Label             ## The on-screen hint shown while the game is paused.
+var _selected_ctrl: Node = null ## The selected NPC's controller, cached for live marker refreshes.
 var _detail: Label           ## The clicked tactical point's detail text (hidden when none).
+var _contact_markers: Node2D ## World-space overlay that draws the selected NPC's contact knowledge.
 
 
 ## Keep running while paused and build the hint + detail UI. `flags` is the set of overlay toggles the
@@ -38,11 +41,10 @@ func setup(combatants: Array, flags: Dictionary) -> void:
 	_combatants = combatants
 	_flags = flags
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	_hint = _make_label(HORIZONTAL_ALIGNMENT_CENTER, 26)
-	_hint.set_anchors_preset(Control.PRESET_TOP_WIDE)
-	_hint.offset_top = 56.0
-	_hint.text = "PAUSED — click an NPC to inspect it (Space to resume)"
-	_hint.visible = false
+	# World-space contact-indicator overlay added as a sibling so it draws in world coordinates.
+	_contact_markers = ContactMarkers.new()
+	_contact_markers.name = "ContactMarkers"
+	get_parent().add_child(_contact_markers)
 	# The clicked point's details sit top-left, directly beneath the match HUD's goal readout.
 	_detail = _make_label(HORIZONTAL_ALIGNMENT_LEFT, 22)
 	_detail.offset_left = GOAL_LEFT
@@ -79,7 +81,6 @@ func _unhandled_input(event: InputEvent) -> void:
 ## Pause or resume the whole tree (this node keeps running — PROCESS_MODE_ALWAYS) and show/hide the hint.
 func _set_paused(paused: bool) -> void:
 	get_tree().paused = paused
-	_hint.visible = paused
 
 
 ## The cursor's world position via the active (spectator framing) camera; the raw screen point if none.
@@ -130,14 +131,42 @@ func _zone_at(world: Vector2) -> Dictionary:
 	return best
 
 
-## Select `npc` (null = none): show only its enabled overlays, hide every other NPC's, and clear any
-## tactical-point detail from the previous selection.
+## Refresh the contact markers every frame so the rings track characters as they move (and as the
+## selected NPC's knowledge of them updates). Runs while paused too, where the knowledge holds steady.
+func _process(_delta: float) -> void:
+	if _selected != null:
+		_refresh_markers()
+
+
+## Select `npc` (null = none): show only the selected NPC's own overlays and cache its controller for
+## the live marker refresh. Clears any tactical-point detail/highlight from the previous selection
+## (on the PREVIOUS NPC, not the new one — _clear_zone must run before _selected is reassigned).
 func _select(npc: Node) -> void:
-	_selected = npc
 	_clear_zone()
+	_selected = npc
+	_selected_ctrl = _controller_of(npc) if npc != null else null
+	# Show only the selected NPC's own overlays; hide every other NPC's.
 	for c in _combatants:
 		if is_instance_valid(c):
 			_set_overlays(c, c == npc)
+	_refresh_markers()
+
+
+## Push the selected NPC's current contact knowledge to the world-space marker overlay (empty when
+## nothing is selected), so each ring sits on the position that NPC last knew the contact to be at.
+func _refresh_markers() -> void:
+	if _contact_markers == null:
+		return
+	var display: Array = []
+	if _selected_ctrl != null and is_instance_valid(_selected_ctrl) and _selected_ctrl.has_method("known_contacts_for_display"):
+		for c in _selected_ctrl.known_contacts_for_display():
+			display.append({
+				"pos": c["pos"],
+				"name": c["name"],
+				"hostile": c["hostile"],
+				"visible": c["visible"],
+			})
+	_contact_markers.set_contacts(display)
 
 
 ## Reveal (`on`) or hide one NPC's debug overlays by duck-typed property name. When revealing, each
