@@ -25,7 +25,35 @@ const CIRCLE_SEGMENTS := 10
 ## Build and add a NavigationRegion2D under `parent`, covering `rooms` (each `{ key, type, rect }`
 ## with a world-space `rect`, from WorldGen.get_rooms) minus `house`'s wall colliders. `agent_radius`
 ## is the pathing clearance (character body radius). Returns the region, or null if there are no rooms.
+## The furniture holes baked in here are not permanent: `rebake` re-carves them at the furniture's
+## live positions on an interval (driven by `nav_updater.gd`) so paths follow scattered pieces.
 static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float = 14.0) -> NavigationRegion2D:
+	var nav_poly := _bake_polygon(house, rooms, agent_radius)
+	if nav_poly == null:
+		return null
+	var region := NavigationRegion2D.new()
+	region.name = "NavRegion"
+	region.position = house.position
+	region.navigation_polygon = nav_poly
+	parent.add_child(region)
+	return region
+
+
+## Re-bake `region`'s navigation polygon in place, re-carving the furniture holes at each piece's
+## CURRENT position so paths route around furniture that has been shoved off its original spot. The
+## region keeps its world offset; reassigning `navigation_polygon` re-registers the mesh with the
+## NavigationServer2D. Call it only when furniture has actually moved — see `nav_updater.gd`.
+static func rebake(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float = 14.0) -> void:
+	var nav_poly := _bake_polygon(house, rooms, agent_radius)
+	if nav_poly != null:
+		region.navigation_polygon = nav_poly
+
+
+## Bake a NavigationPolygon for `house` over `rooms` at `agent_radius`: the house bounds minus the
+## static wall colliders (doorways stay open) minus each solid furniture footprint (carved as a hole).
+## Returns null if there are no rooms. In the house's LOCAL frame — the region offsets it into world
+## space. Shared by the initial `build` and every `rebake`, so both carve furniture holes identically.
+static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float) -> NavigationPolygon:
 	var bounds := _bounds(rooms)
 	if bounds.size == Vector2.ZERO:
 		return null
@@ -52,32 +80,29 @@ static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float
 	# after the footprint (both are outlines on the same source) and before the bake carves them in.
 	_add_furniture_holes(source, house)
 	NavigationServer2D.bake_from_source_geometry_data(nav_poly, source)
-
-	var region := NavigationRegion2D.new()
-	region.name = "NavRegion"
-	region.position = house.position
-	region.navigation_polygon = nav_poly
-	parent.add_child(region)
-	return region
+	return nav_poly
 
 
 ## The furniture footprint holes a bake of `house` carves, each a closed WORLD-space polygon — the
 ## same solid-furniture selection and grown footprints `_add_furniture_holes` feeds the baker, so a
-## debug overlay drawing these shows exactly what was carved out. Snapshot it right after the bake:
-## like the baked holes themselves it is a static picture of where the furniture stood, not re-measured
-## as pieces are shoved around in play.
+## debug overlay drawing these shows exactly what was carved out. Re-measured from each collider's
+## live `global_transform` on every call, so it reflects where the furniture stands NOW — `rebake`
+## and `nav_updater.gd` rely on that to re-carve holes as pieces are shoved around in play. A damaged
+## piece has its primitive collider rebuilt into several deformed ConvexPolygonShape2D pieces, so EACH
+## of a body's collision shapes contributes a footprint — otherwise a dented piece's hole would vanish.
 static func furniture_holes(house: Node2D) -> Array:
 	var out: Array = []
 	for node in _descendants(house):
 		var body := node as RigidBody2D
 		if body == null or body.freeze:
 			continue
-		var col := _collision_shape(body)
-		if col == null:
-			continue
-		var outline := _footprint_world(col)
-		if outline.size() >= 3:
-			out.append(outline)
+		for child in body.get_children():
+			var col := child as CollisionShape2D
+			if col == null or col.shape == null:
+				continue
+			var outline := _footprint_world(col)
+			if outline.size() >= 3:
+				out.append(outline)
 	return out
 
 
@@ -104,17 +129,11 @@ static func _descendants(root: Node) -> Array:
 	return out
 
 
-## The first CollisionShape2D child of `body` carrying a usable shape, or null.
-static func _collision_shape(body: Node) -> CollisionShape2D:
-	for child in body.get_children():
-		if child is CollisionShape2D and (child as CollisionShape2D).shape != null:
-			return child
-	return null
-
-
 ## The furniture footprint as a closed polygon in WORLD space, grown by OBSTACLE_MARGIN. Reads only
-## the generic Shape2D (RectangleShape2D / CircleShape2D), mapped through the collider's global
-## transform so an offset or rotated collider still lines up. Empty for an unsupported shape.
+## the generic Shape2D — the intact primitives (RectangleShape2D / CircleShape2D) and the
+## ConvexPolygonShape2D a damaged piece's collider is rebuilt into (its points inflated by the margin
+## via Geometry2D.offset_polygon) — mapped through the collider's global transform so an offset or
+## rotated collider still lines up. Empty for an unsupported shape.
 static func _footprint_world(col: CollisionShape2D) -> PackedVector2Array:
 	var shape := col.shape
 	var local := PackedVector2Array()
@@ -128,11 +147,26 @@ static func _footprint_world(col: CollisionShape2D) -> PackedVector2Array:
 		for i in CIRCLE_SEGMENTS:
 			var a := TAU * float(i) / float(CIRCLE_SEGMENTS)
 			local.append(Vector2(cos(a), sin(a)) * r)
+	elif shape is ConvexPolygonShape2D:
+		# A deformed piece: inflate its silhouette by the margin. offset_polygon returns the grown
+		# ring(s); take the largest (a convex grow yields one), falling back to the raw points.
+		var grown := Geometry2D.offset_polygon((shape as ConvexPolygonShape2D).points, OBSTACLE_MARGIN)
+		local = _largest_polygon(grown, (shape as ConvexPolygonShape2D).points)
 	var xform := col.global_transform
 	var out := PackedVector2Array()
 	for p in local:
 		out.append(xform * p)
 	return out
+
+
+## The polygon with the most points from `polys` (Geometry2D.offset_polygon's output), or `fallback`
+## when it is empty.
+static func _largest_polygon(polys: Array, fallback: PackedVector2Array) -> PackedVector2Array:
+	var best := fallback
+	for poly in polys:
+		if (poly as PackedVector2Array).size() > best.size():
+			best = poly
+	return best
 
 
 ## The union of every room's world-space rect (zero-size Rect2 if `rooms` is empty).

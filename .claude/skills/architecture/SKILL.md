@@ -148,13 +148,18 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 one `NavigationRegion2D` whose walkable area is the house footprint plus an outdoor ring minus the house's
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
 	 (baked in as a hole), so paths route around furniture.
+   - `NavBuilder.rebake(region, house, rooms, agent_radius=14.0)` — re-carves the furniture holes in
+	 place at the pieces' **current** positions (driven by the Navigation domain's own `nav_updater.gd`).
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
-   `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay right
-   after). Any `NavigationAgent2D` then pathfinds
+   `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay and the
+   `nav_updater.gd` re-baker right after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
-   `get_next_path_position()`. It does **not** enable RVO avoidance: a displaced piece of furniture is
-   simply bulldozed by the character's push physics.
+   `get_next_path_position()`. It does **not** enable RVO avoidance: instead the navmesh is
+   **periodically re-baked** (`nav_updater.gd`, only when a piece has moved) so furniture that gets
+   shoved around is re-carved as a hole at its new spot and paths route around scattered objects.
+   Between re-bakes (and for non-solid decor, never carved) a displaced piece is simply bulldozed by
+   the character's push physics.
 
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.

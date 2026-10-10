@@ -44,6 +44,8 @@ const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
 const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
 ## Draw-only overlay for the baked navmesh's furniture holes (Navigation domain).
 const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
+## Periodic navmesh re-baker: re-carves furniture holes as pieces are shoved around (Navigation domain).
+const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 ## Spectator inspector (UI): Space-pause + click an NPC to show its tactical zones.
 const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
 
@@ -164,14 +166,21 @@ func _spawn_world() -> void:
 	move_child(house, _player.get_index())
 	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
 	var rooms := WorldGen.get_rooms(house)
-	NavBuilder.build(house, rooms, self)
+	var nav_region := NavBuilder.build(house, rooms, self)
 	# Debug overlay (world-space, single node): snapshot the furniture holes carved into the navmesh
-	# right after the bake, before any piece can be shoved — so it matches the static baked holes.
+	# right after the bake. The updater below re-snapshots it after each re-bake so it tracks furniture.
 	var nav_debug: Node2D = NAV_DEBUG.new()
 	nav_debug.name = "NavDebug"
 	add_child(nav_debug)
 	nav_debug.setup(house)
 	nav_debug.show_holes = show_nav_holes
+	# Keep the navmesh in step with furniture that gets shoved around: re-carves the holes at the
+	# pieces' current positions on an interval (and refreshes the overlay), so paths route around
+	# scattered objects instead of their original spots.
+	var nav_updater: Node = NAV_UPDATER.new()
+	nav_updater.name = "NavUpdater"
+	add_child(nav_updater)
+	nav_updater.setup(nav_region, house, rooms, nav_debug)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed
 	for i in defender_count:
