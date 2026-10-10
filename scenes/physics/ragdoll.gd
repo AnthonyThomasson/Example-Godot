@@ -8,8 +8,6 @@ class_name Ragdoll extends RefCounted
 ## anatomical hinges, set in a frame), seeds velocities, then calls step() each physics frame until
 ## it sleeps. Tuning: PhysicsConfig.ragdoll_*.
 
-## Physics layers that block the points (walls + solid furniture).
-const WALL_MASK := 1
 ## Fraction of a joint limit's violation corrected per constraint pass (softens jitter).
 const LIMIT_STIFFNESS := 0.6
 ## Most a limit turns a bone per pass (rad): a far-out bone is brought back over several passes, so
@@ -344,7 +342,7 @@ func _sweep(space: PhysicsDirectSpaceState2D, origin: Vector2, from: Vector2, to
 func _query(radius: float) -> PhysicsShapeQueryParameters2D:
 	if _params == null:
 		_params = PhysicsShapeQueryParameters2D.new()
-		_params.collision_mask = WALL_MASK
+		_params.collision_mask = PhysicsConfig.wall_mask
 		_params.exclude = exclude
 	if not _shapes.has(radius):
 		var circle := CircleShape2D.new()

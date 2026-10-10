@@ -70,14 +70,17 @@ func set_flag(flag: String, on: bool) -> void:
 		(_buttons[flag] as Button).set_pressed_no_signal(on)
 
 
+## A flag's button was toggled: announce it.
 func _on_toggled(on: bool, flag: String) -> void:
 	overlay_toggled.emit(flag, on)
 
 
+## The header was pressed: flip the panel between collapsed and open.
 func _toggle_collapsed() -> void:
 	_set_collapsed(_body.visible)
 
 
+## Show or hide the toggle list and update the header's arrow.
 func _set_collapsed(collapsed: bool) -> void:
 	_body.visible = not collapsed
 	_header.text = ("Overlays  ▸" if collapsed else "Overlays  ▾")

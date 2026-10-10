@@ -142,7 +142,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
-   `interaction_changed(active, label)` and `died` (with `is_dead` / `health` to read; a dead body
+   `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and

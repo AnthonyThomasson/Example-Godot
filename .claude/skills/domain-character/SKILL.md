@@ -193,7 +193,7 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
   damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`
-  (hand 0/1 = melee, −1 = shot), `interaction_changed(active, label)`, `died` (`is_dead`).
+  (hand 0/1 = melee, −1 = shot), `died` (`is_dead`).
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
   `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.

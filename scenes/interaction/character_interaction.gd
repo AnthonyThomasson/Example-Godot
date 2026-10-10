@@ -22,9 +22,6 @@ const QUERY_MASK := PhysicsLayers.SOLID
 ## Extra gap (px) required around the body before an object's collision is re-enabled on exit.
 const CLEAR_MARGIN := 3.0
 
-## Emitted when an interaction starts (true + its label) or ends (false + ""), for the HUD.
-signal interaction_changed(active: bool, label: String)
-
 var _active: Dictionary = {}     ## The active interaction spec, or empty when idle.
 var _active_object: Node = null  ## The object the active interaction belongs to.
 ## Where the character stood when the interaction began; it returns here on exit.
@@ -143,7 +140,7 @@ func _valid_specs(specs: Array) -> Array:
 
 ## Start an interaction: remember the return spot; for a `move_to` action let the body share
 ## space with the object (a collision exception, so neither ejects nor shoves the other) and snap
-## onto its center; then announce. Actions without `move_to` leave the character where it stands.
+## onto its center. Actions without `move_to` leave the character where it stands.
 func _begin(spec: Dictionary, object: Node) -> void:
 	_return_position = _character.global_position
 	_active = spec
@@ -154,7 +151,6 @@ func _begin(spec: Dictionary, object: Node) -> void:
 		else:
 			_character.add_collision_exception_with(object)
 		_character.global_position = object.global_position
-	interaction_changed.emit(true, active_label())
 
 
 ## End the active interaction. try_interact() runs inside the character's physics step, so the
@@ -174,7 +170,6 @@ func _teardown() -> void:
 		_clearing_object = _active_object
 	_active = {}
 	_active_object = null
-	interaction_changed.emit(false, "")
 
 
 ## Whether the body (its circle plus a clearance margin) currently overlaps `object`'s collider.

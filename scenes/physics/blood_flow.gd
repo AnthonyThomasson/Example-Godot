@@ -5,9 +5,9 @@ extends RefCounted
 ## leaves the body, cheapest-first, so the puddle is one continuous shape. Noise makes some
 ## directions cheap and others dear (fingers and bays instead of a disc), and cells overlapping a
 ## wall or furniture collider are never filled, so the blood wraps around them and creeps into
-## gaps. Positions are local to the owning pool. Draw layer reads `cells`.
+## gaps. Positions are local to the owning pool. The draw layer reads `cells` and `fill()`.
 
-const COLLISION_MASK := 1
+## The eight grid neighbours a cell flows into.
 const NEIGHBORS: Array[Vector2i] = [
 	Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1),
 	Vector2i(1, 1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(-1, -1),
@@ -19,18 +19,26 @@ const NEIGHBORS: Array[Vector2i] = [
 var cells: Dictionary = {}
 ## Where the front has reached, in cost units.
 var front := 0.0
+## How far the sweep has run, 0..1 of the duration.
 var _progress := 0.0
+## The highest flow cost claimed so far; the front sweeps up to it.
 var _last_cost := 0.0
 
+## Side (px) of a grid cell.
 var _size: float
+## Unit direction the flow leans toward.
 var _aim: Vector2
+## Collider RIDs the blocked-cell queries ignore (the body the blood leaves).
 var _exclude: Array
+## Roughens the per-cell flow cost into lobes.
 var _noise := FastNoiseLite.new()
+## The square each blocked-cell query tests.
 var _probe := RectangleShape2D.new()
 ## Cells known to be blocked (true) or open (false), so each is queried once.
 var _blocked: Dictionary = {}
 ## Frontier: Vector2i -> accumulated cost to reach it.
 var _frontier: Dictionary = {}
+## The cell blood leaves the body at.
 var _origin: Vector2i
 
 
@@ -71,7 +79,7 @@ func fill(c: Vector2i) -> float:
 
 
 ## Local centre of a cell.
-func cell_center(c: Vector2i) -> Vector2:
+func _cell_center(c: Vector2i) -> Vector2:
 	return (Vector2(c) + Vector2(0.5, 0.5)) * _size
 
 
@@ -97,6 +105,7 @@ func step(count: int, space: PhysicsDirectSpaceState2D, origin_global: Vector2) 
 				_frontier[n] = next
 
 
+## The frontier cell cheapest to reach (the caller removes it).
 func _pop_cheapest() -> Vector2i:
 	var best := Vector2i.ZERO
 	var best_cost := INF
@@ -107,14 +116,15 @@ func _pop_cheapest() -> Vector2i:
 	return best
 
 
+## Whether a wall or furniture collider overlaps cell `c` (cached per cell).
 func _is_blocked(c: Vector2i, space: PhysicsDirectSpaceState2D, origin_global: Vector2) -> bool:
 	if _blocked.has(c):
 		return _blocked[c]
 	var params := PhysicsShapeQueryParameters2D.new()
 	params.shape = _probe
-	params.collision_mask = COLLISION_MASK
+	params.collision_mask = PhysicsConfig.wall_mask
 	params.exclude = _exclude
-	params.transform = Transform2D(0.0, origin_global + cell_center(c))
+	params.transform = Transform2D(0.0, origin_global + _cell_center(c))
 	params.collide_with_bodies = true
 	var blocked := not space.intersect_shape(params, 1).is_empty()
 	_blocked[c] = blocked

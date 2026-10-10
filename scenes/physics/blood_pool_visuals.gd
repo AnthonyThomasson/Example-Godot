@@ -1,12 +1,39 @@
 extends Node2D
 
-## Draw layer for a blood pool: one lumpy filled blob per particle, in the shared blood color. Each
-## blob is a polygon built from the drop's stored per-vertex shape, so it reads as an organic splat
-## rather than a circle and no two blobs match; overlapping blobs merge into a single, ragged puddle.
-## Sits at a negative z_index so the pool draws beneath the player and furniture (like spent
-## casings). Reads the particle list from its parent control node (blood_pool.gd).
+## Draw layer for a blood pool. A wound pool is one lumpy filled blob per particle, in the shared
+## blood color: each blob is a polygon built from the drop's stored per-vertex shape, so it reads as an
+## organic splat rather than a circle and no two blobs match; overlapping blobs merge into a single,
+## ragged puddle. A bleed-out pool draws its flow's cells through a threshold shader instead (see
+## `_draw_flow`). Sits at a negative z_index so the pool draws beneath the player and furniture (like
+## spent casings). Reads the particles or the flow from its parent control node (blood_pool.gd).
+
+## The threshold runs per screen pixel on the bilinearly magnified field (edge width ~1 px via
+## fwidth), so the outline is crisp yet smooth rather than a blurred alpha ramp.
+const FLOW_SHADER := """
+shader_type canvas_item;
+uniform vec4 blood_color : source_color;
+uniform vec4 rim_color : source_color;
+uniform float opacity = 0.85;
+uniform float threshold = 0.3;
+void fragment() {
+	float v = texture(TEXTURE, UV).r;
+	float w = max(fwidth(v) * 0.75, 0.002);
+	float a = smoothstep(threshold - w, threshold + w, v);
+	vec3 c = mix(rim_color.rgb, blood_color.rgb, smoothstep(threshold, 0.9, v));
+	COLOR = vec4(c, a * opacity);
+}
+"""
+## Box-blur passes over the fill field, melting single frontier cells into their neighbours.
+const BLUR_PASSES := 2
+## Empty cells around the claimed ones, so the blur and the outline have room at the edge.
+const PAD := 3
 
 @onready var _pool := get_parent()  ## The blood pool (control node).
+
+## The fill field as a texture; held in a member because one freed at the end of `_draw` renders white.
+var _flow_texture: ImageTexture
+## The threshold shader's material, created on the first flow draw.
+var _flow_material: ShaderMaterial
 
 
 func _ready() -> void:
@@ -34,29 +61,6 @@ func _draw() -> void:
 ## cells at the frontier melt into their neighbours, drawn magnified with linear
 ## filtering through a threshold shader. The contour is one smooth outline that creeps outward, never
 ## separate dots.
-var _flow_texture: ImageTexture
-var _flow_material: ShaderMaterial
-
-## The threshold runs per screen pixel on the bilinearly magnified field (edge width ~1 px via
-## fwidth), so the outline is crisp yet smooth rather than a blurred alpha ramp.
-const FLOW_SHADER := """
-shader_type canvas_item;
-uniform vec4 blood_color : source_color;
-uniform vec4 rim_color : source_color;
-uniform float opacity = 0.85;
-uniform float threshold = 0.3;
-void fragment() {
-	float v = texture(TEXTURE, UV).r;
-	float w = max(fwidth(v) * 0.75, 0.002);
-	float a = smoothstep(threshold - w, threshold + w, v);
-	vec3 c = mix(rim_color.rgb, blood_color.rgb, smoothstep(threshold, 0.9, v));
-	COLOR = vec4(c, a * opacity);
-}
-"""
-const BLUR_PASSES := 2
-const PAD := 3
-
-
 func _draw_flow() -> void:
 	var flow: BloodFlow = _pool.flow
 	if flow.cells.is_empty():

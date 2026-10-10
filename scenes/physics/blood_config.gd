@@ -23,7 +23,8 @@ static var max_pool_volume: int = 210
 ## (particle_count / spill_duration drops per second); lower = blood appears faster.
 static var spill_duration: float = 36.0
 ## A body bleeding out where it came to rest after death (Physics.bleed_out): how many grid cells
-## its flowing pool claims (area = cells * flow_cell_size²) and the seconds it takes.
+## its flowing pool claims (area = cells * flow_cell_size²) and the seconds its edge takes to sweep
+## out across them.
 static var bleed_out_cells: int = 225
 static var bleed_out_duration: float = 10.0
 ## Side (px) of a flow grid cell. Smaller = finer edge, more physics queries.

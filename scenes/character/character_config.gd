@@ -71,9 +71,8 @@ static var art_shoulder_depth: float = 0.54
 static var art_skin_color: Color = Color(0.93, 0.76, 0.6)
 static var art_hair_color: Color = Color(0.36, 0.24, 0.14)
 static var art_pack_color: Color = Color(0.3, 0.32, 0.26)
-## Default pants and shoe colors (seen once a character falls).
+## Default pants color (seen once a character falls).
 static var art_pants_color: Color = Color(0.22, 0.27, 0.4)
-static var art_shoe_color: Color = Color(0.16, 0.13, 0.12)
 
 # --- Ragdoll (the fall on death; character_ragdoll.gd, solved by Physics' Ragdoll) ---
 # Lengths are in body radii (a 14 px radius ≈ 0.225 m, half the shoulders), so a body stands

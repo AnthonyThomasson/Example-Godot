@@ -7,17 +7,17 @@ extends Node2D
 ## the blood already there. Each hit on the body calls `add_hit`, adding volume and widening the
 ## fill disc (`_spread`) toward BloodConfig.pool_radius_max, so a still victim bled repeatedly pools
 ## out wide while a lone wound stays small; the volume is capped at BloodConfig.max_pool_volume.
-## A bleed-out pool (`seed_bleed_out`) instead flows: a BloodFlow flood-fill claims cells outward at
-## a steady rate, wrapping around walls and furniture into one continuous irregular puddle.
+## A bleed-out pool (`seed_bleed_out`) instead flows: a BloodFlow flood-fill claims its cells in
+## per-frame batches, wrapping around walls and furniture into one continuous irregular puddle, then a
+## front eases outward through them over the bleed-out duration.
 ## Drops emerge at the source's `blood_origin()` when it has one (a fallen body bleeds from where it
-## lies, not where it stood), else at its position. Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
+## lies, not where it stood), else at its position. Despawner-tracked. Drawing lives in
+## blood_pool_visuals.gd; this control node owns the fill only.
 
-## Physics layer the drops avoid — walls and furniture (the default world layer).
-const COLLISION_MASK := 1
 ## Vertices in each drop's blob outline — enough to look round-ish while its lumps stay visible.
+const BLOB_VERTS := 11
 ## Flow cells claimed per physics frame.
 const FLOW_CLAIMS_PER_FRAME := 60
-const BLOB_VERTS := 11
 
 ## Live drops, each a Dictionary: pos (local, px), origin (local, px — where it emerged), vel
 ## (px/s), target (px, distance from origin it settles at), radius (px), shape (PackedFloat32Array
@@ -86,8 +86,8 @@ func seed(direction: Vector2, exclude: Array, source: Node2D) -> void:
 	add_hit(direction)
 
 
-## Start a body's bleed-out pool: `cells` grid cells claimed over `duration` seconds, flowing out
-## from its origin and leaning a random way. `exclude` and `source` as for `seed`.
+## Start a body's bleed-out pool: `cells` grid cells flowing out from its origin and leaning a random
+## way, filling in over `duration` seconds once claimed. `exclude` and `source` as for `seed`.
 func seed_bleed_out(cells: int, duration: float, exclude: Array, source: Node2D) -> void:
 	_exclude = exclude
 	_aim = Vector2.RIGHT.rotated(randf() * TAU)
@@ -240,7 +240,7 @@ func _advance(p: Dictionary, delta: float, space: PhysicsDirectSpaceState2D) -> 
 		var from: Vector2 = global_position + p["pos"]
 		var params := PhysicsShapeQueryParameters2D.new()
 		params.shape = _probe
-		params.collision_mask = COLLISION_MASK
+		params.collision_mask = PhysicsConfig.wall_mask
 		params.exclude = _exclude
 		params.transform = Transform2D(0.0, from)
 		params.motion = motion
@@ -253,7 +253,7 @@ func _advance(p: Dictionary, delta: float, space: PhysicsDirectSpaceState2D) -> 
 			# blood hugs the obstacle and keeps flowing sideways (mirrors character_hands slide).
 			p["pos"] += motion * safe
 			var to: Vector2 = from + motion
-			var ray := PhysicsRayQueryParameters2D.create(from, to, COLLISION_MASK)
+			var ray := PhysicsRayQueryParameters2D.create(from, to, PhysicsConfig.wall_mask)
 			ray.exclude = _exclude
 			var hit := space.intersect_ray(ray)
 			var normal: Vector2 = hit.normal if hit and hit.normal.length() > 0.001 else -motion.normalized()

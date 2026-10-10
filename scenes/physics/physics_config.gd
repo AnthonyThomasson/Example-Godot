@@ -8,6 +8,10 @@ class_name PhysicsConfig
 ## hittable object (furniture and walls). Ballistics (fly-over/ricochet/penetration)
 ## live in BallisticsConfig; the character's walking-push knobs in CharacterConfig.
 
+## Physics layer mask walls and furniture live on: the ragdoll's wall sweep and the blood pools' and
+## flows' collision queries all test against it.
+static var wall_mask: int = 1
+
 # --- Impact force (a hit shoves the struck object) ---
 ## Base impulse magnitude at full speed and a head-on hit. Scaled by the hit's speed
 ## factor (speed / muzzle speed) and by the penetration multipliers below.

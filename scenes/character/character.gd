@@ -61,9 +61,6 @@ var _blood_pool: Node
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
 ## is told apart by `hand`, not by the damage value.
 signal hit_landed(body: Node, damage: float, hand: int)
-## Re-emitted from the interaction component: true + label when an interaction starts, false + ""
-## when it ends. For the HUD; the character itself stays unaware of what an interaction means.
-signal interaction_changed(active: bool, label: String)
 
 ## Interaction component (Interaction domain): finds and runs object interactions. Composed in
 ## code like the other components; the character only forwards `try_interact()` and reads
@@ -100,10 +97,8 @@ func _ready() -> void:
 	_deformable.max_impacts = CharacterConfig.flesh_deform_max_impacts
 	add_child(_deformable)
 
-	# Compose the interaction component and surface its state change as our own signal.
 	_interaction = CharacterInteraction.new()
 	add_child(_interaction)
-	_interaction.interaction_changed.connect(func(active: bool, label: String) -> void: interaction_changed.emit(active, label))
 
 
 func _physics_process(delta: float) -> void:
