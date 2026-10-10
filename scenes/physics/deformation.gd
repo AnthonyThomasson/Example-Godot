@@ -180,11 +180,13 @@ static func convex_shapes(polygon: PackedVector2Array) -> Array:
 ## accumulated damage), outline, then crack/hole marks. `crack_color`/`hole_color` override
 ## the mark colors (e.g. red cracks on flesh); left as NO_COLOR they derive from `outline`.
 ## With a `texture` (spanning the `size` footprint) the polygon is drawn textured instead of
-## filled and unoutlined: the dents cut into the image rather than squash it.
+## filled and unoutlined: the dents cut into the image rather than squash it. `texture_angle`
+## turns the image within the (unturned) silhouette — a round body facing any way. Without
+## `marks` the hit marks are left to the caller (draw_marks), to draw over parts layered on top.
 static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: Color,
 		outline: Color, impacts: Array, damage_total: float,
 		crack_color: Color = NO_COLOR, hole_color: Color = NO_COLOR, scorch_color: Color = NO_COLOR,
-		texture: Texture2D = null) -> void:
+		texture: Texture2D = null, texture_angle: float = 0.0, marks: bool = true) -> void:
 	var poly := shape_polygon(shape, size, impacts)
 	# Fall back to the intact outline if the dents pinched the silhouette into a polygon the
 	# renderer can't triangulate; the hit marks below still show the damage.
@@ -196,11 +198,13 @@ static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: C
 	if texture:
 		var uvs := PackedVector2Array()
 		for p in poly:
-			uvs.append(p / size + Vector2(0.5, 0.5))
+			uvs.append(p.rotated(-texture_angle) / size + Vector2(0.5, 0.5))
 		canvas.draw_colored_polygon(poly, Color.WHITE.darkened(darken), uvs, texture)
 	else:
 		canvas.draw_colored_polygon(poly, fill.darkened(darken))
 		_draw_outline(canvas, poly, outline)
+	if not marks:
+		return
 	var cc := crack_color if crack_color.a > 0.0 else outline.darkened(0.3)
 	var hc := hole_color if hole_color.a > 0.0 else HOLE_COLOR
 	var sc := scorch_color if scorch_color.a > 0.0 else Color.BLACK

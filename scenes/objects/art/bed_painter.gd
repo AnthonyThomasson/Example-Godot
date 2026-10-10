@@ -7,8 +7,6 @@ extends RefCounted
 ## ObjectArtConfig.bed_*): `pillows` (0 = by width), `pattern` ("quilt" | "stars" | "stripes"),
 ## `frame` (a Color).
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _FRAME_HEIGHT := 2  ## Heights for cast shadows, floor-up.
 const _MATTRESS_HEIGHT := 3
 const _DUVET_HEIGHT := 4

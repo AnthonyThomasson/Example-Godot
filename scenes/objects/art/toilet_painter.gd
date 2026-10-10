@@ -5,8 +5,6 @@ extends RefCounted
 ## footprint: a glazed cistern with a flush button, and an oval bowl whose seat ring frames the
 ## water. No options.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _BOWL_HEIGHT := 4  ## Heights for cast shadows.
 const _TANK_HEIGHT := 7
 

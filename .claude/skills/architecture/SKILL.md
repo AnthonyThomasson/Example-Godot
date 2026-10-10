@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the eleven isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Example_Godot) — the twelve isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Example_Godot architecture
@@ -8,7 +8,7 @@ description: The architecture map for this Godot project (Example_Godot) — the
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a pistol that
 fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
-organized into **eleven isolated domains** so each can be changed on its own.
+organized into **twelve isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
@@ -20,17 +20,18 @@ isolated (cross-domain connections go only through the interfaces below), keeps 
 the domain skills* in sync when the architecture or a domain's internals change, and enforces
 concise current-state comments.
 
-## The eleven domains (one folder each under `scenes/`)
+## The twelve domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
 | **World Generation** | `worldgen/` | `domain-worldgen` | Picking a floorplan and building/furnishing a house. |
-| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their procedural pixel art. |
+| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their painters (what each piece looks like). |
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
+| **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout. |
@@ -87,9 +88,12 @@ interface(s) and describes how they're implemented; this list is authoritative f
 4. **Objects/Character → Physics** (objects and the character compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
 	 `apply_impulse(v, at_world)`.
-   - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
+   - `Deformable` (Node child): `record(hit, turn = 0.0)`, `impacts`, `damage_total`, `changed`
+	 signal (`turn`: the body's drawn turn beyond its node rotation; the character passes its facing).
    - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` and
-	 `draw_wall` optionally textured, so pixel art is drawn through the dented silhouette).
+	 `draw_wall` optionally textured — `draw_shape` also turned by `texture_angle`, its hit marks
+	 optional for a caller drawing them over later layers with `draw_marks` — so pixel art is drawn
+	 through the dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
 	 and `Physics.spawn_blood(...)` (character, on a hit).
    - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
@@ -103,12 +107,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
    impacts, melee punches, and the walking character.
 
 6. **Items ↔ Character**
-   `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `primary(user)` (F),
+   `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `aiming_hands()` (held
+   steady by the character's pose), `primary(user)` (F),
    `secondary(user)` (LMB), `draw_weapon(canvas, user)`. `ItemRegistry.create(id)` /
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-   `report_shot(body, dmg)`. The pistol is the one place Items reach into the Projectile System
-   (`ProjectileSpawner`/`CasingSpawner`).
+   `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
+   drawn weapon direction, trailing the aim; shots still use `facing`). The pistol is the one
+   place Items reach into the Projectile System (`ProjectileSpawner`/`CasingSpawner`).
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
@@ -186,6 +192,20 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	  its debug mirror (`ai/debug/vision_debug.gd`) all raycast on this one shared constant instead
 	  of each redefining the same magic number — the single point of truth for that layer id.
 
+12. **Objects / Character / Items → Art** (leaf: the pixel-art engine; each domain owns its painters)
+    - `PixelArt.render(painter, size, color, facing, material, opts) -> Texture2D` — a painter's art
+	  at a cardinal facing (the image is turned); furniture, walls, floors.
+    - `PixelArt.render_turned(painter, size, color, angle, material, opts) -> Texture2D` + `PixelArt.snap_angle(angle)`
+	  — canonical art lit for a snapped angle, drawn rotated by the caller to the exact one;
+	  characters, hands, the pistol.
+    - `PixelCanvas` — the surface a painter draws on (`static paint(canvas, base, material, opts)`):
+	  shapes (`rounded`/`ellipse`/`disc`/`bowed`), `fill`, `bevel`, `outline`, `surface`, `grain`,
+	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …
+    - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
+	  turn steps, tone ramp and surface-finish tuning.
+    Objects' painters + `ObjectArt` registry, Character's body/hand painters and Items' pistol
+    painter all render through these; Art imports nothing from other domains.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -194,6 +214,7 @@ main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
+Objects / Character / Item ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
@@ -201,13 +222,15 @@ AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶
 UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
 ```
 
-Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
-the three factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
-five `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
-deformation), `CharacterConfig` (walking push + punch), `BloodConfig` (blood pooling), and
-`ObjectArtConfig` (Objects' furniture pixel art). There is no `Config` autoload. A sixth static
-holder, `PhysicsLayers` (General, interface 11), is not tuning but a shared physics-layer id, the
-same role `Wall.Side` plays for doorway sides.
+Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
+`Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
+only on Godot's `Image`). Tuning is split into six `class_name` static holders: `BallisticsConfig`
+(projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig` (walking push + punch +
+the character's art), `BloodConfig` (blood pooling), `ArtConfig` (the shared pixel-art light,
+shadows, tones and finishes) and `ObjectArtConfig` (Objects' painter proportions/colors, props,
+floor/wall tiles). There is no `Config` autoload. A seventh static holder, `PhysicsLayers`
+(General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
+plays for doorway sides.
 
 ## Cross-cutting conventions
 

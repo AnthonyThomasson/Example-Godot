@@ -7,8 +7,6 @@ extends RefCounted
 ## cracks wrap at its edges, so repeats never show a seam. Options (`art_opts`): `pattern`, `alt`
 ## (the checker's second color); sizes come from ObjectArtConfig.floor_*.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 
 ## The tile size (world px) for the `pattern` in `opts`.
 static func tile_size(opts: Dictionary) -> Vector2:
@@ -53,7 +51,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 
 ## Rows of planks with per-plank tones, wrapped grain, seams between rows and staggered butt joints.
 static func _planks(c: PixelCanvas, base: Color, t: Dictionary) -> void:
-	var row_h := maxi(3, roundi(ObjectArtConfig.floor_plank_px / ObjectArtConfig.pixel_size))
+	var row_h := maxi(3, roundi(ObjectArtConfig.floor_plank_px / ArtConfig.pixel_size))
 	var rows := c.h / row_h
 	for row in rows:
 		var y := row * row_h
@@ -67,9 +65,9 @@ static func _planks(c: PixelCanvas, base: Color, t: Dictionary) -> void:
 				c.line(Vector2i((x0 + x) % c.w, y), Vector2i((x0 + x) % c.w, y + row_h - 1), tone)
 			c.line(Vector2i(x0, y), Vector2i(x0, y + row_h - 1), t.shadow)
 		var plank := PixelCanvas.rounded(Rect2i(0, y + 1, c.w, row_h - 1), 0)
-		c.grain(plank, true, ObjectArtConfig.wood_grain_density, base.darkened(0.13), base.lightened(0.06), true)
+		c.grain(plank, true, ArtConfig.wood_grain_density, base.darkened(0.13), base.lightened(0.06), true)
 		c.line(Vector2i(0, y), Vector2i(c.w - 1, y), t.shadow)
-		if c.rng.randf() < ObjectArtConfig.wood_knot_chance:
+		if c.rng.randf() < ArtConfig.wood_knot_chance:
 			c.knot(c.rng.randi_range(2, c.w - 3), y + row_h / 2, base.darkened(0.4), base.darkened(0.2))
 
 
@@ -89,7 +87,7 @@ static func _parquet(c: PixelCanvas, base: Color, t: Dictionary) -> void:
 				var tone := base.lightened(shift) if shift > 0.0 else base.darkened(-shift)
 				var strip := PixelCanvas.rounded(r, 0)
 				c.fill(strip, tone)
-				c.grain(strip, along_x, ObjectArtConfig.wood_grain_density, tone.darkened(0.12), tone.lightened(0.05))
+				c.grain(strip, along_x, ArtConfig.wood_grain_density, tone.darkened(0.12), tone.lightened(0.05))
 				c.outline(strip, tone.darkened(0.16))
 			c.outline(PixelCanvas.rounded(Rect2i(gx * cell, gy * cell, cell, cell), 0), t.shadow)
 
@@ -97,7 +95,7 @@ static func _parquet(c: PixelCanvas, base: Color, t: Dictionary) -> void:
 ## Square tiles with grout lines (on the tile's top and left edges, so they wrap), a bevelled glaze
 ## per tile and a little glare; `checker` alternates `alt` with `base`.
 static func _tiles(c: PixelCanvas, base: Color, t: Dictionary, material: String, size: int, checker: bool, alt: Color) -> void:
-	var cell := maxi(4, roundi(size / ObjectArtConfig.pixel_size))
+	var cell := maxi(4, roundi(size / ArtConfig.pixel_size))
 	var grout := base.darkened(0.25) if base.get_luminance() > 0.35 else base.lightened(0.3)
 	for gy in c.h / cell:
 		for gx in c.w / cell:
@@ -121,7 +119,7 @@ static func _tiles(c: PixelCanvas, base: Color, t: Dictionary, material: String,
 
 ## Small square tiles in four mixed tones of `base`, with light grout.
 static func _mosaic(c: PixelCanvas, base: Color) -> void:
-	var cell := maxi(3, roundi(ObjectArtConfig.floor_mosaic_px / ObjectArtConfig.pixel_size))
+	var cell := maxi(3, roundi(ObjectArtConfig.floor_mosaic_px / ArtConfig.pixel_size))
 	var tones := [base, base.lightened(0.1), base.darkened(0.1), base.lightened(0.22)]
 	for gy in c.h / cell:
 		for gx in c.w / cell:

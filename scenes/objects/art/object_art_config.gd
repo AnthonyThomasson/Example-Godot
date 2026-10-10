@@ -1,47 +1,12 @@
 class_name ObjectArtConfig
 
-## Tuning for the Objects domain's procedural pixel art (scenes/objects/art/): the art
-## resolution, the lighting and shadows, the tone ramp, the surface textures, each painter's
-## proportions and colors, the prop palette, and the floor and wall tiles.
+## Tuning for the Objects domain's painters (scenes/objects/art/): each painter's proportions and
+## colors, the prop palette, and the floor and wall tiles. The art resolution, lighting, shadows,
+## tone ramp and surface textures every painter shares live in the Art domain's ArtConfig.
 ##
 ## A `class_name` holder of `static var`s — read as `ObjectArtConfig.<name>`; there is no
 ## instance and no autoload. A piece's catalogue `art_opts` overrides a painter knob for that
 ## piece only, keyed by the knob's name without its painter prefix (`table_inset` → `inset`).
-
-# --- Resolution + lighting ---
-## World px per art pixel (1 = one art pixel per world px; 2 = chunkier pixels, less detail).
-static var pixel_size: float = 1.0
-## World-space direction the light comes FROM (top-left). Edges facing it are highlighted,
-## edges facing away are shaded, and raised parts cast shadows away from it.
-static var light_from: Vector2 = Vector2(-1.0, -1.0)
-## Drop shadow on the floor, offset away from the light by a piece's height proxy: px per point
-## of `coverage` (0 = none), capped at drop_shadow_max; and its opacity. Non-solid decor casts none.
-static var drop_shadow_per_coverage: float = 0.06
-static var drop_shadow_max: float = 6.0
-static var drop_shadow_alpha: float = 0.28
-## How far (art px) a raised part (a sofa arm, a chair's back rail) shades the lower surface
-## beside it, and how much it darkens it.
-static var cast_shadow_px: int = 2
-static var cast_shadow_darken: float = 0.22
-
-# --- Tone ramp (darken/lighten amounts applied to a piece's base color) ---
-static var tone_outline: float = 0.62
-static var tone_shadow: float = 0.36
-static var tone_dark: float = 0.18
-static var tone_light: float = 0.14
-static var tone_highlight: float = 0.3
-
-# --- Surface texture ---
-## Fraction of fabric pixels nudged a shade lighter/darker (a woven look).
-static var fabric_speckle: float = 0.12
-## Wood grain streaks per art pixel of plank area.
-static var wood_grain_density: float = 0.018
-## Chance that a plank carries a knot.
-static var wood_knot_chance: float = 0.3
-## Brushed-metal streaks per art pixel of metal area.
-static var metal_brush_density: float = 0.012
-## Fraction of stone pixels flecked lighter/darker (granite).
-static var stone_fleck_density: float = 0.14
 
 # --- Table ---
 ## Plank width (art px); planks run along the table's long side.

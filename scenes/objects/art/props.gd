@@ -4,9 +4,7 @@ extends RefCounted
 ## mugs, books, bowls, tools and the like, drawn by the table / cabinet / counter painters from a
 ## piece's `art_opts.props` list. Each prop is painted in the host's canonical frame (front toward
 ## +y), raised so it casts a shadow onto the surface, with sizes in art px scaled by
-## ObjectArtConfig.pixel_size and colors from ObjectArtConfig.prop_colors.
-
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
+## ArtConfig.pixel_size and colors from ObjectArtConfig.prop_colors.
 
 const _HEIGHT := 7  ## Props stand above the surface they sit on (cast-shadow height).
 
@@ -50,7 +48,7 @@ static func _u(n: float) -> int:
 
 ## An offset of `n` art px at the configured pixel size (may be zero or negative).
 static func _o(n: float) -> int:
-	return roundi(n / maxf(ObjectArtConfig.pixel_size, 0.01))
+	return roundi(n / maxf(ArtConfig.pixel_size, 0.01))
 
 
 ## A prop palette color by name.

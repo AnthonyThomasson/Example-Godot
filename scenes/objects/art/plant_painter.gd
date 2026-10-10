@@ -5,8 +5,6 @@ extends RefCounted
 ## tapering leaves radiating from the middle in two greens, each with a pale midrib. Options
 ## (`art_opts`, defaulting to ObjectArtConfig.plant_*): `leaves`.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _POT_HEIGHT := 3  ## Heights for cast shadows: leaves arch over the pot.
 const _LEAF_HEIGHT := 7
 

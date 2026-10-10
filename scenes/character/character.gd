@@ -4,7 +4,8 @@ extends CharacterBody2D
 ## inventory, and the knockback it takes from shoves. It reads its intent from a pluggable
 ## controller child (any node with a `control(character, delta)` method): the controller
 ## writes `move_input` / `aim_point` and calls `melee/shoot/select_slot`. Drawing
-## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd.
+## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd, and the living
+## motion of head, shoulders and hands in character_pose.gd (stepped here each physics frame).
 
 ## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
 @export var radius: float = 14.0  ## Body circle radius (px).
@@ -26,6 +27,9 @@ var is_dead: bool = false
 
 ## Unit vector from the character toward its aim point; read by the hands and visuals.
 var facing := Vector2.RIGHT
+## The body's living motion (head, shoulders and hands chasing `facing`); read by the hands and
+## visuals.
+var pose: CharacterPose = CharacterPose.new()
 
 ## Intent, written each frame by the controller.
 var move_input := Vector2.ZERO   ## Desired move direction (already 0–1 length).
@@ -60,6 +64,7 @@ signal interaction_changed(active: bool, label: String)
 ## code like the other components; the character only forwards `try_interact()` and reads
 ## `is_busy()` / `interaction_label()`.
 const CharacterInteraction = preload("res://scenes/interaction/character_interaction.gd")
+const CharacterPose = preload("res://scenes/character/character_pose.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -113,6 +118,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
 		_hands.facing = facing
+		pose.update(delta, facing, Vector2.ZERO, speed, _aiming_hands())
 		return
 
 	# Aim toward the aim point. Guard the degenerate zero-length case.
@@ -127,6 +133,8 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _apply_pushes()
+	# Before the children's _physics_process, so the hands build on this frame's pose.
+	pose.update(delta, facing, get_real_velocity(), speed, _aiming_hands())
 
 
 # --- Controller-facing API -------------------------------------------------------------
@@ -233,6 +241,23 @@ func is_attacking() -> bool:
 	return _hands.is_attacking()
 
 
+## Recoil: throw `hand` back and twist the shoulders, as a fired weapon does (the item calls it).
+func kick(hand: int) -> void:
+	pose.kick(hand)
+
+
+## The drawn direction of a held weapon: it trails the aim a little as the character turns. Visual
+## only — shots still leave along `facing`.
+func weapon_facing() -> Vector2:
+	return Vector2.from_angle(pose.weapon_angle)
+
+
+## The hands the held item aims a weapon with (held steady by the pose).
+func _aiming_hands() -> Array:
+	var item: Item = current_item()
+	return item.aiming_hands() if item else []
+
+
 ## Throw a punch with the given hand (the item decides which).
 func punch(hand: int) -> void:
 	_hands.punch(hand)
@@ -250,7 +275,7 @@ func hand_world(hand: int) -> Vector2:
 
 ## World muzzle point for a weapon in `hand` (the drawn barrel tip, +clearance).
 func muzzle_origin(hand: int) -> Vector2:
-	return hand_world(hand) + facing * 26.0
+	return hand_world(hand) + facing * 22.0
 
 
 ## The scene node transient projectiles/casings/debris spawn into (world space, not under us).
@@ -277,13 +302,14 @@ func get_surface() -> Dictionary:
 
 
 ## Take a hit: shove along the impact (folded into locomotion via the pushable path),
-## record the deformation (dents the drawn silhouette), spray blood debris, and feed a blood
-## pool on the floor. The striker fills in a HitInfo. Each hit accumulates into `_blood_pool` while
-## this body stands on it (pooling out wider), starting a new pool once it moves off. The pool
-## excludes this body's collider so the blood spreading out of the wound is not trapped inside it.
+## record the deformation relative to the shoulders (it dents the drawn body and hands and turns
+## with them), spray blood debris, and feed a blood pool on the floor. The striker fills in a HitInfo.
+## Each hit accumulates into `_blood_pool` while this body stands on it (pooling out wider),
+## starting a new pool once it moves off. The pool excludes this body's collider so the blood
+## spreading out of the wound is not trapped inside it.
 func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
-	_deformable.record(hit)
+	_deformable.record(hit, pose.torso_angle)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
 	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
 	_apply_damage(hit.damage)

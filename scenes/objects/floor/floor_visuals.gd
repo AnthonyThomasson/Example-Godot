@@ -1,7 +1,7 @@
 extends Node2D
 
 ## Floor DRAW layer (Objects domain): repeats the floor's pixel-art tile across its rect, scaled so
-## one art pixel covers ObjectArtConfig.pixel_size world px. Floors are static: one draw.
+## one art pixel covers ArtConfig.pixel_size world px. Floors are static: one draw.
 
 const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
 
@@ -19,6 +19,6 @@ func _ready() -> void:
 func _draw() -> void:
 	if _tile == null:
 		return
-	var scale_px := ObjectArtConfig.pixel_size
+	var scale_px := ArtConfig.pixel_size
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2(scale_px, scale_px))
 	draw_texture_rect(_tile, Rect2(Vector2.ZERO, _floor.size / scale_px), true)

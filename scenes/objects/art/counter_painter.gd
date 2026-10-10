@@ -6,7 +6,6 @@ extends RefCounted
 ## an island's seating overhang. Options (`art_opts`, defaulting to ObjectArtConfig.counter_*):
 ## `basin` ("none" | "single" | "deep"), `backsplash`, `overhang`, `props`.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
 const Props = preload("res://scenes/objects/art/props.gd")
 
 const _TOP_HEIGHT := 3     ## Heights for cast shadows.

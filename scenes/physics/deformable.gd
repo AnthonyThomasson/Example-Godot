@@ -35,11 +35,13 @@ func _ready() -> void:
 
 
 ## Record a damage impact from a HitInfo. Stored in local space so it rides along as the
-## body is shoved/spun. `world_pos`/`world_normal` come from the striker's raycast.
-func record(hit: HitInfo) -> void:
+## body is shoved/spun. `turn` is how far the owner draws the body turned beyond its node
+## rotation (a character facing its aim); the impact is stored un-turned, so the owner turns it
+## back when drawing and the dent stays on the part that was hit.
+func record(hit: HitInfo, turn: float = 0.0) -> void:
 	var xf := _body.global_transform.affine_inverse()
-	var local_pos := xf * hit.position
-	var inward := xf.basis_xform(-hit.normal).normalized()  # into the surface
+	var local_pos := (xf * hit.position).rotated(-turn)
+	var inward := xf.basis_xform(-hit.normal).normalized().rotated(-turn)  # into the surface
 	if inward.length() < 0.01:
 		inward = -local_pos.normalized() if local_pos.length() > 0.01 else Vector2.DOWN
 	var depth := minf(hit.damage * PhysicsConfig.deform_depth_per_damage, max_depth)

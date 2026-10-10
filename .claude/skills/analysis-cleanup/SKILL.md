@@ -47,7 +47,7 @@ done
 find scenes -name '*.gd' | wc -l
 ```
 
-Read the `domain-<folder>/SKILL.md` for each domain as you reach it — don't load all eleven up
+Read the `domain-<folder>/SKILL.md` for each domain as you reach it — don't load all twelve up
 front. The AI domain is split into sub-domains, each with its own `domain-ai-<sub>` skill plus the
 `domain-ai` overview; treat its sub-domain boundaries exactly as seriously as the top-level ones.
 
@@ -234,7 +234,7 @@ ls -d scenes/*/ | wc -l    # the real number
 grep -rn "domains" AGENTS.md .claude/skills/architecture/SKILL.md | grep -iE "ten|eleven|twelve|nine|[0-9]+ domains"
 ```
 
-There are **eleven** domain folders; `AGENTS.md` (×2) and `architecture/SKILL.md` (the
+There are **twelve** domain folders; `AGENTS.md` (×2) and `architecture/SKILL.md` (the
 `description`, the intro, the table heading) must all agree. Re-run the grep each audit — the three
 assertions in the skill drift independently when a domain is added or removed.
 

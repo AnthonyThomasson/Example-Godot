@@ -7,7 +7,6 @@ extends RefCounted
 ## ObjectArtConfig.cabinet_*): `front` ("doors" | "drawers" | "lid" | "none"), `count`,
 ## `front_depth`, `crown`, `top` ("solid" | "glass" | "lid"), `labels`, `handle` (a Color), `props`.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
 const Props = preload("res://scenes/objects/art/props.gd")
 
 const _BODY_HEIGHT := 4  ## Cast-shadow height of the carcass (props stand above it).

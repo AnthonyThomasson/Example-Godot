@@ -70,25 +70,14 @@ casings and rugs). `floor_visuals.gd` repeats `ObjectArt.tile(...)` across the r
 
 ## Pixel art (`objects/art/`, private to Objects)
 
-Every catalogue piece, every wall and every floor is drawn as procedural top-down pixel art. A
-piece whose definition sets `art` (a painter id) is drawn as art instead of a flat shape with its
-name label (the flat path stays for any definition without `art`).
-- `object_art.gd` — `texture(art, size, color, facing, material, opts)`: picks the painter from
-  `PAINTERS`, paints at `size / ObjectArtConfig.pixel_size` in a **canonical frame** (front toward
-  +y) under the world light turned into that frame, then rotates the image to `facing`, so
-  lighting stays world-consistent. `tile(art, color, material, opts)` is the same at the painter's
-  own `tile_size(opts)` (floors). Textures are cached by their inputs (static, so they survive
-  scene reloads; a rebuilt house costs a few ms).
-- `pixel_canvas.gd` — the drawing surface: an RGBA8 Image + coverage and height layers (R8
-  images, filled natively, read through snapshots). `Shape`s: `rounded()` / `ellipse()` / `disc()`
-  are `ConvexShape`s (one span per row and column: native row fills, O(1) depth-from-edge and
-  normal, edge band enumerated directly); `bowed()` is a mask `Shape` (run-length sweeps). Depth
-  + normal drive `bevel()` (light-facing edges lit, far edges shaded) and `outline()`. Plus
-  `fill`/`clear`/`paint_over`/`line`/`px`, `speckle` (sampled; matches 8-bit pixels with a
-  tolerance), `grain`/`knot` (wood; `wrap` for seamless tiles), `glare`, `cast_shadows()` (a
-  taller part shades the lower pixels on its far side from the light), and `surface(shape,
-  material, base)` — the material finish every painter shares: wood grain, brushed metal, stone
-  flecks, ceramic/glass glare, fabric weave, plastic grain.
+Every catalogue piece, every wall and every floor is drawn as procedural top-down pixel art,
+rendered through the **Art** domain (`PixelArt` / `PixelCanvas` / `ArtConfig`, interface 12 —
+see `domain-art` for the engine). A piece whose definition sets `art` (a painter id) is drawn as
+art instead of a flat shape with its name label (the flat path stays for any definition without
+`art`).
+- `object_art.gd` — the painter registry: `PAINTERS` maps an `art` id to its painter;
+  `texture(art, size, color, facing, material, opts)` renders it via `PixelArt.render` (a cardinal
+  facing), `tile(art, color, material, opts)` at the painter's own `tile_size(opts)` (floors).
 - Painters (`*_painter.gd`, each `static paint(canvas, base, material, opts)`): `sofa` (also the
   armchair), `table` (+ `gaps`, `props`; desks, benches, the workbench), `chair`, `cabinet`
   (doors/drawers front lip, crown, glass top, chest lid), `shelf` (books / boxes / shoes),
@@ -103,9 +92,9 @@ name label (the flat path stays for any definition without `art`).
   clock, bowl, fruit bowl, vase, cutting board, tools, vise, crayons, plate, lamp, toys, phone),
   drawn by `table` / `cabinet` / `counter` from `art_opts.props` (`{ kind, at }`, `at` relative
   to the surface), raised so they cast shadows; colors from `ObjectArtConfig.prop_colors`.
-- `object_art_config.gd` — `ObjectArtConfig`, the static tuning holder: `pixel_size`,
-  `light_from`, drop and cast shadows, tone ramp, texture densities, per-painter proportions and
-  colors, the prop palette, and the floor/wall tile sizes and floor z-index.
+- `object_art_config.gd` — `ObjectArtConfig`, the Objects painters' tuning: per-painter
+  proportions and colors, the prop palette, and the floor/wall tile sizes and floor z-index (the
+  shared light, shadows, tones and finishes are `ArtConfig`).
 
 Object fields for art: `art`, `art_opts` (from the definition) and `facing` (`opts.facing` from
 World-Gen; visual only, a cardinal direction in the local frame — the `rotated` size swap still
@@ -123,4 +112,6 @@ add its knobs to `ObjectArtConfig`, and set `"art": "<name>"` on catalogue defin
 - **World Generation → Objects** (interface 2): `ObjectFactory.spawn(definition, position,
   parent, opts) -> Node`, `WallFactory.spawn(rect, thickness, openings, name, parent, style) ->
   Node`, `FloorFactory.spawn(rect, definition, name, parent) -> Node`, `Wall.Side` enum.
+- **Objects → Art** (interface 12): its painters render through `PixelArt.render`, draw on
+  `PixelCanvas`, and read `ArtConfig`.
 - Objects also implements the hittable (3), pushable (5) and interactable (8) contracts above.

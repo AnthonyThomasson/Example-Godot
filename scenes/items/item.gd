@@ -4,8 +4,8 @@ class_name Item extends RefCounted
 ## + a little state (e.g. which fist punches next); it owns what the primary (F) and
 ## secondary (LMB) actions do, which hands are drawn, and how its weapon is rendered.
 ## The character calls into these; an Item talks back only through the small character API
-## (facing, punch(), hand_position(), muzzle_origin(), world_root(), report_shot()), so
-## Items and the Character are otherwise independent.
+## (facing, weapon_facing(), punch(), kick(), hand_position(), muzzle_origin(), world_root(),
+## report_shot()), so Items and the Character are otherwise independent.
 
 ## Shown in the HUD.
 var display_name := "Item"
@@ -15,6 +15,12 @@ var reach := 28.0
 
 ## Hands to draw for this item: [] none, [1] right only, [0, 1] both.
 func visible_hands() -> Array:
+	return []
+
+
+## Hands that aim a held weapon: the character keeps them steady and quick to the aim instead of
+## swinging them with the walk. Default: none.
+func aiming_hands() -> Array:
 	return []
 
 

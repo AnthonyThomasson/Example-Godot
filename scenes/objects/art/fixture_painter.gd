@@ -5,8 +5,6 @@ extends RefCounted
 ## streaks. A `towels` rack: a chrome bar on end brackets with folded towels draped over it.
 ## Options (`art_opts`): `kind` ("mirror" | "towels").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _BAR_HEIGHT := 4  ## Heights for cast shadows.
 const _TOWEL_HEIGHT := 6
 

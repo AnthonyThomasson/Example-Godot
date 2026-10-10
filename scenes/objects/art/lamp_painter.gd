@@ -4,8 +4,6 @@ extends RefCounted
 ## of its round footprint: a lampshade in the piece's color with faint panel seams and a lit rim,
 ## and through its open top the dark inside and a glowing bulb. No options.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _SHADE_HEIGHT := 8  ## Cast-shadow height of the shade.
 
 

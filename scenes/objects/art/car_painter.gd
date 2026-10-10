@@ -5,8 +5,6 @@ extends RefCounted
 ## a gloss highlight, headlights and a grille up front and tail lights behind, a tinted windscreen
 ## and rear window around a raised roof, door seams with handles, and wing mirrors. No options.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _TYRE_HEIGHT := 2  ## Heights for cast shadows, floor-up.
 const _BODY_HEIGHT := 6
 const _ROOF_HEIGHT := 10

@@ -4,8 +4,6 @@ extends RefCounted
 ## frame (seat front toward +y): a five-star base with casters peeking out, a rounded padded seat,
 ## armrests at its sides and a curved mesh backrest. No options.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _BASE_HEIGHT := 1  ## Heights for cast shadows, floor-up.
 const _SEAT_HEIGHT := 3
 const _ARM_HEIGHT := 5

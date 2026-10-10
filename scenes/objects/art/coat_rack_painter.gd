@@ -4,8 +4,6 @@ extends RefCounted
 ## of its round footprint: three coats hanging from the hooks, splayed outward with a pale collar,
 ## a hat on top and the wooden post cap with its hook arms. No options.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _COAT_HEIGHT := 5  ## Heights for cast shadows, floor-up.
 const _HAT_HEIGHT := 8
 const _POST_HEIGHT := 9

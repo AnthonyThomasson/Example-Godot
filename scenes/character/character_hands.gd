@@ -5,12 +5,16 @@ extends Node2D
 ## (a shape query at the fist's raw punch position). The character sets `facing` and calls
 ## `punch(hand)`; visuals read `hand_position()` / `hand_radius`. WHICH hand punches and WHEN
 ## is decided by the held Item + the controller — this layer only animates and detects the
-## swing it is told to.
+## swing it is told to. The rest pose follows the character's pose (trailing the aim, swinging
+## with the walk, kicked back by recoil).
 
 ## Hand geometry (all in pixels, in the character's local space).
-@export var hand_radius: float = 6.0      ## Size of each hand circle.
-@export var hand_gap: float = 3.5         ## Gap between the body edge and a resting hand.
-@export var hand_lateral: float = 8.0     ## How far each hand sits to its side of center.
+@export var hand_radius: float = 4.0      ## Size of each hand circle.
+@export var hand_gap: float = -6.5        ## Gap between the body edge and a resting hand (negative: held in over the body).
+@export var hand_lateral: float = 7.0     ## How far each hand sits to its side of center.
+## Gap between the body edge and where a punch's reach starts: a full swing lands the fist
+## `punch_gap + reach` beyond the body edge, however close the hands rest.
+@export var punch_gap: float = 5.5
 
 ## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right);
 ## `damage` is the range-of-motion-scaled punch damage dealt (0 at point-blank, up at full reach).
@@ -86,14 +90,18 @@ func hand_position(hand: int) -> Vector2:
 	return _hand_pos[hand]
 
 
-## The hand's ideal local position from facing/lateral offset + punch extension, before
-## any wall/object collision is applied.
+## The hand's ideal local position, before any wall/object collision is applied: its rest pose
+## in the pose's frame for that hand (which trails and swings around the aim), then the punch extension
+## straight along `facing`.
 func _raw_hand_position(hand: int) -> Vector2:
 	var body_radius: float = _character.radius
-	var perp := facing.orthogonal()
+	var pose = _character.pose
+	var along := Vector2.from_angle(pose.hand_angles[hand])
 	var side := -1.0 if hand == 0 else 1.0
-	var rest := facing * (body_radius + hand_radius + hand_gap) + perp * (hand_lateral * side)
-	return rest + facing * (_current_reach * _punch[hand])
+	var rest := along * (body_radius + hand_radius + hand_gap) + along.orthogonal() * (hand_lateral * side)
+	rest += pose.hand_offset(hand)
+	var swing := punch_gap - hand_gap + _current_reach  # Rest pose → full extension.
+	return rest + facing * (swing * _punch[hand])
 
 
 ## Collide-and-slide the hand from the body center toward its raw target: stop at the first

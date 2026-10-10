@@ -6,8 +6,6 @@ extends RefCounted
 ## with a darker rim. Options (`art_opts`, defaulting to ObjectArtConfig.rug_*): `pattern`
 ## ("medallion" | "stripes" | "plush").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 
 ## Paint a rug onto `c` in `base` fabric.
 static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:

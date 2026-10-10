@@ -6,8 +6,6 @@ extends RefCounted
 ## frames show corner uprights. Options (`art_opts`, defaulting to ObjectArtConfig.shelf_*):
 ## `contents` ("books" | "boxes" | "shoes").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _FRAME_HEIGHT := 5    ## Heights for cast shadows: the frame stands over its contents.
 const _CONTENT_HEIGHT := 3
 

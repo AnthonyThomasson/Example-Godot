@@ -7,8 +7,6 @@ extends RefCounted
 ## them. Options (`art_opts`, defaulting to ObjectArtConfig.sofa_*): `back_depth`, `arm_width`,
 ## `cushion_width`, `max_cushions`, `pillows`.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _FRAME_HEIGHT := 1  ## Heights for cast shadows, floor-up.
 const _SEAT_HEIGHT := 2
 const _PILLOW_HEIGHT := 3
@@ -65,7 +63,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 
 	var bounds := Rect2i(0, 0, c.w, c.h)
 	for tone in [base, base.lightened(0.05), back_tone, back_tone.lightened(0.05)]:
-		c.speckle(bounds, tone, ObjectArtConfig.fabric_speckle)
+		c.speckle(bounds, tone, ArtConfig.fabric_speckle)
 	c.cast_shadows()
 	c.outline(full, t.outline)
 
@@ -98,6 +96,6 @@ static func _pillows(c: PixelCanvas, base: Color, back_d: int, arm_w: int, seat_
 		c.fill(PixelCanvas.rounded(r.grow(-3), 3), col.lightened(0.06))
 		c.bevel(pillow, 2, 2, pt.light, pt.dark)
 		c.outline(pillow, pt.shadow)
-		c.speckle(r, col, ObjectArtConfig.fabric_speckle)
+		c.speckle(r, col, ArtConfig.fabric_speckle)
 		for i in range(2, size / 2):
 			c.px(x + i if left else x + size - 1 - i, y + i, pt.dark)

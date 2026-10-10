@@ -6,8 +6,6 @@ extends RefCounted
 ## to it by spindles. Options (`art_opts`, defaulting to ObjectArtConfig.chair_*): `back_depth`,
 ## `slats`.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _SEAT_HEIGHT := 1  ## Heights for cast shadows: the back stands over the seat.
 const _SLAT_HEIGHT := 3
 const _RAIL_HEIGHT := 5
@@ -33,7 +31,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	var seat := PixelCanvas.rounded(seat_rect, 4)
 	c.fill(seat, base, _SEAT_HEIGHT)
 	c.fill(PixelCanvas.rounded(seat_rect.grow(-4), 4), base.lightened(0.05))
-	c.grain(PixelCanvas.rounded(seat_rect.grow(-2), 3), true, ObjectArtConfig.wood_grain_density * 1.5,
+	c.grain(PixelCanvas.rounded(seat_rect.grow(-2), 3), true, ArtConfig.wood_grain_density * 1.5,
 			base.darkened(0.12), base.lightened(0.08))
 	c.bevel(seat, 2, 2, t.light, t.dark)
 	c.outline(seat, t.outline)
@@ -42,7 +40,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	var rail_rect := Rect2i(inset - 1, 0, c.w - 2 * inset + 2, rail_th + bow)
 	var rail := PixelCanvas.bowed(rail_rect, 2, bow)
 	c.fill(rail, base, _RAIL_HEIGHT)
-	c.grain(rail, true, ObjectArtConfig.wood_grain_density * 2.0, base.darkened(0.12), base.lightened(0.08))
+	c.grain(rail, true, ArtConfig.wood_grain_density * 2.0, base.darkened(0.12), base.lightened(0.08))
 	c.bevel(rail, 2, 2, t.highlight, t.dark)
 	c.outline(rail, t.outline)
 

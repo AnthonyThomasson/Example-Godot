@@ -8,8 +8,6 @@ extends RefCounted
 ## defaulting to ObjectArtConfig.appliance_*): `panel` ("plain" | "burners" | "fridge" |
 ## "microwave" | "washer" | "dryer" | "tv").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _BODY_HEIGHT := 4  ## Heights for cast shadows.
 const _KNOB_HEIGHT := 6
 

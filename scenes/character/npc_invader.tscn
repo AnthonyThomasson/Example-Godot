@@ -14,6 +14,11 @@ hostile_on_trespass = false
 
 [node name="Visuals" parent="."]
 body_color = Color(0.85, 0.35, 0.3, 1)
+skin_color = Color(0.78, 0.58, 0.44, 1)
+hand_color = Color(0.16, 0.16, 0.18, 1)
+hair_color = Color(0.16, 0.16, 0.18, 1)
+hair_style = "beanie"
+backpack = true
 
 [node name="AgentDebug" parent="."]
 label_color = Color(1, 0.6, 0.55, 1)

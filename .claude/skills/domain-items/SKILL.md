@@ -22,6 +22,16 @@ Number keys 1–9 select a slot (`ItemRegistry`):
 Write an `Item` subclass in `items/` and add a case in `ItemRegistry`. `ItemRegistry.create(id)`
 / `default_inventory()` build them.
 
+## Pistol art
+
+`pistol.gd`'s `draw_weapon` draws `pistol_painter.gd` (Items-private; slide, ejection port,
+sights, grip) through the Art domain: `PixelArt.render_turned(PistolPainter, ART_SIZE, color,
+PixelArt.snap_angle(angle), "metal")`, drawn rotated to the exact angle of the character's
+`weapon_facing()` (which trails the aim a touch as it turns) with its grip `GRIP_BACK` px behind
+the weapon hand. Its `aiming_hands()` is `[WEAPON_HAND]`, so that hand stays steady while walking. The character visuals draw the
+weapon before the hands, so the fist grips it. Firing calls `user.kick(WEAPON_HAND)`, so the hand
+(and the gun in it) recoils.
+
 ## Link into the Projectile System
 
 The pistol is the one place Items reaches into the Projectile System
@@ -30,6 +40,9 @@ The pistol is the one place Items reaches into the Projectile System
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Items ↔ Character** (interface 6): `Item` (`items/item.gd`) exposes `display_name`, `reach`,
-  `visible_hands()`, `primary(user)` (F), `secondary(user)` (LMB), `draw_weapon(canvas, user)`.
+  `visible_hands()`, `aiming_hands()`, `primary(user)` (F), `secondary(user)` (LMB),
+  `draw_weapon(canvas, user)`.
   The character API an item may call: `facing`, `punch(hand)`, `hand_position(hand)`,
-  `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`.
+  `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`,
+  `kick(hand)`, `weapon_facing()`.
+- **Items → Art** (interface 12): the pistol's art via `PixelArt.render_turned` / `snap_angle`.

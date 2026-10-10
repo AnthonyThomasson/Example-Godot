@@ -1,6 +1,6 @@
-extends RefCounted
+class_name PixelCanvas extends RefCounted
 
-## Pixel-art drawing surface for the object painters (Objects domain, private): an RGBA8 Image at
+## Pixel-art drawing surface (Art domain) that every painter draws on: an RGBA8 Image at
 ## art resolution plus coverage and height layers, and the primitives the painters compose —
 ## filled shapes, light-aware bevels, outlines, lines, cast shadows and material surface finishes
 ## (wood grain, brushed metal, stone flecks, glaze glare, fabric weave). Coordinates are integer
@@ -240,12 +240,12 @@ func _init(width: int, height: int, seed_value: int, light_from: Vector2) -> voi
 ## Shade ramp around a base color, from the outline (darkest) to the highlight.
 static func tones(base: Color) -> Dictionary:
 	return {
-		"outline": base.darkened(ObjectArtConfig.tone_outline),
-		"shadow": base.darkened(ObjectArtConfig.tone_shadow),
-		"dark": base.darkened(ObjectArtConfig.tone_dark),
+		"outline": base.darkened(ArtConfig.tone_outline),
+		"shadow": base.darkened(ArtConfig.tone_shadow),
+		"dark": base.darkened(ArtConfig.tone_dark),
 		"base": base,
-		"light": base.lightened(ObjectArtConfig.tone_light),
-		"highlight": base.lightened(ObjectArtConfig.tone_highlight),
+		"light": base.lightened(ArtConfig.tone_light),
+		"highlight": base.lightened(ArtConfig.tone_highlight),
 	}
 
 
@@ -439,6 +439,36 @@ func bevel(s: Shape, from_k: int, to_k: int, lit: Color, unlit: Color) -> void:
 			img.set_pixel(x, y, unlit)
 
 
+## Like bevel(), but relative to what is already drawn: edges facing the light are lightened by
+## `lift`, edges facing away darkened by `drop` — for shapes in several colors (a head of hair and
+## skin) that should share one shading.
+func bevel_relative(s: Shape, from_k: int, to_k: int, lift: float, drop: float) -> void:
+	var pts := s.edge_pixels(to_k)
+	for i in range(0, pts.size(), 2):
+		var x := pts[i]
+		var y := pts[i + 1]
+		if not has(x, y):
+			continue
+		var k := s.depth(x, y)
+		if k < from_k or k > to_k:
+			continue
+		var d := s.normal(x, y).dot(light)
+		if d > 0.3:
+			img.set_pixel(x, y, img.get_pixel(x, y).lightened(lift))
+		elif d < -0.3:
+			img.set_pixel(x, y, img.get_pixel(x, y).darkened(drop))
+
+
+## A 1px ring just inside a shape's edge, each pixel darkened by `amount` from what is drawn.
+func outline_relative(s: Shape, amount: float) -> void:
+	var pts := s.edge_pixels(1)
+	for i in range(0, pts.size(), 2):
+		var x := pts[i]
+		var y := pts[i + 1]
+		if has(x, y) and s.depth(x, y) == 1:
+			img.set_pixel(x, y, img.get_pixel(x, y).darkened(amount))
+
+
 ## A 1px ring just inside a shape's edge.
 func outline(s: Shape, c: Color) -> void:
 	var pts := s.edge_pixels(1)
@@ -453,12 +483,12 @@ func outline(s: Shape, c: Color) -> void:
 ## toward the light that stands at least `k` higher shades it (up to cast_shadow_px away).
 func cast_shadows() -> void:
 	var step := Vector2i(roundi(light.x), roundi(light.y))
-	var reach := maxi(0, ObjectArtConfig.cast_shadow_px)
+	var reach := maxi(0, ArtConfig.cast_shadow_px)
 	if step == Vector2i.ZERO or reach == 0:
 		return
 	var hb := _hgt.get_data()
 	covered(0, 0)  # Refresh the coverage snapshot.
-	var shade := ObjectArtConfig.cast_shadow_darken
+	var shade := ArtConfig.cast_shadow_darken
 	for y in h:
 		for x in w:
 			var i := y * w + x
@@ -518,19 +548,19 @@ func _line_inside(s: Shape, a: Vector2i, b: Vector2i, c: Color) -> void:
 func surface(s: Shape, material: String, base: Color, along_x: bool = true, wrap: bool = false) -> void:
 	match material:
 		"wood":
-			grain(s, along_x, ObjectArtConfig.wood_grain_density, base.darkened(0.12), base.lightened(0.07), wrap)
+			grain(s, along_x, ArtConfig.wood_grain_density, base.darkened(0.12), base.lightened(0.07), wrap)
 		"metal":
-			grain(s, along_x, ObjectArtConfig.metal_brush_density, base.lightened(0.07), base.darkened(0.05), wrap)
+			grain(s, along_x, ArtConfig.metal_brush_density, base.lightened(0.07), base.darkened(0.05), wrap)
 		"stone":
-			speckle(s.bounds, base, ObjectArtConfig.stone_fleck_density, 0.16)
-			speckle(s.bounds, base, ObjectArtConfig.stone_fleck_density * 0.5, 0.3)
+			speckle(s.bounds, base, ArtConfig.stone_fleck_density, 0.16)
+			speckle(s.bounds, base, ArtConfig.stone_fleck_density * 0.5, 0.3)
 		"ceramic":
 			speckle(s.bounds, base, 0.02, 0.03)
 			glare(s, base.lightened(0.45), 2)
 		"glass":
 			glare(s, base.lightened(0.55), 3)
 		"fabric":
-			speckle(s.bounds, base, ObjectArtConfig.fabric_speckle)
+			speckle(s.bounds, base, ArtConfig.fabric_speckle)
 		"plastic", "electronics":
 			speckle(s.bounds, base, 0.04, 0.04)
 

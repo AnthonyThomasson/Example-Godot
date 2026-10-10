@@ -36,7 +36,7 @@ extends Node2D
 ## When false, the search-coverage overlay (room sample points a searcher is seeing / still to see) is hidden.
 @export var show_search: bool = true
 ## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
-@export var show_nav_holes: bool = true
+@export var show_nav_holes: bool = false
 
 ## The house defender, dropped into one of the generated rooms.
 const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")

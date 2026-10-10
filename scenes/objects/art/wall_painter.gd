@@ -7,8 +7,6 @@ extends RefCounted
 ## symmetric across the thickness, so it reads the same whichever side of a wall faces a room.
 ## Options (`art_opts`, defaulting to ObjectArtConfig.wall_*): `pattern` ("plaster" | "brick").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 
 ## Paint one wall tile onto `c` in `base` (x along the wall, y across it).
 static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:

@@ -17,10 +17,15 @@ Objects *compose* these components; Physics imports nothing outward.
   the component only hands momentum to the kinematic character on contact
   (`impact_transfer_scale`).
 - `Deformable` — records local impacts (dents / carved "missing pieces") and emits `changed`; the
-  owner redraws + rebuilds its collider from the same deformed polygon.
+  owner redraws + rebuilds its collider from the same deformed polygon. `record(hit, turn)` stores
+  the impact un-turned by `turn`, for a body drawn turned beyond its node rotation (a character
+  facing its aim); the owner turns the impacts back when drawing.
 - `Deformation` — the polygon math + drawing (shared by furniture and walls). `draw_shape` takes
   an optional `texture`: the deformed polygon is then drawn textured (UVs from the intact
-  footprint, so dents cut into the image), tinted darker by damage, without the smooth outline.
+  footprint, so dents cut into the image), tinted darker by damage, without the smooth outline;
+  `texture_angle` turns the image within the unturned silhouette (a round body facing any way);
+  with `marks` false the hit marks are left to the caller's `draw_marks`, to draw over parts
+  layered on top.
   `draw_wall` takes an optional repeating `texture` + `tile_length`: UVs run in the segment's own
   frame (u along the wall per tile, v across its thickness), so the tile follows every wall.
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on

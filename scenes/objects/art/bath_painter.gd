@@ -6,8 +6,6 @@ extends RefCounted
 ## front and one side, a shower head on its arm and a soap dish. Options (`art_opts`):
 ## `style` ("tub" | "shower").
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
-
 const _TRAY_HEIGHT := 1  ## Heights for cast shadows.
 const _RIM_HEIGHT := 5
 const _FIXTURE_HEIGHT := 8

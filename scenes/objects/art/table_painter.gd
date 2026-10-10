@@ -8,7 +8,6 @@ extends RefCounted
 ## axis), `gaps` (open slats, as on a bench) and `props`. A table is symmetric, so its facing only
 ## turns the plank direction with the footprint.
 
-const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
 const Props = preload("res://scenes/objects/art/props.gd")
 
 const _TOP_HEIGHT := 2     ## Tabletop height, for cast shadows.
@@ -54,9 +53,9 @@ static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary
 		var shift := c.rng.randf_range(-0.05, 0.05)
 		var tone := base.lightened(shift) if shift > 0.0 else base.darkened(-shift)
 		c.paint_over(r, tone)
-		c.grain(PixelCanvas.rounded(r, 0), along_x, ObjectArtConfig.wood_grain_density,
+		c.grain(PixelCanvas.rounded(r, 0), along_x, ArtConfig.wood_grain_density,
 				tone.darkened(0.12), tone.lightened(0.06))
-		if c.rng.randf() < ObjectArtConfig.wood_knot_chance and b - a >= 4 and length >= 12:
+		if c.rng.randf() < ArtConfig.wood_knot_chance and b - a >= 4 and length >= 12:
 			var k_along := c.rng.randi_range(5, length - 6)
 			var k_across := (a + b) / 2
 			var kp := Vector2i(k_along, k_across) if along_x else Vector2i(k_across, k_along)
@@ -93,7 +92,7 @@ static func _inset(c: PixelCanvas, radius: int, base: Color, t: Dictionary, opts
 	var inner := PixelCanvas.rounded(inner_rect, maxi(radius - 1, 1))
 	var inlay := base.darkened(0.1)
 	c.fill(inner, inlay)
-	c.grain(inner, c.w >= c.h, ObjectArtConfig.wood_grain_density, inlay.darkened(0.12), inlay.lightened(0.05))
+	c.grain(inner, c.w >= c.h, ArtConfig.wood_grain_density, inlay.darkened(0.12), inlay.lightened(0.05))
 	c.bevel(inner, 1, 1, t.shadow, t.light)
 	c.bevel(inner, 2, 2, t.dark, inlay)
 
@@ -111,7 +110,7 @@ static func _runner(c: PixelCanvas) -> void:
 	var rt := PixelCanvas.tones(col)
 	var r := Rect2i(1, a, length - 2, width) if along_x else Rect2i(a, 1, width, length - 2)
 	c.fill(PixelCanvas.rounded(r, 0), col, _RUNNER_HEIGHT)
-	c.speckle(r, col, ObjectArtConfig.fabric_speckle)
+	c.speckle(r, col, ArtConfig.fabric_speckle)
 	for i in range(1, length - 1):
 		for s in [a, a + width - 1]:
 			_dot(c, along_x, i, s, rt.dark)
