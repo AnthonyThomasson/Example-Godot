@@ -4,8 +4,9 @@ extends CharacterBody2D
 ## inventory, and the knockback it takes from shoves. It reads its intent from a pluggable
 ## controller child (any node with a `control(character, delta)` method): the controller
 ## writes `move_input` / `aim_point` and calls `melee/shoot/select_slot`. Drawing
-## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd, and the living
-## motion of head, shoulders and hands in character_pose.gd (stepped here each physics frame).
+## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd, the living
+## motion of head, shoulders and hands in character_pose.gd (stepped here each physics frame), and
+## the body's fall on death in character_ragdoll.gd (stepped here once dead).
 
 ## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
 @export var radius: float = 14.0  ## Body circle radius (px).
@@ -30,6 +31,8 @@ var facing := Vector2.RIGHT
 ## The body's living motion (head, shoulders and hands chasing `facing`); read by the hands and
 ## visuals.
 var pose: CharacterPose = CharacterPose.new()
+## The falling body once dead (null while alive): stepped here, drawn by the visuals.
+var ragdoll: CharacterRagdoll
 
 ## Intent, written each frame by the controller.
 var move_input := Vector2.ZERO   ## Desired move direction (already 0–1 length).
@@ -65,6 +68,7 @@ signal interaction_changed(active: bool, label: String)
 ## `is_busy()` / `interaction_label()`.
 const CharacterInteraction = preload("res://scenes/interaction/character_interaction.gd")
 const CharacterPose = preload("res://scenes/character/character_pose.gd")
+const CharacterRagdoll = preload("res://scenes/character/character_ragdoll.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -102,7 +106,7 @@ func _ready() -> void:
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
-		velocity = Vector2.ZERO
+		ragdoll.step(delta, get_world_2d().direct_space_state, global_position)
 		return
 
 	# Pull intent from the controller first, so facing/movement use this frame's input.
@@ -141,16 +145,18 @@ func _physics_process(delta: float) -> void:
 
 ## Melee with the held item (F): runs its primary action. Ignored while locked in an interaction.
 func melee() -> void:
-	if is_busy():
+	var item := current_item()
+	if is_busy() or item == null:
 		return
-	current_item().primary(self)
+	item.primary(self)
 
 
 ## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction.
 func shoot() -> void:
-	if is_busy():
+	var item := current_item()
+	if is_busy() or item == null:
 		return
-	current_item().secondary(self)
+	item.secondary(self)
 
 
 ## Switch to inventory slot `slot`. Ignored while locked. The held item is read on demand via
@@ -312,7 +318,7 @@ func take_hit(hit: HitInfo) -> void:
 	_deformable.record(hit, pose.torso_angle)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
 	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
-	_apply_damage(hit.damage)
+	_apply_damage(hit.damage, hit.direction)
 
 
 ## Reduce health by `amount`; called by the punch path (projectile path goes through take_hit).
@@ -320,24 +326,44 @@ func take_damage(amount: float) -> void:
 	_apply_damage(amount)
 
 
-## Apply `amount` of damage to health (shared by the punch and projectile paths), dying at zero.
-func _apply_damage(amount: float) -> void:
+## Apply `amount` of damage to health (shared by the punch and projectile paths), dying at zero;
+## `direction` is the blow's (zero when unknown), which the body falls along.
+func _apply_damage(amount: float, direction := Vector2.ZERO) -> void:
 	if is_dead:
 		return
 	health = maxf(health - amount, 0.0)
 	if health == 0.0:
-		_die()
+		_die(direction)
 
 
-## Mark the character dead and halt its motion, emitting `died` for observers.
-func _die() -> void:
+## Mark the character dead and let the body fall: the ragdoll takes over from the live pose with the
+## momentum it had (walk + any shove, including the killing blow's), toppling along `direction`, and
+## the hand lets go of what it held. Emits `died` for observers.
+func _die(direction: Vector2) -> void:
 	is_dead = true
+	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
+	# punches, sight lines and the dropped item, all on layer 1) pass right over it instead of being
+	# blocked, and draw it beneath them.
+	collision_layer = 0
+	z_index = CharacterConfig.ragdoll_z_index
+	end_interaction()
+	var momentum := move_input * speed * _push_slow + _knockback
+	ragdoll = CharacterRagdoll.new(self, momentum, direction)
+	_drop_item(momentum)
 	velocity = Vector2.ZERO
 	_knockback = Vector2.ZERO
-	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
-	# punches and sight lines, all on layer 1) pass right over it instead of being blocked.
-	collision_layer = 0
 	died.emit()
+
+
+## Let go of the held item: it flies off with the body's `momentum` plus a toss, and leaves the
+## inventory if it left something behind in the world.
+func _drop_item(momentum: Vector2) -> void:
+	var item := current_item()
+	if item == null:
+		return
+	var toss := Vector2.from_angle(randf() * TAU) * CharacterConfig.ragdoll_drop_toss * randf_range(0.5, 1.0)
+	if item.drop(self, momentum + toss):
+		_items.erase(_current_slot)
 
 
 ## Total accumulated hit damage this character has taken, read from its deformation record. Lets a

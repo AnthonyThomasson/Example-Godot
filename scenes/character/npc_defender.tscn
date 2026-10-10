@@ -15,6 +15,8 @@ hostile_on_attack = true
 body_color = Color(0.5, 0.8, 0.4, 1)
 hair_color = Color(0.18, 0.22, 0.35, 1)
 hair_style = "cap"
+pants_color = Color(0.55, 0.5, 0.36, 1)
+shoe_color = Color(0.3, 0.2, 0.12, 1)
 
 [node name="AgentDebug" parent="."]
 label_color = Color(0.7, 1, 0.6, 1)

@@ -51,11 +51,28 @@ func secondary(user) -> void:
 ## character's weapon_facing() (trailing the aim a touch as it turns): lit for the nearest lighting
 ## step, drawn rotated to the exact angle.
 func draw_weapon(canvas: CanvasItem, user) -> void:
-	var hand_pos: Vector2 = user.hand_position(WEAPON_HAND)
 	var facing: Vector2 = user.weapon_facing()
+	_draw_art(canvas, user.hand_position(WEAPON_HAND) + facing * (ART_SIZE.y * 0.5 - GRIP_BACK), facing)
+
+
+## The dead hand lets go: the pistol leaves from where it was drawn and skids off at `velocity`.
+func drop(user, velocity: Vector2) -> Node2D:
+	var facing: Vector2 = user.weapon_facing()
+	var hand: Vector2 = user.hand_world(WEAPON_HAND)
+	var at := hand + facing * (ART_SIZE.y * 0.5 - GRIP_BACK)
+	return DroppedItem.spawn(self, at, facing.angle(), velocity, user.world_root(), hand)
+
+
+## The pistol lying loose, centered at `at`, its muzzle along `angle`.
+func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color = Color.WHITE) -> void:
+	_draw_art(canvas, at, Vector2.from_angle(angle), modulate)
+
+
+## The pistol's art centered at `centre`, muzzle along `facing`: lit for the nearest lighting step,
+## drawn rotated to the exact angle.
+func _draw_art(canvas: CanvasItem, centre: Vector2, facing: Vector2, modulate: Color = Color.WHITE) -> void:
 	var angle := facing.angle() - PI * 0.5
 	var tex := PixelArt.render_turned(PistolPainter, ART_SIZE, color, PixelArt.snap_angle(angle), "metal")
-	var centre := hand_pos + facing * (ART_SIZE.y * 0.5 - GRIP_BACK)
 	canvas.draw_set_transform(centre, angle, Vector2.ONE)
-	canvas.draw_texture_rect(tex, Rect2(-ART_SIZE * 0.5, ART_SIZE), false)
+	canvas.draw_texture_rect(tex, Rect2(-ART_SIZE * 0.5, ART_SIZE), false, modulate)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

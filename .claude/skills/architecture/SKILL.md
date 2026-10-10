@@ -96,9 +96,17 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 through the dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
 	 and `Physics.spawn_blood(...)` (character, on a hit).
+   - `Ragdoll` (`RefCounted`, character on death): a generic 3D point-mass body over the floor plane
+	 (x/y + height z). Built with `add_point(at, radius, mass)`, `add_bone(a, b)` / `add_rigid(indices)`,
+	 `add_frame(origin, up, right, forward_hint)`, `add_swing(frame, joint, child, rest, limits)`
+	 (cone limit) and `add_hinge(frame, parent, joint, child, rest, bend, min, max, slack)` (one-way
+	 hinge), seeded with `push(i, v)`, stepped with `step(delta, space, origin)` until `asleep`; read
+	 with `point(i)` / `point_count()` / `frame_basis(f)`; `exclude` lists colliders its wall sweep
+	 ignores. The Character domain owns the humanoid skeleton built on it.
    - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
 	 (`deform_depth_per_damage`, `deform_max_depth`, `deform_chunk_damage`, `deform_max_impacts`,
-	 `deform_update_collider`) that Objects reads directly when recording damage.
+	 `deform_update_collider`) that Objects reads directly when recording damage, and the ragdoll
+	 solver's `ragdoll_*` tuning (read only by `Ragdoll` itself).
    Physics imports nothing from other domains.
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
@@ -109,7 +117,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `aiming_hands()` (held
    steady by the character's pose), `primary(user)` (F),
-   `secondary(user)` (LMB), `draw_weapon(canvas, user)`. `ItemRegistry.create(id)` /
+   `secondary(user)` (LMB), `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
+   as its user dies: the pistol leaves a skidding `DroppedItem` in the world, the default leaves
+   nothing) and `draw_dropped(canvas, at, angle, modulate)` (how it looks lying loose). The character
+   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id)` /
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
    `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
@@ -126,8 +137,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
    (aim and visible wounds are things it perceives).
    `player_controller.gd` is the human one and
    is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
-   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot) and
-   `interaction_changed(active, label)`. Observers (debug HUD, match HUD, camera) attach by
+   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
+   `interaction_changed(active, label)` and `died` (with `is_dead` / `health` to read; a dead body
+   falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
@@ -225,8 +237,8 @@ UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Charac
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
 `Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
 only on Godot's `Image`). Tuning is split into six `class_name` static holders: `BallisticsConfig`
-(projectile), `PhysicsConfig` (impact + deformation), `CharacterConfig` (walking push + punch +
-the character's art), `BloodConfig` (blood pooling), `ArtConfig` (the shared pixel-art light,
+(projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
+push + punch + the character's art, pose and fall), `BloodConfig` (blood pooling), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes) and `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles). There is no `Config` autoload. A seventh static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`

@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, hands, the punch, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands, punch hit detection, or the player/NPC scene wiring. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, hands, the punch, death and the ragdoll fall, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands, punch hit detection, death / the fallen body, or the player/NPC scene wiring. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -20,10 +20,11 @@ its own child `Node2D`.
 - **Animate** (`character_hands.gd`, a child `Node2D`) owns hand geometry, the punch tween, and
   punch hit detection; exposes `hand_position(i)` and the `punched` signal. `character_pose.gd`
   (a `RefCounted` the character owns as `pose`) owns the living motion of head, shoulders and
-  hands (below).
+  hands (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
 - **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the shoulders, the head (with
   its shadow on the shoulders), then `item.draw_weapon()`, then the hands the held item wants
-  shown (on top, gripping the weapon), then the wound marks over all of it.
+  shown (on top, gripping the weapon), then the wound marks over all of it. Once dead it draws the
+  fallen body instead (below).
 
 ## Pose (the living motion)
 
@@ -50,6 +51,53 @@ frame's pose.
   hand, weapon, free hands and shoulders; lag catch, hand pace spread, stride, sway, hand swing, aim
   drift, bob, lean, breath, glance, recoil).
 
+## Death and the fall (the ragdoll)
+
+`_apply_damage(amount, direction)` (shared by `take_hit`, which passes the shot's direction, and
+`take_damage`, the punch path) calls `_die(direction)` at zero health. `_die` leaves layer 1 and
+moves to `CharacterConfig.ragdoll_z_index` (beneath the living, above blood pools), ends any
+interaction, builds `ragdoll` from the live pose with the body's momentum (walk + knockback,
+including the killing blow's shove), lets go of the held item (`Item.drop(self, momentum + toss)`;
+a returned node removes the slot, so `current_item()` may be null on a corpse), then emits `died`.
+While dead `_physics_process` only steps the ragdoll (`step(delta, space, global_position)`); the
+pose and hands stop.
+
+`character_ragdoll.gd` builds a humanoid on the Physics domain's generic `Ragdoll` (3D points
+over the floor: local x/y + height z), its indices as consts (`HEAD`, `CHEST`, `PELVIS`, `BELLY`,
+`SPINE`, and per-side pairs `SHOULDER`, `HIP`, `ELBOW`, `HAND`, `KNEE`, `ANKLE`, side 0/1 matching the
+hands):
+- A rigid trunk (chest, pelvis, belly and back, shoulders, hips): the belly/back radii reach just
+  to the trunk's surface so it lies flat on either side. Bones to the head, elbows, fists, knees and
+  ankles.
+- Limits in the trunk's frame (x toward hand 1's shoulder, y up the spine, z out of the chest):
+  swing cones at the neck (rest up), shoulders and hips (rest down, out/in mirrored per side), and
+  one-way hinges at the elbows (bend toward the front) and knees (toward the back), so no joint
+  ever bends backward. Ranges are `CharacterConfig.ragdoll_*_limits` / `_bend` / `_slack` (degrees).
+- Starts in the live pose: trunk upright turned to `pose.torso_angle`, head at `head_offset`, fists
+  where the hands hold them (elbows by two-bone IK, pointing back and out), feet under the hips
+  fore/aft by the stride (`pose.stride_phase()` / `walk_amount()`), knees a touch bent.
+- Launch: every point carries the momentum, the upper body is pushed along the blow
+  (`ragdoll_hit_topple`, fading to nothing at the hips; weaker and along the momentum or a random
+  way with no blow), the knees buckle forward (`ragdoll_knee_buckle`) and each point gets a random
+  jolt (`ragdoll_jitter`). The legs give out, then the body topples and settles (≈ 2–3 s), then sleeps.
+- Reads for the visuals: `point(i)`, `torso()` (the trunk's basis), `face()`, `toes(i)` (a
+  trunk-frame direction carried onto the bone by the shortest turn), `is_settled()`.
+
+**Drawing the fallen body** (`character_visuals.gd`, `_draw_fallen`): every part from its 3D
+points seen from above, sorted by height (lowest first), so a standing body hides its legs under
+the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
+- Limbs: `limb_painter.gd` capsules along each projected bone, squashed to its projected length —
+  sleeves (`body_color`), forearms and neck (`skin_color`), thighs and shins (`pants_color`), shoes
+  (`shoe_color`, along `toes(i)`). Fists (`HandPainter`) turned along the forearm; the head
+  (`HeadPainter`) turned to where the face looks, or front toward the neck when it looks up or down.
+- The trunk as a box, by the faces turned to the camera, each mapped with a `Transform2D` from its
+  projected axes: the top (the standing `BodyPainter` shoulders, dents and wound marks included),
+  the chest or back (`torso_painter.gd`: shirt with collar and buttons narrowing to a belt, pants on
+  the hips; the back with a seam and the backpack), and a side.
+- A floor shadow per part with each point shifted from the light by its height
+  (`ragdoll_shadow_per_height`), drawn opaque inside a code-built `CanvasGroup` that carries the
+  alpha, so overlaps don't stack. Redrawing stops once the body has settled.
+
 ## Pixel art
 
 The character is top-down pixel art rendered through the Art domain (interface 12):
@@ -75,8 +123,9 @@ The character is top-down pixel art rendered through the Art domain (interface 1
   crossed it before they struck the body: each is re-seated where the shot entered the part, its
   depth scaled by part size / body radius. A hand mid-punch has left its wounds behind.
 - Look exports on `Visuals`: `body_color`, `hand_color` (skin or glove), `skin_color`,
-  `hair_color`, `hair_style`, `backpack`, `pack_color`. The defender preset wears a navy cap; the
-  invader a dark beanie, gloves and a backpack. Proportions/defaults: `CharacterConfig.art_*`.
+  `hair_color`, `hair_style`, `backpack`, `pack_color`, and `pants_color` / `shoe_color` (seen once
+  fallen). The defender preset wears a navy cap, khaki pants and brown shoes; the invader a dark
+  beanie, gloves, a backpack and dark jeans. Proportions/defaults: `CharacterConfig.art_*`.
 
 Ordering: a parent's `_physics_process` runs before its children's, so the hands see the
 character's fresh `facing`, and the character pulls its controller's intent at the top of its own
@@ -128,11 +177,13 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
   damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`
-  (hand 0/1 = melee, −1 = shot), `interaction_changed(active, label)`.
+  (hand 0/1 = melee, −1 = shot), `interaction_changed(active, label)`, `died` (`is_dead`).
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
-- **Character → Art** (interface 12): the body/hand painters render through
+- **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
   `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.
+- **Character → Physics** (interface 4): `Deformable` / `Deformation` for wounds, `spawn_blood` on a
+  hit, and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
   `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`; and reads the item's
-  `aiming_hands()`.
+  `aiming_hands()`, calling its `drop(user, velocity)` on death.

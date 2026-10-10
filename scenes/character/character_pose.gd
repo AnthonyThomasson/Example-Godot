@@ -108,6 +108,16 @@ func hand_offset(hand: int) -> Vector2:
 	return along * (step * CharacterConfig.pose_hand_swing - _recoil[hand])
 
 
+## The walk cycle's phase (rad; one turn per stride).
+func stride_phase() -> float:
+	return _stride
+
+
+## How much the character is walking, 0..1.
+func walk_amount() -> float:
+	return _walk
+
+
 ## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side.
 func kick(hand: int) -> void:
 	_recoil_vel[hand] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq

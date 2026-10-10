@@ -1,7 +1,7 @@
 class_name CharacterConfig
 
-## Tuning for a Character walking into / being shoved by world objects, being shot, and its
-## pixel art (scenes/character/). A `class_name` holder of `static var`s — read as
+## Tuning for a Character walking into / being shoved by world objects, being shot, its
+## pixel art, its pose and its fall on death (scenes/character/). A `class_name` holder of `static var`s — read as
 ## `CharacterConfig.<name>`; there is no instance and no autoload.
 ##
 ## Walking the character body into a pushable object (anything exposing `apply_impulse`
@@ -71,6 +71,68 @@ static var art_shoulder_depth: float = 0.54
 static var art_skin_color: Color = Color(0.93, 0.76, 0.6)
 static var art_hair_color: Color = Color(0.36, 0.24, 0.14)
 static var art_pack_color: Color = Color(0.3, 0.32, 0.26)
+## Default pants and shoe colors (seen once a character falls).
+static var art_pants_color: Color = Color(0.22, 0.27, 0.4)
+static var art_shoe_color: Color = Color(0.16, 0.13, 0.12)
+
+# --- Ragdoll (the fall on death; character_ragdoll.gd, solved by Physics' Ragdoll) ---
+# Lengths are in body radii (a 14 px radius ≈ 0.225 m, half the shoulders), so a body stands
+# ≈ 7.6 radii tall; angles are in degrees.
+static var ragdoll_hip_height: float = 3.95       ## Hip joints above the floor (legs stand a touch bent).
+static var ragdoll_shoulder_height: float = 6.3   ## Shoulder joints above the floor.
+static var ragdoll_head_height: float = 7.2       ## Head center above the floor.
+static var ragdoll_shoulder_width: float = 0.8    ## Each shoulder joint off the spine.
+static var ragdoll_hip_width: float = 0.4         ## Each hip joint off the spine.
+static var ragdoll_belly: float = 0.4             ## Belly and back points off the spine (keep the trunk rigid).
+static var ragdoll_upper_arm: float = 1.35
+static var ragdoll_forearm: float = 1.4           ## Elbow to the center of the fist.
+static var ragdoll_thigh: float = 1.95
+static var ragdoll_shin: float = 1.85             ## Knee to ankle.
+static var ragdoll_foot: float = 1.0              ## Shoe length.
+## Collision radii: the trunk's is half its depth, so it lies on its back or front with thickness.
+static var ragdoll_torso_radius: float = 0.5
+static var ragdoll_head_radius: float = 0.38
+static var ragdoll_limb_radius: float = 0.24
+## Point masses (relative): a heavy trunk (seven points), lighter limbs toward their ends.
+static var ragdoll_torso_mass: float = 1.0
+static var ragdoll_head_mass: float = 0.8
+static var ragdoll_elbow_mass: float = 0.25
+static var ragdoll_hand_mass: float = 0.15
+static var ragdoll_knee_mass: float = 0.6
+static var ragdoll_ankle_mass: float = 0.35
+## Drawn thickness of the neck and each limb (body radii).
+static var ragdoll_neck_width: float = 0.42
+static var ragdoll_upper_arm_width: float = 0.46
+static var ragdoll_forearm_width: float = 0.38
+static var ragdoll_thigh_width: float = 0.62
+static var ragdoll_shin_width: float = 0.5
+static var ragdoll_foot_width: float = 0.42
+## How far the drawn trunk reaches below the hip joints and above the shoulder joints (body radii).
+static var ragdoll_torso_below_hips: float = 0.35
+static var ragdoll_torso_above_shoulders: float = 0.25
+## Joint limits: how far each bone may swing off its rest (neck up; arms and legs down) toward the
+## front / back / the body's outside / across it, and each hinge's bend range plus the twist out of
+## its plane it allows (the elbow's stands in for the upper arm's roll; the knee barely twists).
+static var ragdoll_neck_limits: Dictionary = { "front": 50.0, "back": 45.0, "out": 40.0, "in": 40.0 }
+static var ragdoll_shoulder_limits: Dictionary = { "front": 170.0, "back": 60.0, "out": 160.0, "in": 40.0 }
+static var ragdoll_hip_limits: Dictionary = { "front": 120.0, "back": 25.0, "out": 35.0, "in": 30.0 }
+static var ragdoll_elbow_bend: Vector2 = Vector2(0.0, 145.0)
+static var ragdoll_elbow_slack: float = 70.0
+static var ragdoll_knee_bend: Vector2 = Vector2(0.0, 150.0)
+static var ragdoll_knee_slack: float = 20.0
+## The fall's launch: the upper body's push along the killing blow (px/s at the shoulders, fading
+## to none at the hips), the knees' forward buckle (px/s), a random jolt on every point (px/s), and
+## how far the feet stand fore and aft mid-stride at full walking speed (body radii).
+static var ragdoll_hit_topple: float = 60.0
+static var ragdoll_knee_buckle: float = 70.0
+static var ragdoll_jitter: float = 15.0
+static var ragdoll_stride: float = 0.5
+## Speed (px/s) a held item is tossed off at as the hand lets go, on top of the body's momentum.
+static var ragdoll_drop_toss: float = 70.0
+## A fallen part's floor shadow shift per px of height (matches the standing drop shadow).
+static var ragdoll_shadow_per_height: float = 0.03
+## Draw layer of a dead body: beneath the living, above blood pools.
+static var ragdoll_z_index: int = -1
 
 # --- Pose (the living motion of head, shoulders, hands and weapon; see character_pose.gd) ---
 # Each part chases `facing` on a damped spring: `freq` is how fast (rad/s), `damping` how much it

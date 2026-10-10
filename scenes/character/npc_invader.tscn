@@ -19,6 +19,7 @@ hand_color = Color(0.16, 0.16, 0.18, 1)
 hair_color = Color(0.16, 0.16, 0.18, 1)
 hair_style = "beanie"
 backpack = true
+pants_color = Color(0.15, 0.17, 0.22, 1)
 
 [node name="AgentDebug" parent="."]
 label_color = Color(1, 0.6, 0.55, 1)

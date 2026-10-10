@@ -1,6 +1,6 @@
 ---
 name: domain-physics
-description: Deep implementation detail for the Physics System domain (scenes/physics/) — physical reactions: forces, knockback, deformation, debris, blood pooling. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, or PhysicsConfig/BloodConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Physics System domain (scenes/physics/) — physical reactions: forces, knockback, deformation, debris, blood pooling, and the generic 3D ragdoll solver. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, Ragdoll (joint limits, floor/wall contact, sleeping), or PhysicsConfig/BloodConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Physics System domain
@@ -31,6 +31,34 @@ Objects *compose* these components; Physics imports nothing outward.
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on
   `Despawner`.
 
+## Ragdoll (a generic 3D body falling to the floor)
+
+`ragdoll.gd` (`class_name Ragdoll`, `RefCounted`) knows nothing of what the body is; the owner (the
+Character domain's humanoid) builds and steps it. Space is the owner's local floor plane (x, y)
+plus z = height; gravity pulls to z = 0.
+- Building: `add_point(at, radius, mass)`, `add_bone(a, b, stiffness)` (rest length = current
+  distance), `add_rigid(indices)` (all pairs), `add_frame(origin, up, right, forward_hint)` (an
+  orthonormal frame read off three points every step; forward signed by the hint),
+  `add_swing(frame, joint, child, rest, {right, left, front, back})` (a cone around `rest` along the
+  frame's y, its reach toward each frame axis in radians, blended linearly by direction between
+  them) and `add_hinge(frame, parent, joint, child, rest, bend, min, max, slack)` (a one-way hinge:
+  the bend side `bend` is carried onto the live parent bone by the shortest turn from `rest`; the
+  child's bend off straight is held to [min, max] and its twist off that plane to ±slack).
+  `push(i, v)` seeds velocities; `exclude` lists colliders the wall sweep ignores.
+- `step(delta, space, origin)`: position-based dynamics in `ragdoll_substeps` sub-steps — predict
+  under gravity and air drag; `ragdoll_iterations` passes of bones, limits and the floor (limits
+  correct `LIMIT_STIFFNESS` of the error per pass, turning a bone at most `LIMIT_MAX_TURN`, split
+  by inverse mass); sweep each point's x/y move against layer 1 with `cast_motion` (stop + slide);
+  then derive velocities. A point leaves the constraints no faster than it came in plus
+  `ragdoll_max_push` (and never past `ragdoll_max_speed`), so constraints fighting the floor can't
+  fling the body. Floor contact bounces (`ragdoll_floor_bounce`) and skids to a stop
+  (`ragdoll_floor_friction`); `ragdoll_joint_friction` pulls each limited child's velocity toward
+  its joint's so limbs swing heavy. The first step pulls any point that starts inside a wall back
+  toward the origin.
+- Sleeps once every point stays under `ragdoll_sleep_speed` for `ragdoll_sleep_time`, or after
+  `ragdoll_max_time`; then `asleep` is true and `step` does nothing.
+- Reading: `point(i)`, `point_count()`, `frame_basis(f)`.
+
 ## Blood pooling (self-contained, separate from debris/deformation)
 
 `BloodSpawner` / `BloodPool` / `BloodPoolVisuals`. `Physics.spawn_blood(parent, hit, exclude,
@@ -47,11 +75,12 @@ blood. Only the character's `take_hit` calls it (furniture bleeds no blood).
 
 ## Tuning
 
-`PhysicsConfig` tunes impact + deformation; `BloodConfig` tunes blood pooling. Both are
-`class_name` static holders — there is no `Config` autoload.
+`PhysicsConfig` tunes impact + deformation and the ragdoll solver (`ragdoll_*`); `BloodConfig`
+tunes blood pooling. Both are `class_name` static holders — there is no `Config` autoload.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
   call `Physics.impact_impulse` / `Physics.spawn_debris`. The character's `take_hit` calls
-  `Physics.spawn_blood`. Debris / casings despawn via the Despawner.
+  `Physics.spawn_blood`, and its death builds its fallen body on a `Ragdoll`. Debris / casings
+  despawn via the Despawner.

@@ -63,6 +63,8 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _character.is_dead:
+		return  # The fallen body's fists are the ragdoll's.
 	# Track the current reach from the held item.
 	var item: Item = _character.current_item()
 	if item:
