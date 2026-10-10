@@ -11,6 +11,7 @@ class_name BloodConfig
 ## wide while a lone wound stays small. Total volume per pool is capped at `max_pool_volume`. A body
 ## that moves off its pool (farther than its radius + `detection_margin`) starts a fresh one, so it
 ## trails blood. Drops creep out from the wound, slide around walls and furniture, and settle there.
+## A dead body also bleeds out one slow, wide pool (`bleed_out_*`) from where it came to rest.
 
 ## Drops one hit adds. Also the density reference: `pool_radius_base` holds about this many drops, and
 ## the disc widens only for volume beyond the first hit, so a single wound stays a small solid pool.
@@ -21,6 +22,11 @@ static var max_pool_volume: int = 420
 ## Seconds one hit's worth of drops takes to emerge. Sets the steady release rate
 ## (particle_count / spill_duration drops per second); lower = blood appears faster.
 static var spill_duration: float = 6.0
+## A body bleeding out where it came to rest after death (Physics.bleed_out): how many drops it
+## holds, the seconds they take to emerge, and how wide the pool spreads (px).
+static var bleed_out_volume: int = 180
+static var bleed_out_duration: float = 10.0
+static var bleed_out_radius: float = 45.0
 ## Radius (px) a single wound's pool fills — the small "immediate surroundings" puddle.
 static var pool_radius_base: float = 13.0
 ## Radius (px) a pool grows to at most, reached when a body is bled repeatedly in one spot.

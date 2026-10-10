@@ -95,7 +95,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 optional for a caller drawing them over later layers with `draw_marks` — so pixel art is drawn
 	 through the dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
-	 and `Physics.spawn_blood(...)` (character, on a hit).
+	 and `Physics.spawn_blood(...)` (character, on a hit), `Physics.bleed_out(parent, source, exclude)`
+	 (a dead character, once its body comes to rest: one slow, wide pool). A blood source may expose
+	 `blood_origin() -> Vector2` (where its blood leaves it, in world space); pools emerge there instead
+	 of at its position, so a fallen body bleeds from where it lies.
    - `Ragdoll` (`RefCounted`, character on death): a generic 3D point-mass body over the floor plane
 	 (x/y + height z). Built with `add_point(at, radius, mass)`, `add_bone(a, b)` / `add_rigid(indices)`,
 	 `add_frame(origin, up, right, forward_hint)`, `add_swing(frame, joint, child, rest, limits)`
@@ -119,7 +122,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    steady by the character's pose), `primary(user)` (F),
    `secondary(user)` (LMB), `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
    as its user dies: the pistol leaves a skidding `DroppedItem` in the world, the default leaves
-   nothing) and `draw_dropped(canvas, at, angle, modulate)` (how it looks lying loose). The character
+   nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
+   is which side landed up). The character
    calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id)` /
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,

@@ -38,3 +38,10 @@ static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> voi
 static func spawn_blood(parent: Node, hit: HitInfo, exclude: Array, source: Node2D, active: Node) -> Node:
 	var spill := hit.normal if hit.normal.length() > 0.001 else -hit.direction
 	return BloodSpawner.add_blood(active, hit.position, spill, parent, exclude, source)
+
+
+## Start a dead body's bleed-out: one slow, wide pool (BloodConfig.bleed_out_*) spreading from where
+## its blood leaves it — `source.blood_origin()` if it has one (where it lies), else its position —
+## added under `parent`. `exclude` is the body's RID(s). Returns the pool.
+static func bleed_out(parent: Node, source: Node2D, exclude: Array) -> Node:
+	return BloodSpawner.bleed(parent, source, exclude)

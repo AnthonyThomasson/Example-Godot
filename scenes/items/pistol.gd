@@ -7,6 +7,9 @@ class_name PistolItem extends Item
 
 const WEAPON_HAND := 1
 const PistolPainter = preload("res://scenes/items/pistol_painter.gd")
+const PistolFlatPainter = preload("res://scenes/items/pistol_flat_painter.gd")
+## The pistol's footprint lying flat on its side (px): its profile across, its length along.
+const FLAT_SIZE := Vector2(9.0, 14.0)
 ## Pistol sprite footprint (px): width across, length from grip to muzzle.
 const ART_SIZE := Vector2(5.0, 13.0)
 ## How far the grip end sits behind the hand's center (px).
@@ -63,16 +66,23 @@ func drop(user, velocity: Vector2) -> Node2D:
 	return DroppedItem.spawn(self, at, facing.angle(), velocity, user.world_root(), hand)
 
 
-## The pistol lying loose, centered at `at`, its muzzle along `angle`.
-func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color = Color.WHITE) -> void:
-	_draw_art(canvas, at, Vector2.from_angle(angle), modulate)
+## The pistol lying flat on its side, centered at `at`, its muzzle along `angle`; `opts.flip` picks
+## the side facing up.
+func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color = Color.WHITE,
+		opts: Dictionary = {}) -> void:
+	var turn := angle - PI * 0.5
+	var tex := PixelArt.render_turned(PistolFlatPainter, FLAT_SIZE, color, PixelArt.snap_angle(turn), "metal",
+		{ "flip": opts.get("flip", false) })
+	canvas.draw_set_transform(at, turn, Vector2.ONE)
+	canvas.draw_texture_rect(tex, Rect2(-FLAT_SIZE * 0.5, FLAT_SIZE), false, modulate)
+	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The pistol's art centered at `centre`, muzzle along `facing`: lit for the nearest lighting step,
-## drawn rotated to the exact angle.
-func _draw_art(canvas: CanvasItem, centre: Vector2, facing: Vector2, modulate: Color = Color.WHITE) -> void:
+## The pistol's held art centered at `centre`, muzzle along `facing`: lit for the nearest lighting
+## step, drawn rotated to the exact angle.
+func _draw_art(canvas: CanvasItem, centre: Vector2, facing: Vector2) -> void:
 	var angle := facing.angle() - PI * 0.5
 	var tex := PixelArt.render_turned(PistolPainter, ART_SIZE, color, PixelArt.snap_angle(angle), "metal")
 	canvas.draw_set_transform(centre, angle, Vector2.ONE)
-	canvas.draw_texture_rect(tex, Rect2(-ART_SIZE * 0.5, ART_SIZE), false, modulate)
+	canvas.draw_texture_rect(tex, Rect2(-ART_SIZE * 0.5, ART_SIZE), false)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

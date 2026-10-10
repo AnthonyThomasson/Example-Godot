@@ -100,16 +100,20 @@ static var ragdoll_elbow_mass: float = 0.25
 static var ragdoll_hand_mass: float = 0.15
 static var ragdoll_knee_mass: float = 0.6
 static var ragdoll_ankle_mass: float = 0.35
-## Drawn thickness of the neck and each limb (body radii).
+## Drawn thickness of the fallen body's limbs (body radii), at each joint down the chain: the neck;
+## the arm at the shoulder, elbow and wrist; the leg at the hip, knee, calf and ankle; the shoe at
+## the heel and toe. Neighbouring segments share a joint's width, so limbs taper smoothly.
 static var ragdoll_neck_width: float = 0.42
-static var ragdoll_upper_arm_width: float = 0.46
-static var ragdoll_forearm_width: float = 0.38
-static var ragdoll_thigh_width: float = 0.62
-static var ragdoll_shin_width: float = 0.5
-static var ragdoll_foot_width: float = 0.42
-## How far the drawn trunk reaches below the hip joints and above the shoulder joints (body radii).
-static var ragdoll_torso_below_hips: float = 0.35
-static var ragdoll_torso_above_shoulders: float = 0.25
+static var ragdoll_arm_widths: Array = [0.48, 0.36, 0.3]
+static var ragdoll_leg_widths: Array = [0.66, 0.46, 0.52, 0.32]
+static var ragdoll_shoe_widths: Array = [0.38, 0.34]
+## The fallen trunk's shape: cross-sections along the spine, each Vector3(where along it — 0 at the
+## hip joints, 1 at the shoulder joints —, half-width, half-depth in body radii), bottom to top. Its
+## outline is the hull of each neighbouring pair, so it is waisted and rounded at both ends.
+static var ragdoll_trunk_sections: Array = [
+	Vector3(-0.15, 0.62, 0.42), Vector3(0.0, 0.74, 0.5), Vector3(0.45, 0.64, 0.45),
+	Vector3(0.8, 0.9, 0.55), Vector3(1.0, 1.0, 0.54), Vector3(1.1, 0.78, 0.4),
+]
 ## Joint limits: how far each bone may swing off its rest (neck up; arms and legs down) toward the
 ## front / back / the body's outside / across it, and each hinge's bend range plus the twist out of
 ## its plane it allows (the elbow's stands in for the upper arm's roll; the knee barely twists).

@@ -17,6 +17,23 @@ static func add_blood(active: Node, position: Vector2, direction: Vector2, paren
 		active.add_hit(direction)
 		return active
 
+	var pool := _new_pool(position, parent)
+	pool.seed(direction, exclude, source)
+	return pool
+
+
+## Start `source`'s bleed-out pool where its blood leaves it (`blood_origin()`, else its position):
+## a set volume (BloodConfig.bleed_out_*) oozing slowly into a wide pool. Returns the pool.
+static func bleed(parent: Node, source: Node2D, exclude: Array) -> Node:
+	var at: Vector2 = source.blood_origin() if source.has_method("blood_origin") else source.global_position
+	var pool := _new_pool(at, parent)
+	pool.seed_bleed_out(BloodConfig.bleed_out_volume, BloodConfig.bleed_out_duration,
+		BloodConfig.bleed_out_radius, exclude, source)
+	return pool
+
+
+## A fresh, empty, Despawner-tracked pool (with its draw layer) at world `position` under `parent`.
+static func _new_pool(position: Vector2, parent: Node) -> Node:
 	var pool := Node2D.new()
 	pool.name = "BloodPool"
 	pool.script = BloodPool
@@ -27,10 +44,8 @@ static func add_blood(active: Node, position: Vector2, direction: Vector2, paren
 	pool.add_child(visuals)
 
 	parent.add_child(pool)
-	# `position` is a world contact point; place the pool there regardless of the parent's
-	# transform (a world-root parent may be offset from the origin).
+	# `position` is a world point; place the pool there regardless of the parent's transform (a
+	# world-root parent may be offset from the origin).
 	pool.global_position = position
 	Despawner.track(pool)
-
-	pool.seed(direction, exclude, source)
 	return pool

@@ -33,6 +33,8 @@ var facing := Vector2.RIGHT
 var pose: CharacterPose = CharacterPose.new()
 ## The falling body once dead (null while alive): stepped here, drawn by the visuals.
 var ragdoll: CharacterRagdoll
+## True once the dead body has come to rest and started bleeding out.
+var _bled_out := false
 
 ## Intent, written each frame by the controller.
 var move_input := Vector2.ZERO   ## Desired move direction (already 0–1 length).
@@ -107,6 +109,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if is_dead:
 		ragdoll.step(delta, get_world_2d().direct_space_state, global_position)
+		if ragdoll.is_settled() and not _bled_out:
+			_bled_out = true
+			Physics.bleed_out(get_parent(), self, [get_rid()])
 		return
 
 	# Pull intent from the controller first, so facing/movement use this frame's input.
@@ -364,6 +369,15 @@ func _drop_item(momentum: Vector2) -> void:
 	var toss := Vector2.from_angle(randf() * TAU) * CharacterConfig.ragdoll_drop_toss * randf_range(0.5, 1.0)
 	if item.drop(self, momentum + toss):
 		_items.erase(_current_slot)
+
+
+## Where this body's blood leaves it (world): its position while alive; once fallen, the middle of
+## the trunk where it lies. Blood pools sample it, so they spill from the body, not where it stood.
+func blood_origin() -> Vector2:
+	if ragdoll == null:
+		return global_position
+	var mid: Vector3 = (ragdoll.point(CharacterRagdoll.CHEST) + ragdoll.point(CharacterRagdoll.PELVIS)) * 0.5
+	return global_position + Vector2(mid.x, mid.y)
 
 
 ## Total accumulated hit damage this character has taken, read from its deformation record. Lets a

@@ -1,22 +1,18 @@
 extends RefCounted
 
 ## Top-down pixel-art CHARACTER TRUNK painter (Character domain, private; rendered through the Art
-## domain's PixelArt): a fallen body's trunk seen from its front, back or side — the faces that turn
-## toward the camera once the body is down. Canonical frame: shoulders toward −y, hips toward +y,
-## across the body along x. The shirt runs from rounded shoulders to the belt, narrowing to the
-## waist, and pants cover the narrower hips; the front has a collar and buttons, the back a seam and the
-## optional backpack. Options (`opts`, defaulting to CharacterConfig.art_*): `face` ("front" |
-## "back" | "side"), `pants`, `backpack`, `pack`.
+## domain's PixelArt): the surface of a fallen body's trunk seen from its front, back or side, as a
+## full strip the caller maps onto the trunk's rounded outline (which gives it its shape and outline).
+## Canonical frame: shoulders toward −y, hips toward +y, across the body along x. The shirt runs down
+## to the belt and pants cover the hips; the front has a collar and buttons, the back a seam and the
+## optional backpack, the side a seam. Options (`opts`, defaulting to CharacterConfig.art_*): `face`
+## ("front" | "back" | "side"), `pants`, `backpack`, `pack`.
 
 const _PANTS_HEIGHT := 3  ## Heights for cast shadows, floor-up.
 const _SHIRT_HEIGHT := 4
 const _PACK_HEIGHT := 7
 ## Share of the trunk's length the shirt covers, down to the belt.
-const _WAIST := 0.74
-## How far the trunk narrows from the shoulders to the waist, and the hips' width (shares of the
-## shoulders' width; the side view keeps its depth).
-const _WAIST_TAPER := 0.28
-const _HIP_WIDTH := 0.74
+const _WAIST := 0.8
 
 
 ## Paint the trunk's `face` onto `c` with a `base` shirt.
@@ -27,30 +23,13 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	var pt := PixelCanvas.tones(pants)
 	var cx := c.w / 2
 	var waist := roundi(c.h * _WAIST)
-	var side := face == "side"
-	var taper := 0.0 if side else c.w * _WAIST_TAPER * 0.5
-	var round_r := maxf(2.0, c.w * (0.12 if side else 0.2))
-	var hip_in := 0 if side else roundi(c.w * (1.0 - _HIP_WIDTH) * 0.5)
-
-	var hips := PixelCanvas.rounded(Rect2i(hip_in, waist - 2, c.w - hip_in * 2, c.h - waist + 2), 3)
+	var hips := PixelCanvas.rounded(Rect2i(0, waist, c.w, c.h - waist), 0)
 	c.fill(hips, pants, _PANTS_HEIGHT)
 	c.surface(hips, "fabric", pants)
-	c.bevel(hips, 1, 1, pt.light, pt.dark)
-	c.outline(hips, pt.outline)
-
-	# The shirt: rounded shoulders, then easing in toward the waist.
-	var shirt := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, waist + 1), func(x: int, y: int) -> bool:
-		var k := float(y) / maxf(waist, 1.0)
-		var inset := taper * k * k
-		if y < round_r:
-			var dy := round_r - y - 0.5
-			inset += round_r - sqrt(maxf(round_r * round_r - dy * dy, 0.0))
-		return x >= roundi(inset) and x < c.w - roundi(inset))
+	var shirt := PixelCanvas.rounded(Rect2i(0, 0, c.w, waist), 0)
 	c.fill(shirt, base, _SHIRT_HEIGHT)
 	c.surface(shirt, material, base)
-	c.bevel(shirt, 1, 2, t.light, t.dark)
-	c.outline(shirt, t.outline)
-	var belt_in := roundi(taper) + 1
+	var belt_in := 0
 
 	match face:
 		"front":

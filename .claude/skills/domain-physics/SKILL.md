@@ -73,6 +73,13 @@ adding volume and widening its radius toward `pool_radius_max`, capped at `max_p
 still victim shot repeatedly pools out wide, while moving off the pool starts a new one and trails
 blood. Only the character's `take_hit` calls it (furniture bleeds no blood).
 
+Drops emerge at the source's `blood_origin()` when it has one (else its position): the character
+returns its trunk's middle once fallen, so a pool still filling at death flows from the body as it
+falls and rests. Each pool releases at its own rate. `Physics.bleed_out(parent, source, exclude)`
+(`BloodSpawner.bleed`) starts a dead body's bleed-out where its blood leaves it: a pool holding
+`BloodConfig.bleed_out_volume` drops, released over `bleed_out_duration` into a disc of
+`bleed_out_radius`, leaning a random way (`BloodPool.seed_bleed_out`).
+
 ## Tuning
 
 `PhysicsConfig` tunes impact + deformation and the ragdoll solver (`ragdoll_*`); `BloodConfig`
@@ -82,5 +89,6 @@ tunes blood pooling. Both are `class_name` static holders — there is no `Confi
 
 - **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
   call `Physics.impact_impulse` / `Physics.spawn_debris`. The character's `take_hit` calls
-  `Physics.spawn_blood`, and its death builds its fallen body on a `Ragdoll`. Debris / casings
+  `Physics.spawn_blood`, and its death builds its fallen body on a `Ragdoll` and, once it rests,
+  calls `Physics.bleed_out`. Debris / casings
   despawn via the Despawner.

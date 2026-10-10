@@ -39,10 +39,13 @@ When its user dies the character calls `item.drop(user, velocity)`. The base `It
 `Node2D` in the world root) where its art was drawn, pulled back toward the hand (`held_from`) if
 that spot is inside a wall. The dropped item falls from about hand height on a pseudo-height,
 bounces, skids to a stop with a fading spin and glances off walls and solid furniture (circle
-`cast_motion` on layer 1); it draws through `item.draw_dropped(canvas, at, angle, modulate)` over
+`cast_motion` on layer 1); it picks which side lands up once (`flip`) and draws through
+`item.draw_dropped(canvas, at, angle, modulate, opts)` over
 a shadow that closes in as it lands, at `z_index` −1, and stops processing once at rest. Tuning is
 its exports. Visual only: nothing picks it up and the Despawner never frees it. The pistol's
-`draw_weapon` and `draw_dropped` share one `_draw_art`.
+`draw_dropped` paints `pistol_flat_painter.gd` (Items-private): the gun's side profile lying on
+the floor — slide with sights and muzzle, grip raked back off one side (`flip` mirrors it), trigger
+guard — at `FLAT_SIZE`.
 
 ## Link into the Projectile System
 
@@ -53,7 +56,7 @@ The pistol is the one place Items reaches into the Projectile System
 
 - **Items ↔ Character** (interface 6): `Item` (`items/item.gd`) exposes `display_name`, `reach`,
   `visible_hands()`, `aiming_hands()`, `primary(user)` (F), `secondary(user)` (LMB),
-  `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate)`.
+  `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate, opts)`.
   The character API an item may call: `facing`, `punch(hand)`, `hand_position(hand)`,
   `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`,
   `kick(hand)`, `weapon_facing()`.

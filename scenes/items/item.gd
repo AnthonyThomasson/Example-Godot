@@ -47,6 +47,8 @@ func drop(_user, _velocity: Vector2) -> Node2D:
 
 
 ## Draw the item lying loose, centered at `at` on `canvas` and pointing along `angle`, tinted by
-## `modulate` (its art, or its shadow). Default: none.
-func draw_dropped(_canvas: CanvasItem, _at: Vector2, _angle: float, _modulate: Color = Color.WHITE) -> void:
+## `modulate` (its art, or its shadow). `opts` is how it landed, picked once when dropped
+## (`flip`: which side faces up). Default: none.
+func draw_dropped(_canvas: CanvasItem, _at: Vector2, _angle: float, _modulate: Color = Color.WHITE,
+		_opts: Dictionary = {}) -> void:
 	pass

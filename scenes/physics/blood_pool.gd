@@ -7,7 +7,9 @@ extends Node2D
 ## the blood already there. Each hit on the body calls `add_hit`, adding volume and widening the
 ## fill disc (`_spread`) toward BloodConfig.pool_radius_max, so a still victim bled repeatedly pools
 ## out wide while a lone wound stays small; the volume is capped at BloodConfig.max_pool_volume.
-## Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
+## A bleed-out pool (`seed_bleed_out`) instead holds a set volume released slowly into a wide disc.
+## Drops emerge at the source's `blood_origin()` when it has one (a fallen body bleeds from where it
+## lies, not where it stood), else at its position. Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
 
 ## Physics layer the drops avoid — walls and furniture (the default world layer).
 const COLLISION_MASK := 1
@@ -36,6 +38,8 @@ var _source: Node2D
 var _emitted := 0
 ## Fractional drop budget accrued at the emission rate; drops release as it passes whole numbers.
 var _emit_budget := 0.0
+## Drops released per second.
+var _rate := BloodConfig.particle_count / maxf(BloodConfig.spill_duration, 0.001)
 
 ## Reusable query shape (the small circle each drop sweeps with).
 var _probe: CircleShape2D
@@ -71,6 +75,19 @@ func seed(direction: Vector2, exclude: Array, source: Node2D) -> void:
 	_source = source
 	_make_edge_profile()
 	add_hit(direction)
+
+
+## Start a body's bleed-out pool: `volume` drops released over `duration` seconds into a disc of
+## `radius`, leaning a random way. `exclude` and `source` as for `seed`.
+func seed_bleed_out(volume: int, duration: float, radius: float, exclude: Array, source: Node2D) -> void:
+	_exclude = exclude
+	_aim = Vector2.RIGHT.rotated(randf() * TAU)
+	_source = source
+	_make_edge_profile()
+	_count = volume
+	_spread = radius
+	_rate = volume / maxf(duration, 0.001)
+	set_physics_process(true)
 
 
 ## Add one wound's worth of blood: bump the volume (capped) and widen the fill disc from the volume
@@ -146,11 +163,10 @@ func _physics_process(delta: float) -> void:
 		set_physics_process(false)
 
 
-## Release drops at a steady rate (one base pool's worth over BloodConfig.spill_duration), up to the
-## volume accrued so far. Rate-based so added hits keep feeding out smoothly as the pool grows.
+## Release drops at the pool's steady rate, up to the volume accrued so far. Rate-based so added
+## hits keep feeding out smoothly as the pool grows.
 func _release_due(delta: float) -> void:
-	var rate := BloodConfig.particle_count / maxf(BloodConfig.spill_duration, 0.001)
-	_emit_budget += rate * delta
+	_emit_budget += _rate * delta
 	while _emitted < _count and _emitted < _emit_budget:
 		_add_drop(_emitted)
 		_emitted += 1
@@ -167,7 +183,7 @@ func _add_drop(index: int) -> void:
 	var speed := randf_range(BloodConfig.speed_min, BloodConfig.speed_max)
 	# Emerge at the wounded body's current spot (local to this pool), so a moving body trails blood
 	# instead of piling it at the first contact point; fall back to the pool origin if it is gone.
-	var origin := (_source.global_position - global_position) if is_instance_valid(_source) else Vector2.ZERO
+	var origin := (_source_point() - global_position) if is_instance_valid(_source) else Vector2.ZERO
 	particles.append({
 		"pos": origin,
 		"origin": origin,
@@ -177,6 +193,11 @@ func _add_drop(index: int) -> void:
 		"shape": _make_blob_shape(),
 		"settled": false,
 	})
+
+
+## Where blood leaves the source (world): its `blood_origin()` if it has one, else its position.
+func _source_point() -> Vector2:
+	return _source.blood_origin() if _source.has_method("blood_origin") else _source.global_position
 
 
 ## Move one drop for this frame: sweep its motion, slide off any obstacle it meets, grow its

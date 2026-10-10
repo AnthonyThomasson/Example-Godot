@@ -86,17 +86,33 @@ hands):
 **Drawing the fallen body** (`character_visuals.gd`, `_draw_fallen`): every part from its 3D
 points seen from above, sorted by height (lowest first), so a standing body hides its legs under
 the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
-- Limbs: `limb_painter.gd` capsules along each projected bone, squashed to its projected length —
-  sleeves (`body_color`), forearms and neck (`skin_color`), thighs and shins (`pants_color`), shoes
-  (`shoe_color`, along `toes(i)`). Fists (`HandPainter`) turned along the forearm; the head
-  (`HeadPainter`) turned to where the face looks, or front toward the neck when it looks up or down.
-- The trunk as a box, by the faces turned to the camera, each mapped with a `Transform2D` from its
-  projected axes: the top (the standing `BodyPainter` shoulders, dents and wound marks included),
-  the chest or back (`torso_painter.gd`: shirt with collar and buttons narrowing to a belt, pants on
-  the hips; the back with a seam and the backpack), and a side.
-- A floor shadow per part with each point shifted from the light by its height
-  (`ragdoll_shadow_per_height`), drawn opaque inside a code-built `CanvasGroup` that carries the
-  alpha, so overlaps don't stack. Redrawing stops once the body has settled.
+- Limbs are chains of tapered capsules between the projected joints (the true silhouette of a limb
+  seen from any angle), widths per joint from `ragdoll_arm_widths` / `ragdoll_leg_widths` (hip,
+  knee, calf, ankle) / `ragdoll_shoe_widths` / `ragdoll_neck_width`, so neighbours share a joint's
+  width. A chain draws every segment a pixel wider in its outline tone first, then the fills, so its
+  joints run together under one outline. Each fill maps a `limb_painter.gd` strip (shaded across,
+  fabric for cloth) onto the capsule: sleeves (`body_color`), forearms and neck (`skin_color`),
+  thighs and shins (`pants_color`), shoes (`shoe_color`, along `toes(i)`). Fists (`HandPainter`)
+  turn along the forearm; the head (`HeadPainter`) to where the face looks, or front toward the neck
+  when it looks up or down.
+- The trunk is lofted: ellipse cross-sections across the spine, eased between
+  `ragdoll_trunk_sections` (spine fraction, half-width, half-depth) and domed at both ends; its
+  outline is the union of each neighbouring pair's hull — waisted and rounded from any side, the
+  shoulder ellipse from above. It fills with the shirt, then the art of the side most turned to the
+  camera mapped across it (UVs from that side's projected axes): the standing `BodyPainter`
+  shoulders on top, or `torso_painter.gd` (a full strip: shirt with collar and buttons down to a
+  belt, pants on the hips; the back with a seam and the backpack; a flank), then a 1 px outline.
+- Wounds: each recorded impact sits on the trunk's surface around the body where it struck (its
+  angle in the shoulders' frame) at a seeded height between waist and chest, drawn with
+  `Deformation.draw_marks` only while that patch faces the camera — chest wounds on a body lying on
+  its back, back wounds on one face down.
+- A floor shadow per part (the trunk's is its outline) with each point shifted from the light by its
+  height (`ragdoll_shadow_per_height`), drawn opaque inside a code-built `CanvasGroup` that carries
+  the alpha, so overlaps don't stack. Redrawing stops once the body has settled.
+
+**Bleeding out:** `blood_origin()` is the character's position while alive and its trunk's middle
+once fallen (blood pools sample it). When the ragdoll first settles the character calls
+`Physics.bleed_out(get_parent(), self, [get_rid()])`, so a pool spreads out from under the body.
 
 ## Pixel art
 

@@ -25,6 +25,7 @@ var _height := 0.0             ## Above the floor (px).
 var _rise := 0.0               ## Vertical speed (px/s, up).
 var _angle := 0.0              ## Which way the item's art points (rad).
 var _spin := 0.0               ## Spin (rad/s).
+var _landing := {}             ## How it lies, passed to draw_dropped (`flip`: which side is up).
 var _query: PhysicsShapeQueryParameters2D  ## Reused wall sweep (a circle of `radius`).
 
 
@@ -39,6 +40,7 @@ static func spawn(dropped: Item, at: Vector2, angle: float, velocity: Vector2, p
 	node._angle = angle
 	node._velocity = velocity
 	node._spin = randf_range(6.0, 14.0) * (1.0 if randf() < 0.5 else -1.0)
+	node._landing = { "flip": randf() < 0.5 }
 	parent.add_child(node)
 	node.global_position = held_from
 	node._slide(at - held_from, false)
@@ -99,5 +101,5 @@ func _draw() -> void:
 		return
 	var away := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized()
 	item.draw_dropped(self, away * (0.5 + _height * shadow_per_height), _angle,
-		Color(0.0, 0.0, 0.0, ArtConfig.drop_shadow_alpha))
-	item.draw_dropped(self, Vector2.ZERO, _angle)
+		Color(0.0, 0.0, 0.0, ArtConfig.drop_shadow_alpha), _landing)
+	item.draw_dropped(self, Vector2.ZERO, _angle, Color.WHITE, _landing)
