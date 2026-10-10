@@ -32,7 +32,7 @@ concise current-state comments.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server. |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 
@@ -69,22 +69,28 @@ interface(s) and describes how they're implemented; this list is authoritative f
    World-Gen owns the *catalogue*; Objects owns the *field schema* and turns a plain definition
    dict into a node. World-Gen never touches an object's fields.
 
-3. **Objects ↔ strikers: the "hittable" contract**
-   Every world object (furniture **and** walls) implements:
+3. **Objects/Character ↔ strikers: the "hittable" contract**
+   Every world object (furniture **and** walls), **and the Character domain's `character.gd`**,
+   implements:
    - `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }`
    - `take_hit(hit: HitInfo) -> void`
    `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage,
    speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then hands
-   the object a HitInfo; the object decides what a hit *does to it*. The projectile is the only
-   striker that uses this; a melee punch shoves through the "pushable" contract below and does
-   **not** deform.
+   the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
+   (interface 4), the character spawns blood instead (`Physics.spawn_blood`, interface 4). The
+   projectile is the only striker that uses this; a melee punch shoves through the "pushable"
+   contract below and does **not** deform.
 
-4. **Objects → Physics** (objects compose physics; Physics is a leaf domain)
+4. **Objects/Character → Physics** (objects and the character compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
 	 `apply_impulse(v, at_world)`.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
    - `Deformation` (static): silhouette/collider polygons + drawing.
-   - `Physics.impact_impulse(hit) -> Vector2` and `Physics.spawn_debris(world, hit, surface)`.
+   - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
+	 and `Physics.spawn_blood(...)` (character, on a hit).
+   - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
+	 (`deform_depth_per_damage`, `deform_max_depth`, `deform_chunk_damage`, `deform_max_impacts`,
+	 `deform_update_collider`) that Objects reads directly when recording damage.
    Physics imports nothing from other domains.
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
@@ -164,6 +170,13 @@ interface(s) and describes how they're implemented; this list is authoritative f
       where to support it).
     Emitters and listeners never reference each other (like `Despawner`).
 
+11. **General → Interaction / AI: `PhysicsLayers.SOLID`**
+    - `PhysicsLayers` (`general/physics_layers.gd`, a `class_name` static holder) — `SOLID` names
+	  the physics layer bit (1) that "walls + solid furniture" live on. Interaction's reach query
+	  (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and
+	  its debug mirror (`ai/debug/vision_debug.gd`) all raycast on this one shared constant instead
+	  of each redefining the same magic number — the single point of truth for that layer id.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -183,7 +196,8 @@ Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep 
 the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
 four `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
 deformation), `CharacterConfig` (walking push + punch), and `BloodConfig` (blood pooling). There
-is no `Config` autoload.
+is no `Config` autoload. A fifth static holder, `PhysicsLayers` (General, interface 11), is not
+tuning but a shared physics-layer id, the same role `Wall.Side` plays for doorway sides.
 
 ## Cross-cutting conventions
 

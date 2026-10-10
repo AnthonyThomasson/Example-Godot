@@ -9,8 +9,8 @@ extends Node2D
 ## `see_over_coverage`, so low pieces (tables, beds) cast no shadow. Toggle with `show_vision`. Draw-only —
 ## it senses nothing and feeds nothing back (follows the "draw on its own child Node2D" convention).
 
-## Must match agent_vision.QUERY_MASK — walls + solid furniture that block sight.
-const QUERY_MASK := 1
+## Same source as agent_vision.QUERY_MASK — walls + solid furniture that block sight.
+const QUERY_MASK := PhysicsLayers.SOLID
 ## Rays cast across the forward FOV arc (higher = smoother wall edges, more cost).
 const CONE_RAYS := 64
 ## Rays cast for the 360° awareness-bubble sweep.

@@ -1,13 +1,19 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), despawner, camera, and the dev command server. Use when editing scenes/general/ or working on input/keybinds/rebinding, the dev command server (gcmd), camera follow, or the despawn cap. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), despawner, camera, the dev command server, and shared physics-layer ids (PhysicsLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the dev command server (gcmd), camera follow, the despawn cap, or a cross-domain physics-layer constant. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
 
-Infrastructure: input (Keybinds), despawner, event bus, camera, dev command server.
-`Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
+Infrastructure: input (Keybinds), despawner, event bus, camera, dev command server, shared
+physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
 HUDs and menus have moved to the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
+
+`physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
+`class_name` static holders) names physics-layer bits so they aren't redefined as magic numbers
+per caller. `SOLID := 1` is "walls + solid furniture" — read by Interaction's reach query
+(`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and its
+debug mirror (`ai/debug/vision_debug.gd`).
 
 ## Input architecture
 

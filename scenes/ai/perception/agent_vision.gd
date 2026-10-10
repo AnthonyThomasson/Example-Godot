@@ -18,10 +18,11 @@ extends RefCounted
 ## (every solid collider counts) because they serve line-of-fire and cover, where a bullet is still
 ## stopped by a table even though an agent can see across it.
 
-## Physics layer walls + solid furniture live on (matches CharacterInteraction.QUERY_MASK). This
-## module is the sub-domain's single owner of the solid-geometry ray query: the perception runs its
-## line-of-fire and cover tests through `blocked()` / `raycast()` below rather than repeating it.
-const QUERY_MASK := 1
+## Physics layer walls + solid furniture live on (General's `PhysicsLayers.SOLID`, also used by
+## CharacterInteraction). This module is the sub-domain's single owner of the solid-geometry ray
+## query: the perception runs its line-of-fire and cover tests through `blocked()` / `raycast()`
+## below rather than repeating it.
+const QUERY_MASK := PhysicsLayers.SOLID
 
 ## Whether vision is gated at all; false = the agent sees everything (omniscient fallback).
 var enabled: bool = true

@@ -15,6 +15,11 @@ enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
 ## left/right walls start at the top).
 @export var openings: Array = []
 
+## The wall's own ballistic surface rating (Objects owns its surface data, same as
+## environment_object.gd): full cover, hard to shoot through.
+@export var coverage: float = 100.0
+@export var penetration: float = 100.0
+
 ## Damage impacts per wall-segment index (into wall_segments()), in wall-local space.
 ## Read by wall_visuals.gd to deform the struck segments. See _record_segment_damage().
 var _seg_impacts := {}
@@ -31,7 +36,7 @@ func _ready() -> void:
 
 ## The wall's ballistic surface: full cover, hard to shoot through, gray debris.
 func get_surface() -> Dictionary:
-	return { "coverage": BallisticsConfig.wall_coverage, "penetration": BallisticsConfig.wall_penetration,
+	return { "coverage": coverage, "penetration": penetration,
 		"material": "", "color": Color(0.6, 0.6, 0.6) }
 
 

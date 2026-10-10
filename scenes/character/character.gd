@@ -8,7 +8,7 @@ extends CharacterBody2D
 
 ## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
 @export var radius: float = 14.0  ## Body circle radius (px).
-@export var speed: float = 300.0  ## Move speed (px/s).
+@export var speed: float = 150.0  ## Move speed (px/s).
 ## Slot the character starts holding.
 @export var start_slot: int = 1
 ## Allegiance tag, read by AI perception to tell allies from potential hostiles.
@@ -207,6 +207,19 @@ func current_item() -> Item:
 ## The held slot id (1–9).
 func current_slot() -> int:
 	return _current_slot
+
+
+## The held item's display name, or "Unknown" with none held. For UI observers, so they
+## never need to read Item's fields directly.
+func item_name() -> String:
+	var item := current_item()
+	return item.display_name if item else "Unknown"
+
+
+## The held item's reach, or 0.0 with none held. For UI observers.
+func item_reach() -> float:
+	var item := current_item()
+	return item.reach if item else 0.0
 
 
 ## Whether inventory slot `id` is present (carried, not necessarily held). Gates interactions

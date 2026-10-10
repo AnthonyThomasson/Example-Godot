@@ -54,9 +54,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	var item: Item = _character.current_item()
-	var item_name: String = item.display_name if item else "Unknown"
-	var reach: float = item.reach if item else 0.0
+	var item_name: String = _character.item_name()
+	var reach: float = _character.item_reach()
 	var attack_active: bool = _character.is_attacking()
 	var interaction: String = _character.interaction_label()
 

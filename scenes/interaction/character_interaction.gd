@@ -17,8 +17,8 @@ extends Node2D
 ## Bias the reach circle this far ahead of the character along its facing (0 = centered on body).
 @export var front_offset: float = 0.0
 
-## Physics layer the reach query tests (walls + solid furniture default to layer 1).
-const QUERY_MASK := 1
+## Physics layer the reach query tests (General's `PhysicsLayers.SOLID` — walls + solid furniture).
+const QUERY_MASK := PhysicsLayers.SOLID
 ## Extra gap (px) required around the body before an object's collision is re-enabled on exit.
 const CLEAR_MARGIN := 3.0
 
