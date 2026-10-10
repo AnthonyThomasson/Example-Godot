@@ -1,16 +1,21 @@
 extends CanvasLayer
 
 ## UI domain, in-game debug-overlay toggle bar: a collapsible panel of toggle buttons, one per overlay in
-## `overlay_registry.gd`, grouped (Perception / Combat / Movement / Brain / Map). Pressing one emits
+## `overlay_registry.gd`, grouped (Perception / Combat / Movement / Brain / Map / Stats). Pressing one emits
 ## `overlay_toggled(flag, on)`; Main applies it live to the NPCs' overlay nodes (or, in the spectator
 ## match, to the inspector's selected-NPC flags). It knows nothing of the AI — only the registry rows and
-## the flag dict it is given. Runs PROCESS_MODE_ALWAYS so it still works while the match is paused, and
-## its panel swallows clicks so pressing a button never selects an NPC underneath.
+## the flag dict it is given. Its "Overlays" title is a drag handle that moves the bar. Runs
+## PROCESS_MODE_ALWAYS so it still works while the match is paused, and its panel swallows clicks so
+## pressing a button never selects an NPC underneath.
 
 const Registry := preload("res://scenes/ui/overlay_registry.gd")
+const DragHandle := preload("res://scenes/ui/drag_handle.gd")
 
 ## Size multiplier for the whole bar (width, fonts, spacing).
 const SCALE := 1.5
+
+## Screen width the bar occupies from the right edge (panel + margin); other top-right HUDs dock left of it.
+const RESERVED_WIDTH := SCALE * 220.0 + 10.0
 
 ## Emitted when a button is pressed: the overlay's `show_<x>` flag and its new state.
 signal overlay_toggled(flag: String, on: bool)
@@ -28,17 +33,28 @@ func setup(flags: Dictionary) -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.anchor_left = 1.0
 	panel.anchor_right = 1.0
-	panel.offset_left = -SCALE * 220.0 - 10.0
+	panel.offset_left = -RESERVED_WIDTH
 	panel.offset_right = -10.0
 	panel.offset_top = 10.0
 	add_child(panel)
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", int(2 * SCALE))
 	panel.add_child(box)
+	var title_row := HBoxContainer.new()
+	box.add_child(title_row)
+	var grip := Label.new()  # the drag handle: left-drag it to move the whole bar
+	grip.text = "Overlays"
+	grip.tooltip_text = "Drag to move"
+	grip.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	grip.add_theme_font_size_override("font_size", int(16 * SCALE))
+	title_row.add_child(grip)
+	var drag := DragHandle.new()
+	grip.add_child(drag)
+	drag.setup(grip, panel)
 	_header = Button.new()
 	_header.add_theme_font_size_override("font_size", int(16 * SCALE))
 	_header.pressed.connect(_toggle_collapsed)
-	box.add_child(_header)
+	title_row.add_child(_header)
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", int(2 * SCALE))
 	box.add_child(_body)
@@ -83,5 +99,5 @@ func _toggle_collapsed() -> void:
 ## Show or hide the toggle list and update the header's arrow.
 func _set_collapsed(collapsed: bool) -> void:
 	_body.visible = not collapsed
-	_header.text = ("Overlays  ▸" if collapsed else "Overlays  ▾")
+	_header.text = ("▸" if collapsed else "▾")
 	_header.focus_mode = Control.FOCUS_NONE

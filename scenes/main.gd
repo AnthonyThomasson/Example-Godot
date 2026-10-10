@@ -58,6 +58,8 @@ const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
 const OVERLAY_TOGGLES := preload("res://scenes/ui/overlay_toggles.gd")
+## The performance overlay (docks left of the toggle bar).
+const PERFORMANCE_OVERLAY := preload("res://scenes/ui/performance_overlay.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
@@ -73,8 +75,10 @@ var _combatants: Array = []
 var _overlay_flags: Dictionary = {}
 ## The spectator inspector (spectator mode only), told of live toggles so the selected NPC follows them.
 var _inspector: Node = null
-## The world-space furniture-hole overlay, the one overlay that isn't per NPC.
+## The world-space furniture-hole overlay, one of the two overlays that aren't per NPC.
 var _nav_debug: Node2D = null
+## The performance overlay (the other global overlay); null when Debug is off.
+var _perf_overlay: CanvasLayer = null
 
 
 func _ready() -> void:
@@ -200,6 +204,10 @@ func _spawn_world() -> void:
 	if spectator_mode:
 		_setup_spectator()
 	if debug_overlays:
+		_perf_overlay = PERFORMANCE_OVERLAY.new()
+		_perf_overlay.name = "PerformanceOverlay"
+		add_child(_perf_overlay)
+		_perf_overlay.set_shown(_overlay_flags.get(OVERLAY_REGISTRY.PERF, false))
 		var toggles := OVERLAY_TOGGLES.new()
 		toggles.name = "OverlayToggles"
 		add_child(toggles)
@@ -228,7 +236,8 @@ func _setup_spectator() -> void:
 	add_child(inspector)
 	_inspector = inspector
 	var npc_flags := _overlay_flags.duplicate()
-	npc_flags.erase(OVERLAY_REGISTRY.NAV_HOLES)  # global, not per NPC
+	for flag in OVERLAY_REGISTRY.GLOBAL:  # global overlays, not per NPC
+		npc_flags.erase(flag)
 	inspector.setup(combatants, npc_flags)
 	var debug := get_node_or_null("DebugUI")
 	if debug:
@@ -331,12 +340,12 @@ func _configure_debug() -> void:
 	for npc in _combatants:
 		for child in npc.get_children():
 			for flag in _overlay_flags:
-				if flag != OVERLAY_REGISTRY.NAV_HOLES and flag in child:
+				if not OVERLAY_REGISTRY.is_global(flag) and flag in child:
 					child.set(flag, _overlay_flags[flag])
 
 
 ## A toggle-bar button was pressed: record the flag and apply it live. The furniture holes go to the single
-## NavDebug node; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
+## NavDebug node and the performance flag to the performance overlay; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
 ## only); in player mode every NPC's overlay takes it directly.
 func _on_overlay_toggled(flag: String, on: bool) -> void:
 	_overlay_flags[flag] = on
@@ -344,6 +353,9 @@ func _on_overlay_toggled(flag: String, on: bool) -> void:
 		if is_instance_valid(_nav_debug):
 			_nav_debug.show_holes = on
 			_nav_debug.queue_redraw()
+	elif flag == OVERLAY_REGISTRY.PERF:
+		if is_instance_valid(_perf_overlay):
+			_perf_overlay.set_shown(on)
 	elif _inspector != null and is_instance_valid(_inspector):
 		_inspector.set_flag(flag, on)
 	else:
