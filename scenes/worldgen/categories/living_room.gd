@@ -5,8 +5,8 @@ class_name LivingRoomCatalog
 
 const OBJECTS := {
 	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "weight": 12, "coverage": 40, "penetration": 35, "interactions": [{ "id": "watch", "label": "Watch TV" }, { "id": "toggle", "label": "Turn off" }] },
-	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric", "weight": 45, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "lie", "label": "Lie down", "move_to": true }] },
-	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood", "weight": 12, "coverage": 30, "penetration": 45, "interactions": [{ "id": "sit_on", "label": "Sit on it", "move_to": true }, { "id": "examine", "label": "Examine" }] },
+	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric", "art": "sofa", "weight": 45, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "lie", "label": "Lie down", "move_to": true }] },
+	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood", "art": "table", "art_opts": { "inset": true }, "weight": 12, "coverage": 30, "penetration": 45, "interactions": [{ "id": "sit_on", "label": "Sit on it", "move_to": true }, { "id": "examine", "label": "Examine" }] },
 	"rug": { "name": "Rug", "shape": "rect", "size": Vector2(170, 110), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
 }
 
@@ -17,7 +17,7 @@ const ARRANGEMENTS := {
 			{ "key": "tv", "pos": Vector2(100, 15) },
 			{ "key": "rug", "pos": Vector2(100, 105) },
 			{ "key": "coffee_table", "pos": Vector2(100, 85) },
-			{ "key": "sofa", "pos": Vector2(100, 148) },
+			{ "key": "sofa", "pos": Vector2(100, 148), "facing": Vector2.UP },
 			{ "key": "lamp", "pos": Vector2(180, 148) },
 		],
 	},
@@ -27,7 +27,7 @@ const ARRANGEMENTS := {
 			{ "key": "tv", "pos": Vector2(120, 15) },
 			{ "key": "rug", "pos": Vector2(120, 100) },
 			{ "key": "coffee_table", "pos": Vector2(120, 85) },
-			{ "key": "sofa", "pos": Vector2(120, 145) },
+			{ "key": "sofa", "pos": Vector2(120, 145), "facing": Vector2.UP },
 			{ "key": "armchair", "pos": Vector2(25, 90) },
 			{ "key": "side_table", "pos": Vector2(215, 145) },
 		],
@@ -36,7 +36,7 @@ const ARRANGEMENTS := {
 		"placement": "wall", "footprint": Vector2(124, 60),
 		"items": [
 			{ "key": "tv", "pos": Vector2(62, 18) },
-			{ "key": "sofa", "pos": Vector2(62, 45) },
+			{ "key": "sofa", "pos": Vector2(62, 45), "facing": Vector2.UP },
 		],
 	},
 	"reading_nook": {

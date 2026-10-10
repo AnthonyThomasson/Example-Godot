@@ -18,7 +18,9 @@ Objects *compose* these components; Physics imports nothing outward.
   (`impact_transfer_scale`).
 - `Deformable` — records local impacts (dents / carved "missing pieces") and emits `changed`; the
   owner redraws + rebuilds its collider from the same deformed polygon.
-- `Deformation` — the polygon math + drawing (shared by furniture and walls).
+- `Deformation` — the polygon math + drawing (shared by furniture and walls). `draw_shape` takes
+  an optional `texture`: the deformed polygon is then drawn textured (UVs from the intact
+  footprint, so dents cut into the image), tinted darker by damage, without the smooth outline.
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on
   `Despawner`.
 

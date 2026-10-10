@@ -85,7 +85,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
 	 `apply_impulse(v, at_world)`.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
-   - `Deformation` (static): silhouette/collider polygons + drawing.
+   - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` optionally
+	 textured, so a piece's pixel art is drawn through its dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
 	 and `Physics.spawn_blood(...)` (character, on a hit).
    - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
@@ -199,10 +200,11 @@ UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Charac
 
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
 the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
-four `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
-deformation), `CharacterConfig` (walking push + punch), and `BloodConfig` (blood pooling). There
-is no `Config` autoload. A fifth static holder, `PhysicsLayers` (General, interface 11), is not
-tuning but a shared physics-layer id, the same role `Wall.Side` plays for doorway sides.
+five `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
+deformation), `CharacterConfig` (walking push + punch), `BloodConfig` (blood pooling), and
+`ObjectArtConfig` (Objects' furniture pixel art). There is no `Config` autoload. A sixth static
+holder, `PhysicsLayers` (General, interface 11), is not tuning but a shared physics-layer id, the
+same role `Wall.Side` plays for doorway sides.
 
 ## Cross-cutting conventions
 

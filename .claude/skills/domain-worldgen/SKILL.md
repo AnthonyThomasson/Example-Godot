@@ -30,10 +30,17 @@ ArrangementDefinitions
   `ARRANGEMENTS`, `RECIPES`. `ObjectDefinitions` / `ArrangementDefinitions` are thin
   aggregators that merge them and expose `get_definition` / `get_arrangement` / `get_recipe`.
 - **Arrangements** are authored against the top wall (`x` along, `y` depth); `placement`
-  `"wall"`/`"center"`, `prefer_corner`, `tags` (dedupe). **Recipes** list ordered `zones`
-  (each picks `count` from `options`, with optional `required`/`fallback`) + `palettes`.
+  `"wall"`/`"center"`, `prefer_corner`, `tags` (dedupe). Items take `pos`, optional `rotated`
+  (footprint swap) and optional `facing` (which way the piece's front faces in that frame;
+  default `Vector2.DOWN`, into the room — a sofa facing the TV is `UP`, a chair facing a table
+  to its right is `RIGHT`). **Recipes** list ordered `zones` (each picks `count` from `options`,
+  with optional `required`/`fallback`) + `palettes`.
 - **Placement** (`room_furnisher.gd`) fits each arrangement's footprint against a random wall
-  without overlap, rotates/mirrors it, then hands each object's definition to `ObjectFactory`.
+  without overlap, rotates/mirrors it, then hands each object's definition to `ObjectFactory`
+  (item `facing` mapped onto the wall by `_map_dir`, the same way positions are, and passed as
+  `opts.facing`).
+- Definitions may set `art` / `art_opts` to draw a piece as pixel art (the sofa, the tables and
+  the chair do); the Objects domain owns the painters.
 
 ## To add a room type
 

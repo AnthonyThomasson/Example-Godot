@@ -4,7 +4,7 @@ class_name DiningRoomCatalog
 ## side_table_lamp) live in GeneralCatalog.
 
 const OBJECTS := {
-	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 45, "coverage": 45, "penetration": 55, "interactions": [{ "id": "sit_at", "label": "Sit at table", "move_to": true }, { "id": "examine", "label": "Examine" }] },
+	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood", "art": "table", "art_opts": { "runner": true }, "weight": 45, "coverage": 45, "penetration": 55, "interactions": [{ "id": "sit_at", "label": "Sit at table", "move_to": true }, { "id": "examine", "label": "Examine" }] },
 	"buffet": { "name": "Buffet", "shape": "rect", "size": Vector2(120, 40), "color": Color(0.5, 0.32, 0.18), "material": "wood", "weight": 50, "coverage": 40, "penetration": 55, "interactions": [{ "id": "open", "label": "Open buffet" }, { "id": "examine", "label": "Examine" }] },
 	"china_cabinet": { "name": "China", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.48, 0.3, 0.16), "material": "wood", "weight": 45, "coverage": 75, "penetration": 50, "interactions": [{ "id": "open", "label": "Open cabinet" }, { "id": "examine", "label": "Examine" }] },
 }
@@ -16,10 +16,10 @@ const ARRANGEMENTS := {
 			{ "key": "formal_table", "pos": Vector2(95, 75) },
 			{ "key": "chair", "pos": Vector2(65, 22) },
 			{ "key": "chair", "pos": Vector2(125, 22) },
-			{ "key": "chair", "pos": Vector2(65, 128) },
-			{ "key": "chair", "pos": Vector2(125, 128) },
-			{ "key": "chair", "pos": Vector2(18, 75) },
-			{ "key": "chair", "pos": Vector2(172, 75) },
+			{ "key": "chair", "pos": Vector2(65, 128), "facing": Vector2.UP },
+			{ "key": "chair", "pos": Vector2(125, 128), "facing": Vector2.UP },
+			{ "key": "chair", "pos": Vector2(18, 75), "facing": Vector2.RIGHT },
+			{ "key": "chair", "pos": Vector2(172, 75), "facing": Vector2.LEFT },
 		],
 	},
 	"buffet_wall": {

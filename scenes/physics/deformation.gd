@@ -179,20 +179,28 @@ static func convex_shapes(polygon: PackedVector2Array) -> Array:
 ## Draw a deformed primitive shape (furniture, characters): filled polygon (darkened by
 ## accumulated damage), outline, then crack/hole marks. `crack_color`/`hole_color` override
 ## the mark colors (e.g. red cracks on flesh); left as NO_COLOR they derive from `outline`.
+## With a `texture` (spanning the `size` footprint) the polygon is drawn textured instead of
+## filled and unoutlined: the dents cut into the image rather than squash it.
 static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: Color,
 		outline: Color, impacts: Array, damage_total: float,
-		crack_color: Color = NO_COLOR, hole_color: Color = NO_COLOR, scorch_color: Color = NO_COLOR) -> void:
+		crack_color: Color = NO_COLOR, hole_color: Color = NO_COLOR, scorch_color: Color = NO_COLOR,
+		texture: Texture2D = null) -> void:
 	var poly := shape_polygon(shape, size, impacts)
 	# Fall back to the intact outline if the dents pinched the silhouette into a polygon the
 	# renderer can't triangulate; the hit marks below still show the damage.
 	if not is_valid_polygon(poly):
 		poly = base_ring(shape, size)
-	var body_color := fill
+	var darken := 0.0
 	if damage_total > 0.0 and PhysicsConfig.deform_darken_full > 0.0:
-		var k := clampf(damage_total / PhysicsConfig.deform_darken_full, 0.0, 1.0) * PhysicsConfig.deform_darken_max
-		body_color = fill.darkened(k)
-	canvas.draw_colored_polygon(poly, body_color)
-	_draw_outline(canvas, poly, outline)
+		darken = clampf(damage_total / PhysicsConfig.deform_darken_full, 0.0, 1.0) * PhysicsConfig.deform_darken_max
+	if texture:
+		var uvs := PackedVector2Array()
+		for p in poly:
+			uvs.append(p / size + Vector2(0.5, 0.5))
+		canvas.draw_colored_polygon(poly, Color.WHITE.darkened(darken), uvs, texture)
+	else:
+		canvas.draw_colored_polygon(poly, fill.darkened(darken))
+		_draw_outline(canvas, poly, outline)
 	var cc := crack_color if crack_color.a > 0.0 else outline.darkened(0.3)
 	var hc := hole_color if hole_color.a > 0.0 else HOLE_COLOR
 	var sc := scorch_color if scorch_color.a > 0.0 else Color.BLACK

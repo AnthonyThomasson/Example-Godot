@@ -29,6 +29,13 @@ extends RigidBody2D
 ## Interactions this object offers, as plain data dicts (id, label, optional move_to /
 ## requires_item). Read by the Interaction domain via get_interactions(); empty means none.
 @export var interactions: Array = []
+## Pixel-art painter id ("sofa", "table", "chair"); "" draws the flat shape and its label.
+@export var art: String = ""
+## Per-piece painter overrides (see ObjectArtConfig), e.g. { "runner": true }.
+@export var art_opts: Dictionary = {}
+## Which way the piece's front faces, in its local frame (a cardinal direction). Visual only:
+## it orients the art (a sofa's seat, a chair's seat away from its back rail).
+@export var facing: Vector2 = Vector2.DOWN
 
 ## Physics components, created in _ready() (runtime-shape convention).
 var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.

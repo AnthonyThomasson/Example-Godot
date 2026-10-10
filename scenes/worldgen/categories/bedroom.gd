@@ -44,7 +44,7 @@ const ARRANGEMENTS := {
 		"placement": "wall", "footprint": Vector2(150, 95),
 		"items": [
 			{ "key": "desk", "pos": Vector2(60, 25) },
-			{ "key": "chair", "pos": Vector2(60, 72) },
+			{ "key": "chair", "pos": Vector2(60, 72), "facing": Vector2.UP },
 			{ "key": "lamp", "pos": Vector2(140, 15) },
 		],
 	},

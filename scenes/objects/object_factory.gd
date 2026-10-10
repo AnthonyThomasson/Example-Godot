@@ -6,11 +6,14 @@ class_name ObjectFactory
 ## through a plain Dictionary, so neither reaches into the other's internals.
 ##
 ## Definition fields: name, shape ("circle"|"square"|"rect"), size, color (required);
-##   material, coverage, penetration, weight, solid, interactions (all optional).
+##   material, coverage, penetration, weight, solid, interactions (all optional);
+##   art (pixel-art painter id: "sofa"|"table"|"chair"; omitted = flat shape + label) and
+##   art_opts (painter overrides, see ObjectArtConfig) (optional).
 ## `opts`:
-##   name:    String — node name (readable hit labels; defaults to the definition name).
-##   rotated: bool   — swap the footprint's width/height (a 90° turn).
-##   color:   Color  — override the definition color (e.g. a room palette tone).
+##   name:    String  — node name (readable hit labels; defaults to the definition name).
+##   rotated: bool    — swap the footprint's width/height (a 90° turn).
+##   color:   Color   — override the definition color (e.g. a room palette tone).
+##   facing:  Vector2 — which way the piece's front faces (cardinal; default DOWN). Orients art.
 
 const EnvironmentObject = preload("res://scenes/objects/environment_object.gd")
 const EnvironmentObjectVisuals = preload("res://scenes/objects/environment_object_visuals.gd")
@@ -42,6 +45,9 @@ static func spawn(definition: Dictionary, position: Vector2, parent: Node, opts:
 	obj.penetration = definition.get("penetration", 0.0)
 	obj.weight = definition.get("weight", 10.0)
 	obj.interactions = definition.get("interactions", [])
+	obj.art = definition.get("art", "")
+	obj.art_opts = definition.get("art_opts", {})
+	obj.facing = opts.get("facing", Vector2.DOWN)
 
 	var visuals := Node2D.new()
 	visuals.name = "EnvironmentObjectVisuals"

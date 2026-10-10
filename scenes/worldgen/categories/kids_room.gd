@@ -26,7 +26,7 @@ const ARRANGEMENTS := {
 		"items": [
 			{ "key": "toy_chest", "pos": Vector2(30, 19) },
 			{ "key": "small_desk", "pos": Vector2(110, 20) },
-			{ "key": "chair", "pos": Vector2(110, 55) },
+			{ "key": "chair", "pos": Vector2(110, 55), "facing": Vector2.UP },
 		],
 	},
 	"play_compact": {

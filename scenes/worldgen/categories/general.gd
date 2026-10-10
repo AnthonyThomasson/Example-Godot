@@ -10,11 +10,13 @@ class_name GeneralCatalog
 ##     descriptive only, never recolored);
 ##   coverage (0–100, a height/cover proxy); penetration (0–100, resistance to being
 ##     shot through); weight (mass for knockback — heavier = thrown back less);
-##     solid (optional, default true; false = walk-over decor under all).
+##     solid (optional, default true; false = walk-over decor under all);
+##   art (optional pixel-art painter: "sofa"/"table"/"chair"; omitted = flat shape + label)
+##     and art_opts (optional painter overrides, e.g. { "runner": true }).
 ## Arrangements/recipes: see ArrangementDefinitions for the authoring conventions.
 
 const OBJECTS := {
-	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "weight": 6, "coverage": 45, "penetration": 50, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "stand_on", "label": "Stand on it", "move_to": true }] },
+	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "art": "chair", "weight": 6, "coverage": 45, "penetration": 50, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "stand_on", "label": "Stand on it", "move_to": true }] },
 	"lamp": { "name": "Lamp", "shape": "circle", "size": Vector2(20, 20), "color": Color(1.0, 1.0, 0.6), "material": "metal", "weight": 3, "coverage": 55, "penetration": 30, "interactions": [{ "id": "toggle", "label": "Toggle light" }, { "id": "examine", "label": "Examine" }] },
 	"plant": { "name": "Plant", "shape": "circle", "size": Vector2(26, 26), "color": Color(0.25, 0.6, 0.3), "material": "foliage", "weight": 5, "coverage": 50, "penetration": 10, "interactions": [{ "id": "water", "label": "Water plant" }, { "id": "examine", "label": "Examine" }] },
 	"armchair": { "name": "Armchair", "shape": "square", "size": Vector2(50, 50), "color": Color(0.7, 0.45, 0.3), "material": "fabric", "weight": 22, "coverage": 50, "penetration": 25, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "lie", "label": "Curl up", "move_to": true }] },

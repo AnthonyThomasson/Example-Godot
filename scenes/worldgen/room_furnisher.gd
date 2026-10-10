@@ -163,11 +163,30 @@ static func _spawn_items(arrangement: Dictionary, spot: Dictionary, palette: Dic
 		if definition.is_empty():
 			push_error("Unknown object type: ", key)
 			continue
-		var opts := { "rotated": item.get("rotated", false) != sideways, "name": key }
+		var opts := {
+			"rotated": item.get("rotated", false) != sideways, "name": key,
+			"facing": _map_dir(item.get("facing", Vector2.DOWN), orient, mirror),
+		}
 		var material: String = definition.get("material", "")
 		if palette.has(material):
 			opts["color"] = palette[material]
 		ObjectFactory.spawn(definition, rect.position + mapped, parent, opts)
+
+
+## Map a direction from the arrangement's top-wall frame onto the chosen wall, the same way
+## _spawn_items maps item positions (mirror flips x; LEFT/RIGHT swap the axes).
+static func _map_dir(dir: Vector2, orient: int, mirror: bool) -> Vector2:
+	if mirror:
+		dir.x = -dir.x
+	match orient:
+		Orient.TOP:
+			return dir
+		Orient.BOTTOM:
+			return Vector2(dir.x, -dir.y)
+		Orient.LEFT:
+			return Vector2(dir.y, dir.x)
+		_:
+			return Vector2(-dir.y, dir.x)
 
 
 ## Fisher–Yates shuffle driven by `rng`, so a seed reproduces the whole house.

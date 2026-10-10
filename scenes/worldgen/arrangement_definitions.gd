@@ -11,6 +11,8 @@ class_name ArrangementDefinitions
 ## An arrangement is authored in a local frame AS IF PLACED AGAINST THE TOP WALL:
 ##   x runs along the wall (0..footprint.x), y is depth into the room (0..footprint.y).
 ## Item `pos` is the item's center. `rotated` swaps an item's width/height (90° turn).
+## Item `facing` is the way its front faces in this frame (default Vector2.DOWN, into the
+## room): a sofa facing a TV on the top wall is UP; a chair facing a table to its right is RIGHT.
 ## The furnisher rotates the whole frame onto whichever wall it picks, and may mirror it.
 ##   placement:     "wall" (backed against a wall) or "center" (free-standing).
 ##   prefer_corner: try the ends of a wall first.
