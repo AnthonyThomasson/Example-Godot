@@ -9,6 +9,8 @@ extends Node2D
 ## sibling GoalController's `debug_zones()` / `debug_room_zones()` through its public API, senses nothing
 ## and feeds nothing back (the "draw on its own child Node2D" convention, like vision_debug.gd).
 
+const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
+
 ## Whether to draw the candidate point zones. Off by default — it is the densest overlay.
 @export var show_tactics: bool = false
 ## Whether to draw the room zones (each room tinted by how the NPC regards it). Off by default.
@@ -41,7 +43,7 @@ const ZONE_RADIUS := 15.0
 ## Radius (px) of the solid dot at a zone's exact point.
 const DOT_RADIUS := 3.0
 ## Point size of the per-category label.
-const FONT_SIZE := 11
+const FONT_SIZE := 16
 ## Inset (px) of a room's tag from its top-left corner.
 const ROOM_LABEL_INSET := 6.0
 
@@ -88,7 +90,7 @@ func _draw_room_zones() -> void:
 		var local := Rect2(to_local(rect.position), rect.size)
 		draw_rect(local, Color(color, 0.08), true)
 		draw_rect(local, color, false, 2.0)
-		draw_string(font, local.position + Vector2(ROOM_LABEL_INSET, ROOM_LABEL_INSET + FONT_SIZE),
+		DebugText.string(self, font, local.position + Vector2(ROOM_LABEL_INSET, ROOM_LABEL_INSET + FONT_SIZE),
 			"%s · %s" % [room["type"], String(status)], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)
 
 
@@ -126,5 +128,5 @@ func _draw_point_zones() -> void:
 		draw_circle(p, DOT_RADIUS, color)
 		if not labelled.has(category):
 			labelled[category] = true
-			draw_string(font, p + Vector2(ZONE_RADIUS + 2.0, FONT_SIZE * 0.4), String(category),
+			DebugText.string(self, font, p + Vector2(ZONE_RADIUS + 2.0, FONT_SIZE * 0.4), String(category),
 				HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)

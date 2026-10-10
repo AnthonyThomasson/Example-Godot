@@ -122,6 +122,10 @@ func _controller_of(character: Node) -> Node:
 func _build_ui() -> void:
 	_timer_label = _add_label(0.5, 0.0, Vector2(-130, 16), Vector2(260, 52), 34, Color.WHITE, HORIZONTAL_ALIGNMENT_CENTER)
 	_goal_label = _add_label(0.0, 0.0, Vector2(24, 76), Vector2(560, 280), 28, Color.WHITE, HORIZONTAL_ALIGNMENT_LEFT)
+	# Span the left half of the screen (right edge at the centre line, small gap) and wrap onto more lines.
+	_goal_label.anchor_right = 0.5
+	_goal_label.offset_right = -8.0
+	_goal_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_verdict_label = _add_label(0.5, 0.4, Vector2(-350, 0), Vector2(700, 88), 62, Color.GOLD, HORIZONTAL_ALIGNMENT_CENTER)
 	_feed_label = _add_label(0.0, 1.0, Vector2(24, -250), Vector2(520, 240), 28, Color.ORANGE, HORIZONTAL_ALIGNMENT_LEFT)
 

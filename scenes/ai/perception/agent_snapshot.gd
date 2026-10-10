@@ -413,6 +413,18 @@ func _fire_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 	return { "summary": summary, "options": options }
 
 
+## `tags` plus the spot's geometry, kept for the routes debug overlay (`clear_shot`, `route_exposed`,
+## `cover`, `route_len`, `exposed_to`, and the flank `ally_lane` / `held_by` / `crosses` names). Planner
+## filters read only `inside` / `held` / `crosses` / `hidden`, so the extra keys are inert to decisions.
+func _geo_tags(s: Dictionary, tags: Dictionary) -> Dictionary:
+	for key in ["clear_shot", "route_exposed", "cover", "route_len", "exposed_to", "ally_lane", "held_by"]:
+		if s.has(key):
+			tags[key] = s[key]
+	if s.has("crosses"):
+		tags["crosses_name"] = s["crosses"]
+	return tags
+
+
 ## One fighting-spot option: its place (`lead`), clear shot, cover, the route there (`moving`: a spot to
 ## go to rather than where the NPC stands) and other exposure.
 func _spot_option(id: String, label: String, lead: String, s: Dictionary, moving: bool) -> Dictionary:
@@ -424,7 +436,7 @@ func _spot_option(id: String, label: String, lead: String, s: Dictionary, moving
 	if not s["exposed_to"].is_empty():
 		parts.append("also exposed to %s" % ", ".join(s["exposed_to"]))
 	return { "id": id, "label": label, "desc": " — ".join(parts),
-		"params": { "point": s["point"], "style": &"peek_cover" }, "tags": { "inside": _is_inside(s["point"]) } }
+		"params": { "point": s["point"], "style": &"peek_cover" }, "tags": _geo_tags(s, { "inside": _is_inside(s["point"]) }) }
 
 
 ## A firing spot named by its place, `dir` being its bearing from the target: "behind the sofa in the
@@ -462,7 +474,7 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 			"label": "%s (%s)" % [SIDE_WORDS[s["side"]], _room_name(room["type"]) if not room.is_empty() else "outside"],
 			"desc": " — ".join(parts),
 			"params": { "point": s["point"] },
-			"tags": { "inside": not room.is_empty(), "held": s["held_by"] != "", "crosses": s["crosses"] != "" },
+			"tags": _geo_tags(s, { "inside": not room.is_empty(), "held": s["held_by"] != "", "crosses": s["crosses"] != "" }),
 		})
 		if s["held_by"] == "" and s["crosses"] == "":
 			open.append(s)
@@ -539,7 +551,7 @@ func _advance_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary
 		if not s["exposed_to"].is_empty():
 			parts.append("also exposed to %s" % ", ".join(s["exposed_to"]))
 		options.append({ "id": id, "label": label, "desc": " — ".join(parts),
-			"params": { "point": s["point"] }, "tags": { "inside": _is_inside(s["point"]) } })
+			"params": { "point": s["point"] }, "tags": _geo_tags(s, { "inside": _is_inside(s["point"]) }) })
 	var summary := "they are %s, %s, holding a %s" % [
 		_dist_band((ctx["self_pos"] as Vector2).distance_to(t["pos"])), _move_text(t, ctx["self_pos"]), t.get("item", "nothing")]
 	var wound := _wound_band(t.get("wound_dmg", 0.0))
@@ -585,7 +597,7 @@ func _retreat_group(ctx: Dictionary, hostiles: Array, known_rooms: Array, dmg: f
 			("cover close by (the %s)" % s["cover"]) if s["cover"] != "" else "in the open",
 			_route_text(s["route_len"], s["route_exposed"]) + " route"]
 		options.append({ "id": id, "label": lead.trim_prefix("fall back to ").trim_prefix("back off "), "desc": " — ".join(parts),
-			"params": { "point": s["point"] }, "tags": { "inside": _is_inside(s["point"]), "hidden": s["hidden"] } })
+			"params": { "point": s["point"] }, "tags": _geo_tags(s, { "inside": _is_inside(s["point"]), "hidden": s["hidden"] }) })
 	var inside: Array = options.filter(func(o): return o["tags"]["inside"])
 	return {
 		"summary": _retreat_summary(options, dmg),

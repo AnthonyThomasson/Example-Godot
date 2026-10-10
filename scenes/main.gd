@@ -23,18 +23,25 @@ extends Node2D
 ## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
 ## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
 @export var spectator_mode: bool = true
+## Master switch for the AI debug overlays: off = every overlay is hidden and the in-game toggle bar is
+## not built. Chosen as the single "Debug" checkbox in the setup window on a fresh launch.
+@export var debug_overlays: bool = true
+## Initial state of the debug overlays. The authoritative set is `_overlay_flags` (one entry per row of
+## `overlay_registry.gd`), seeded from these exports for the overlays they name, from the setup window on
+## a fresh launch, and flipped live by the in-game toggle bar. Overlays without an export here start at
+## their registry default.
 ## When false, the floating action-status label drawn above each NPC is hidden.
-@export var show_agent_labels: bool = true
+@export var show_agent_labels: bool = false
 ## When false, the navigation-path polyline drawn under each NPC is hidden.
-@export var show_agent_paths: bool = true
+@export var show_agent_paths: bool = false
 ## When false, the line-of-sight / awareness overlay drawn around each NPC is hidden.
-@export var show_vision: bool = true
+@export var show_vision: bool = false
 ## When false, the tactical navigation-zone overlay drawn around each NPC is hidden.
-@export var show_tactics: bool = true
+@export var show_tactics: bool = false
 ## When false, the tactical room-zone overlay (each room tinted by how the NPC regards it) is hidden.
-@export var show_room_zones: bool = true
+@export var show_room_zones: bool = false
 ## When false, the search-coverage overlay (room sample points a searcher is seeing / still to see) is hidden.
-@export var show_search: bool = true
+@export var show_search: bool = false
 ## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
 @export var show_nav_holes: bool = false
 
@@ -48,6 +55,9 @@ const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 ## Spectator inspector (UI): Space-pause + click an NPC to show its tactical zones.
 const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
+## The overlay table (UI) and the in-game bar of toggle buttons built from it.
+const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
+const OVERLAY_TOGGLES := preload("res://scenes/ui/overlay_toggles.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
@@ -59,9 +69,16 @@ const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
 
 ## Every NPC spawned this run, in spawn order — the spectator camera + match HUD observe these.
 var _combatants: Array = []
+## Every debug overlay's on/off state, `{ show_<x>: bool }` keyed like `overlay_registry.gd`.
+var _overlay_flags: Dictionary = {}
+## The spectator inspector (spectator mode only), told of live toggles so the selected NPC follows them.
+var _inspector: Node = null
+## The world-space furniture-hole overlay, the one overlay that isn't per NPC.
+var _nav_debug: Node2D = null
 
 
 func _ready() -> void:
+	_overlay_flags = _initial_overlays()
 	# A scripted restart (the dev command server's `restart`) sets `skip_setup` so a reloaded scene
 	# builds immediately — the headless match harness never clicks the setup window. A fresh launch
 	# opens the window first and builds the world once the player presses Start.
@@ -78,12 +95,7 @@ func _ready() -> void:
 			"seed": house_seed,
 			"defenders": defender_count,
 			"invaders": invader_count,
-			"show_agent_labels": show_agent_labels,
-			"show_agent_paths": show_agent_paths,
-			"show_vision": show_vision,
-			"show_tactics": show_tactics,
-			"show_room_zones": show_room_zones,
-			"show_nav_holes": show_nav_holes,
+			"debug": debug_overlays,
 		})
 
 
@@ -94,12 +106,8 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	house_seed = int(config.get("seed", house_seed))
 	defender_count = int(config.get("defenders", defender_count))
 	invader_count = int(config.get("invaders", invader_count))
-	show_agent_labels = bool(config.get("show_agent_labels", show_agent_labels))
-	show_agent_paths = bool(config.get("show_agent_paths", show_agent_paths))
-	show_vision = bool(config.get("show_vision", show_vision))
-	show_tactics = bool(config.get("show_tactics", show_tactics))
-	show_room_zones = bool(config.get("show_room_zones", show_room_zones))
-	show_nav_holes = bool(config.get("show_nav_holes", show_nav_holes))
+	debug_overlays = bool(config.get("debug", debug_overlays))
+	_overlay_flags = _initial_overlays()  # Recomputed now that the master switch is chosen.
 	# Hold the start until the decision server is live, so the NPCs' first decisions don't fail
 	# against a booting server and leave them holding steady. The window stays up (showing why)
 	# until then; this returns immediately when a server is already up or none is coming.
@@ -173,7 +181,8 @@ func _spawn_world() -> void:
 	nav_debug.name = "NavDebug"
 	add_child(nav_debug)
 	nav_debug.setup(house)
-	nav_debug.show_holes = show_nav_holes
+	_nav_debug = nav_debug
+	nav_debug.show_holes = _overlay_flags.get(OVERLAY_REGISTRY.NAV_HOLES, false)
 	# Keep the navmesh in step with furniture that gets shoved around: re-carves the holes at the
 	# pieces' current positions on an interval (and refreshes the overlay), so paths route around
 	# scattered objects instead of their original spots.
@@ -190,6 +199,12 @@ func _spawn_world() -> void:
 	_configure_debug()
 	if spectator_mode:
 		_setup_spectator()
+	if debug_overlays:
+		var toggles := OVERLAY_TOGGLES.new()
+		toggles.name = "OverlayToggles"
+		add_child(toggles)
+		toggles.setup(_overlay_flags)
+		toggles.overlay_toggled.connect(_on_overlay_toggled)
 
 
 ## Turn the scene into a pure 2-AI spectator match: drop the human player and its player-HUD, point
@@ -211,14 +226,10 @@ func _setup_spectator() -> void:
 	var inspector := SPECTATOR_INSPECTOR.new()
 	inspector.name = "SpectatorInspector"
 	add_child(inspector)
-	inspector.setup(combatants, {
-		"show_actions": show_agent_labels,
-		"show_path": show_agent_paths,
-		"show_vision": show_vision,
-		"show_tactics": show_tactics,
-		"show_room_zones": show_room_zones,
-		"show_search": show_search,
-	})
+	_inspector = inspector
+	var npc_flags := _overlay_flags.duplicate()
+	npc_flags.erase(OVERLAY_REGISTRY.NAV_HOLES)  # global, not per NPC
+	inspector.setup(combatants, npc_flags)
 	var debug := get_node_or_null("DebugUI")
 	if debug:
 		debug.queue_free()
@@ -296,21 +307,44 @@ func _bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> 
 			return
 
 
-## Apply the current debug-overlay toggles to every spawned NPC. Duck-typed by property name so
-## Main doesn't depend on the debug nodes' class or path — any child with show_actions / show_path /
-## show_vision / show_tactics / show_room_zones / show_search gets the matching toggle value.
+## The overlays' starting state: each registry default, overridden by the Main exports that name an
+## overlay (labels / paths / vision / tactics / room zones / search / furniture holes).
+func _initial_overlays() -> Dictionary:
+	var flags: Dictionary = OVERLAY_REGISTRY.defaults()
+	flags["show_actions"] = show_agent_labels
+	flags["show_path"] = show_agent_paths
+	flags["show_vision"] = show_vision
+	flags["show_tactics"] = show_tactics
+	flags["show_room_zones"] = show_room_zones
+	flags["show_search"] = show_search
+	flags[OVERLAY_REGISTRY.NAV_HOLES] = show_nav_holes
+	if not debug_overlays:
+		for flag in flags:
+			flags[flag] = false
+	return flags
+
+
+## Apply the current debug-overlay toggles to every spawned NPC. Duck-typed by property name so Main
+## doesn't depend on the debug nodes' class or path — any NPC child with a matching `show_<x>` property
+## gets that flag's value. (In spectator mode the inspector then shows them only on the selected NPC.)
 func _configure_debug() -> void:
 	for npc in _combatants:
 		for child in npc.get_children():
-			if "show_actions" in child:
-				child.show_actions = show_agent_labels
-			if "show_path" in child:
-				child.show_path = show_agent_paths
-			if "show_vision" in child:
-				child.show_vision = show_vision
-			if "show_tactics" in child:
-				child.show_tactics = show_tactics
-			if "show_room_zones" in child:
-				child.show_room_zones = show_room_zones
-			if "show_search" in child:
-				child.show_search = show_search
+			for flag in _overlay_flags:
+				if flag != OVERLAY_REGISTRY.NAV_HOLES and flag in child:
+					child.set(flag, _overlay_flags[flag])
+
+
+## A toggle-bar button was pressed: record the flag and apply it live. The furniture holes go to the single
+## NavDebug node; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
+## only); in player mode every NPC's overlay takes it directly.
+func _on_overlay_toggled(flag: String, on: bool) -> void:
+	_overlay_flags[flag] = on
+	if flag == OVERLAY_REGISTRY.NAV_HOLES:
+		if is_instance_valid(_nav_debug):
+			_nav_debug.show_holes = on
+			_nav_debug.queue_redraw()
+	elif _inspector != null and is_instance_valid(_inspector):
+		_inspector.set_flag(flag, on)
+	else:
+		_configure_debug()

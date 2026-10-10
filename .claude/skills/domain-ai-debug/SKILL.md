@@ -15,6 +15,10 @@ Files:
 - `agent_debug.gd` — the NPC's current decision + path.
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
 - `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
+- Eight further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
+  character, runs `PROCESS_MODE_ALWAYS`, redraws only while its `show_<x>` is on, plus ring/arrow/line/
+  timer-arc helpers): `contacts_debug.gd`, `hearing_debug.gd`, `combat_debug.gd`, `territory_debug.gd`,
+  `targets_debug.gd`, `brain_debug.gd`, `routes_debug.gd`, `stuck_debug.gd` (see the section below).
 
 ## `vision_debug.gd` (toggle `show_vision`)
 
@@ -83,9 +87,34 @@ API, and runs `PROCESS_MODE_ALWAYS`.
 
 ## Note on the controller's observer getters
 
-All four overlays depend on the controller keeping its observer getters and the Vision exports public.
+All the overlays depend on the controller keeping its observer getters and the Vision exports public.
 The controller is the single authoring/observer surface: it forwards `debug_status()` (and
 `current_act()`) from the behaviour sub-domain, builds `debug_zones()` from the last perception snapshot
 it holds, forwards `debug_room_zones()` from the perception's `room_status()` and
 `debug_search_coverage()` from the behaviour's `debug_coverage()`, and holds the Vision group exports —
 so these overlays need no reference into the perception/behaviour internals.
+
+## The behaviour overlays (all default off; toggled from the UI toggle bar / setup window)
+
+Each is a child of the NPC in `npc.tscn`, found by its `show_<x>` property (registry in
+`scenes/ui/overlay_registry.gd`), and reads only the controller's public `debug_*` getters:
+
+| Overlay (flag) | Draws | Controller getter(s) |
+|---|---|---|
+| `contacts_debug` (`show_contacts`) | ghost at each contact's last-KNOWN position, fading with age; red/green by hostility + the reason; facing/velocity arrows; wound pip; sight line when visible; lost hostiles' extrapolated heading | `known_contacts_for_display()`, `debug_memory()`, `debug_state()` |
+| `hearing_debug` (`show_hearing`) | hearing / hit-awareness / callout-range rings; gunfire heard (fading); incoming-fire arrow; ally callouts heard (speaker→point); the last callout this NPC radioed | `debug_memory()`, `debug_sent_callout()` |
+| `combat_debug` (`show_combat`) | engaged target crosshair, fire line (clear green / blocked red / out of range), shoot + punch rings, aim arrow, committed fire/cover spot, peek/cover phase + duck countdown, fire-cooldown arc, ambush badge | `debug_combat()` |
+| `territory_debug` (`show_territory`) | house outline, "inside/outside · HOLDING GROUND", engaged target inside/outside, zones outside the house a territorial NPC drops | `debug_combat()`, `debug_room_zones()`, `debug_zones()` |
+| `targets_debug` (`show_targets`) | requested vs navmesh-snapped destination (red = unreachable), room-entry target, interact object + dwell arc, hold watch line, checked-lead count | `debug_combat()`, `debug_memory()` |
+| `brain_debug` (`show_brain`) | THINKING badge while Von is asked, FALLBACK badge when the last walk failed, next-decision / tactic / commit timers, force reason, true facts, per-level probability bars | `debug_brain()` |
+| `routes_debug` (`show_routes`) | navigated route to each fire/flank/advance/retreat point (green hidden / red exposed), clear-shot + cover notes, flank `held by` / `route passes` / ally lane, hostile `watch_arc` wedges | `debug_zones()` (entries carry `tags`), `known_contacts_for_display()`; route from the nav map, cached 0.5 s |
+| `stuck_debug` (`show_stuck`) | recent-position trail + a ring that reddens while the NPC is trying to move without progressing | `debug_progress()` |
+
+The getters are read-only and added to the controller: `debug_memory()` (perception memory: gunfire,
+under-fire, callouts, engaged window, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
+state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
+and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
+reacts to a stall) and `debug_sent_callout()`. `debug_zones()` entries now also carry the option's `tags`
+(`inside`, `held`, `crosses`/`crosses_name`, `hidden`, plus `clear_shot`, `route_exposed`, `cover`,
+`route_len`, `exposed_to`, `ally_lane`, `held_by` added by the snapshot's `_geo_tags()`; the planner reads
+only `inside`/`held`/`crosses`/`hidden`, so the extras don't affect decisions).

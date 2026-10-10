@@ -14,7 +14,21 @@ extends Node
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 var arrive_dist: float = 10.0
 
+## Stuck-sensing window (s): displacement is compared over this span while the NPC is trying to move.
+const STALL_WINDOW := 0.75
+## Speed (px/s) below which an NPC that is trying to move counts as not progressing.
+const STALL_SPEED := 8.0
+## Seconds between recorded trail points, and the most points kept (a short recent-position trail).
+const TRAIL_STEP := 0.25
+const TRAIL_MAX := 24
+
 var _agent: NavigationAgent2D     ## Pathfinding agent, or null (falls back to straight-line).
+var _stall_pos := Vector2.ZERO    ## Position at the start of the current stall-sensing window.
+var _stall_clock := 0.0           ## Seconds into the current window.
+var _stall_speed := 0.0           ## Speed (px/s) measured over the last full window.
+var _stalled_for := 0.0           ## Seconds the NPC has been trying to move without progressing.
+var _trail_clock := 0.0           ## Seconds since the last trail point.
+var _trail: Array = []            ## Recent world positions, oldest first.
 
 
 ## Resolve + wire the navigation agent. `agent` may be null (then everything falls back to straight
@@ -69,6 +83,36 @@ func debug_state() -> Dictionary:
 		"path_points": path.size(),
 		"path_index": idx,
 	}
+
+
+## Observation only: sample the character's progress each tick. While it is trying to move
+## (`move_input` set) it compares displacement over `STALL_WINDOW`; a speed under `STALL_SPEED` grows
+## `_stalled_for`. Nothing reacts to it — `debug_progress()` exposes it to the stuck overlay.
+func sample(character, delta: float) -> void:
+	var pos: Vector2 = character.global_position
+	_trail_clock += delta
+	if _trail_clock >= TRAIL_STEP:
+		_trail_clock = 0.0
+		_trail.append(pos)
+		if _trail.size() > TRAIL_MAX:
+			_trail.pop_front()
+	if (character.move_input as Vector2).length() < 0.1:
+		_stall_clock = 0.0
+		_stall_pos = pos
+		_stalled_for = 0.0
+		_stall_speed = 0.0
+		return
+	_stall_clock += delta
+	if _stall_clock >= STALL_WINDOW:
+		_stall_speed = pos.distance_to(_stall_pos) / _stall_clock
+		_stalled_for = _stalled_for + _stall_clock if _stall_speed < STALL_SPEED else 0.0
+		_stall_pos = pos
+		_stall_clock = 0.0
+
+
+## Read-only: the movement-progress state sampled by `sample()`, for the stuck debug overlay.
+func debug_progress() -> Dictionary:
+	return { "speed": _stall_speed, "stalled_for": _stalled_for, "stall_window": STALL_WINDOW, "trail": _trail }
 
 
 ## A world point as a JSON-safe [x, y] int pair.

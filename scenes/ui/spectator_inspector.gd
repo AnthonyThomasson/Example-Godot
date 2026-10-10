@@ -56,6 +56,14 @@ func setup(combatants: Array, flags: Dictionary) -> void:
 	_select(null)  # start with every NPC's overlays hidden — nothing is shown until clicked
 
 
+## Update one overlay toggle live (from the in-game toggle bar) and re-apply it to the selected NPC, so the
+## button takes effect at once; later selections use the new value too.
+func set_flag(flag: String, on: bool) -> void:
+	_flags[flag] = on
+	if _selected != null and is_instance_valid(_selected):
+		_set_overlays(_selected, true)
+
+
 ## A label on this layer that never swallows a click meant for an NPC. The caller anchors/positions it.
 func _make_label(align: int, size: int) -> Label:
 	var label := Label.new()

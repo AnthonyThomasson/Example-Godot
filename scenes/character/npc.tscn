@@ -1,4 +1,4 @@
-[gd_scene load_steps=9 format=3 uid="uid://d2vjx5ny4i4kv"]
+[gd_scene load_steps=17 format=3 uid="uid://d2vjx5ny4i4kv"]
 
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_character"]
 [ext_resource type="Script" path="res://scenes/ai/goal_controller.gd" id="2_controller"]
@@ -8,6 +8,14 @@
 [ext_resource type="Script" path="res://scenes/ai/debug/agent_debug.gd" id="6_agent"]
 [ext_resource type="Script" path="res://scenes/ai/debug/tactics_debug.gd" id="7_tactics"]
 [ext_resource type="Script" path="res://scenes/ai/debug/search_debug.gd" id="8_search"]
+[ext_resource type="Script" path="res://scenes/ai/debug/contacts_debug.gd" id="9_contacts"]
+[ext_resource type="Script" path="res://scenes/ai/debug/hearing_debug.gd" id="10_hearing"]
+[ext_resource type="Script" path="res://scenes/ai/debug/combat_debug.gd" id="11_combat"]
+[ext_resource type="Script" path="res://scenes/ai/debug/territory_debug.gd" id="12_territory"]
+[ext_resource type="Script" path="res://scenes/ai/debug/targets_debug.gd" id="13_targets"]
+[ext_resource type="Script" path="res://scenes/ai/debug/brain_debug.gd" id="14_brain"]
+[ext_resource type="Script" path="res://scenes/ai/debug/routes_debug.gd" id="15_routes"]
+[ext_resource type="Script" path="res://scenes/ai/debug/stuck_debug.gd" id="16_stuck"]
 
 [node name="NPC" type="CharacterBody2D"]
 script = ExtResource("1_character")
@@ -42,3 +50,27 @@ script = ExtResource("7_tactics")
 
 [node name="SearchDebug" type="Node2D" parent="."]
 script = ExtResource("8_search")
+
+[node name="ContactsDebug" type="Node2D" parent="."]
+script = ExtResource("9_contacts")
+
+[node name="HearingDebug" type="Node2D" parent="."]
+script = ExtResource("10_hearing")
+
+[node name="CombatDebug" type="Node2D" parent="."]
+script = ExtResource("11_combat")
+
+[node name="TerritoryDebug" type="Node2D" parent="."]
+script = ExtResource("12_territory")
+
+[node name="TargetsDebug" type="Node2D" parent="."]
+script = ExtResource("13_targets")
+
+[node name="BrainDebug" type="Node2D" parent="."]
+script = ExtResource("14_brain")
+
+[node name="RoutesDebug" type="Node2D" parent="."]
+script = ExtResource("15_routes")
+
+[node name="StuckDebug" type="Node2D" parent="."]
+script = ExtResource("16_stuck")

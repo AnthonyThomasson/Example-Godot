@@ -8,6 +8,8 @@ extends Node2D
 ## the whole room has been seen. Senses nothing, feeds nothing back (the "draw on its own child Node2D"
 ## convention, like tactics_debug.gd / vision_debug.gd).
 
+const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
+
 ## Whether to draw the coverage overlay. Off by default; in spectator mode the inspector turns it on
 ## only for the selected NPC (like the tactics overlay).
 @export var show_search: bool = false
@@ -20,7 +22,7 @@ const TARGET_COLOR := Color(1.0, 0.4, 0.2)       # red — the point being looke
 const POINT_RADIUS := 2.5
 const UNSEEN_RADIUS := 4.0
 const TARGET_RADIUS := 8.0
-const FONT_SIZE := 11
+const FONT_SIZE := 16
 
 var _controller: Node   ## The GoalController read for the coverage state.
 var _character: Node2D   ## The NPC body this overlay is a child of.
@@ -63,5 +65,5 @@ func _draw() -> void:
 	draw_arc(target, TARGET_RADIUS, 0.0, TAU, 16, TARGET_COLOR, 2.0)
 	# A seen / total readout beside the NPC.
 	var seen: int = points.size() - unseen.size()
-	draw_string(ThemeDB.fallback_font, Vector2(TARGET_RADIUS, -TARGET_RADIUS),
+	DebugText.string(self, ThemeDB.fallback_font, Vector2(TARGET_RADIUS, -TARGET_RADIUS),
 		"searched %d/%d" % [seen, points.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, UNSEEN_COLOR)

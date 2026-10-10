@@ -224,6 +224,58 @@ func debug_coverage() -> Dictionary:
 	}
 
 
+## Read-only: the running combat / movement / interaction state as world-space data (Vector2s, not the
+## JSON-safe digest), for the combat, territory and targets debug overlays. `character` is the NPC's body,
+## needed for its aim point and the fire-line query. A pure read — the line query only casts a ray.
+func debug_combat(character) -> Dictionary:
+	var engaged := _engage_id != 0
+	var in_range := false
+	var fire_clear := false
+	if engaged and character != null:
+		in_range = character.global_position.distance_to(_engage_pos) <= shoot_range
+		fire_clear = in_range and _perception.has_line_to(character, _engage_node, _engage_pos)
+	var fighting := _primitive in [&"engage", &"melee"]
+	var obj_pos = null
+	if _primitive == &"interact" and is_instance_valid(_target_obj) and _target_obj is Node2D:
+		obj_pos = (_target_obj as Node2D).global_position
+	return {
+		"primitive": _primitive,
+		"style": _params.get("style", &"peek_cover") if _primitive == &"engage" else &"",
+		"engaged": engaged,
+		"engage_pos": _engage_pos,
+		"engage_inside": _engage_inside,
+		"hold_ground": _hold_ground,
+		"in_range": in_range,
+		"fire_clear": fire_clear,
+		"shoot_range": shoot_range,
+		"punch_range": punch_range,
+		"combat_phase": _combat_phase if fighting else "",
+		"cover_timer": _cover_timer,
+		"cover_time": cover_time,
+		"fire_timer": _fire_timer,
+		"fire_cooldown": fire_cooldown,
+		"combat_dest": _combat_dest if _primitive == &"engage" and _arrived and _combat_dest != Vector2.ZERO else null,
+		"aim_point": character.aim_point if character != null else Vector2.ZERO,
+		"fire_at_will": bool(_params.get("fire_at_will", false)),
+		"requested_point": _params["point"] if _params.has("point") else null,
+		"point": _point if _params.has("point") else null,
+		"arrived": _arrived,
+		"arrive_room": _arrive_room,
+		"object_pos": obj_pos,
+		"in_interaction": _in_interaction,
+		"interaction_timer": _interaction_timer,
+		"interaction_dwell": interaction_dwell,
+		"watch_pos": _hostiles[0]["pos"] if _primitive == &"hold" and not _hostiles.is_empty() else null,
+		"reachable": _loco.debug_state().get("reachable", true),
+		"timers": { "commit": _commit_timer, "commit_max": max_commit_time, "tactic": _tactic_timer, "tactic_max": tactic_interval },
+	}
+
+
+## Read-only: the movement-progress sample (speed, seconds stalled, recent trail) for the stuck overlay.
+func debug_progress() -> Dictionary:
+	return _loco.debug_progress()
+
+
 ## A params dict with points as [x, y] and objects as names, so an observer can serialize it.
 func _json_safe(d: Dictionary) -> Dictionary:
 	var out := {}
@@ -390,6 +442,7 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 ## Carry out the running primitive this tick.
 func apply(character, delta: float) -> void:
 	_fire_timer -= delta
+	_loco.sample(character, delta)  # Observation only (stuck overlay); never alters the tick.
 	match _primitive:
 		&"move":
 			_apply_move(character, delta)

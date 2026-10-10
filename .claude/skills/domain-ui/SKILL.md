@@ -22,29 +22,42 @@ the domains.
   faction, health bar, current act (the controller's `debug_status()` — the full decision path,
   word-wrapped) — whose bottom-centre is placed 24 px above the NPC's on-screen origin each
   frame via `get_global_transform_with_canvas()` (clamped inside the viewport). Also: a top-centre
-  running timer (34pt), a top-left goal readout listing every NPC's name and goal (28pt), a centre
+  running timer (34pt), a top-left goal readout listing every NPC's name and goal (28pt, spans the left half of the screen and word-wraps), a centre
   winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus
   `&"hit"`). Declares the winner once an entire faction is eliminated.
 
 - `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open(defaults)` shows a
   full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox,
-  "Seed" text field (blank = random), Defenders/Invaders spinboxes, six debug-overlay
-  checkboxes ("Agent labels", "Agent paths", "Vision cones", "Tactics zones", "Room zones",
-  "Furniture holes"), and a Start button. Pressing Start emits `start_requested({ has_player, seed,
-  defenders, invaders, show_agent_labels, show_agent_paths, show_vision, show_tactics,
-  show_room_zones, show_nav_holes })`. Main opens it on a fresh launch; a scripted `restart` sets the
+  "Seed" text field (blank = random), Defenders/Invaders spinboxes, a single "Debug" checkbox (the master
+  switch for the AI overlays: off = every overlay hidden and no toggle bar; on = the toggle bar, every overlay starting off, plus
+  the bar), and a Start button. Pressing Start emits `start_requested({ has_player, seed, defenders,
+  invaders, debug })`. Main opens it on a fresh launch on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. Pressing Start also **disables the button**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
   shows "Waiting for the decision server…" there so that pause is never silent.
 
+- `overlay_registry.gd` — the ONE table of debug overlays (`ENTRIES`: `flag`, `label`, `group`, `default`;
+  `defaults()`; `NAV_HOLES`, the one global non-per-NPC flag). `flag` is the overlay node's `show_<x>`
+  property name. The setup window, the toggle bar and Main all read it, so a new overlay is one row here
+  plus its draw script (`scenes/ai/debug/`) and a node in `npc.tscn`.
+
+- `overlay_toggles.gd` — the **in-game overlay toggle bar** (`OverlayToggles` CanvasLayer, built by
+  `main.gd` after the world spawns, both modes, only when Debug is on). A collapsible top-right panel (1.5× scale: `SCALE` in the script) of toggle buttons grouped
+  from the registry (Perception / Combat / Movement / Brain / Map). `setup(flags)` seeds the buttons;
+  pressing one emits `overlay_toggled(flag, on)`, which Main applies live (`_on_overlay_toggled`: player
+  mode → every NPC's overlay via `_configure_debug`; spectator mode → `SpectatorInspector.set_flag`, so
+  the selected NPC follows; `show_nav_holes` → the single NavDebug). `PROCESS_MODE_ALWAYS` (works while
+  paused); the panel swallows clicks so pressing a button never selects an NPC; buttons take no focus
+  (Space stays pause/interact).
+
 - `seed_display.gd` — the **seed readout** (`SeedDisplay` node). `show_seed(level_seed)` writes the
   run's seed into a 32pt label anchored to the bottom-right corner (semi-transparent), so a layout
   you like can be re-entered in the setup window.
 
 - `spectator_inspector.gd` — the **spectator inspector** (`SpectatorInspector` node), built by `main.gd`
-  only in spectator mode via `setup(combatants, flags)` (`flags` = the setup menu's overlay toggles).
+  only in spectator mode via `setup(combatants, flags)` (`flags` = the current overlay toggles; `set_flag(flag, on)` updates one live from the toggle bar and re-applies it to the selected NPC).
   **Space** toggles `get_tree().paused`. A **left-click** on an NPC (nearest within `PICK_RADIUS` of the
   cursor's world point, via the framing camera) selects it — revealing ONLY that NPC's *enabled* overlays
   (each toggle set from `flags`) and hiding every other NPC's; clicking it again or empty ground clears
@@ -54,7 +67,7 @@ the domains.
   directly beneath the match HUD's goal readout — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
   paused (freeze the match, then inspect). Decoupled like the other observers: reads the combatants'
   public `global_position`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
-  toggles (`show_actions` / `show_path` / `show_vision` / `show_tactics` / `show_room_zones`) by the same
+  toggles (every per-NPC flag of the overlay registry) by the same
   duck-typed names `main.gd`'s `_configure_debug` uses. Reads `Keybinds.PAUSE` (Space; shares it with
   `INTERACT`, unused in the player-less match). Mouse-ignoring hint + detail labels (with text shadow).
 

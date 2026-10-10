@@ -7,6 +7,8 @@ extends Node2D
 ## and NavigationAgent2D through their public API, senses nothing and feeds nothing back (follows the
 ## "draw on its own child Node2D" convention, like vision_debug.gd).
 
+const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
+
 ## Whether to draw the floating action label above the NPC.
 @export var show_actions: bool = true
 ## Whether to draw the NPC's current navigation path.
@@ -23,7 +25,7 @@ extends Node2D
 @export var label_offset: float = 28.0
 
 ## Point size of the label font.
-const FONT_SIZE := 16
+const FONT_SIZE := 11
 ## Radius (px) of a waypoint dot on the path.
 const WAYPOINT_RADIUS := 2.5
 ## Radius (px) of the ring drawn at the path's final target.
@@ -84,4 +86,4 @@ func _draw_label(text: String) -> void:
 	var font: Font = ThemeDB.fallback_font
 	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE).x
 	var pos := Vector2(-width / 2.0, label_offset)
-	draw_string(font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE, label_color)
+	DebugText.string(self, font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE, label_color)

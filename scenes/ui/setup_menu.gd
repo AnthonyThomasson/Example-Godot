@@ -11,10 +11,8 @@ extends CanvasLayer
 ## dict it emits.
 
 ## Emitted when the player presses Start, carrying the chosen parameters:
-## `{ has_player: bool, seed: int, defenders: int, invaders: int,
-##    show_agent_labels: bool, show_agent_paths: bool, show_vision: bool, show_tactics: bool,
-##    show_room_zones: bool, show_nav_holes: bool }`.
-## Main applies these and builds the world.
+## `{ has_player: bool, seed: int, defenders: int, invaders: int, debug: bool }` — `debug` is the single
+## switch for the AI debug overlays and their in-game toggle bar. Main applies these and builds the world.
 signal start_requested(config: Dictionary)
 
 const _MAX_COUNT := 8  ## Upper bound per side in the spinboxes; spawn spread handles any count in range.
@@ -23,19 +21,13 @@ var _player_check: CheckBox         ## Checked = a human player; unchecked = the
 var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
 var _defender_spin: SpinBox         ## How many defenders to drop into the house.
 var _invader_spin: SpinBox          ## How many invaders to spawn outside the house.
-var _agent_labels_check: CheckBox   ## Checked = draw the floating action-status label above each NPC.
-var _agent_paths_check: CheckBox    ## Checked = draw the NPC's live navigation path in the world.
-var _vision_check: CheckBox         ## Checked = draw each NPC's line-of-sight / awareness overlay.
-var _tactics_check: CheckBox        ## Checked = draw each NPC's tactical navigation-zone overlay.
-var _room_zones_check: CheckBox     ## Checked = draw each NPC's tactical room-zone overlay.
-var _nav_holes_check: CheckBox      ## Checked = draw the navmesh's furniture holes.
+var _debug_check: CheckBox          ## Checked = AI debug overlays (and their in-game toggle bar) are enabled.
 var _start_button: Button           ## Disabled on press, so holding the start can't be triggered twice.
 var _status: Label                  ## Status line Main shows while it holds the start (hidden when blank).
 
 
 ## Build the window seeded from `defaults` (`{ has_player, seed, defenders, invaders,
-## show_agent_labels, show_agent_paths, show_vision, show_tactics }`) and show it. Called by Main
-## before the world is spawned.
+## debug }`) and show it. Called by Main before the world is spawned.
 func open(defaults: Dictionary) -> void:
 	_build_ui(defaults)
 
@@ -83,47 +75,11 @@ func _build_ui(defaults: Dictionary) -> void:
 	_defender_spin = _spin_row(box, "Defenders", int(defaults.get("defenders", 1)))
 	_invader_spin = _spin_row(box, "Invaders", int(defaults.get("invaders", 1)))
 
-	var sep := Label.new()
-	sep.text = "Debug overlays"
-	sep.add_theme_font_size_override("font_size", 28)
-	sep.modulate = Color(1, 1, 1, 0.5)
-	box.add_child(sep)
-
-	_agent_labels_check = CheckBox.new()
-	_agent_labels_check.text = "Agent labels"
-	_agent_labels_check.button_pressed = bool(defaults.get("show_agent_labels", true))
-	_agent_labels_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_agent_labels_check)
-
-	_agent_paths_check = CheckBox.new()
-	_agent_paths_check.text = "Agent paths"
-	_agent_paths_check.button_pressed = bool(defaults.get("show_agent_paths", true))
-	_agent_paths_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_agent_paths_check)
-
-	_vision_check = CheckBox.new()
-	_vision_check.text = "Vision cones"
-	_vision_check.button_pressed = bool(defaults.get("show_vision", true))
-	_vision_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_vision_check)
-
-	_tactics_check = CheckBox.new()
-	_tactics_check.text = "Tactics zones"
-	_tactics_check.button_pressed = bool(defaults.get("show_tactics", false))
-	_tactics_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_tactics_check)
-
-	_room_zones_check = CheckBox.new()
-	_room_zones_check.text = "Room zones"
-	_room_zones_check.button_pressed = bool(defaults.get("show_room_zones", false))
-	_room_zones_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_room_zones_check)
-
-	_nav_holes_check = CheckBox.new()
-	_nav_holes_check.text = "Furniture holes"
-	_nav_holes_check.button_pressed = bool(defaults.get("show_nav_holes", false))
-	_nav_holes_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_nav_holes_check)
+	_debug_check = CheckBox.new()
+	_debug_check.text = "Debug"
+	_debug_check.button_pressed = bool(defaults.get("debug", true))
+	_debug_check.add_theme_font_size_override("font_size", 30)
+	box.add_child(_debug_check)
 
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 24)
@@ -200,10 +156,6 @@ func _on_start() -> void:
 		"seed": _seed_edit.text.strip_edges().to_int(),
 		"defenders": int(_defender_spin.value),
 		"invaders": int(_invader_spin.value),
-		"show_agent_labels": _agent_labels_check.button_pressed,
-		"show_agent_paths": _agent_paths_check.button_pressed,
-		"show_vision": _vision_check.button_pressed,
-		"show_tactics": _tactics_check.button_pressed,
-		"show_room_zones": _room_zones_check.button_pressed,
-		"show_nav_holes": _nav_holes_check.button_pressed,
+		"debug": _debug_check.button_pressed,
 	})
+

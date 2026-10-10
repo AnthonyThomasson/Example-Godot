@@ -48,6 +48,7 @@ var _last_levels: Array = []       ## The last finished walk's records, for the 
 var _prev_path: Array = []         ## Ids of the last adopted path, for the "(your current plan)" cue.
 var _asked_ms := 0                 ## When the in-flight question was sent.
 var _pending := false              ## Whether a walk is in flight.
+var _last_failed := false          ## Whether the last finished walk failed (Von down / bad pick) rather than decided.
 
 
 ## Wire the Von transport and build the tree with this NPC's overrides. The controller calls this once
@@ -124,6 +125,7 @@ func debug_state() -> Dictionary:
 	return {
 		"entry": String(_entry),
 		"pending": _pending,
+		"last_failed": _last_failed,
 		"path": " - ".join(_steps.map(func(s): return s["label"])),
 		"levels": _levels if _pending else _last_levels,
 	}
@@ -239,6 +241,7 @@ func _finish(node_id: StringName, option: Dictionary) -> void:
 		"params": params,
 	}
 	_pending = false
+	_last_failed = false
 	_last_levels = _levels
 	_prev_path = leaf["path"]
 	decided.emit(leaf)
@@ -247,6 +250,7 @@ func _finish(node_id: StringName, option: Dictionary) -> void:
 ## End the walk without a decision.
 func _fail_walk() -> void:
 	_pending = false
+	_last_failed = true
 	_last_levels = _levels
 	failed.emit()
 

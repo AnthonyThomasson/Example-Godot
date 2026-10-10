@@ -256,6 +256,53 @@ func memory_size() -> int:
 	return _memory.size()
 
 
+## Debug read: what the NPC has heard and been told, for the hearing/contacts overlays — gunfire heard
+## (`pos`, `age`), the live under-fire event (`from` direction, `hit`, seconds `left`), ally callouts
+## heard (`pos`, `point`, `label`, `name`, `age`), the engaged window's seconds left, checked leads, the
+## hostiles it has lost track of, and the hearing/awareness radii. A pure read of memory; never writes it.
+func debug_memory() -> Dictionary:
+	var now := Time.get_ticks_msec()
+	var gunfire: Array = []
+	for rec in _memory.recall_aged(&"heard_gunfire"):
+		gunfire.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "age": rec["age"] })
+	var under := {}
+	var engaged_left := 0.0
+	var checked: Array = []
+	for e in _memory.fresh():
+		var left: float = maxf((e["ttl"] - (now - e["at"]) / 1000.0), 0.0) if e["ttl"] > 0.0 else 0.0
+		match e["topic"]:
+			&"under_fire":
+				if under.is_empty():
+					under = { "from": e["data"].get("from", Vector2.ZERO), "hit": e["data"].get("hit", false), "left": left }
+			&"engaged":
+				engaged_left = maxf(engaged_left, left)
+			&"checked_lead":
+				checked.append(str(e["data"].get("id", "")))
+	var callouts: Array = []
+	for c in _callouts():
+		callouts.append({
+			"name": c["name"], "age": c["age"], "label": c.get("label", ""),
+			"pos": c.get("position", Vector2.ZERO), "point": c.get("point", Vector2.ZERO),
+		})
+	var lost: Array = []
+	for c in lost_hostiles():
+		lost.append({ "pos": c["pos"], "vel": c.get("vel", Vector2.ZERO), "age": c["age"], "name": c["name"] })
+	return {
+		"gunfire": gunfire,
+		"under_fire": under,
+		"engaged_left": engaged_left,
+		"callouts": callouts,
+		"checked_leads": checked,
+		"lost": lost,
+		"hearing_radius": hearing_radius,
+		"hit_awareness_radius": hit_awareness_radius,
+		"callout_range": callout_range,
+		"contact_memory_ttl": contact_memory_ttl,
+		"lead_memory_ttl": lead_memory_ttl,
+		"extrapolate_cap": extrapolate_cap,
+	}
+
+
 ## Debug read: every room tagged by how this NPC regards it right now — the one it stands in
 ## (`current`), a room it has seen and searched recently (`searched`) or seen but not searched
 ## (`unsearched`), or one it has not yet seen at all (`unknown`). This is the room reasoning the

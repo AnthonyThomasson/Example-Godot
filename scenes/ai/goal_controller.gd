@@ -227,6 +227,9 @@ var _last_facts := {} ## The facts of the last decision snapshot, retained for `
 var _last_options := {} ## The option groups of the last snapshot, retained for `debug_zones()`.
 var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
 var _force := false ## Force a decision now (task resolved or salient event).
+var _force_reason := "" ## Why `_force` was last raised, kept (with `_force_ms`) for the brain overlay.
+var _force_ms := 0 ## When `_force_reason` was raised (msec).
+var _last_callout := {} ## The last callout this NPC radioed (`position`, `point`, `label`, `at`), for the hearing overlay.
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
 var _salient_init := false ## Whether _salient_key has been seeded.
 # EventBus events are queued here, then handed to perception on the next control() tick.
@@ -462,7 +465,55 @@ func _collect_zones(out: Array, group: Dictionary, category: StringName) -> void
 			point = (params["object"] as Node2D).global_position
 		if point != null:
 			out.append({ "point": point, "category": cat,
-				"label": opt.get("label", ""), "desc": opt.get("desc", "") })
+				"label": opt.get("label", ""), "desc": opt.get("desc", ""), "tags": opt.get("tags", {}) })
+
+
+## Read-only: what the NPC has heard and been told (gunfire heard, under-fire direction, ally callouts,
+## lost hostiles, checked leads, radii) — for the contacts and hearing overlays. Empty before perception exists.
+func debug_memory() -> Dictionary:
+	return _perception.debug_memory() if _perception != null else {}
+
+
+## Read-only: the behaviour's combat / movement / interaction state as world-space data — the engaged
+## target, committed destination, aim and fire line, peek-and-cover phase, leash, move/interact targets —
+## for the combat, territory and targets overlays. Empty until the controller knows its character.
+func debug_combat() -> Dictionary:
+	if _behavior == null or _character == null:
+		return {}
+	return _behavior.debug_combat(_character)
+
+
+## Read-only: the movement-progress sample (speed, seconds stalled, recent trail) for the stuck overlay.
+func debug_progress() -> Dictionary:
+	return _behavior.debug_progress() if _behavior != null else {}
+
+
+## Read-only: the last callout this NPC radioed (`position`, `point`, `label`, `at` msec), or empty.
+func debug_sent_callout() -> Dictionary:
+	return _last_callout
+
+
+## Read-only: the decision machinery's live state for the brain overlay — whether Von is being asked
+## (`pending`), the last walk's levels (state, offered options, probabilities, pick), whether it failed
+## (the behaviour then holds steady), the decide/force timers and why the last force fired, and the facts.
+func debug_brain() -> Dictionary:
+	if _planner == null:
+		return {}
+	var d: Dictionary = _planner.debug_state()
+	var timers: Dictionary = _behavior.debug_combat(_character).get("timers", {}) if _character != null else {}
+	return {
+		"pending": d.get("pending", false),
+		"failed": d.get("last_failed", false),
+		"entry": d.get("entry", ""),
+		"levels": d.get("levels", []),
+		"decide_in": maxf(_decide_timer, 0.0),
+		"decide_interval": decide_interval,
+		"forced": _force,
+		"force_reason": _force_reason,
+		"force_age": (Time.get_ticks_msec() - _force_ms) / 1000.0 if _force_reason != "" else INF,
+		"timers": timers,
+		"facts": _last_facts,
+	}
 
 
 ## Full contact data for display in the spectator inspector: each entry has `node`, `pos` (last-known
@@ -513,13 +564,13 @@ func control(character, delta: float) -> void:
 		entry_point = Vector2.ZERO
 	var known: Array = _perception.contacts(character.global_position)
 	if _behavior.update_known(known, delta):
-		_force = true # Lost the engaged contact mid-fight → reconsider.
+		_force_now("lost the engaged contact") # Lost the engaged contact mid-fight → reconsider.
 	_check_salient()
 	# An active interaction holds the tick; when it or a move resolves, re-decide at once.
 	if _behavior.service_interaction(character, delta, _force):
 		return
 	if _behavior.take_resolved():
-		_force = true
+		_force_now("task resolved")
 		var lead: String = _behavior.reached_lead()
 		if lead != "":
 			_perception.check_lead(lead) # Reached it and found nothing: don't send it back there.
@@ -531,6 +582,13 @@ func control(character, delta: float) -> void:
 		_start_decision(character)
 	# ACT.
 	_behavior.apply(character, delta)
+
+
+## Raise the force-decide flag and remember why, for the brain debug overlay.
+func _force_now(reason: String) -> void:
+	_force = true
+	_force_reason = reason
+	_force_ms = Time.get_ticks_msec()
 
 
 ## Whether a new decision may start now: always when forced; otherwise the behaviour decides whether
@@ -573,7 +631,7 @@ func _process_events(character) -> void:
 	for ev in _event_queue:
 		if ev[0] == &"hit":
 			if _perception.process_hit(character, ev[1]) and not _behavior.in_combat():
-				_force = true
+				_force_now("attacked")
 		elif hear_callouts:
 			_perception.process_callout(character, ev[1])
 	_event_queue.clear()
@@ -591,7 +649,7 @@ func _check_salient() -> void:
 		return
 	if key != _salient_key:
 		_salient_key = key
-		_force = true
+		_force_now("hostile belief changed")
 
 
 ## Adopt the planner's leaf: hand it to the behaviour, log the full decision path, and tell allies
@@ -616,6 +674,8 @@ func _post_callout(leaf: Dictionary) -> void:
 		status.append("badly wounded")
 	elif dmg >= _perception.hurt_threshold:
 		status.append("hurt")
+	_last_callout = { "position": _character.global_position, "point": params.get("point", _character.global_position),
+		"label": " - ".join(leaf["labels"]), "at": Time.get_ticks_msec() }
 	EventBus.post(&"callout", {
 		"speaker": _character,
 		"faction": _character.faction,

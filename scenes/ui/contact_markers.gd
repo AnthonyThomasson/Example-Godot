@@ -9,7 +9,7 @@ extends Node2D
 ## queues the redraw — so the rings redraw live, and hold steady while the match is Space-paused.
 
 const RING_RADIUS := 28.0
-const FONT_SIZE := 14
+const FONT_SIZE := 18
 ## Opacity for a currently-visible contact vs a stale (remembered but not in sight) one.
 const ALPHA_VISIBLE := 0.9
 const ALPHA_STALE := 0.45
@@ -40,5 +40,6 @@ func _draw() -> void:
 		draw_arc(world_pos, RING_RADIUS, 0.0, TAU, 24, base, 2.5)
 		var label: String = c["name"] + (" ●" if visible else " ?")
 		var str_w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
-		draw_string(font, world_pos + Vector2(-str_w * 0.5, -RING_RADIUS - 5.0),
-			label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, base)
+		var label_pos := world_pos + Vector2(-str_w * 0.5, -RING_RADIUS - 5.0)
+		draw_string_outline(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 5, Color(0, 0, 0, 0.95))
+		draw_string(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, Color(base, 1.0))
