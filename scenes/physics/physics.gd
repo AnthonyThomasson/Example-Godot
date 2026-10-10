@@ -40,7 +40,7 @@ static func spawn_blood(parent: Node, hit: HitInfo, exclude: Array, source: Node
 	return BloodSpawner.add_blood(active, hit.position, spill, parent, exclude, source)
 
 
-## Start a dead body's bleed-out: one slow, wide pool (BloodConfig.bleed_out_*) spreading from where
+## Start a dead body's bleed-out: one slow, flowing pool (BloodConfig.bleed_out_*) spreading from where
 ## its blood leaves it — `source.blood_origin()` if it has one (where it lies), else its position —
 ## added under `parent`. `exclude` is the body's RID(s). Returns the pool.
 static func bleed_out(parent: Node, source: Node2D, exclude: Array) -> Node:

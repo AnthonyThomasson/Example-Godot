@@ -77,8 +77,10 @@ Drops emerge at the source's `blood_origin()` when it has one (else its position
 returns its trunk's middle once fallen, so a pool still filling at death flows from the body as it
 falls and rests. Each pool releases at its own rate. `Physics.bleed_out(parent, source, exclude)`
 (`BloodSpawner.bleed`) starts a dead body's bleed-out where its blood leaves it: a pool holding
-`BloodConfig.bleed_out_volume` drops, released over `bleed_out_duration` into a disc of
-`bleed_out_radius`, leaning a random way (`BloodPool.seed_bleed_out`).
+`BloodConfig.bleed_out_cells` grid cells claimed over `bleed_out_duration` by a `BloodFlow`
+flood-fill (`BloodPool.seed_bleed_out`): cheapest-first with noise-roughened cost (`flow_*` tuning), cells
+overlapping a layer-1 collider never fill, so the puddle is one continuous irregular shape wrapping around
+walls and furniture. All cells are claimed up front (a batch per frame); a front then sweeps through flow-cost over `bleed_out_duration`, so each cell's fill rises continuously. Drawn by blurring the fill field into a small image and thresholding it in a shader (one smooth outline, darker rim); wound spatter keeps the drop model.
 
 ## Tuning
 

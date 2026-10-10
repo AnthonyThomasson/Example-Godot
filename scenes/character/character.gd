@@ -346,6 +346,8 @@ func _apply_damage(amount: float, direction := Vector2.ZERO) -> void:
 ## the hand lets go of what it held. Emits `died` for observers.
 func _die(direction: Vector2) -> void:
 	is_dead = true
+	if is_instance_valid(_blood_pool):
+		_blood_pool.stop_emitting()
 	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
 	# punches, sight lines and the dropped item, all on layer 1) pass right over it instead of being
 	# blocked, and draw it beneath them.

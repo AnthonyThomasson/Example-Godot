@@ -7,13 +7,16 @@ extends Node2D
 ## the blood already there. Each hit on the body calls `add_hit`, adding volume and widening the
 ## fill disc (`_spread`) toward BloodConfig.pool_radius_max, so a still victim bled repeatedly pools
 ## out wide while a lone wound stays small; the volume is capped at BloodConfig.max_pool_volume.
-## A bleed-out pool (`seed_bleed_out`) instead holds a set volume released slowly into a wide disc.
+## A bleed-out pool (`seed_bleed_out`) instead flows: a BloodFlow flood-fill claims cells outward at
+## a steady rate, wrapping around walls and furniture into one continuous irregular puddle.
 ## Drops emerge at the source's `blood_origin()` when it has one (a fallen body bleeds from where it
 ## lies, not where it stood), else at its position. Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
 
 ## Physics layer the drops avoid — walls and furniture (the default world layer).
 const COLLISION_MASK := 1
 ## Vertices in each drop's blob outline — enough to look round-ish while its lumps stay visible.
+## Flow cells claimed per physics frame.
+const FLOW_CLAIMS_PER_FRAME := 60
 const BLOB_VERTS := 11
 
 ## Live drops, each a Dictionary: pos (local, px), origin (local, px — where it emerged), vel
@@ -36,10 +39,16 @@ var _spread := 0.0
 var _source: Node2D
 ## Drops released so far.
 var _emitted := 0
-## Fractional drop budget accrued at the emission rate; drops release as it passes whole numbers.
-var _emit_budget := 0.0
+## Seconds until the next drop is released (re-rolled at random after each).
+var _drop_wait := 0.0
 ## Drops released per second.
 var _rate := BloodConfig.particle_count / maxf(BloodConfig.spill_duration, 0.001)
+
+## The flood-fill of a bleed-out pool (null for wound pools); the visuals draw its cells.
+var flow: BloodFlow
+## Cells the flow still has to claim, and the seconds its front takes to sweep them.
+var _flow_left := 0
+var _flow_duration := 1.0
 
 ## Reusable query shape (the small circle each drop sweeps with).
 var _probe: CircleShape2D
@@ -77,17 +86,22 @@ func seed(direction: Vector2, exclude: Array, source: Node2D) -> void:
 	add_hit(direction)
 
 
-## Start a body's bleed-out pool: `volume` drops released over `duration` seconds into a disc of
-## `radius`, leaning a random way. `exclude` and `source` as for `seed`.
-func seed_bleed_out(volume: int, duration: float, radius: float, exclude: Array, source: Node2D) -> void:
+## Start a body's bleed-out pool: `cells` grid cells claimed over `duration` seconds, flowing out
+## from its origin and leaning a random way. `exclude` and `source` as for `seed`.
+func seed_bleed_out(cells: int, duration: float, exclude: Array, source: Node2D) -> void:
 	_exclude = exclude
 	_aim = Vector2.RIGHT.rotated(randf() * TAU)
 	_source = source
-	_make_edge_profile()
-	_count = volume
-	_spread = radius
-	_rate = volume / maxf(duration, 0.001)
+	flow = BloodFlow.new(_aim, exclude)
+	_flow_left = cells
+	_flow_duration = duration
 	set_physics_process(true)
+
+
+## Stop releasing drops (the body died): the ones already out finish settling, and the dead body's
+## smooth bleed-out takes over.
+func stop_emitting() -> void:
+	_count = _emitted
 
 
 ## Add one wound's worth of blood: bump the volume (capped) and widen the fill disc from the volume
@@ -146,6 +160,19 @@ func _make_blob_shape() -> PackedFloat32Array:
 
 
 func _physics_process(delta: float) -> void:
+	if flow:
+		# Claim the cells a batch per frame (each costs a collider query), then sweep the front.
+		if _flow_left > 0 and not flow.done():
+			var n := mini(FLOW_CLAIMS_PER_FRAME, _flow_left)
+			_flow_left -= n
+			flow.step(n, get_world_2d().direct_space_state, global_position)
+		else:
+			flow.advance(delta, _flow_duration)
+			if flow.settled():
+				set_physics_process(false)
+		_visuals.queue_redraw()
+		return
+
 	_release_due(delta)
 
 	var space := get_world_2d().direct_space_state
@@ -163,13 +190,16 @@ func _physics_process(delta: float) -> void:
 		set_physics_process(false)
 
 
-## Release drops at the pool's steady rate, up to the volume accrued so far. Rate-based so added
-## hits keep feeding out smoothly as the pool grows.
+## Release drops at the pool's average rate, up to the volume accrued so far. Each gap to the next
+## drop is random (0.1x..1.9x the average), so drops come out irregularly, in bursts and lulls.
 func _release_due(delta: float) -> void:
-	_emit_budget += _rate * delta
-	while _emitted < _count and _emitted < _emit_budget:
+	if _emitted >= _count:
+		return
+	_drop_wait -= delta
+	while _emitted < _count and _drop_wait <= 0.0:
 		_add_drop(_emitted)
 		_emitted += 1
+		_drop_wait += randf_range(0.1, 1.9) / maxf(_rate, 0.001)
 
 
 ## Create the drop with the given fill index and send it creeping outward from the wound's current
