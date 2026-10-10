@@ -18,6 +18,8 @@ const WALL_MARGIN := 4.0
 const BOUNDS_PAD := 160.0
 ## Padding (px) grown around a furniture footprint before it is baked in as a hole, so paths clear it.
 const OBSTACLE_MARGIN := 6.0
+## Baked polygons smaller than this (px^2) are slivers and are dropped (see `_drop_slivers`).
+const MIN_POLYGON_AREA := 0.5
 ## Segment count approximating a circular furniture footprint as an obstruction polygon.
 const CIRCLE_SEGMENTS := 10
 
@@ -74,13 +76,44 @@ static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float) -> N
 	# is not parsed — only the walls become holes. Parsing resets the source data, so it must run
 	# before the traversable footprint is added.
 	NavigationServer2D.parse_source_geometry_data(nav_poly, source, house)
+	source.set_obstruction_outlines(_on_grid(source.get_obstruction_outlines()))
 	# Walkable footprint: the whole house bounds. The parsed walls carve it, leaving the doorways.
 	source.add_traversable_outline(_rect_outline(local_bounds))
 	# Furniture holes: each solid piece's footprint, so the baked mesh routes paths around it. Added
 	# after the footprint (both are outlines on the same source) and before the bake carves them in.
 	_add_furniture_holes(source, house)
 	NavigationServer2D.bake_from_source_geometry_data(nav_poly, source)
+	_drop_slivers(nav_poly)
 	return nav_poly
+
+
+## Remove the baked polygons with (almost) no area. Where furniture sits flush against a wall the
+## bake can leave a zero-width sliver whose edges coincide with its neighbours'; it covers no
+## walkable ground, and the NavigationServer rejects the map ("navigation map synchronization
+## error") when it tries to merge those coincident edges.
+static func _drop_slivers(nav_poly: NavigationPolygon) -> void:
+	var verts := nav_poly.get_vertices()
+	var kept: Array = []
+	for i in nav_poly.get_polygon_count():
+		var indices := nav_poly.get_polygon(i)
+		var ring := PackedVector2Array()
+		for index in indices:
+			ring.append(verts[index])
+		if absf(_signed_area(ring)) >= MIN_POLYGON_AREA:
+			kept.append(indices)
+	if kept.size() == nav_poly.get_polygon_count():
+		return
+	nav_poly.clear_polygons()
+	for indices in kept:
+		nav_poly.add_polygon(indices)
+
+
+## Shoelace area of `ring` (positive when counter-clockwise).
+static func _signed_area(ring: PackedVector2Array) -> float:
+	var area := 0.0
+	for i in ring.size():
+		area += ring[i].cross(ring[(i + 1) % ring.size()])
+	return area * 0.5
 
 
 ## The furniture footprint holes a bake of `house` carves, each a closed WORLD-space polygon — the
@@ -113,11 +146,48 @@ static func furniture_holes(house: Node2D) -> Array:
 ## non-frozen RigidBody2D (non-solid decor freezes itself) with a CollisionShape2D; walls are
 ## StaticBody2D and already parsed.
 static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D) -> void:
+	var outlines: Array = []
 	for outline in furniture_holes(house):
 		var local := PackedVector2Array()
 		for p in outline:
 			local.append(p - house.position)
-		source.add_obstruction_outline(local)
+		outlines.append(local)
+	for outline in _on_grid(_union_outlines(outlines)):
+		source.add_obstruction_outline(outline)
+
+
+## `outlines` with every vertex snapped to the map's 1 px cell grid.
+static func _on_grid(outlines: Array) -> Array:
+	var out: Array = []
+	for outline in outlines:
+		var snapped_outline := PackedVector2Array()
+		for p in outline:
+			snapped_outline.append(p.round())
+		out.append(snapped_outline)
+	return out
+
+
+## `outlines` with every overlapping set fused into one polygon. A dented piece is several convex
+## pieces and furniture can rest against furniture, so the raw footprints overlap. Baked as separate
+## obstructions at fractional coordinates they can leave the navmesh with edges the NavigationServer
+## can't merge ("navigation map synchronization error"), so `_add_furniture_holes` fuses them and
+## snaps the result to the map's 1 px cell grid. An enclosed gap in a union is filled in.
+static func _union_outlines(outlines: Array) -> Array:
+	var out: Array = []
+	for outline in outlines:
+		var cur: PackedVector2Array = outline
+		var k := 0
+		while k < out.size():
+			var fused := Geometry2D.merge_polygons(cur, out[k])
+			var outer: Array = fused.filter(func(poly: PackedVector2Array) -> bool: return not Geometry2D.is_polygon_clockwise(poly))
+			if outer.size() == 1:
+				cur = outer[0]
+				out.remove_at(k)
+				k = 0  # the grown polygon may now touch ones already passed
+			else:
+				k += 1
+		out.append(cur)
+	return out
 
 
 ## Every descendant node of `root`, depth-first (so furniture nested under room containers is found).

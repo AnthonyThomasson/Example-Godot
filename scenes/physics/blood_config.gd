@@ -21,7 +21,7 @@ static var particle_count: int = 36
 static var max_pool_volume: int = 210
 ## Seconds one hit's worth of drops takes to emerge. Sets the steady release rate
 ## (particle_count / spill_duration drops per second); lower = blood appears faster.
-static var spill_duration: float = 36.0
+static var spill_duration: float = 72.0
 ## A body bleeding out where it came to rest after death (Physics.bleed_out): how many grid cells
 ## its flowing pool claims (area = cells * flow_cell_size²) and the seconds its edge takes to sweep
 ## out across them.

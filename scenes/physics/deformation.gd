@@ -155,25 +155,88 @@ static func wall_polygon(a: Vector2, b: Vector2, thickness: float, impacts: Arra
 
 ## True when `poly` is a valid simple polygon the engine can triangulate. A silhouette
 ## deformed by many overlapping dents on a small body can pinch itself into a degenerate
-## (self-touching) polygon; both `draw_colored_polygon` and `decompose_polygon_in_convex`
-## reject those, so callers check this first and skip the deformed polygon that frame.
+## (self-touching) polygon; `draw_colored_polygon` rejects those, so callers check this first
+## and skip the deformed polygon that frame.
 static func is_valid_polygon(poly: PackedVector2Array) -> bool:
 	return poly.size() >= 3 and not Geometry2D.triangulate_polygon(poly).is_empty()
 
 
 ## Decompose a (possibly concave) polygon into convex ConvexPolygonShape2D pieces for a
-## static collider. Returns [] for a degenerate polygon or if decomposition fails (caller
-## keeps the old collider).
+## static collider. Returns [] for a degenerate polygon (caller keeps the old collider).
+## Merges the triangulation itself rather than calling `Geometry2D.decompose_polygon_in_convex`,
+## which logs "Convex decomposing failed!" on some near-degenerate polygons that do triangulate.
 static func convex_shapes(polygon: PackedVector2Array) -> Array:
 	var shapes: Array = []
 	if not is_valid_polygon(polygon):
 		return shapes
-	for piece in Geometry2D.decompose_polygon_in_convex(polygon):
-		if piece.size() >= 3:
-			var shape := ConvexPolygonShape2D.new()
-			shape.points = piece
-			shapes.append(shape)
+	for piece in _convex_pieces(polygon):
+		var points := PackedVector2Array()
+		for i in piece:
+			points.append(polygon[i])
+		var shape := ConvexPolygonShape2D.new()
+		shape.points = points
+		shapes.append(shape)
 	return shapes
+
+
+## Convex pieces of `polygon` as vertex-index loops (Hertel-Mehlhorn): start from its
+## triangulation, wound like the polygon, and keep merging two pieces across a shared edge
+## while the union stays convex. Needs `is_valid_polygon(polygon)`.
+static func _convex_pieces(polygon: PackedVector2Array) -> Array:
+	var sign_ := -1.0 if Geometry2D.is_polygon_clockwise(polygon) else 1.0
+	var tris := Geometry2D.triangulate_polygon(polygon)
+	var pieces: Array = []
+	for t in range(0, tris.size(), 3):
+		var tri := [tris[t], tris[t + 1], tris[t + 2]]
+		if _turn(polygon, tri[0], tri[1], tri[2]) * sign_ < 0.0:
+			tri = [tri[0], tri[2], tri[1]]
+		pieces.append(tri)
+	var merged := true
+	while merged:
+		merged = false
+		for a in pieces.size():
+			for b in range(a + 1, pieces.size()):
+				var union := _merge_across_edge(pieces[a], pieces[b])
+				if union.is_empty() or not _is_convex_loop(polygon, union, sign_):
+					continue
+				pieces[a] = union
+				pieces.remove_at(b)
+				merged = true
+				break
+			if merged:
+				break
+	return pieces
+
+
+## Cross product of the turn at `b` on the way a -> b -> c (positive = counter-clockwise).
+static func _turn(polygon: PackedVector2Array, a: int, b: int, c: int) -> float:
+	return (polygon[b] - polygon[a]).cross(polygon[c] - polygon[b])
+
+
+## The loop `a` + `b` form when they share an edge (a runs i -> j, b runs j -> i), or [] when
+## they share none.
+static func _merge_across_edge(a: Array, b: Array) -> Array:
+	for k in a.size():
+		var i: int = a[k]
+		var j: int = a[(k + 1) % a.size()]
+		var m := b.find(j)
+		if m == -1 or b[(m + 1) % b.size()] != i:
+			continue
+		var out: Array = []
+		for n in a.size():  # a rotated to start at j and end at i
+			out.append(a[(k + 1 + n) % a.size()])
+		for n in range(2, b.size()):  # b's vertices strictly between i and j
+			out.append(b[(m + n) % b.size()])
+		return out
+	return []
+
+
+## True when every turn around `loop` goes the polygon's way (`sign_` = +1 / -1), straight allowed.
+static func _is_convex_loop(polygon: PackedVector2Array, loop: Array, sign_: float) -> bool:
+	for k in loop.size():
+		if _turn(polygon, loop[k], loop[(k + 1) % loop.size()], loop[(k + 2) % loop.size()]) * sign_ < 0.0:
+			return false
+	return true
 
 
 ## Draw a deformed primitive shape (furniture, characters): filled polygon (darkened by
@@ -218,6 +281,10 @@ static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: C
 static func draw_wall(canvas: CanvasItem, a: Vector2, b: Vector2, thickness: float,
 		color: Color, impacts: Array, texture: Texture2D = null, tile_length: float = 0.0) -> void:
 	var poly := wall_polygon(a, b, thickness, impacts)
+	# Many dents can pinch the segment into a polygon the renderer can't triangulate; draw it
+	# undented that frame (the hit marks below still show the damage).
+	if not is_valid_polygon(poly):
+		poly = wall_polygon(a, b, thickness, [])
 	if texture and tile_length > 0.0:
 		var dir := (b - a).normalized()
 		var across := dir.orthogonal()
