@@ -8,7 +8,7 @@ class_name HouseDefinitions
 
 const PLANS := {
 	"starter_home": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 0, 520, 350) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(520, 0, 380, 350) },
@@ -23,7 +23,7 @@ const PLANS := {
 		],
 	},
 	"open_plan_home": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 0, 520, 350) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(520, 0, 380, 350) },
@@ -37,7 +37,7 @@ const PLANS := {
 	},
 
 	"studio_flat": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "studio", "type": "studio", "rect": Rect2(0, 0, 620, 480) },
 			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(620, 0, 300, 480) },
@@ -49,7 +49,7 @@ const PLANS := {
 	},
 
 	"one_bed_flat": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 0, 400, 340) },
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(400, 0, 400, 340) },
@@ -66,7 +66,7 @@ const PLANS := {
 	},
 
 	"two_bed_flat": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 0, 440, 340) },
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(440, 0, 360, 340) },
@@ -86,7 +86,7 @@ const PLANS := {
 	},
 
 	"family_home": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "entry_hall", "type": "entry_hall", "rect": Rect2(0, 0, 260, 300) },
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(260, 0, 380, 300) },
@@ -107,7 +107,7 @@ const PLANS := {
 	},
 
 	"office_loft": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(0, 0, 660, 440) },
 			{ "key": "home_office", "type": "home_office", "rect": Rect2(660, 0, 340, 240) },
@@ -122,7 +122,7 @@ const PLANS := {
 	},
 
 	"dining_house": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 0, 450, 340) },
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(450, 0, 450, 340) },
@@ -142,7 +142,7 @@ const PLANS := {
 	},
 
 	"bungalow": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 0, 430, 340) },
 			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(430, 0, 430, 340) },
@@ -162,7 +162,7 @@ const PLANS := {
 	},
 
 	"garage_home": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "garage", "type": "garage", "rect": Rect2(0, 0, 420, 400) },
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(420, 0, 300, 400) },
@@ -182,7 +182,7 @@ const PLANS := {
 	},
 
 	"cottage": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(0, 0, 600, 440) },
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(600, 0, 340, 240) },
@@ -197,7 +197,7 @@ const PLANS := {
 	},
 
 	"luxury_home": {
-		"wall_thickness": 24.0,
+		"wall_thickness": 12.0,
 		"rooms": [
 			{ "key": "entry_hall", "type": "entry_hall", "rect": Rect2(0, 0, 260, 340) },
 			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(260, 0, 360, 340) },
