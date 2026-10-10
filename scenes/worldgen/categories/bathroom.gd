@@ -4,11 +4,11 @@ class_name BathroomCatalog
 ## laundry_pair arrangement with its washing_machine/dryer) live in GeneralCatalog.
 
 const OBJECTS := {
-	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95), "material": "ceramic", "weight": 35, "coverage": 40, "penetration": 55 },
-	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0), "material": "ceramic", "weight": 120, "coverage": 45, "penetration": 60 },
-	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95), "material": "glass", "weight": 80, "coverage": 95, "penetration": 25 },
-	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65), "material": "metal", "weight": 4, "coverage": 25, "penetration": 30 },
-	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "weight": 2, "solid": false, "coverage": 0, "penetration": 5 },
+	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95), "material": "ceramic", "art": "toilet", "weight": 35, "coverage": 40, "penetration": 55 },
+	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0), "material": "ceramic", "art": "bath", "art_opts": { "style": "tub" }, "weight": 120, "coverage": 45, "penetration": 60 },
+	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95), "material": "glass", "art": "bath", "art_opts": { "style": "shower" }, "weight": 80, "coverage": 95, "penetration": 25 },
+	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65), "material": "metal", "art": "fixture", "art_opts": { "kind": "towels" }, "weight": 4, "coverage": 25, "penetration": 30 },
+	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "art": "rug", "art_opts": { "pattern": "plush" }, "weight": 2, "solid": false, "coverage": 0, "penetration": 5 },
 }
 
 const ARRANGEMENTS := {
@@ -56,9 +56,9 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"bathroom": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.aqua },
-			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.slate },
-			{ "wood": GeneralCatalog.WOOD.charcoal, "fabric": GeneralCatalog.FABRIC.cream },
+			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.aqua, "floor": "mosaic" },
+			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.slate, "floor": "slate_tile" },
+			{ "wood": GeneralCatalog.WOOD.charcoal, "fabric": GeneralCatalog.FABRIC.cream, "floor": "white_tile" },
 		],
 		"zones": [
 			{ "options": ["bath_tub_zone", "shower_zone"], "count": Vector2i(1, 1), "required": true, "fallback": "shower_compact" },

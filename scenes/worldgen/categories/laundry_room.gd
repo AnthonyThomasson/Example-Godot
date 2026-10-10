@@ -4,7 +4,7 @@ class_name LaundryRoomCatalog
 ## the laundry_pair arrangement with washing_machine/dryer) live in GeneralCatalog.
 
 const OBJECTS := {
-	"laundry_sink": { "name": "Sink", "shape": "square", "size": Vector2(45, 45), "color": Color(0.72, 0.8, 0.88), "material": "ceramic", "weight": 25, "coverage": 45, "penetration": 45 },
+	"laundry_sink": { "name": "Sink", "shape": "square", "size": Vector2(45, 45), "color": Color(0.72, 0.8, 0.88), "material": "ceramic", "art": "counter", "art_opts": { "basin": "deep" }, "weight": 25, "coverage": 45, "penetration": 45 },
 }
 
 const ARRANGEMENTS := {
@@ -20,8 +20,8 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"laundry_room": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.slate },
-			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.aqua },
+			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.slate, "floor": "slate_tile" },
+			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.aqua, "floor": "white_tile" },
 		],
 		"zones": [
 			{ "options": ["laundry_pair"], "count": Vector2i(1, 1), "required": true },

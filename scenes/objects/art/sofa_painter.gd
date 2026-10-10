@@ -18,7 +18,7 @@ const _ARM_HEIGHT := 6
 
 
 ## Paint a sofa onto `c` in `base` upholstery, seat front toward +y.
-static func paint(c: PixelCanvas, base: Color, opts: Dictionary) -> void:
+static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
 	var full := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), 4)
 	var back_d := clampi(roundi(c.h * float(opts.get("back_depth", ObjectArtConfig.sofa_back_depth))), 4, c.h / 2)

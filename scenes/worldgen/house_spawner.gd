@@ -1,8 +1,10 @@
 class_name HouseSpawner
 
 ## Builds a house from a HouseDefinitions floorplan: walls per room (via the Objects
-## domain's WallFactory, with every doorway opening cut into each wall it lies on) and furniture
-## per room (via RoomFurnisher). The house is positioned so its front entrance lands on a point.
+## domain's WallFactory, in the GeneralCatalog.WALL style, with every doorway opening cut into
+## each wall it lies on), furniture per room (via RoomFurnisher) and each room's floor (via
+## FloorFactory, the one its furnishing palette names). The house is positioned so its front
+## entrance lands on a point.
 
 const Wall = preload("res://scenes/objects/wall/wall.gd")
 
@@ -46,13 +48,17 @@ static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNu
 	for room in rooms:
 		var rect: Rect2 = room["rect"]
 		var room_name := (room["key"] as String).capitalize()
-		WallFactory.spawn(rect, wall_thickness, _openings_for(rect, openings), room_name, house)
+		WallFactory.spawn(rect, wall_thickness, _openings_for(rect, openings), room_name, house, GeneralCatalog.WALL)
 
 		var furniture := Node2D.new()
 		furniture.name = room_name + " Furniture"
 		house.add_child(furniture)
 		var interior := rect.grow(-(wall_thickness * 0.5 + INTERIOR_MARGIN))
-		RoomFurnisher.furnish(room["type"], interior, blocked, rng, furniture)
+		var palette := RoomFurnisher.furnish(room["type"], interior, blocked, rng, furniture)
+		# The floor runs to the wall centerlines, so the walls cover the seams between rooms.
+		var floor_def: Dictionary = GeneralCatalog.FLOORS.get(palette.get("floor", ""), {})
+		if not floor_def.is_empty():
+			FloorFactory.spawn(rect, floor_def, room_name + " Floor", house)
 
 		rooms_world.append({
 			"key": room["key"], "type": room["type"],

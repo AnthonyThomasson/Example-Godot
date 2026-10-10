@@ -4,9 +4,9 @@ class_name BedroomCatalog
 ## lamp, armchair via reading_chair) live in GeneralCatalog.
 
 const OBJECTS := {
-	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric", "weight": 50, "coverage": 35, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }, { "id": "make", "label": "Make the bed" }] },
-	"wardrobe": { "name": "Wardrobe", "shape": "rect", "size": Vector2(90, 45), "color": Color(0.45, 0.28, 0.12), "material": "wood", "weight": 60, "coverage": 95, "penetration": 55, "interactions": [{ "id": "hide", "label": "Hide inside", "move_to": true }, { "id": "rummage", "label": "Rummage (needs Key)", "requires_item": 4 }] },
-	"dresser": { "name": "Dresser", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.5, 0.3, 0.1), "material": "wood", "weight": 35, "coverage": 45, "penetration": 55, "interactions": [{ "id": "open", "label": "Open drawer" }, { "id": "examine", "label": "Examine" }] },
+	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric", "art": "bed", "weight": 50, "coverage": 35, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }, { "id": "make", "label": "Make the bed" }] },
+	"wardrobe": { "name": "Wardrobe", "shape": "rect", "size": Vector2(90, 45), "color": Color(0.45, 0.28, 0.12), "material": "wood", "art": "cabinet", "art_opts": { "front": "doors", "count": 2, "crown": true }, "weight": 60, "coverage": 95, "penetration": 55, "interactions": [{ "id": "hide", "label": "Hide inside", "move_to": true }, { "id": "rummage", "label": "Rummage (needs Key)", "requires_item": 4 }] },
+	"dresser": { "name": "Dresser", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.5, 0.3, 0.1), "material": "wood", "art": "cabinet", "art_opts": { "front": "drawers", "count": 3, "props": [{ "kind": "vase", "at": Vector2(0.15, 0.45) }, { "kind": "book", "at": Vector2(0.72, 0.5) }] }, "weight": 35, "coverage": 45, "penetration": 55, "interactions": [{ "id": "open", "label": "Open drawer" }, { "id": "examine", "label": "Examine" }] },
 }
 
 const ARRANGEMENTS := {
@@ -53,10 +53,10 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"bedroom": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.blush },
-			{ "wood": GeneralCatalog.WOOD.cherry, "fabric": GeneralCatalog.FABRIC.cream },
-			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.slate },
-			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.sage },
+			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.blush, "floor": "oak_planks" },
+			{ "wood": GeneralCatalog.WOOD.cherry, "fabric": GeneralCatalog.FABRIC.cream, "floor": "beige_carpet" },
+			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.slate, "floor": "grey_planks" },
+			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.sage, "floor": "ash_planks" },
 		],
 		"zones": [
 			{ "options": ["bed_twin_nightstands", "bed_single_nightstand"], "count": Vector2i(1, 1), "required": true, "fallback": "bed_compact" },

@@ -4,9 +4,9 @@ class_name KidsRoomCatalog
 ## bookshelf, plant) live in GeneralCatalog.
 
 const OBJECTS := {
-	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric", "weight": 20, "coverage": 30, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "jump", "label": "Jump on bed", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }] },
-	"toy_chest": { "name": "Toys", "shape": "rect", "size": Vector2(55, 38), "color": Color(0.9, 0.55, 0.25), "material": "wood", "weight": 10, "coverage": 35, "penetration": 45, "interactions": [{ "id": "open", "label": "Open toy chest" }, { "id": "rummage", "label": "Rummage" }] },
-	"small_desk": { "name": "Desk", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.45, 0.3, 0.15), "material": "wood", "weight": 14, "coverage": 40, "penetration": 45, "interactions": [{ "id": "sit_at", "label": "Sit at desk", "move_to": true }, { "id": "examine", "label": "Examine" }] },
+	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric", "art": "bed", "art_opts": { "pattern": "stars" }, "weight": 20, "coverage": 30, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "jump", "label": "Jump on bed", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }] },
+	"toy_chest": { "name": "Toys", "shape": "rect", "size": Vector2(55, 38), "color": Color(0.9, 0.55, 0.25), "material": "wood", "art": "cabinet", "art_opts": { "front": "lid", "top": "lid" }, "weight": 10, "coverage": 35, "penetration": 45, "interactions": [{ "id": "open", "label": "Open toy chest" }, { "id": "rummage", "label": "Rummage" }] },
+	"small_desk": { "name": "Desk", "shape": "rect", "size": Vector2(80, 40), "color": Color(0.45, 0.3, 0.15), "material": "wood", "art": "table", "art_opts": { "props": [{ "kind": "crayons", "at": Vector2(0.5, 0.5) }] }, "weight": 14, "coverage": 40, "penetration": 45, "interactions": [{ "id": "sit_at", "label": "Sit at desk", "move_to": true }, { "id": "examine", "label": "Examine" }] },
 }
 
 const ARRANGEMENTS := {
@@ -42,9 +42,9 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"kids_room": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.aqua },
-			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.mustard },
-			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.blush },
+			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.aqua, "floor": "blue_carpet" },
+			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.mustard, "floor": "green_carpet" },
+			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.blush, "floor": "beige_carpet" },
 		],
 		"zones": [
 			{ "options": ["kids_bed_zone"], "count": Vector2i(1, 1), "required": true, "fallback": "kids_bed_compact" },

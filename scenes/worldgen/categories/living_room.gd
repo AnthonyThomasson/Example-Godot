@@ -4,10 +4,10 @@ class_name LivingRoomCatalog
 ## side_table, plant, bookshelf, coat_rack, shoe_rack) live in GeneralCatalog.
 
 const OBJECTS := {
-	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "weight": 12, "coverage": 40, "penetration": 35, "interactions": [{ "id": "watch", "label": "Watch TV" }, { "id": "toggle", "label": "Turn off" }] },
+	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "art": "appliance", "art_opts": { "panel": "tv" }, "weight": 12, "coverage": 40, "penetration": 35, "interactions": [{ "id": "watch", "label": "Watch TV" }, { "id": "toggle", "label": "Turn off" }] },
 	"sofa": { "name": "Sofa", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.8, 0.4, 0.2), "material": "fabric", "art": "sofa", "weight": 45, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "lie", "label": "Lie down", "move_to": true }] },
 	"coffee_table": { "name": "Coffee", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.55, 0.35, 0.2), "material": "wood", "art": "table", "art_opts": { "inset": true }, "weight": 12, "coverage": 30, "penetration": 45, "interactions": [{ "id": "sit_on", "label": "Sit on it", "move_to": true }, { "id": "examine", "label": "Examine" }] },
-	"rug": { "name": "Rug", "shape": "rect", "size": Vector2(170, 110), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
+	"rug": { "name": "Rug", "shape": "rect", "size": Vector2(170, 110), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "art": "rug", "art_opts": { "pattern": "medallion" }, "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
 }
 
 const ARRANGEMENTS := {
@@ -28,7 +28,7 @@ const ARRANGEMENTS := {
 			{ "key": "rug", "pos": Vector2(120, 100) },
 			{ "key": "coffee_table", "pos": Vector2(120, 85) },
 			{ "key": "sofa", "pos": Vector2(120, 145), "facing": Vector2.UP },
-			{ "key": "armchair", "pos": Vector2(25, 90) },
+			{ "key": "armchair", "pos": Vector2(25, 90), "facing": Vector2.RIGHT },
 			{ "key": "side_table", "pos": Vector2(215, 145) },
 		],
 	},
@@ -53,10 +53,10 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"living_room": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.navy },
-			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.terracotta },
-			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.sage },
-			{ "wood": GeneralCatalog.WOOD.charcoal, "fabric": GeneralCatalog.FABRIC.mustard },
+			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.navy, "floor": "ash_planks" },
+			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.terracotta, "floor": "walnut_planks" },
+			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.sage, "floor": "oak_planks" },
+			{ "wood": GeneralCatalog.WOOD.charcoal, "fabric": GeneralCatalog.FABRIC.mustard, "floor": "parquet" },
 		],
 		"zones": [
 			{ "options": ["tv_wall_cozy", "tv_wall_modern"], "count": Vector2i(1, 1), "required": true, "fallback": "tv_compact" },

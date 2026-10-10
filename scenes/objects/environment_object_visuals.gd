@@ -11,7 +11,7 @@ var _art: Texture2D  ## The piece's pixel-art texture, or null for the flat shap
 func _ready() -> void:
 	if _obj.art != "":
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		_art = ObjectArt.texture(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.art_opts)
+		_art = ObjectArt.texture(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.object_material, _obj.art_opts)
 
 func _process(_delta: float) -> void:
 	queue_redraw()
@@ -46,14 +46,19 @@ func _draw() -> void:
 	draw_string(font, pos, name_text, HORIZONTAL_ALIGNMENT_CENTER, -1, font_size, text_color)
 
 
-## The deformed silhouette cast on the floor away from the light. The offset is fixed in world
-## space, so the shadow stays put relative to the light as a shoved piece spins.
+## The art's silhouette (its alpha, through the deformed outline) cast on the floor away from the
+## light, longer for taller pieces (`coverage`); flat decor casts none. The offset is fixed in
+## world space, so the shadow stays put relative to the light as a shoved piece spins.
 func _draw_drop_shadow(shape: String, size: Vector2, impacts: Array) -> void:
-	if ObjectArtConfig.drop_shadow_offset <= 0.0 or ObjectArtConfig.drop_shadow_alpha <= 0.0:
+	var offset := minf(_obj.coverage * ObjectArtConfig.drop_shadow_per_coverage, ObjectArtConfig.drop_shadow_max)
+	if not _obj.solid or offset <= 0.0 or ObjectArtConfig.drop_shadow_alpha <= 0.0:
 		return
 	var poly := Deformation.shape_polygon(shape, size, impacts)
 	if not Deformation.is_valid_polygon(poly):
 		poly = Deformation.base_ring(shape, size)
+	var uvs := PackedVector2Array()
+	for p in poly:
+		uvs.append(p / size + Vector2(0.5, 0.5))
 	var away := -ObjectArtConfig.light_from.normalized()
-	var shift := global_transform.basis_xform_inv(away).normalized() * ObjectArtConfig.drop_shadow_offset
-	draw_colored_polygon(Transform2D(0.0, shift) * poly, Color(0.0, 0.0, 0.0, ObjectArtConfig.drop_shadow_alpha))
+	var shift := global_transform.basis_xform_inv(away).normalized() * offset
+	draw_colored_polygon(Transform2D(0.0, shift) * poly, Color(0.0, 0.0, 0.0, ObjectArtConfig.drop_shadow_alpha), uvs, _art)

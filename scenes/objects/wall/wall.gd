@@ -14,6 +14,11 @@ enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
 ## measured along the wall from its start corner (top/bottom walls start at the left,
 ## left/right walls start at the top).
 @export var openings: Array = []
+## Pixel-art cap: the tiling painter id ("" = a flat gray line), its base color (also the debris
+## color) and painter options (see ObjectArtConfig.wall_*). Read by wall_visuals.gd.
+@export var art: String = ""
+@export var art_color: Color = Color(0.6, 0.6, 0.6)  ## Cap base color (and debris color).
+@export var art_opts: Dictionary = {}  ## Painter options, e.g. { "pattern": "plaster" }.
 
 ## The wall's own ballistic surface rating (Objects owns its surface data, same as
 ## environment_object.gd): full cover, hard to shoot through.
@@ -34,10 +39,10 @@ func _ready() -> void:
 	_build_walls()
 
 
-## The wall's ballistic surface: full cover, hard to shoot through, gray debris.
+## The wall's ballistic surface: full cover, hard to shoot through, debris in the wall's color.
 func get_surface() -> Dictionary:
 	return { "coverage": coverage, "penetration": penetration,
-		"material": "", "color": Color(0.6, 0.6, 0.6) }
+		"material": "", "color": art_color }
 
 
 ## Deform the nearest wall segment and spray debris. Walls are immovable, so no knockback.

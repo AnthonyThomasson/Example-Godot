@@ -13,12 +13,13 @@ const STEP := 10.0         ## Spacing of candidate offsets along a wall.
 const CENTER_TRIES := 40   ## Random spots tried for free-standing arrangements.
 
 
-## `interior` and `blocked` rects are in `parent`'s coordinate space.
-static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: RandomNumberGenerator, parent: Node) -> void:
+## `interior` and `blocked` rects are in `parent`'s coordinate space. Returns the palette picked
+## for the room (its `wood` / `fabric` tones and `floor` key), or {} if the type has no recipe.
+static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: RandomNumberGenerator, parent: Node) -> Dictionary:
 	var recipe := ArrangementDefinitions.get_recipe(room_type)
 	if recipe.is_empty():
 		push_error("No furnishing recipe for room type: ", room_type)
-		return
+		return {}
 
 	var palettes: Array = recipe["palettes"]
 	var palette: Dictionary = palettes[rng.randi_range(0, palettes.size() - 1)]
@@ -55,6 +56,7 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 				placed = 1
 		if zone.get("required", false) and placed == 0 and wanted > 0:
 			push_warning("RoomFurnisher: no room for required zone %s in %s" % [zone["options"], room_type])
+	return palette
 
 
 ## Returns { rect, orient, mirror } for a free spot, or {} if none fits.

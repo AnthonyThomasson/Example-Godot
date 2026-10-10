@@ -25,7 +25,7 @@ concise current-state comments.
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
 | **World Generation** | `worldgen/` | `domain-worldgen` | Picking a floorplan and building/furnishing a house. |
-| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture + walls): their data and how they're hit/pushed. |
+| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their procedural pixel art. |
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
@@ -64,7 +64,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
-   - `WallFactory.spawn(rect: Rect2, thickness, openings, name, parent) -> Node`
+   - `WallFactory.spawn(rect: Rect2, thickness, openings, name, parent, style = {}) -> Node` —
+	 `style` is the cap's look (`art`, `color`, `art_opts`); empty = a flat gray line.
+   - `FloorFactory.spawn(rect: Rect2, definition: Dictionary, name, parent) -> Node` — a room's
+	 floor (no collider), from a floor definition (`art`, `color`, `material`, `art_opts`).
    - `Wall.Side` — enum used when building `openings`.
    World-Gen owns the *catalogue*; Objects owns the *field schema* and turns a plain definition
    dict into a node. World-Gen never touches an object's fields.
@@ -85,8 +88,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
 	 `apply_impulse(v, at_world)`.
    - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
-   - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` optionally
-	 textured, so a piece's pixel art is drawn through its dented silhouette).
+   - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` and
+	 `draw_wall` optionally textured, so pixel art is drawn through the dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
 	 and `Physics.spawn_blood(...)` (character, on a hit).
    - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
@@ -186,7 +189,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
-main ─▶ WorldGen ─▶ ObjectFactory / WallFactory ─▶ Objects ─▶ Physics
+main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory ─▶ Objects ─▶ Physics
 main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
@@ -199,7 +202,7 @@ UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Charac
 ```
 
 Physics, Navigation and World-Gen are leaves (World-Gen's only outward code dep is `Wall.Side` +
-the two factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
+the three factories; Navigation depends only on Godot's `NavigationServer2D`). Tuning is split into
 five `class_name` static holders: `BallisticsConfig` (projectile), `PhysicsConfig` (impact +
 deformation), `CharacterConfig` (walking push + punch), `BloodConfig` (blood pooling), and
 `ObjectArtConfig` (Objects' furniture pixel art). There is no `Config` autoload. A sixth static

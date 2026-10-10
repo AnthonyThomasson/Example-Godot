@@ -21,6 +21,8 @@ Objects *compose* these components; Physics imports nothing outward.
 - `Deformation` — the polygon math + drawing (shared by furniture and walls). `draw_shape` takes
   an optional `texture`: the deformed polygon is then drawn textured (UVs from the intact
   footprint, so dents cut into the image), tinted darker by damage, without the smooth outline.
+  `draw_wall` takes an optional repeating `texture` + `tile_length`: UVs run in the segment's own
+  frame (u along the wall per tile, v across its thickness), so the tile follows every wall.
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on
   `Despawner`.
 

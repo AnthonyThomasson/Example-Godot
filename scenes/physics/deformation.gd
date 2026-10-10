@@ -207,12 +207,23 @@ static func draw_shape(canvas: CanvasItem, shape: String, size: Vector2, fill: C
 	draw_marks(canvas, impacts, cc, hc, sc)
 
 
-## Draw one deformed wall segment (fill + outline + marks).
+## Draw one deformed wall segment (fill + outline + marks). With a `texture` (a repeating tile
+## `tile_length` px long, x along the wall and y across its thickness) the polygon is drawn
+## textured in the segment's own frame instead of filled and outlined, so the tile runs along the
+## wall whichever way it points and dents cut into it (the canvas item must repeat textures).
 static func draw_wall(canvas: CanvasItem, a: Vector2, b: Vector2, thickness: float,
-		color: Color, impacts: Array) -> void:
+		color: Color, impacts: Array, texture: Texture2D = null, tile_length: float = 0.0) -> void:
 	var poly := wall_polygon(a, b, thickness, impacts)
-	canvas.draw_colored_polygon(poly, color)
-	_draw_outline(canvas, poly, color.darkened(0.25))
+	if texture and tile_length > 0.0:
+		var dir := (b - a).normalized()
+		var across := dir.orthogonal()
+		var uvs := PackedVector2Array()
+		for p in poly:
+			uvs.append(Vector2((p - a).dot(dir) / tile_length, (p - a).dot(across) / thickness + 0.5))
+		canvas.draw_colored_polygon(poly, Color.WHITE, uvs, texture)
+	else:
+		canvas.draw_colored_polygon(poly, color)
+		_draw_outline(canvas, poly, color.darkened(0.25))
 	draw_marks(canvas, impacts, color.darkened(0.4).darkened(0.3), HOLE_COLOR, Color.BLACK)
 
 

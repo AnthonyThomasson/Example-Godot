@@ -4,9 +4,9 @@ class_name EntryHallCatalog
 ## bench_coats, plant, and the entry_area arrangement) live in GeneralCatalog.
 
 const OBJECTS := {
-	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood", "weight": 14, "coverage": 30, "penetration": 45 },
-	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood", "weight": 14, "coverage": 30, "penetration": 50 },
-	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85), "material": "glass", "weight": 6, "coverage": 40, "penetration": 20 },
+	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood", "art": "table", "art_opts": { "plank_px": 7, "props": [{ "kind": "bowl", "at": Vector2(0.3, 0.5) }, { "kind": "vase", "at": Vector2(0.75, 0.5) }] }, "weight": 14, "coverage": 30, "penetration": 45 },
+	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood", "art": "table", "art_opts": { "gaps": true, "plank_px": 6, "rim_px": 1 }, "weight": 14, "coverage": 30, "penetration": 50 },
+	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85), "material": "glass", "art": "fixture", "art_opts": { "kind": "mirror" }, "weight": 6, "coverage": 40, "penetration": 20 },
 }
 
 const ARRANGEMENTS := {
@@ -29,8 +29,8 @@ const ARRANGEMENTS := {
 const RECIPES := {
 	"entry_hall": {
 		"palettes": [
-			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.terracotta },
-			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.sage },
+			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.terracotta, "floor": "slate_tile" },
+			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.sage, "floor": "terracotta_tile" },
 		],
 		"zones": [
 			{ "options": ["console_wall", "bench_coats"], "count": Vector2i(1, 2), "required": true },

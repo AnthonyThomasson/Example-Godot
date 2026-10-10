@@ -2,39 +2,46 @@ extends RefCounted
 
 ## Top-down pixel-art TABLE painter (Objects domain, private). A planked wooden top — planks
 ## along the long side with dark seams, staggered butt joints, a slight tone per plank, grain and
-## the odd knot — inside a light-aware bevelled rim with rounded corners. Options (`art_opts`,
-## defaulting to ObjectArtConfig.table_*): `plank_px`, `rim_px`, `corner_radius`, `inset` (a
-## recessed centre panel) and `runner` (a cloth runner down the long axis). A table is
-## symmetric, so its facing only turns the plank direction with the footprint.
+## the odd knot — inside a light-aware bevelled rim with rounded corners, optionally dressed with
+## props. Options (`art_opts`, defaulting to ObjectArtConfig.table_*): `plank_px`, `rim_px`,
+## `corner_radius`, `inset` (a recessed centre panel), `runner` (a cloth runner down the long
+## axis), `gaps` (open slats, as on a bench) and `props`. A table is symmetric, so its facing only
+## turns the plank direction with the footprint.
 
 const PixelCanvas = preload("res://scenes/objects/art/pixel_canvas.gd")
+const Props = preload("res://scenes/objects/art/props.gd")
 
 const _TOP_HEIGHT := 2     ## Tabletop height, for cast shadows.
 const _RUNNER_HEIGHT := 3  ## The runner sits on the top.
 
 
 ## Paint a table onto `c` in `base` wood.
-static func paint(c: PixelCanvas, base: Color, opts: Dictionary) -> void:
+static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
 	var radius: int = opts.get("corner_radius", ObjectArtConfig.table_corner_radius)
 	var rim: int = opts.get("rim_px", ObjectArtConfig.table_rim_px)
 	var top := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), radius)
 
 	c.fill(top, base, _TOP_HEIGHT)
-	_planks(c, base, t, opts)
+	var seams := _planks(c, base, t, opts)
 	if opts.get("inset", ObjectArtConfig.table_inset):
 		_inset(c, radius, base, t, opts)
 	c.bevel(top, 2, 2, t.highlight, t.shadow)
 	c.bevel(top, 3, 1 + rim, t.light, t.dark)
 	c.outline(top, t.outline)
+	if opts.get("gaps", false):
+		for a in seams:
+			c.clear(PixelCanvas.rounded(Rect2i(0, a, c.w, 1) if c.w >= c.h else Rect2i(a, 0, 1, c.h), 0))
 	if opts.get("runner", ObjectArtConfig.table_runner):
 		_runner(c)
+	Props.draw_all(c, opts.get("props", []), Rect2i(0, 0, c.w, c.h).grow(-3))
 	c.cast_shadows()
 
 
 ## Planks along the long side: per-plank tone, grain and knots, seams between planks and
-## staggered butt joints on long ones.
-static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary) -> void:
+## staggered butt joints on long ones. Returns the seam positions across the planks.
+static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary) -> Array[int]:
+	var seams: Array[int] = []
 	var along_x := c.w >= c.h
 	var span := c.h if along_x else c.w
 	var length := c.w if along_x else c.h
@@ -56,6 +63,7 @@ static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary
 			c.knot(kp.x, kp.y, tone.darkened(0.4), tone.darkened(0.2))
 		if i > 0:
 			_seam(c, along_x, a, 0, length, t.shadow)
+			seams.append(a)
 		# A long plank is two boards end to end; neighbours stagger their joints.
 		if length >= 50:
 			var joint := roundi(length * (0.3 if i % 2 == 0 else 0.65) + c.rng.randi_range(-4, 4))
@@ -63,6 +71,7 @@ static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary
 				var jp := Vector2i(joint, j) if along_x else Vector2i(j, joint)
 				if c.at(jp.x, jp.y).a > 0.0:
 					c.px(jp.x, jp.y, t.shadow)
+	return seams
 
 
 ## A 1px seam line at `across` running `from`..`to` along the planks (drawn pixels only).
