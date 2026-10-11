@@ -30,7 +30,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 |---|---|---|---|
 | **Perception** | `ai/perception/` | `domain-ai-perception` | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
-| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold) and the commitment state Von lacks; owns a locomotion layer for pathing. |
+| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload) and the commitment state Von lacks; owns a locomotion layer for pathing. |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck). |
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
@@ -69,6 +69,10 @@ Spawned by Main (`defender_count` / `invader_count`, default 1 each):
 
 Both pursue hostiles (`pursue_hostiles`, default on): IDLE is never offered and a known hostile sends
 every decision straight to COMBAT.
+
+Both know their ammo: the snapshot's `loadout` section and the `pistol_loaded` / `weapon_low` / `can_reload` facts feed a RELOAD
+tactic in the decision tree, the `reload` primitive runs it, and the `auto_reload` export (default on) reloads an empty pistol
+as a reflex. `low_ammo_fraction` sets where "nearly empty" starts.
 
 ## Key idea: Von picks, perceptions inform, behaviour executes
 

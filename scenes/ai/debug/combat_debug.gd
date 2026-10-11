@@ -60,5 +60,7 @@ func _paint() -> void:
 		_label(me, "AMBUSH", COVER, Vector2(-22, 40))
 	elif phase != "":
 		_label(me, "peek" if phase == "peek" else "cover", col, Vector2(-14, 40))
+	if c.get("reloading", false):
+		_label(me, "RELOADING", COVER, Vector2(-30, 84))
 	if c.get("fire_at_will", false):
 		_label(me, "fire at will", CLEAR, Vector2(-26, 62))

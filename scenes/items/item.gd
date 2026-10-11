@@ -6,12 +6,15 @@ class_name Item extends RefCounted
 ## leaves behind when its user dies (drop).
 ## The character calls into these; an Item talks back only through the small character API
 ## (facing, weapon_facing(), punch(), kick(), hand_position(), muzzle_origin(), world_root(),
-## report_shot()), so Items and the Character are otherwise independent.
+## report_shot(), and for reloading best_magazine() / take_magazine() / stow_magazine()), so Items and
+## the Character are otherwise independent.
 
 ## Shown in the HUD.
 var display_name := "Item"
 ## Punch reach (px), read by the hands to size the swing.
 var reach := 28.0
+## True while the character is reloading this item (the character sets and clears it).
+var reloading := false
 
 
 ## How `hand` (0 = left, 1 = right) is held while this item is out: the name of a stance in
@@ -28,6 +31,32 @@ func primary(_user) -> void:
 
 ## Secondary action (left-click). Default: nothing.
 func secondary(_user) -> void:
+	pass
+
+
+## Rounds loaded right now, or -1 for an item with no ammo (the default).
+func rounds_loaded() -> int:
+	return -1
+
+
+## Rounds a full load holds, or -1 for an item with no ammo (the default).
+func ammo_capacity() -> int:
+	return -1
+
+
+## Seconds a reload of this item takes. Default: 0 (instant).
+func reload_time() -> float:
+	return 0.0
+
+
+## Whether reloading would change anything: a carried magazine fuller than what is loaded. Default: no.
+func can_reload(_user) -> bool:
+	return false
+
+
+## The reload time is up: swap the loaded magazine for a carried one (through the character's
+## best_magazine / take_magazine / stow_magazine). Default: nothing.
+func finish_reload(_user) -> void:
 	pass
 
 

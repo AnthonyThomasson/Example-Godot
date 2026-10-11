@@ -14,6 +14,10 @@ extends CharacterBody2D
 @export var speed: float = 150.0  ## Move speed (px/s).
 ## Slot the character starts holding.
 @export var start_slot: int = 1
+## Rounds the starting gun is loaded with (negative = a full magazine).
+@export var start_rounds: int = -1
+## The spare magazines carried, as `MagazineConfig.types` ids (several of a kind are fine).
+@export var spare_magazine_types: Array = [&"standard", &"standard"]
 ## Allegiance tag, read by AI perception to tell allies from potential hostiles.
 @export var faction: StringName = &"player"
 ## Maximum health. Characters start at this value; configurable per character in the inspector.
@@ -51,6 +55,11 @@ var _running := false  ## Running this frame.
 ## Inventory (slot id -> Item) and the currently held slot.
 var _items := {}
 var _current_slot := 1  ## Held inventory slot.
+## Spare magazines carried (Magazine). They are not inventory slots: none can be held or selected.
+var _magazines: Array = []
+## The item being reloaded (null = not reloading) and the seconds left until it is done.
+var _reloading_item: Item
+var _reload_left := 0.0
 
 ## Knockback velocity from objects shoved into the character; decays each frame. Added on
 ## top of controller-driven movement.
@@ -97,7 +106,8 @@ func _ready() -> void:
 
 	health = max_health
 
-	_items = ItemRegistry.default_inventory()
+	_items = ItemRegistry.default_inventory(start_rounds)
+	_magazines = ItemRegistry.create_magazines(spare_magazine_types)
 	_current_slot = start_slot
 	# Re-emit the hands' punch as a unified hit_landed (melee → hand 0/1, with its dealt damage).
 	_hands.punched.connect(_on_punched)
@@ -132,6 +142,7 @@ func _physics_process(delta: float) -> void:
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
+	_update_reload(delta)
 
 	# While in an interaction the character is fully frozen: it holds the exact spot the
 	# interaction placed it (possibly overlapping the object, via a collision exception the
@@ -174,13 +185,26 @@ func melee() -> void:
 	item.primary(self)
 
 
-## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction
-## or running (the arms are down at the sides).
+## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction,
+## running (the arms are down at the sides) or reloading.
 func shoot() -> void:
 	var item := current_item()
-	if is_busy() or item == null or _running:
+	if is_busy() or item == null or _running or is_reloading():
 		return
 	item.secondary(self)
+
+
+## Reload the held item (R): start swapping in the fullest carried magazine, which takes
+## the item's `reload_time()`. Ignored when dead, locked in an interaction, running, already
+## reloading, or when no carried magazine would add rounds. Switching items, running or an interaction
+## cancels it.
+func reload() -> void:
+	var item := current_item()
+	if is_dead or is_busy() or _running or is_reloading() or item == null or not item.can_reload(self):
+		return
+	_reloading_item = item
+	_reload_left = item.reload_time()
+	item.reloading = true
 
 
 ## Switch to inventory slot `slot`. Ignored while locked. Observers read the held item with
@@ -189,6 +213,7 @@ func select_slot(slot: int) -> void:
 	if is_busy():
 		return
 	if slot in _items and slot != _current_slot:
+		_cancel_reload()
 		_current_slot = slot
 
 
@@ -232,6 +257,84 @@ func is_running() -> bool:
 ## Stamina left, 0..1 of a full bar.
 func stamina_fraction() -> float:
 	return stamina
+
+
+## True while a reload is in progress.
+func is_reloading() -> bool:
+	return _reloading_item != null
+
+
+## Rounds loaded in the item in `slot` (the held one by default), or -1 if it has no ammo.
+func ammo(slot := -1) -> int:
+	var item := _item_in(slot)
+	return item.rounds_loaded() if item else -1
+
+
+## Rounds a full load of the item in `slot` (the held one by default) holds, or -1 if it has no ammo.
+func ammo_capacity(slot := -1) -> int:
+	var item := _item_in(slot)
+	return item.ammo_capacity() if item else -1
+
+
+## Whether a reload of the item in `slot` (the held one by default) would add rounds right now.
+func can_reload(slot := -1) -> bool:
+	var item := _item_in(slot)
+	return item != null and not is_reloading() and item.can_reload(self)
+
+
+## How many spare magazines are carried.
+func spare_magazines() -> int:
+	return _magazines.size()
+
+
+## The carried magazine for `gun` holding the most rounds (null with none); it stays carried.
+func best_magazine(gun: StringName) -> Magazine:
+	var best: Magazine
+	for mag: Magazine in _magazines:
+		if mag.gun == gun and (best == null or mag.rounds > best.rounds):
+			best = mag
+	return best
+
+
+## Take `best_magazine(gun)` out of the carried store (null with none): an item loading it.
+func take_magazine(gun: StringName) -> Magazine:
+	var mag := best_magazine(gun)
+	if mag != null:
+		_magazines.erase(mag)
+	return mag
+
+
+## Carry `mag` (a magazine an item has taken out of a gun).
+func stow_magazine(mag: Magazine) -> void:
+	_magazines.append(mag)
+
+
+## The item in inventory slot `slot`; the held item for a negative slot.
+func _item_in(slot: int) -> Item:
+	return current_item() if slot < 0 else _items.get(slot)
+
+
+## Count a reload down; it is dropped if its item is no longer held, the character is locked in an
+## interaction or runs. Done: the item swaps its magazine.
+func _update_reload(delta: float) -> void:
+	if _reloading_item == null:
+		return
+	if is_busy() or _running or current_item() != _reloading_item:
+		_cancel_reload()
+		return
+	_reload_left -= delta
+	if _reload_left > 0.0:
+		return
+	var item := _reloading_item
+	_cancel_reload()
+	item.finish_reload(self)
+
+
+## Stop any reload in progress and clear the item's `reloading` flag.
+func _cancel_reload() -> void:
+	if _reloading_item != null:
+		_reloading_item.reloading = false
+	_reloading_item = null
 
 
 ## Walking speed, or run speed while running.
@@ -404,6 +507,7 @@ func _apply_damage(amount: float, direction := Vector2.ZERO) -> void:
 ## the hand lets go of what it held. Emits `died` for observers.
 func _die(direction: Vector2) -> void:
 	is_dead = true
+	_cancel_reload()
 	_wound.stop()
 	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
 	# punches, sight lines and the dropped item, all on layer 1) pass right over it instead of being

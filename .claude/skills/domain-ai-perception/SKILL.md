@@ -65,15 +65,19 @@ only; it writes no memory and holds no policy. Everything in this section and th
 lives in `agent_snapshot.gd`.
 
 - **facts** — named booleans a `requires` or an entry rule can gate on: `threat_known`, `hostile_known`,
-  `hostile_visible`, `has_pistol`, `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`,
-  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `has_pistol`,
+  `hostile_visible`, `has_pistol`, `pistol_loaded` (a pistol with rounds that is not mid-reload), `weapon_empty`,
+  `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
+  rounds), `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`,
+  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `pistol_loaded`, `weapon_low`, `can_reload`,
   `under_fire`, `engaged` and `leads`; the rest feed the brain overlay and are there for new rules.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal`,
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
   (clear shot / exposed to their fire / behind cover / line blocked, plus other hostiles that can see
   you), `allies` (each ally's side of the target + their radio callouts), `flanks` (one-line digest),
-  `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
+  `loadout` (the pistol in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
+  once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
+  empty without a pistol; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
   `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile.
 - **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
   `threat` (summary only), `hostiles` (bind: one per hostile, only DISTINGUISHING facts), per target
@@ -82,7 +86,7 @@ lives in `agent_snapshot.gd`.
   `flank_sides` (tagged `held` when an ally — seen or radioed — holds it, `crosses` when the route
   there passes a known hostile; described as "route passes X"), `advance_positions` (halfway / close /
   rush), `melee` (one `punch` option, only while the target is point-blank); globally
-  `retreat_positions`, `shooter`, `leads`
+  `reload` (one option, only while `can_reload`, so the planner takes it unasked), `retreat_positions`, `shooter`, `leads`
   (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `search_rooms`
   (+ front entrance / approach the house while outside), `explore` (unknown rooms by direction only),
   `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
@@ -104,7 +108,8 @@ compare numbers, and an encoder reads "no cover" as "cover". So:
 4. **Only distinguishing facts in options** — common facts (every hostile is hostile and has a pistol)
    and the contacts section on a bind level blur the match.
 5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
-Room types are humanized ("kitchen_living" → "kitchen living").
+A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
+`low_ammo_fraction` is a controller export pushed through `apply_config`. Room types are humanized ("kitchen_living" → "kitchen living").
 
 ## Contacts and hostility
 

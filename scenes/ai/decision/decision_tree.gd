@@ -36,7 +36,7 @@ extends RefCounted
 ##               already holds: Von can't weigh "taken by Invader2" — the name matches the state; or
 ##               one whose route passes a known hostile). A node whose options are all dropped is not
 ##               offered at all.
-##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold). FLANK
+##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload). FLANK
 ##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
 ##               `move`: it only closes the distance, then the NPC re-decides how to fight.
 ##   params    — default primitive params, merged under each option's own params. `run: true` lets the
@@ -45,8 +45,8 @@ extends RefCounted
 const NODES := {
 	&"root": {
 		"question": "What should you do right now? Choose what best serves your goal, given any threat and what you know.",
-		"context": [&"situation", &"current", &"odds", &"contacts", &"awareness"],
-		"children": [&"combat", &"investigate", &"search", &"idle"],
+		"context": [&"situation", &"loadout", &"current", &"odds", &"contacts", &"awareness"],
+		"children": [&"combat", &"reload_quiet", &"investigate", &"search", &"idle"],
 	},
 	&"combat": {
 		"label": "COMBAT",
@@ -58,25 +58,25 @@ const NODES := {
 		"bind_options": &"hostiles",
 		"bind_question": "Which hostile should you fight? Prefer the most dangerous one you can actually hit: close, armed, aiming at you or an ally.",
 		"bind_context": [&"situation", &"odds", &"awareness"],
-		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered.",
-		"context": [&"situation", &"current", &"odds", &"exposure", &"contacts", &"allies", &"flanks", &"awareness"],
-		"children": [&"engage", &"flank", &"advance", &"melee", &"retreat", &"locate"],
+		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+		"context": [&"situation", &"loadout", &"current", &"odds", &"exposure", &"contacts", &"allies", &"flanks", &"awareness"],
+		"children": [&"engage", &"flank", &"advance", &"melee", &"reload", &"retreat", &"locate"],
 	},
 	&"engage": {
 		"label": "ENGAGE",
 		"desc": "You have a clear shot at {target}, and you are not badly wounded ({summary})",
-		"requires": [&"target", &"has_pistol"],
+		"requires": [&"target", &"pistol_loaded"],
 		"question": "Where should you fight {target} from? Prefer a clear shot with cover close by, hidden from other hostiles; wait in ambush when they are coming to you.",
-		"context": [&"current", &"exposure", &"contacts", &"allies", &"awareness"],
+		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"fire_positions"],
 		"primitive": &"engage",
 	},
 	&"flank": {
 		"label": "FLANK",
 		"desc": "Your line to {target} is blocked, or they are aiming at someone else ({summary})",
-		"requires": [&"target"],
+		"requires": [&"target", &"pistol_loaded"],
 		"question": "Which side should you flank {target} from? Prefer a free side behind or beside them, with cover and a short, hidden route.",
-		"context": [&"current", &"contacts", &"allies", &"flanks", &"exposure"],
+		"context": [&"current", &"loadout", &"contacts", &"allies", &"flanks", &"exposure"],
 		"options": [&"flank_sides"],
 		"drop_tags": [&"held", &"crosses"],
 		"primitive": &"engage",
@@ -87,7 +87,7 @@ const NODES := {
 		"desc": "{target} looks badly wounded, is unarmed, or is moving away from you ({summary})",
 		"requires": [&"target"],
 		"question": "How should you close in on {target}? Prefer cover close to them and a hidden route; rush only when they are weak, fleeing or unarmed.",
-		"context": [&"current", &"exposure", &"contacts", &"allies", &"awareness"],
+		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"advance_positions"],
 		"primitive": &"move",
 		"params": { "aim": &"target", "fire_at_will": true, "run": true },
@@ -98,6 +98,13 @@ const NODES := {
 		"requires": [&"target"],
 		"options": [&"melee"],
 		"primitive": &"melee",
+	},
+	&"reload": {
+		"label": "RELOAD",
+		"desc": "Your pistol is nearly empty or empty, and you carry spare magazines",
+		"requires": [&"weapon_low", &"can_reload"],
+		"options": [&"reload"],
+		"primitive": &"reload",
 	},
 	&"retreat": {
 		"label": "RETREAT",
@@ -117,6 +124,13 @@ const NODES := {
 		"options": [&"shooter"],
 		"primitive": &"move",
 		"params": { "aim": &"point", "fire_at_will": true },
+	},
+	&"reload_quiet": {
+		"label": "RELOAD",
+		"desc": "All is quiet, your pistol is nearly empty or empty, and you carry spare magazines",
+		"requires": [&"weapon_low", &"can_reload", &"!threat_known"],
+		"options": [&"reload"],
+		"primitive": &"reload",
 	},
 	&"investigate": {
 		"label": "INVESTIGATE",

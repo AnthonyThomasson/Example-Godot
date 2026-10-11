@@ -20,5 +20,7 @@ func control(character, _delta: float) -> void:
 		character.melee()
 	if Keybinds.is_fire_just_pressed():
 		character.shoot()
+	if Keybinds.is_reload_just_pressed():
+		character.reload()
 	if Keybinds.is_interact_just_pressed():
 		character.try_interact()

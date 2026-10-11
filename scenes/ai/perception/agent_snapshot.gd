@@ -36,6 +36,7 @@ var extrapolate_cap: float = 3.0
 var max_options_per_level: int = 4
 var hurt_threshold: float = 15.0
 var critical_threshold: float = 35.0
+var low_ammo_fraction: float = 0.34
 var max_contacts_in_state: int = 4
 var search_memory_ttl: float = 60.0
 
@@ -104,11 +105,17 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var line: Dictionary = analyses[primary["id"]]["line"] if not primary.is_empty() else {}
 	var leads := _lead_group(ctx, hostiles)
 	var dmg: float = character.damage_taken()
+	# Rounds in the pistol (-1 without one): the AI shoots, reloads and plans around it.
+	var ammo: int = character.ammo(PISTOL_SLOT) if character.has_item(PISTOL_SLOT) else -1
 	var facts := {
 		"hostile_known": not hostiles.is_empty(),
 		"hostile_visible": hostiles.any(func(c): return c["visible"]),
 		"threat_known": not hostiles.is_empty() or _under_fire(),
 		"has_pistol": character.has_item(PISTOL_SLOT),
+		"pistol_loaded": ammo > 0 and not character.is_reloading(),
+		"weapon_empty": ammo == 0,
+		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(PISTOL_SLOT) * low_ammo_fraction),
+		"can_reload": character.can_reload(PISTOL_SLOT),
 		"under_fire": _under_fire(),
 		"hit_recently": _hit_recently(),
 		"engaged": _engaged_fresh(),
@@ -122,6 +129,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var sections := {
 		"goal": goal,
 		"situation": _situation_text(character, rooms),
+		"loadout": _loadout_text(character, ammo),
 		"current": ("Current activity: %s." % activity) if activity != "" else "",
 		"odds": _odds_text(hostiles, allies, ctx["callouts"], not leads["options"].is_empty()),
 		"contacts": _contacts_text(self_pos, known),
@@ -134,6 +142,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"per_target": per_target,
 		"threat": { "summary": _threat_summary(self_pos, hostiles) },
 		"hostiles": _hostile_group(ctx, hostiles, analyses),
+		"reload": _reload_group(character),
 		"retreat_positions": _retreat_group(ctx, hostiles, known_rooms, dmg),
 		"leads": leads,
 		"shooter": _shooter_group(ctx, hostiles),
@@ -176,6 +185,30 @@ func _situation_text(character, rooms: Array) -> String:
 	var busy := (" You are busy: %s." % character.interaction_label()) if character.is_busy() else ""
 	return "You are %s, holding a %s.%s You are %s." % [
 		where, character.current_item().display_name, busy, _health_band(character.damage_taken())]
+
+
+## The pistol's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
+## reloaded; once it runs low, whether spare magazines are carried. Empty without a pistol.
+func _loadout_text(character, ammo: int) -> String:
+	if ammo < 0:
+		return ""
+	if character.is_reloading():
+		return "You are reloading your pistol."
+	var spares := "You carry spare magazines." if character.spare_magazines() > 0 else "You are out of spare magazines."
+	if ammo == 0:
+		return "Your pistol is empty. " + spares
+	if ammo <= ceili(character.ammo_capacity(PISTOL_SLOT) * low_ammo_fraction):
+		return "Your pistol is nearly empty. " + spares
+	return "Your pistol is loaded."
+
+
+## Reloading the pistol: one option, offered only while a carried magazine would add rounds, so the
+## planner takes it without asking (a lone option).
+func _reload_group(character) -> Dictionary:
+	var options: Array = []
+	if character.can_reload(PISTOL_SLOT):
+		options.append({ "id": "reload", "label": "reload your pistol", "desc": "reload your pistol" })
+	return { "summary": "a spare magazine is carried", "options": options }
 
 
 ## How many hostiles the NPC knows of against which allies it has. With none known it says whether
@@ -222,6 +255,8 @@ func _contact_line(c: Dictionary, self_pos: Vector2, everyone: Array) -> String:
 	if aim != "":
 		parts.append(aim)
 	parts.append("holding a %s" % c.get("item", "nothing"))
+	if c.get("reloading", false):
+		parts.append("reloading")
 	var wound := _wound_band(c.get("wound_dmg", 0.0))
 	if wound != "":
 		parts.append(wound)

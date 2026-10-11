@@ -25,8 +25,10 @@ root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_posi
       │                                         ├─ flank   [flank_sides, drop `held`, `crosses`] → engage (anchored at the side)
       │                                         ├─ advance [advance_positions]         → move{aim target, fire_at_will}
       │                                         ├─ melee   [melee: point-blank only]   → melee
+      │                                         ├─ reload  [reload: pistol low + spare] → reload
       │                                         ├─ retreat [retreat_positions]         → move{aim threat, fire_at_will}
       │                                         └─ locate  [shooter]                   → move{aim point, fire_at_will}
+      ├─ reload_quiet [reload; no threat known, pistol low + spare] → reload
       ├─ investigate [leads]               → move{aim travel, fire_at_will}
       ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
@@ -42,7 +44,10 @@ state, since the options carry each candidate's details), `requires` (fact names
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, or one whose
 route passes a known hostile), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it).
-A node may mix `children` and `options`. A node whose option groups end up empty (every flank side
+A node may mix `children` and `options`. `engage` and `flank` require `pistol_loaded` (an empty gun is never offered "a clear shot"); `advance`, `melee` and
+`retreat` stay available so an empty NPC can still close in, punch or fall back. The `reload` nodes require `weapon_low` +
+`can_reload` (the quiet one also `!threat_known`) and have a lone option, so the planner takes them without a Von request when
+nothing else is on offer. A node whose option groups end up empty (every flank side
 dropped; MELEE while the target isn't point-blank) has no leaf, so it isn't offered at all. Adding a
 mode or tactic = adding a node (+ a perception option group if it needs new places).
 

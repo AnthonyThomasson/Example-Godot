@@ -17,6 +17,8 @@ const RUN := "run"
 const PUNCH := "punch"
 const FIRE := "fire"
 const INTERACT := "interact"
+## Reload the held gun from a carried magazine.
+const RELOAD := "reload"
 ## Return to the pre-game setup window to start a fresh match (handled by main.gd, works in both
 ## player and spectator mode).
 const MENU := "menu"
@@ -52,6 +54,7 @@ const DEFAULTS := {
 	RUN: KEY_SHIFT,
 	PUNCH: KEY_F,
 	INTERACT: KEY_SPACE,
+	RELOAD: KEY_R,
 	MENU: KEY_ESCAPE,
 	PAUSE: KEY_SPACE,
 	CAMERA_LEFT: KEY_A,
@@ -87,6 +90,7 @@ const LABELS := {
 	RUN: "Run (hold)",
 	PUNCH: "Punch",
 	FIRE: "Fire",
+	RELOAD: "Reload",
 	INTERACT: "Interact",
 	ITEM_1: "Item 1",
 	ITEM_2: "Item 2",
@@ -116,6 +120,7 @@ const GROUPS := {
 	RUN: "Movement",
 	PUNCH: "Combat",
 	FIRE: "Combat",
+	RELOAD: "Combat",
 	INTERACT: "Interaction",
 	ITEM_1: "Items",
 	ITEM_2: "Items",
@@ -348,6 +353,11 @@ func is_fire_just_pressed() -> bool:
 ## action path as the others.
 func is_interact_just_pressed() -> bool:
 	return Input.is_action_just_pressed(INTERACT)
+
+
+## True on the frame the reload key (R) is pressed. Rebindable like the others.
+func is_reload_just_pressed() -> bool:
+	return Input.is_action_just_pressed(RELOAD)
 
 
 ## Item selection (1-9). Returns the item number (1-9) if an item key was pressed

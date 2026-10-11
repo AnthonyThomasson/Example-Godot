@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold) and the System-Two state Von lacks: engagement + retargeting, peek-and-cover and ambush, fire-at-will on the move, territorial confinement, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, furniture bulldozing). Use when editing scenes/ai/behavior/ or working on how a chosen option becomes movement and shooting, combat maneuvering, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload) and the System-Two state Von lacks: engagement + retargeting, peek-and-cover and ambush, fire-at-will on the move, territorial confinement, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, furniture bulldozing). Use when editing scenes/ai/behavior/ or working on how a chosen option becomes movement and shooting, combat maneuvering, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -28,6 +28,7 @@ fields are read live, so only locomotion needs the push.)
 | `engage` | `point` (anchor), `target_id`, `style` (peek_cover / ambush), `confine_inside` | Path to the anchor firing at will, then fight from it: **peek-and-cover** (peek to the nearest spot with a clear shot, fire on `fire_cooldown`, duck to cover for `cover_time`, positions committed for `reposition_interval`) or **ambush** (hold the covered spot, fire the moment a line opens). ENGAGE and FLANK use this, anchored at the chosen spot or side. | Moving: at `max_commit_time`. In position: every `tactic_interval` (timer starts on arrival) or when `engaged` lapses. |
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
+| `reload` | — | Equip the pistol, stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -44,6 +45,15 @@ walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `r
 A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_fire()` skips a pistol
 shot while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
 Test: `tests/ai/ai_runs_to_destination_test.gd`.
+
+**Ammo.** An empty pistol cannot fire, so the behaviour never "fights" with one: `_fire_at_will` returns early when the pistol
+is empty or reloading, and `_fire()` on an empty pistol is a dry click that does not note engagement or call `shoot()`; it spends
+`fire_cooldown` and flags the task resolved, so the NPC re-decides (the snapshot now says the pistol is empty) at most once per
+cooldown. `auto_reload` (controller export, default on) is a reflex in `hold` (the server-down fallback, and after a
+reload) and in the cover phase of peek-and-cover: an EMPTY pistol with a spare magazine is reloaded without a decision. A reload
+runs only while standing (running cancels it, so the `reload` primitive never sets `run_input`). `debug_state()` / `debug_combat()`
+carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/scripted_reload_decision_test.gd`,
+`dry_pistol_fallback_test.gd`, `empty_pistol_no_spares_test.gd`.
 
 ## Public interface (what the orchestrator calls)
 

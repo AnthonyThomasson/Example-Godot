@@ -72,6 +72,7 @@ var investigate_distance: float = 300.0
 var max_options_per_level: int = 4
 var hurt_threshold: float = 15.0       ## Accumulated damage at/above which a character reads as hurt.
 var critical_threshold: float = 35.0   ## Accumulated damage at/above which a character reads as badly wounded.
+var low_ammo_fraction: float = 0.34    ## A gun at/below this fraction of its magazine reads as nearly empty.
 var max_contacts_in_state: int = 4     ## Most contacts described in the decision state (hostiles first).
 # Tactics (the combat geometry).
 var cover_min: float = 40.0            ## Surface coverage at/above which a blocking object counts as cover.
@@ -154,6 +155,7 @@ func apply_config() -> void:
 	_snapshot.max_options_per_level = max_options_per_level
 	_snapshot.hurt_threshold = hurt_threshold
 	_snapshot.critical_threshold = critical_threshold
+	_snapshot.low_ammo_fraction = low_ammo_fraction
 	_snapshot.max_contacts_in_state = max_contacts_in_state
 	_snapshot.search_memory_ttl = search_memory_ttl
 
@@ -366,6 +368,7 @@ func observe(character, rooms: Array) -> void:
 			"inside": not room.is_empty(),
 			"room_type": room.get("type", "") if not room.is_empty() else "",
 			"item": item.display_name if item != null else "nothing",
+			"reloading": other.has_method("is_reloading") and other.is_reloading(),
 		}
 		_visible_now[id] = true
 		_memory.remember(&"saw_character", sighting, maxf(contact_memory_ttl, lead_memory_ttl), str(id))

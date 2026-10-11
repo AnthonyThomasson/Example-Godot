@@ -12,6 +12,7 @@ extends Node
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
 ##   interact — walk to `object`, run its interaction `id`, hold it for `interaction_dwell`.
+##   reload   — stand and swap in a fresh magazine (`Character.reload()`), then re-decide.
 ##   hold     — stay and watch.
 ## It never chooses WHAT to do — the planner does — and applies no policy beyond the params it is
 ## handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
@@ -50,6 +51,7 @@ var arrive_dist: float = 10.0
 var run_enabled: bool = true ## May sprint at all.
 var run_min_distance: float = 150.0 ## Only run when farther than this (px) from the destination.
 var run_start_fraction: float = 0.5 ## Stamina needed to START a run (once running it goes on until dry).
+var auto_reload: bool = true ## An empty pistol with a spare magazine is reloaded on its own while holding or ducked in cover.
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
 var rooms: Array = []
@@ -77,6 +79,8 @@ var _engage_node: Node2D          ## That contact's body (excluded from line-of-
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
 var _engage_inside := false       ## Whether that contact was last seen inside the house.
 var _running := false             ## The character was running last tick (for the status line).
+var _reloading := false           ## The character was reloading last tick (for the status line and overlay).
+var _reload_started := false      ## A `reload` leaf has seen its reload begin, so it ends when the reload does.
 var _hold_ground := false         ## Combat: stay inside the house (territorial vs. an outsider).
 var _combat_phase := "peek"       ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
 var _cover_timer := 0.0           ## Seconds left ducking behind cover before peeking again.
@@ -137,6 +141,8 @@ func ongoing() -> bool:
 			return true
 		&"interact":
 			return true
+		&"reload":
+			return _reloading
 	return false
 
 
@@ -185,6 +191,8 @@ func _progress() -> String:
 			return "running in to punch" if _running else "closing in to punch"
 		&"interact":
 			return "using it" if _in_interaction else "walking to it"
+		&"reload":
+			return "reloading"
 	return "waiting" if not _labels.is_empty() else ""
 
 
@@ -198,6 +206,7 @@ func debug_state() -> Dictionary:
 		"params": _json_safe(_params),
 		"arrived": _arrived,
 		"running": _running,
+		"reloading": _reloading,
 		"engage": str(_engage_node.name) if is_instance_valid(_engage_node) else "",
 		"engage_id": _engage_id,
 		"engage_inside": _engage_inside,
@@ -263,6 +272,7 @@ func debug_combat(character) -> Dictionary:
 		"combat_dest": _combat_dest if _primitive == &"engage" and _arrived and _combat_dest != Vector2.ZERO else null,
 		"aim_point": character.aim_point if character != null else Vector2.ZERO,
 		"fire_at_will": bool(_params.get("fire_at_will", false)),
+		"reloading": _reloading,
 		"requested_point": _params["point"] if _params.has("point") else null,
 		"point": _point if _params.has("point") else null,
 		"arrived": _arrived,
@@ -334,6 +344,8 @@ func set_leaf(leaf: Dictionary) -> void:
 		&"interact":
 			_target_obj = _params.get("object")
 			_interact_id = _params.get("id", "")
+		&"reload":
+			_reload_started = false
 
 
 ## Fight known contact `id`: capture its body and last-known position (no-op when it isn't known).
@@ -438,7 +450,7 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 			if _look_around and _arrived and not _resolved:
 				return false  # Hold through room coverage; it ends itself (all seen, or the budget runs out).
 			return _commit_timer <= 0.0
-		&"interact":
+		&"interact", &"reload":
 			return _commit_timer <= 0.0
 	return decide_timer_elapsed
 
@@ -458,10 +470,13 @@ func apply(character, delta: float) -> void:
 			_apply_melee(character)
 		&"interact":
 			_apply_interact(character)
+		&"reload":
+			_apply_reload(character)
 		_:
 			_apply_hold(character)
 	character.run_input = _should_run(character)
 	_running = character.is_running()
+	_reloading = character.is_reloading()
 
 
 ## Whether to sprint this tick, judged after the primitive has steered: only while travelling to a
@@ -573,9 +588,9 @@ func _aim_move(character) -> void:
 
 
 ## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the
-## facing has settled on it; aims at it meanwhile. No-op without the pistol.
+## facing has settled on it; aims at it meanwhile. No-op without a loaded pistol (or mid-reload).
 func _fire_at_will(character) -> void:
-	if not character.has_item(PISTOL_SLOT):
+	if not character.has_item(PISTOL_SLOT) or character.ammo(PISTOL_SLOT) == 0 or character.is_reloading():
 		return
 	var target: Dictionary = {}
 	for c in _hostiles:
@@ -632,6 +647,7 @@ func _apply_peek_cover(character, delta: float) -> void:
 			_combat_dest = _choose_combat_dest(character, "cover")
 			_combat_dest_timer = reposition_interval
 		_loco.move_to(character, _combat_dest)
+		_reload_if_dry(character)
 		if _cover_timer <= 0.0:
 			_combat_phase = "peek"
 			_combat_dest_timer = 0.0  # Re-pick a firing spot immediately on peeking out.
@@ -691,8 +707,14 @@ func _apply_melee(character) -> void:
 ## Equip `slot` and throw one shot (pistol) or punch, refreshing the combat engagement so an active
 ## fight stays committed.
 func _fire(character, slot: int) -> void:
-	if slot == PISTOL_SLOT and character.is_running():
-		return  # No shooting at a run: keep the cooldown for when it stops.
+	if slot == PISTOL_SLOT and (character.is_running() or character.is_reloading()):
+		return  # No shooting at a run or mid-reload: keep the cooldown for when it stops.
+	if slot == PISTOL_SLOT and character.ammo(PISTOL_SLOT) == 0:
+		# Dry: a click is not a shot, so it neither commits the fight nor needs a hand free to reload;
+		# re-decide (the empty gun is in the snapshot now), at most once per cooldown.
+		_fire_timer = fire_cooldown
+		_resolved = true
+		return
 	_perception.note_engaged()
 	_fire_timer = fire_cooldown
 	character.select_slot(slot)
@@ -728,11 +750,44 @@ func _apply_interact(character) -> void:
 		_resolved = true
 
 
-## Hold: stand still and watch the nearest known hostile, if any.
+## Hold: stand still and watch the nearest known hostile, if any. An empty pistol is reloaded meanwhile,
+## so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold(character) -> void:
 	character.move_input = Vector2.ZERO
 	if not _hostiles.is_empty():
 		character.aim_point = _hostiles[0]["pos"]
+	_reload_if_dry(character)
+
+
+## Reload: stand and swap magazines, watching the nearest known hostile; when the reload ends (or can't
+## start) the task is resolved and the NPC re-decides. A reload refused while the previous leaf's run is
+## still winding down is retried the next tick.
+func _apply_reload(character) -> void:
+	character.move_input = Vector2.ZERO
+	if not _hostiles.is_empty():
+		character.aim_point = _hostiles[0]["pos"]
+	if character.is_reloading():
+		_reload_started = true
+		return
+	if not _reload_started:
+		character.select_slot(PISTOL_SLOT)
+		character.reload()
+		if character.is_reloading():
+			_reload_started = true
+			return
+		if character.is_running():
+			return
+	_primitive = &"hold"
+	_resolved = true
+
+
+## Reflex: swap in a fresh magazine when the pistol is empty and one is carried (`auto_reload`). It
+## equips the pistol first, since a reload works on the held item.
+func _reload_if_dry(character) -> void:
+	if not auto_reload or character.is_reloading() or character.ammo(PISTOL_SLOT) != 0 or not character.can_reload(PISTOL_SLOT):
+		return
+	character.select_slot(PISTOL_SLOT)
+	character.reload()
 
 
 # --- Helpers ---------------------------------------------------------------------------------

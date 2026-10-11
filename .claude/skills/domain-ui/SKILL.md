@@ -13,7 +13,8 @@ the domains.
 ## Files
 
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
-  item slot, punch active flag, active interaction, reach, stamina (and whether running). Top-left hit banner: last body hit, method
+  item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
+  `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), punch active flag, active interaction, reach, stamina (and whether running). Top-left hit banner: last body hit, method
   (punch left/right or gunshot), damage, and elapsed time. Listens to `hit_landed` on the character;
   freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
 
