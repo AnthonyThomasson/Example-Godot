@@ -71,8 +71,15 @@ const ARRANGEMENTS := {
 			{ "key": "chair", "pos": Vector2(80, 75), "facing": Vector2.UP },
 		],
 	},
+	"counter_run": {
+		"placement": "wall", "footprint": Vector2(206, 50),
+		"items": [
+			{ "key": "kitchen_counter", "pos": Vector2(50, 25) },
+			{ "key": "kitchen_counter", "pos": Vector2(156, 25) },
+		],
+	},
 	"pantry": {
-		"placement": "wall", "footprint": Vector2(95, 40),
+		"placement": "wall", "footprint": Vector2(95, 40), "tags": ["pantry"],
 		"items": [
 			{ "key": "cabinet", "pos": Vector2(25, 18) },
 			{ "key": "microwave", "pos": Vector2(73, 20) },
@@ -93,5 +100,6 @@ const RECIPES := {
 			{ "options": ["dining_set_4", "dining_set_2", "island_stools"], "count": Vector2i(1, 1), "required": true, "fallback": "dining_compact" },
 			{ "options": ["pantry", "plant_corner"], "count": Vector2i(0, 2) },
 		],
+		"fill": { "target": 0.35, "options": ["counter_run", "storage_wall", "pantry", "plant_corner", "runner_hall"] },
 	},
 }

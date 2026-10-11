@@ -36,12 +36,16 @@ const ARRANGEMENTS := {
 			{ "key": "dresser", "pos": Vector2(135, 20) },
 		],
 	},
+	"dresser_wall": {
+		"placement": "wall", "footprint": Vector2(80, 40),
+		"items": [{ "key": "dresser", "pos": Vector2(40, 20) }],
+	},
 	"wardrobe_compact": {
 		"placement": "wall", "footprint": Vector2(94, 49), "prefer_corner": true,
 		"items": [{ "key": "wardrobe", "pos": Vector2(47, 24) }],
 	},
 	"work_desk": {
-		"placement": "wall", "footprint": Vector2(150, 95),
+		"placement": "wall", "footprint": Vector2(150, 95), "tags": ["desk"],
 		"items": [
 			{ "key": "desk", "pos": Vector2(60, 25) },
 			{ "key": "chair", "pos": Vector2(60, 72), "facing": Vector2.UP },
@@ -64,5 +68,6 @@ const RECIPES := {
 			{ "options": ["work_desk", "reading_chair"], "count": Vector2i(1, 2) },
 			{ "options": ["plant_corner"], "count": Vector2i(0, 1) },
 		],
+		"fill": { "target": 0.38, "options": ["dresser_wall", "bookshelf_wall", "shelf_single", "lamp_corner", "lamp_corner", "plant_corner", "side_table_lamp", "reading_chair", "work_desk", "rug_small", "rug_center"] },
 	},
 }

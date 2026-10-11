@@ -16,6 +16,7 @@ class_name GeneralCatalog
 ##     flat shape + label) and art_opts (optional painter variant/overrides, e.g.
 ##     { "front": "drawers", "count": 3 } or { "props": [...] }).
 ## Arrangements/recipes: see ArrangementDefinitions for the authoring conventions.
+## Objects and arrangements used by 2+ room categories (bench, console_wall, bookshelf_wall, the rugs, …) live here.
 
 const OBJECTS := {
 	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "art": "chair", "weight": 6, "coverage": 45, "penetration": 50, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "stand_on", "label": "Stand on it", "move_to": true }] },
@@ -32,6 +33,11 @@ const OBJECTS := {
 	"desk": { "name": "Desk", "shape": "rect", "size": Vector2(120, 50), "color": Color(0.4, 0.25, 0.1), "material": "wood", "art": "table", "art_opts": { "props": [{ "kind": "monitor", "at": Vector2(0.5, 0.22) }, { "kind": "keyboard", "at": Vector2(0.5, 0.62) }, { "kind": "mug", "at": Vector2(0.83, 0.55) }, { "kind": "papers", "at": Vector2(0.15, 0.5) }] }, "weight": 24, "coverage": 45, "penetration": 50, "interactions": [{ "id": "sit_at", "label": "Sit at desk", "move_to": true }, { "id": "examine", "label": "Examine" }] },
 	"washing_machine": { "name": "Wash", "shape": "square", "size": Vector2(60, 60), "color": Color(0.9, 0.9, 0.9), "material": "metal", "art": "appliance", "art_opts": { "panel": "washer" }, "weight": 70, "coverage": 55, "penetration": 80 },
 	"dryer": { "name": "Dryer", "shape": "square", "size": Vector2(60, 60), "color": Color(0.7, 0.7, 0.7), "material": "metal", "art": "appliance", "art_opts": { "panel": "dryer" }, "weight": 55, "coverage": 55, "penetration": 80 },
+	"bench": { "name": "Bench", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.55, 0.4, 0.25), "material": "wood", "art": "table", "art_opts": { "gaps": true, "plank_px": 6, "rim_px": 1 }, "weight": 14, "coverage": 30, "penetration": 50 },
+	"console_table": { "name": "Console", "shape": "rect", "size": Vector2(90, 28), "color": Color(0.5, 0.34, 0.2), "material": "wood", "art": "table", "art_opts": { "plank_px": 7, "props": [{ "kind": "bowl", "at": Vector2(0.3, 0.5) }, { "kind": "vase", "at": Vector2(0.75, 0.5) }] }, "weight": 14, "coverage": 30, "penetration": 45 },
+	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85), "material": "glass", "art": "fixture", "art_opts": { "kind": "mirror" }, "weight": 6, "coverage": 40, "penetration": 20 },
+	"rug_large": { "name": "Rug", "shape": "rect", "size": Vector2(250, 170), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "art": "rug", "art_opts": { "pattern": "medallion" }, "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
+	"runner": { "name": "Runner", "shape": "rect", "size": Vector2(220, 56), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "art": "rug", "art_opts": { "pattern": "stripes" }, "weight": 3, "solid": false, "coverage": 0, "penetration": 5 },
 }
 
 const ARRANGEMENTS := {
@@ -71,6 +77,71 @@ const ARRANGEMENTS := {
 	"dining_compact": {
 		"placement": "wall", "footprint": Vector2(64, 64), "prefer_corner": true,
 		"items": [{ "key": "table", "pos": Vector2(32, 32) }],
+	},
+	"lamp_corner": {
+		"placement": "wall", "footprint": Vector2(26, 26), "prefer_corner": true,
+		"items": [{ "key": "lamp", "pos": Vector2(13, 13) }],
+	},
+	"shelf_single": {
+		"placement": "wall", "footprint": Vector2(80, 40), "prefer_corner": true,
+		"items": [{ "key": "bookshelf", "pos": Vector2(40, 20), "rotated": true }],
+	},
+	"bookshelf_wall": {
+		"placement": "wall", "footprint": Vector2(170, 40),
+		"items": [
+			{ "key": "bookshelf", "pos": Vector2(45, 20), "rotated": true },
+			{ "key": "bookshelf", "pos": Vector2(125, 20), "rotated": true },
+		],
+	},
+	"storage_wall": {
+		"placement": "wall", "footprint": Vector2(106, 36),
+		"items": [
+			{ "key": "cabinet", "pos": Vector2(26, 18) },
+			{ "key": "cabinet", "pos": Vector2(80, 18) },
+		],
+	},
+	"console_wall": {
+		"placement": "wall", "footprint": Vector2(90, 42),
+		"items": [
+			{ "key": "mirror", "pos": Vector2(45, 6) },
+			{ "key": "console_table", "pos": Vector2(45, 26) },
+		],
+	},
+	"bench_coats": {
+		"placement": "wall", "footprint": Vector2(125, 32),
+		"items": [
+			{ "key": "bench", "pos": Vector2(40, 16) },
+			{ "key": "coat_rack", "pos": Vector2(95, 14) },
+		],
+	},
+	"sofa_wall": {
+		"placement": "wall", "footprint": Vector2(150, 50),
+		"items": [
+			{ "key": "sofa", "pos": Vector2(60, 25) },
+			{ "key": "side_table", "pos": Vector2(135, 15) },
+		],
+	},
+	"lounge_group": {
+		"placement": "center", "footprint": Vector2(200, 80),
+		"tags": ["lounge"],
+		"items": [
+			{ "key": "armchair", "pos": Vector2(25, 40), "facing": Vector2.RIGHT },
+			{ "key": "coffee_table", "pos": Vector2(100, 40) },
+			{ "key": "armchair", "pos": Vector2(175, 40), "facing": Vector2.LEFT },
+		],
+	},
+	# Ground pieces lie under whatever is on the floor: they never block it, and only one rug a room.
+	"rug_center": {
+		"placement": "center", "footprint": Vector2(250, 170), "ground": true, "tags": ["rug"],
+		"items": [{ "key": "rug_large", "pos": Vector2(125, 85) }],
+	},
+	"rug_small": {
+		"placement": "center", "footprint": Vector2(170, 110), "ground": true, "tags": ["rug"],
+		"items": [{ "key": "rug", "pos": Vector2(85, 55) }],
+	},
+	"runner_hall": {
+		"placement": "center", "footprint": Vector2(220, 56), "ground": true, "tags": ["rug"],
+		"items": [{ "key": "runner", "pos": Vector2(110, 28) }],
 	},
 }
 
@@ -126,6 +197,7 @@ const RECIPES := {
 			{ "options": ["dining_set_4", "dining_set_2", "island_stools"], "count": Vector2i(1, 1), "required": true, "fallback": "dining_compact" },
 			{ "options": ["reading_nook", "entry_area", "pantry", "plant_corner", "side_table_lamp"], "count": Vector2i(1, 3) },
 		],
+		"fill": { "target": 0.4, "options": ["bookshelf_wall", "shelf_single", "lamp_corner", "lamp_corner", "plant_corner", "plant_corner", "side_table_lamp", "sofa_wall", "lounge_group", "storage_wall", "counter_run", "pantry", "entry_area"] },
 	},
 	"studio": {
 		"palettes": [
@@ -139,5 +211,6 @@ const RECIPES := {
 			{ "options": ["bed_single_nightstand", "bed_twin_nightstands"], "count": Vector2i(1, 1), "required": true, "fallback": "bed_compact" },
 			{ "options": ["fridge_corner", "dining_set_2", "plant_corner"], "count": Vector2i(0, 2) },
 		],
+		"fill": { "target": 0.4, "options": ["bookshelf_wall", "shelf_single", "lamp_corner", "plant_corner", "side_table_lamp", "storage_wall", "reading_chair", "work_desk"] },
 	},
 }

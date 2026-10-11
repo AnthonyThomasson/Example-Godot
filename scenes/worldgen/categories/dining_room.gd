@@ -23,11 +23,11 @@ const ARRANGEMENTS := {
 		],
 	},
 	"buffet_wall": {
-		"placement": "wall", "footprint": Vector2(120, 40),
+		"placement": "wall", "footprint": Vector2(120, 40), "tags": ["buffet"],
 		"items": [{ "key": "buffet", "pos": Vector2(60, 20) }],
 	},
 	"china_corner": {
-		"placement": "wall", "footprint": Vector2(70, 40), "prefer_corner": true,
+		"placement": "wall", "footprint": Vector2(70, 40), "prefer_corner": true, "tags": ["china"],
 		"items": [{ "key": "china_cabinet", "pos": Vector2(35, 20) }],
 	},
 }
@@ -44,5 +44,6 @@ const RECIPES := {
 			{ "options": ["buffet_wall", "china_corner"], "count": Vector2i(1, 2) },
 			{ "options": ["plant_corner", "side_table_lamp"], "count": Vector2i(0, 2) },
 		],
+		"fill": { "target": 0.38, "options": ["buffet_wall", "china_corner", "plant_corner", "plant_corner", "side_table_lamp", "side_table_lamp", "storage_wall", "lamp_corner", "rug_center"] },
 	},
 }

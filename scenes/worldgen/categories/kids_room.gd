@@ -34,7 +34,7 @@ const ARRANGEMENTS := {
 		"items": [{ "key": "toy_chest", "pos": Vector2(29, 20) }],
 	},
 	"kids_books": {
-		"placement": "wall", "footprint": Vector2(80, 40), "prefer_corner": true,
+		"placement": "wall", "footprint": Vector2(80, 40), "prefer_corner": true, "tags": ["books"],
 		"items": [{ "key": "bookshelf", "pos": Vector2(40, 20), "rotated": true }],
 	},
 }
@@ -51,5 +51,6 @@ const RECIPES := {
 			{ "options": ["play_area"], "count": Vector2i(1, 1), "required": true, "fallback": "play_compact" },
 			{ "options": ["kids_books", "plant_corner"], "count": Vector2i(0, 1) },
 		],
+		"fill": { "target": 0.35, "options": ["kids_books", "plant_corner", "play_compact", "lamp_corner", "bookshelf_wall", "rug_small"] },
 	},
 }

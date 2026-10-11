@@ -15,16 +15,30 @@ plain definition dict into a node — World-Gen never touches an object's fields
 `luxury_home`) and hands it to `HouseSpawner`:
 
 ```
-HouseDefinitions (floorplans) ─┐
+HouseDefinitions (floorplans) ─┐        LayoutRules (is the plan logical?) ◀─ HouseSpawner._validate
 categories/*  (catalogues)  ───┼─▶ HouseSpawner ─▶ WallFactory (walls, doorway openings cut in)
-ObjectDefinitions / ───────────┘                ├▶ RoomFurnisher ─▶ ObjectFactory
+ObjectDefinitions / ───────────┘                ├▶ RoomFurnisher ─▶ ObjectFactory   (WorldGenConfig: fill knobs)
 ArrangementDefinitions                          └▶ FloorFactory (the floor the room's palette names)
 ```
 
 - **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a `type`;
   `openings` are doorway points on wall lines. `HouseSpawner` cuts each opening into every wall
   through it, keeps opening clearances free of furniture, and mirrors the plan L/R 50% of the time.
-  Openings are plain archways — there are no physical door objects.
+  Openings are plain archways — there are no physical door objects. Exactly one opening is `front`
+  (the house is positioned by it, always on the south wall); a plan may add `"exit": true` openings
+  (an exterior back/side/garage door on exactly one room's wall). Houses have an exit; the flats keep
+  only the front door. `get_openings` reports `{ pos, width, front, exit, rooms }`.
+- **Layout rules** (`layout_rules.gd`, `LayoutRules`): the tunable table of what makes a plan logical.
+  `ROOMS[type]` = `front` (may carry the front door: studio, living room, great room, entry hall,
+  hallway — never a bedroom, bathroom, dining room …), `exit`, `through` (may be the only route between
+  two other rooms; bedrooms/bathrooms/offices may not — only a private dead end such as an en-suite may
+  hang off them) and `max_doors` (a bathroom has exactly one door); `LINKS` = the room-type pairs that may
+  share an interior door (bathrooms only open onto a hallway, bedroom, living space or studio; a garage
+  only onto kitchen/laundry/hallway). `LayoutRules.check(rooms, openings)` returns one string per
+  violation; `HouseSpawner._validate` warns with them and `tests/worldgen/house_layout_logical_test.gd`
+  fails on any plan. A new room type needs its `ROOMS`/`LINKS` entries before a plan can use it. Bedrooms
+  and bathrooms open off a **hallway** (type `hallway`, ≥120 px deep: `family_home`, `luxury_home`) or a
+  living space, never off each other.
 - **Catalogues** (`worldgen/categories/*.gd`, one `<Name>Catalog` per room type; `general.gd`
   holds shared entries + the `WOOD`/`FABRIC` palettes + the `FLOORS` and the house `WALL` style +
   combined recipes). Hold `OBJECTS`,
@@ -40,7 +54,18 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
 - **Placement** (`room_furnisher.gd`) fits each arrangement's footprint against a random wall
   without overlap, rotates/mirrors it, then hands each object's definition to `ObjectFactory`
   (item `facing` mapped onto the wall by `_map_dir`, the same way positions are, and passed as
-  `opts.facing`). `furnish` returns the palette it picked.
+  `opts.facing`). `furnish` returns the palette it picked. `_try_place` is the one place a piece is
+  committed (tags, spot search, occupied/walk-grid bookkeeping).
+- **Fill pass**: a recipe may carry `fill: { target, options }`. After its zones, `_fill` keeps drawing
+  random `options` (through the same placement checks) until the room's solid footprints cover `target`
+  of the interior, so big rooms aren't left bare. Each listed option is tried once, hit or miss (list it
+  twice to allow two): a miss can't become a hit later (a fuller room never gains a spot), so a full room
+  ends the pass quickly. `WorldGenConfig` (`class_name` static holder)
+  holds the knobs: `fill_enabled`, `fill_scale` (× every target; 0 = off), `fill_attempts`,
+  `fill_max_pieces`. Fill consumes the shared RNG, so a seed is stable but changes if a recipe's fill does.
+- **Ground pieces**: an arrangement with `"ground": true` (rugs `rug_center`/`rug_small`/`runner_hall`) is non-solid decor that lies *under* furniture: it avoids only other ground pieces,
+  never touches the walk grid, and is tried dead-centre first. The `"rug"` tag keeps it to one rug a room
+  (the `tv_wall_*` arrangements carry their own rug and the tag).
 - **Walkability** (`room_furnisher.gd`): furnishing is planned before anything spawns (`_plan`), and a
   candidate spot is accepted only if it keeps every doorway of the room reachable from the others on a
   coarse grid (furniture grown by `FURNITURE_CLEAR`, the room edge by `WALL_CLEAR`; a doorway is the free
@@ -61,9 +86,18 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
 
 ## To add a room type
 
-Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `type`. New
-`class_name` scripts resolve only after Godot rescans (open the editor or run `godot --headless
---path . --import`).
+Add a `categories/<type>.gd` catalog with its recipe (register it in `ObjectDefinitions` and
+`ArrangementDefinitions`), give the type its `LayoutRules.ROOMS` / `LINKS` entries and use its key as a
+room `type`. Pieces used by 2+ categories (`bench`, `console_wall`, `bookshelf_wall`, the rugs …) live in
+`GeneralCatalog`. New `class_name` scripts resolve only after Godot rescans (open the editor or run
+`godot --headless --path . --import`).
+
+## To add or change a floorplan
+
+Rooms are rects that share walls; put a doorway on each shared wall you want open and make the graph
+satisfy `LayoutRules` (check with `tools/run_tests.sh worldgen`). Mind the room sizes: a room needs space
+for its required pieces plus the door lanes (`OPENING_CLEARANCE` each side of every doorway), or the
+furnisher warns "no room for required zone" and the doorway test fails.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
@@ -71,7 +105,7 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
   front_entrance_world, parent) -> Node2D` seeds one RNG for the whole run (plan
   pick is its first draw), prints `House: <plan>  seed: N`, builds the house; every doorway is an
   open archway. `WorldGen.get_openings(house) -> Array`
-  returns the doorways as `{ pos, width, front, rooms }` (world space; `rooms` = the room keys it joins).
+  returns the doorways as `{ pos, width, front, exit, rooms }` (world space; `rooms` = the room keys it joins).
   `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
   `rooms` metadata. `main.gd` positions the front entrance, fixes draw order, builds the nav map, and

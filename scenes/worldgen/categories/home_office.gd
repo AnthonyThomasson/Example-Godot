@@ -1,7 +1,7 @@
 class_name HomeOfficeCatalog
 
 ## Home-office objects, arrangements, and recipe. Shared items (desk, bookshelf,
-## plant, and the reading_chair arrangement) live in GeneralCatalog.
+## plant, and the reading_chair / bookshelf_wall arrangements) live in GeneralCatalog.
 
 const OBJECTS := {
 	"office_chair": { "name": "Chair", "shape": "square", "size": Vector2(30, 30), "color": Color(0.2, 0.2, 0.24), "material": "plastic", "art": "office_chair", "weight": 8, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "spin", "label": "Spin around", "move_to": true }] },
@@ -20,15 +20,8 @@ const ARRANGEMENTS := {
 		"placement": "wall", "footprint": Vector2(124, 54),
 		"items": [{ "key": "desk", "pos": Vector2(62, 27) }],
 	},
-	"bookshelf_wall": {
-		"placement": "wall", "footprint": Vector2(170, 40),
-		"items": [
-			{ "key": "bookshelf", "pos": Vector2(45, 20), "rotated": true },
-			{ "key": "bookshelf", "pos": Vector2(125, 20), "rotated": true },
-		],
-	},
 	"filing_corner": {
-		"placement": "wall", "footprint": Vector2(40, 50), "prefer_corner": true,
+		"placement": "wall", "footprint": Vector2(40, 50), "prefer_corner": true, "tags": ["filing"],
 		"items": [{ "key": "filing_cabinet", "pos": Vector2(20, 25) }],
 	},
 }
@@ -45,5 +38,6 @@ const RECIPES := {
 			{ "options": ["bookshelf_wall", "filing_corner"], "count": Vector2i(1, 2) },
 			{ "options": ["reading_chair", "plant_corner"], "count": Vector2i(0, 1) },
 		],
+		"fill": { "target": 0.35, "options": ["bookshelf_wall", "filing_corner", "reading_chair", "plant_corner", "lamp_corner", "shelf_single", "storage_wall", "rug_small"] },
 	},
 }

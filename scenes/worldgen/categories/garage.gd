@@ -21,6 +21,10 @@ const ARRANGEMENTS := {
 			{ "key": "tool_chest", "pos": Vector2(140, 20) },
 		],
 	},
+	"tool_corner": {
+		"placement": "wall", "footprint": Vector2(45, 40), "prefer_corner": true,
+		"items": [{ "key": "tool_chest", "pos": Vector2(22, 20) }],
+	},
 	"garage_shelf": {
 		"placement": "wall", "footprint": Vector2(95, 30), "prefer_corner": true,
 		"items": [{ "key": "shelving", "pos": Vector2(47, 15) }],
@@ -38,5 +42,6 @@ const RECIPES := {
 			{ "options": ["workbench_wall"], "count": Vector2i(1, 1), "required": true },
 			{ "options": ["garage_shelf"], "count": Vector2i(0, 2) },
 		],
+		"fill": { "target": 0.3, "options": ["garage_shelf", "garage_shelf", "tool_corner", "storage_wall"] },
 	},
 }

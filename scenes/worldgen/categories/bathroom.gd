@@ -8,6 +8,7 @@ const OBJECTS := {
 	"bathtub": { "name": "Tub", "shape": "rect", "size": Vector2(100, 150), "color": Color(0.8, 0.8, 1.0), "material": "ceramic", "art": "bath", "art_opts": { "style": "tub" }, "weight": 120, "coverage": 45, "penetration": 60 },
 	"shower": { "name": "Shower", "shape": "square", "size": Vector2(80, 80), "color": Color(0.75, 0.85, 0.95), "material": "glass", "art": "bath", "art_opts": { "style": "shower" }, "weight": 80, "coverage": 95, "penetration": 25 },
 	"towel_rack": { "name": "Towels", "shape": "rect", "size": Vector2(50, 14), "color": Color(0.6, 0.6, 0.65), "material": "metal", "art": "fixture", "art_opts": { "kind": "towels" }, "weight": 4, "coverage": 25, "penetration": 30 },
+	"linen_shelf": { "name": "Linen", "shape": "rect", "size": Vector2(60, 25), "color": Color(0.55, 0.55, 0.58), "material": "wood", "art": "shelf", "art_opts": { "contents": "boxes" }, "weight": 10, "coverage": 40, "penetration": 35 },
 	"bath_mat": { "name": "Mat", "shape": "rect", "size": Vector2(70, 40), "color": Color(0.5, 0.65, 0.75), "material": "fabric", "art": "rug", "art_opts": { "pattern": "plush" }, "weight": 2, "solid": false, "coverage": 0, "penetration": 5 },
 }
 
@@ -19,14 +20,14 @@ const ARRANGEMENTS := {
 		],
 	},
 	"shower_zone": {
-		"placement": "wall", "footprint": Vector2(80, 125), "prefer_corner": true,
+		"placement": "wall", "footprint": Vector2(80, 125), "prefer_corner": true, "tags": ["shower"],
 		"items": [
 			{ "key": "shower", "pos": Vector2(40, 40) },
 			{ "key": "bath_mat", "pos": Vector2(40, 103) },
 		],
 	},
 	"shower_compact": {
-		"placement": "wall", "footprint": Vector2(84, 84), "prefer_corner": true,
+		"placement": "wall", "footprint": Vector2(84, 84), "prefer_corner": true, "tags": ["shower"],
 		"items": [{ "key": "shower", "pos": Vector2(42, 42) }],
 	},
 	"toilet_zone": {
@@ -47,6 +48,10 @@ const ARRANGEMENTS := {
 			{ "key": "cabinet", "pos": Vector2(82, 18) },
 		],
 	},
+	"linen_wall": {
+		"placement": "wall", "footprint": Vector2(60, 26),
+		"items": [{ "key": "linen_shelf", "pos": Vector2(30, 13) }],
+	},
 	"vanity_compact": {
 		"placement": "wall", "footprint": Vector2(54, 54), "prefer_corner": true,
 		"items": [{ "key": "sink", "pos": Vector2(27, 27) }],
@@ -66,5 +71,6 @@ const RECIPES := {
 			{ "options": ["vanity"], "count": Vector2i(1, 1), "required": true, "fallback": "vanity_compact" },
 			{ "options": ["laundry_pair", "plant_corner"], "count": Vector2i(0, 1) },
 		],
+		"fill": { "target": 0.35, "options": ["shower_compact", "storage_wall", "linen_wall", "plant_corner", "storage_wall"] },
 	},
 }

@@ -20,7 +20,8 @@ static func _all() -> Dictionary:
 		for src in [GeneralCatalog.OBJECTS, LivingRoomCatalog.OBJECTS,
 				KitchenCatalog.OBJECTS, BedroomCatalog.OBJECTS, BathroomCatalog.OBJECTS,
 				DiningRoomCatalog.OBJECTS, HomeOfficeCatalog.OBJECTS, KidsRoomCatalog.OBJECTS,
-				EntryHallCatalog.OBJECTS, LaundryRoomCatalog.OBJECTS, GarageCatalog.OBJECTS]:
+				EntryHallCatalog.OBJECTS, HallwayCatalog.OBJECTS, LaundryRoomCatalog.OBJECTS,
+				GarageCatalog.OBJECTS]:
 			_catalog.merge(src)
 	return _catalog
 
