@@ -15,7 +15,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A target at a corridor's dead end cannot be flanked",
 		"description": "The target holds the dead end of a corridor; every flank point is behind a wall, so combat offers no flank and the NPC engages directly.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 15.0,
 	}
 

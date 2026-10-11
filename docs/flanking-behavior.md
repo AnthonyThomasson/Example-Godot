@@ -2,8 +2,8 @@
 
 What an NPC should do when it flanks a target, and which tests hold the AI to it. The tests in
 `tests/ai/flank_*_test.gd` assert this document, not the current code: where the AI falls short the test
-is red and tagged `gap` (`tools/run_tests.sh gap` lists them). Each test's header comment names the
-behaviour (F, B1 to B9, C) it asserts.
+is written first, left red and tagged `gap` (`tools/run_tests.sh gap` lists them); no test is red now.
+Each test's header comment names the behaviour (F, B1 to B9, C) it asserts.
 
 Flanking here means taking one of the sides of a known hostile, measured in the hostile's own frame
 (left, right, rear), and fighting it from there. The AI's side of this lives in `agent_tactics.gd`
@@ -21,8 +21,9 @@ Tests: `flank_sides_target_facing_npc`, `flank_sides_target_facing_away`, `flank
 **B1. Approach out of the target's sight.** A flank position is behind the target and out of view of its
 other enemies, and the approach is covered or concealed rather than across the target's front. A route
 the target cannot see (it looks away, or a wall is between) is described as hidden, not exposed.
-Why: surprise is the point of a flank; game AI gives path cost to the target's forward arc.
-Tests: `flank_sides_target_facing_npc`, `flank_sides_target_facing_away` (gap).
+Only the samples inside the target's view cone (`watch_arc`) count toward a route being exposed. Why:
+surprise is the point of a flank; game AI gives path cost to the target's forward arc.
+Tests: `flank_sides_target_facing_npc`, `flank_sides_target_facing_away`.
 
 **B2. Never walk a flank route past a hostile.** A route that passes within `route_clearance` of the target
 or another known hostile is dropped as `crosses`. Walking away from someone close by is not passing them.
@@ -30,9 +31,10 @@ Why: the NPC would walk into their fire. Tests: `flank_rear_route_crosses_target
 `flank_route_passes_second_hostile`.
 
 **B3. Do not flank across a friend's line of fire.** A side whose point lies in an ally's line of fire to
-the target, or whose route crosses that line, is not offered.
-Why: blue-on-blue; the assault must land where the base of fire is not shooting. Tests: `flank_ally_lane`
-(gap), `flank_two_invaders_split_sides`.
+the target, or whose route crosses that line, is not offered. Only allies the NPC can see (or that
+radioed a side) count: it weighs what it perceives, so an ally outside its view cone has no lane.
+Why: blue-on-blue; the assault must land where the base of fire is not shooting. Tests: `flank_ally_lane`,
+`flank_two_invaders_split_sides`.
 
 **B4. One flanker per side.** A side an ally holds, standing on it where the NPC can see it or by radio
 callout, is not offered; with every side held there is no FLANK tactic and the NPC fights directly. Allies
@@ -46,20 +48,20 @@ Tests: `flank_all_sides_held`, `flank_side_held_by_radio`, `flank_side_held_by_s
 doorway funnel every side lies behind a wall or past the target. The FLANK tactic is absent and the NPC
 engages or advances.
 Why: anchored flanks cannot be turned; the doorway is the fatal funnel, so no one lingers in it.
-Tests: `flank_corridor_dead_end` (gap), `flank_side_behind_wall` (gap), `flank_rear_route_crosses_target`.
+Tests: `flank_corridor_dead_end`, `flank_side_behind_wall`, `flank_rear_route_crosses_target`.
 
 **B6. The flank spot is a firing position.** It has a clear shot at the target, and cover beside it is
 reported ("cover close by (the pillar)"). A point with the line blocked, such as outside a wall or behind a
-shelf, is not offered as a flank, however well described.
+shelf, is still weighed (and worded "line blocked from there") but is not offered as a flank.
 Why: a flank that cannot shoot only ends the NPC somewhere pointless; F.E.A.R.'s flanks were cover-to-cover
 moves to spots with a line on the player.
-Tests: `flank_spot_cover_and_clear_shot`, `flank_spot_line_blocked` (gap), `flank_side_behind_wall` (gap),
-`flank_corridor_dead_end` (gap).
+Tests: `flank_spot_cover_and_clear_shot`, `flank_spot_line_blocked`, `flank_side_behind_wall`,
+`flank_corridor_dead_end`.
 
 **B7. Do not step into the side the target is walking toward.** A side the target's smoothed velocity heads
 toward reads "they are moving toward that side" and is not offered. The risk of being flanked back is
 weighed against the gain.
-Tests: `flank_target_moving_toward_side` (gap).
+Tests: `flank_target_moving_toward_side`.
 
 **B8. A territorial defender does not leave its house to flank.** Sides outside the house are weighed and
 dropped for a NPC that defends territory, and offered when it does not.
@@ -96,18 +98,16 @@ Terrace house                     Corridor spine                  Warehouse
 +---------------------+
 ```
 
-## Known gaps
+## How the rules are enforced
 
-Six tests are red because the AI does not do the behaviour yet.
+A side the AI will not take is still weighed: `debug_zones()` lists it with its words and tags, and the
+decision tree's `flank` node drops it through `drop_tags`. The tags, set in `agent_snapshot.gd`
+(`_flank_group`), are `held` (B4), `crosses` (B2), `no_shot` (B5/B6), `heading` (B7) and `lane` (B3). The
+geometry behind them is in `agent_tactics.gd` (`flank_sides`, `ally_lane`, `route_exposed`, which takes the
+target's front for B1). A FLANK tactic whose every side is dropped is not offered at all.
 
-| Test | Behaviour missing | Where it would change |
-|---|---|---|
-| `flank_ally_lane` | B3: `ally_lane` flags only the flank point (and rarely, since an ally on a side already holds it); a route that crosses an ally's line of fire is offered. | `agent_tactics.gd` (`flank_sides`, `ally_lane`): test the route against each lane; `decision_tree.gd` flank `drop_tags`. |
-| `flank_corridor_dead_end` | B5/B6: sides behind walls are offered with "line blocked from there". | `_flank_point` falls back to a blocked point; `flank_sides` / the flank `drop_tags` should drop a side with no shot. |
-| `flank_side_behind_wall` | B5/B6: the rear point outside the house, behind the wall, is offered. | Same as above. |
-| `flank_spot_line_blocked` | B6: a side behind a shelf screen is offered. | Same as above. |
-| `flank_sides_target_facing_away` | B1: `route_exposed` is a line-of-sight test from the target's position and ignores which way it faces, so a route behind its back reads exposed. | `route_exposed` in `agent_tactics.gd`: count only samples inside the target's view cone (`watch_arc`). |
-| `flank_target_moving_toward_side` | B7: `heading_toward` only adds words to the description; the side is still offered. | `decision_tree.gd` flank `drop_tags` with a new tag from `_geo_tags`. |
+There are no known gaps. A new behaviour that the AI does not show yet is written as a red test tagged
+`gap` first, and listed here until it passes.
 
 ## Sources
 

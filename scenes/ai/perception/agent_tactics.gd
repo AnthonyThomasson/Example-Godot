@@ -90,14 +90,20 @@ func path_length(path: PackedVector2Array) -> float:
 	return total
 
 
-## Whether most of a route lies in the open from `threat` (a clear line from it to most samples).
-func route_exposed(space, path: PackedVector2Array, threat: Vector2, exclude: Array) -> bool:
+## Whether most of a route lies in the open from `threat` (a clear line from it to most samples). With a
+## `front` (the threat's facing, radians) a sample also has to lie inside its view cone (`watch_arc`): a
+## route behind the threat's back is not in its view, however clear the line. Without one, only the line counts.
+func route_exposed(space, path: PackedVector2Array, threat: Vector2, exclude: Array, front := NAN) -> bool:
 	var total := path_length(path)
 	if total <= 0.0:
 		return false
+	var half := deg_to_rad(watch_arc) * 0.5
 	var seen := 0
 	for i in ROUTE_SAMPLES:
-		if not blocked(space, threat, _along(path, total * (i + 1) / (ROUTE_SAMPLES + 1)), exclude):
+		var sample := _along(path, total * (i + 1) / (ROUTE_SAMPLES + 1))
+		if not is_nan(front) and not _looking_at(threat, front, sample, half):
+			continue
+		if not blocked(space, threat, sample, exclude):
 			seen += 1
 	return seen * 2 > ROUTE_SAMPLES
 
@@ -189,14 +195,18 @@ func side_holder(target: Dictionary, front: float, side: String, allies: Array, 
 	return ""
 
 
-## The ally whose line of fire on the target passes close to `p`, or "".
-func ally_lane(p: Vector2, target_pos: Vector2, allies: Array) -> String:
+## The ally whose line of fire on the target passes close to `p`, or that the route `path` to `p` crosses,
+## or "". Walking across a friend's line of fire is as bad as standing in it.
+func ally_lane(p: Vector2, target_pos: Vector2, allies: Array, path := PackedVector2Array()) -> String:
 	for a in allies:
 		var apos: Vector2 = a["pos"]
 		if apos.distance_to(target_pos) > flank_ally_radius:
 			continue
 		if Geometry2D.get_closest_point_to_segment(p, apos, target_pos).distance_to(p) < 40.0:
 			return a["name"]
+		for i in range(1, path.size()):
+			if Geometry2D.segment_intersects_segment(path[i - 1], path[i], apos, target_pos) != null:
+				return a["name"]
 	return ""
 
 
@@ -270,12 +280,12 @@ func flank_sides(ctx: Dictionary, target: Dictionary, front: float) -> Array:
 			"clear_shot": not blocked(ctx["space"], p, tpos, ex),
 			"cover": cover_near(ctx["space"], p, tpos, ex),
 			"route_len": path_length(path),
-			"route_exposed": route_exposed(ctx["space"], path, tpos, ex),
+			"route_exposed": route_exposed(ctx["space"], path, tpos, ex, front),
 			"crosses": route_crosses(path, ctx["hostiles"]),
 			"held_by": side_holder(target, front, side, ctx["allies"], ctx["callouts"]),
 			"exposed_to": exposed_to(ctx["space"], p, ctx["hostiles"], target["id"], ctx["exclude"]),
 			"heading_toward": vel.length() >= still_speed and absf(vel.angle_to(p - tpos)) < PI / 3.0,
-			"ally_lane": ally_lane(p, tpos, ctx["allies"]),
+			"ally_lane": ally_lane(p, tpos, ctx["allies"], path),
 		})
 	return out
 

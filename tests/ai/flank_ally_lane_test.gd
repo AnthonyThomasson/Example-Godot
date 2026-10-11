@@ -3,11 +3,12 @@ extends GameTest
 ## Desired (B3): never flank across a friend's line of fire. An ally holds the east end of a warehouse and
 ## shoots west at the target; the NPC comes up from the south-east. Walking round to the target's north
 ## side would cut across the ally's line of fire, so that side is not offered; the south and west sides,
-## whose routes stay clear of the line, are.
+## whose routes stay clear of the line, are. The NPC stands where the ally is inside its view cone (110°,
+## so the ally must bear within 55° of its line to the target): it only weighs allies it can see.
 
 const Flank := preload("res://tests/_ai/flank_probe.gd")
 const Maps := preload("res://tests/_ai/flank_maps.gd")
-const NPC_POS := Vector2(800, 480)
+const NPC_POS := Vector2(900, 420)
 const TARGET_POS := Vector2(620, 330)
 const BUDDY_POS := Vector2(860, 330)     # shooting west along the target's row
 
@@ -16,7 +17,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A flank across an ally's line of fire is not offered",
 		"description": "An ally shoots at the target from the east; the NPC's route to the target's north side crosses that line of fire, so the side is dropped.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 15.0,
 	}
 

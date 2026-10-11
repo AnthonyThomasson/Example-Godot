@@ -34,9 +34,10 @@ extends RefCounted
 ##   requires  — fact names that must be true ("!" negates); a binding name counts as a true fact.
 ##   confine   — this subtree is combat: a territorial NPC drops options outside the house.
 ##   drop_tags — options carrying any of these tags are never offered (e.g. a flank side an ally
-##               already holds: Von can't weigh "taken by Invader2" — the name matches the state; or
-##               one whose route passes a known hostile). A node whose options are all dropped is not
-##               offered at all.
+##               already holds: Von can't weigh "taken by Invader2" — the name matches the state; one
+##               whose route passes a known hostile; one with no shot at the target, one the target is
+##               walking toward, or one whose point or route lies in an ally's line of fire). A node
+##               whose options are all dropped is not offered at all.
 ##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload). FLANK
 ##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
 ##               `move`: it only closes the distance, then the NPC re-decides how to fight.
@@ -79,7 +80,7 @@ const NODES := {
 		"question": "Which side should you flank {target} from? Prefer a free side behind or beside them, with cover and a short, hidden route.",
 		"context": [&"current", &"loadout", &"contacts", &"allies", &"flanks", &"exposure"],
 		"options": [&"flank_sides"],
-		"drop_tags": [&"held", &"crosses"],
+		"drop_tags": [&"held", &"crosses", &"no_shot", &"heading", &"lane"],
 		"primitive": &"engage",
 		"params": { "style": &"peek_cover", "run": true },
 	},

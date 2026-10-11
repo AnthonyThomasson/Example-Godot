@@ -467,7 +467,8 @@ func _fire_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 
 ## `tags` plus the spot's geometry, kept for the routes debug overlay (`clear_shot`, `route_exposed`,
 ## `cover`, `route_len`, `exposed_to`, and the flank `ally_lane` / `held_by` / `crosses` names). Planner
-## filters read only `inside` / `held` / `crosses` / `hidden`, so the extra keys are inert to decisions.
+## filters read only the boolean tags (`inside` / `hidden`, and on a flank side `held` / `crosses` /
+## `no_shot` / `heading` / `lane`), so the extra keys are inert to decisions.
 func _geo_tags(s: Dictionary, tags: Dictionary) -> Dictionary:
 	for key in ["clear_shot", "route_exposed", "cover", "route_len", "exposed_to", "ally_lane", "held_by"]:
 		if s.has(key):
@@ -526,9 +527,11 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 			"label": "%s (%s)" % [SIDE_WORDS[s["side"]], _room_name(room["type"]) if not room.is_empty() else "outside"],
 			"desc": " — ".join(parts),
 			"params": { "point": s["point"] },
-			"tags": _geo_tags(s, { "inside": not room.is_empty(), "held": s["held_by"] != "", "crosses": s["crosses"] != "" }),
+			"tags": _geo_tags(s, {
+				"inside": not room.is_empty(), "held": s["held_by"] != "", "crosses": s["crosses"] != "",
+				"no_shot": not s["clear_shot"], "heading": s["heading_toward"], "lane": s["ally_lane"] != "" }),
 		})
-		if s["held_by"] == "" and s["crosses"] == "":
+		if s["held_by"] == "" and s["crosses"] == "" and s["clear_shot"] and not s["heading_toward"] and s["ally_lane"] == "":
 			open.append(s)
 	var inside_open: Array = open.filter(func(s): return not room_at(s["point"], rooms).is_empty())
 	var shot_here: bool = a["line"]["clear"] and a["line"]["in_range"]

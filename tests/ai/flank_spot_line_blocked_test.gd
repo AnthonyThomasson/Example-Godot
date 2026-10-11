@@ -14,7 +14,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A flank point behind a shelf reads 'line blocked' with cover",
 		"description": "A row of shelving screens the target's south side; that side reads 'line blocked from there' with cover and is not offered, the open sides are.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 15.0,
 	}
 

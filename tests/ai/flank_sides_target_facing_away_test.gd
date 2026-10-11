@@ -15,7 +15,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Flank sides of a target that faces away from the NPC",
 		"description": "In the living room the target looks away; the NPC is on its rear, so only left and right are offered, and neither route is exposed to a target that cannot see it.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 15.0,
 	}
 

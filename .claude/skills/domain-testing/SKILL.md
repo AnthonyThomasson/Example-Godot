@@ -217,7 +217,8 @@ load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/f
 safety, ally and radio claims, shot and cover wording, territory, and the walk itself. They are
 scripted-Von tests (no server); `tools/run_tests.sh flank` runs them. What they assert is written in
 `docs/flanking-behavior.md` (behaviours F, B1 to B9, C); each test header names the behaviour. A test that
-asserts a behaviour the AI does not show yet is red and tagged `gap` (`tools/run_tests.sh gap`).
+asserts a behaviour the AI does not show yet is written first, left red and tagged `gap`
+(`tools/run_tests.sh gap`); none are open now.
 
 - **Realistic maps** (`tests/_ai/flank_maps.gd`, `const Maps := preload(...)`): `Maps.house(s)`,
   `Maps.spine(s)` and `Maps.warehouse(s)` lay out rooms, doorways, corridors and cover with
@@ -228,7 +229,8 @@ asserts a behaviour the AI does not show yet is red and tagged `gap` (`tools/run
   `target`, `npc`, `ally`, `radio`, `settle`, and the reads below.
 - **Observe through the controller's public reads.** `debug_zones()` lists every flank side the snapshot
   weighed *including those the planner then dropped*, with its `desc` and `tags` (`held`, `held_by`,
-  `crosses`, `crosses_name`, `clear_shot`, `cover`, `inside`, `route_exposed`, `ally_lane`);
+  `crosses`, `crosses_name`, `no_shot`, `heading`, `lane`, `clear_shot`, `cover`, `inside`,
+  `route_exposed`, `ally_lane`);
   `debug_state()["decision"]["levels"]` holds what each level offered. So "dropped because X" is `zones`
   says X and `offered` lacks the id. `Flank.zones/offered/offered_sides/dump/level/side_of_act` wrap these;
   `Flank.side_of` is the test's own copy of the target-frame maths (left is the target's own left, so a
@@ -249,6 +251,11 @@ asserts a behaviour the AI does not show yet is red and tagged `gap` (`tools/run
   and in open ground the straight route to a rear point passes the target. Tests about other rules set
   `route_clearance` low (0 for the group tests, 40 for the ally lane) so only the rule under test acts, and
   say so in a comment.
+- **An ally only counts if the NPC sees it.** The NPC weighs allies by sight (a 110° view cone toward its
+  target, plus a 48 px bubble) or by radio, so a test about an ally's line of fire or side must put the ally
+  within 55° of the NPC's line to the target, with no wall or pillar between. An ally outside it leaves
+  `allies` empty and no rule fires. The lane rule also tests the NPC's *route*: a route that passes between an
+  ally and the target is dropped, so place a held-side ally off the routes the test expects to be offered.
 - **Not testable here: TTL lapse.** Memory ages in wall-clock ms (`Time.get_ticks_msec`), which a headless
   `--fixed-fps` run outruns, so a callout or contact never lapses in test time.
 - **Flank point sampling** prefers any sampled point with a clear shot, so a "line blocked" scenario needs

@@ -153,10 +153,16 @@ Pure queries over known contacts, the physics space (via the vision rays) and th
 last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,
 sampled across `flank_arc`, snapped to the navmesh, preferring a clear shot. Each spot is annotated
 with clear shot, cover within a step (`cover_min`), route length + exposure (share of route samples
-the target can see), `crosses` (a known hostile the route passes), `held_by` (ally within
-`flank_ally_radius` on that side, or a callout point there), `exposed_to` (other hostiles),
-`heading_toward` and `ally_lane`. Hostile fronts (`ctx.fronts`, built once per `sense()`) serve both
-the flank frames and the watch test below.
+the target can see; for a flank, only samples inside the target's view cone, `watch_arc` around its
+front, so a route behind its back is hidden — `route_exposed`'s optional `front`), `crosses` (a known
+hostile the route passes), `held_by` (ally within `flank_ally_radius` on that side, or a callout point
+there), `exposed_to` (other hostiles), `heading_toward` and `ally_lane` (a seen ally whose line of fire
+on the target passes within 40 px of the spot, or that the route there crosses). Hostile fronts
+(`ctx.fronts`, built once per `sense()`) serve both the flank frames and the watch test below. The
+snapshot turns these into boolean tags on each `flank_sides` option — `held`, `crosses`, `no_shot` (no
+clear shot), `heading`, `lane` — which the `flank` node's `drop_tags` drop; the side stays in
+`debug_zones()` with its words ("line blocked from there", "they are moving toward that side", "in X's
+line of fire").
 
 Route safety: `route_crosses(path, hostiles)` names a hostile whose last-known position lies within
 `route_clearance` of the route AND nearer than the route's start (walking away from someone close by

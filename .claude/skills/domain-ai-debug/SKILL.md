@@ -115,6 +115,7 @@ under-fire, callouts, engaged window, checked leads, lost hostiles, radii), `deb
 state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
 and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
 reacts to a stall) and `debug_sent_callout()`. `debug_zones()` entries now also carry the option's `tags`
-(`inside`, `held`, `crosses`/`crosses_name`, `hidden`, plus `clear_shot`, `route_exposed`, `cover`,
-`route_len`, `exposed_to`, `ally_lane`, `held_by` added by the snapshot's `_geo_tags()`; the planner reads
-only `inside`/`held`/`crosses`/`hidden`, so the extras don't affect decisions).
+(`inside`, `held`, `crosses`/`crosses_name`, `no_shot`, `heading`, `lane`, `hidden`, plus `clear_shot`,
+`route_exposed`, `cover`, `route_len`, `exposed_to`, `ally_lane`, `held_by` added by the snapshot's
+`_geo_tags()`; the planner reads only the booleans (`inside`, `held`, `crosses`, `no_shot`, `heading`,
+`lane`, `hidden`), so the extras don't affect decisions).

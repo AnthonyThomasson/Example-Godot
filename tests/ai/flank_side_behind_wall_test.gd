@@ -14,7 +14,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A flank point behind a wall is weighed as outside, shot blocked",
 		"description": "The target stands against the living room's north wall; its rear point is outside the house with the wall in the line of fire, and is not offered, while the sides inside the room are.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 15.0,
 	}
 

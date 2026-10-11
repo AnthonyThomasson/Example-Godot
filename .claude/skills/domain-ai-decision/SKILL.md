@@ -22,7 +22,7 @@ Files:
 
 ```
 root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
-      │                                         ├─ flank   [flank_sides, drop `held`, `crosses`] → engage (anchored at the side)
+      │                                         ├─ flank   [flank_sides, drop `held`, `crosses`, `no_shot`, `heading`, `lane`] → engage (anchored at the side)
       │                                         ├─ advance [advance_positions]         → move{aim target, fire_at_will}
       │                                         ├─ melee   [melee: point-blank only]   → melee
       │                                         ├─ reload  [reload: gun low + spare] → reload
@@ -43,8 +43,9 @@ snapshot's `gun`: "pistol", "assault rifle"), `bind` + `bind_options` +
 `bind_question` + `bind_context` (pick and bind one option first, e.g. which hostile — with a leaner
 state, since the options carry each candidate's details), `requires` (fact names, `!` negates; a bound
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
-`drop_tags` (options carrying these tags are never offered — a flank side an ally holds, or one whose
-route passes a known hostile), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it).
+`drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
+route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
+whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it).
 A node may mix `children` and `options`. `engage` and `flank` require `gun_loaded` (an empty gun is never offered "a clear shot"); `advance`, `melee` and
 `retreat` stay available so an empty NPC can still close in, punch or fall back. The `reload` nodes require `weapon_low` +
 `can_reload` (the quiet one also `!threat_known`) and have a lone option, so the planner takes them without a Von request when

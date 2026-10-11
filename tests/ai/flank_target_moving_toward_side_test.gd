@@ -14,7 +14,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A flank side the target is walking toward is not offered",
 		"description": "The target walks north across the warehouse; its north side reads 'they are moving toward that side' and is not offered, while the east side is.",
-		"tags": ["ai", "flank", "scripted", "gap"],
+		"tags": ["ai", "flank", "scripted"],
 		"timeout": 20.0,
 	}
 

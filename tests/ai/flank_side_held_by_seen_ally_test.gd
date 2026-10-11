@@ -8,7 +8,7 @@ const Flank := preload("res://tests/_ai/flank_probe.gd")
 const Maps := preload("res://tests/_ai/flank_maps.gd")
 const NPC_POS := Vector2(120, 350)
 const TARGET_POS := Vector2(620, 330)
-const BUDDY_POS := Vector2(600, 500)     # on the target's south side, in the NPC's sight
+const BUDDY_POS := Vector2(620, 410)     # on the target's south side, in the NPC's sight; the rear route runs south of it, clear of its line of fire
 
 
 func describe() -> Dictionary:
