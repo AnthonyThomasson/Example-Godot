@@ -82,7 +82,9 @@ the test browser. Pressing Start also **disables the button**, because Main may 
 
 - `overlay_toggles.gd` — the **in-game overlay toggle bar** (`OverlayToggles` CanvasLayer, built by
   `main.gd` after the world spawns, both modes, only when Debug is on). A collapsible top-right panel (1.5× scale: `SCALE` in the script) of toggle buttons grouped
-  from the registry (Perception / Combat / Movement / Brain / Map / Stats). `RESERVED_WIDTH` is the screen width it occupies from the right edge. `setup(flags)` seeds the buttons;
+  from the registry (Perception / Combat / Movement / Brain / Map / Stats). An **All (n/N)** button and each
+  group's header button (`Perception (n/N)`) flip a whole set: all on unless already all on, then all off; each
+  changed flag emits its own `overlay_toggled`, so Main needs no bulk path. `RESERVED_WIDTH` is the screen width it occupies from the right edge. `setup(flags)` seeds the buttons;
   pressing one emits `overlay_toggled(flag, on)`, which Main applies live (`_on_overlay_toggled`: player
   mode → every NPC's overlay via `_configure_debug`; spectator mode → `SpectatorInspector.set_flag`, so
   the selected NPC follows; `show_nav_holes` → the single NavDebug; `show_perf` → the PerformanceOverlay).

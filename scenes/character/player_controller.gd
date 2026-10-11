@@ -18,7 +18,9 @@ func control(character, _delta: float) -> void:
 
 	if Keybinds.is_punch_just_pressed():
 		character.melee()
-	if Keybinds.is_fire_just_pressed():
+	# A click on a HUD control (the overlay bar, a panel) belongs to the UI, not the gun. Input polling
+	# ignores GUI mouse filters, so ask the viewport what the pointer is over.
+	if Keybinds.is_fire_just_pressed() and character.get_viewport().gui_get_hovered_control() == null:
 		character.shoot()
 	if Keybinds.is_reload_just_pressed():
 		character.reload()

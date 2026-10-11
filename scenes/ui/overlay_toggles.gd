@@ -2,10 +2,11 @@ extends CanvasLayer
 
 ## UI domain, in-game debug-overlay toggle bar: a collapsible panel of toggle buttons, one per overlay in
 ## `overlay_registry.gd`, grouped (Perception / Combat / Movement / Brain / Map / Stats). Pressing one emits
-## `overlay_toggled(flag, on)`; Main applies it live to the NPCs' overlay nodes (or, in the spectator
-## match, to the inspector's selected-NPC flags). It knows nothing of the AI — only the registry rows and
-## the flag dict it is given. Its "Overlays" title is a drag handle that moves the bar. Runs
-## PROCESS_MODE_ALWAYS so it still works while the match is paused, and its panel swallows clicks so
+## `overlay_toggled(flag, on)`; each group's header button and the "All" button flip a whole set at once
+## (all on unless they already are, then all off), emitting one `overlay_toggled` per flag changed. Main
+## applies each live to the NPCs' overlay nodes (or, in the spectator match, to the inspector's
+## selected-NPC flags). It knows nothing of the AI — only the registry rows and the flag dict it is given.
+## Its "Overlays" title is a drag handle that moves the bar. Runs PROCESS_MODE_ALWAYS so it still works while the match is paused, and its panel swallows clicks so
 ## pressing a button never selects an NPC underneath.
 
 const Registry := preload("res://scenes/ui/overlay_registry.gd")
@@ -23,6 +24,9 @@ signal overlay_toggled(flag: String, on: bool)
 var _buttons: Dictionary = {}  ## flag → its toggle Button.
 var _body: Control             ## The button list, hidden when the bar is collapsed.
 var _header: Button            ## The collapse/expand button.
+var _all_button: Button        ## Flips every overlay at once.
+var _group_buttons: Dictionary = {}  ## group name → its header Button (flips that group).
+var _group_flags: Dictionary = {}    ## group name → Array of its flags.
 
 
 ## Build the bar seeded from `flags` (`{ flag: bool }`; a missing flag uses its registry default).
@@ -58,15 +62,27 @@ func setup(flags: Dictionary) -> void:
 	_body = VBoxContainer.new()
 	_body.add_theme_constant_override("separation", int(2 * SCALE))
 	box.add_child(_body)
+	_all_button = Button.new()  # click to flip every overlay
+	_all_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	_all_button.focus_mode = Control.FOCUS_NONE
+	_all_button.add_theme_font_size_override("font_size", int(14 * SCALE))
+	_all_button.pressed.connect(func(): _on_bulk_pressed(_all_flags()))
+	_body.add_child(_all_button)
 	var group := ""
 	for e in Registry.ENTRIES:
 		if e["group"] != group:
 			group = e["group"]
-			var title := Label.new()
-			title.text = group
+			_group_flags[group] = []
+			var title := Button.new()  # click to flip the whole group
+			title.flat = true
+			title.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			title.focus_mode = Control.FOCUS_NONE
 			title.add_theme_font_size_override("font_size", int(12 * SCALE))
-			title.modulate = Color(1, 1, 1, 0.5)
+			title.modulate = Color(1, 1, 1, 0.7)
+			title.pressed.connect(_on_bulk_pressed.bind(_group_flags[group]))
 			_body.add_child(title)
+			_group_buttons[group] = title
+		(_group_flags[group] as Array).append(e["flag"])
 		var b := Button.new()
 		b.toggle_mode = true
 		b.text = e["label"]
@@ -77,6 +93,7 @@ func setup(flags: Dictionary) -> void:
 		b.toggled.connect(_on_toggled.bind(e["flag"]))
 		_body.add_child(b)
 		_buttons[e["flag"]] = b
+	_refresh_bulk()
 	_set_collapsed(false)
 
 
@@ -84,11 +101,48 @@ func setup(flags: Dictionary) -> void:
 func set_flag(flag: String, on: bool) -> void:
 	if _buttons.has(flag):
 		(_buttons[flag] as Button).set_pressed_no_signal(on)
+		_refresh_bulk()
 
 
 ## A flag's button was toggled: announce it.
 func _on_toggled(on: bool, flag: String) -> void:
 	overlay_toggled.emit(flag, on)
+	_refresh_bulk()
+
+
+## A group header or "All" was pressed: turn all of `flags` on, or all off if they already are.
+func _on_bulk_pressed(flags: Array) -> void:
+	var on := _count_on(flags) < flags.size()
+	for flag in flags:
+		var b := _buttons[flag] as Button
+		if b.button_pressed != on:
+			b.button_pressed = on  # emits toggled → overlay_toggled
+
+
+func _all_flags() -> Array:
+	var flags: Array = []
+	for e in Registry.ENTRIES:
+		flags.append(e["flag"])
+	return flags
+
+
+func _count_on(flags: Array) -> int:
+	var n := 0
+	for flag in flags:
+		if (_buttons[flag] as Button).button_pressed:
+			n += 1
+	return n
+
+
+## Relabel the "All" and group header buttons with how many of their overlays are on.
+func _refresh_bulk() -> void:
+	if _all_button == null:
+		return
+	var all := _all_flags()
+	_all_button.text = "All (%d/%d)" % [_count_on(all), all.size()]
+	for group in _group_buttons:
+		var flags: Array = _group_flags[group]
+		(_group_buttons[group] as Button).text = "%s (%d/%d)" % [group, _count_on(flags), flags.size()]
 
 
 ## The header was pressed: flip the panel between collapsed and open.
