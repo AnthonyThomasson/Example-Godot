@@ -14,7 +14,7 @@ class_name GameTest extends RefCounted
 ##   tags: Array[String]   — extra search terms
 ##   timeout: float        — sim seconds before the test is stopped as TIMEOUT (default 10)
 ##   requires_von: bool    — needs a live Von decision server; SKIPPED without one (default false)
-##   manual: bool          — a sandbox to play: no assertions needed, no timeout, skipped in batch runs
+##   (sandboxes — `res://sandboxes/*_sandbox.gd`, same base class — are played by hand: no assertions, no timeout, never in a batch run)
 ##   internal: bool        — a harness self-test: hidden from the browser and normal runs, run by
 ##                           `tools/run_tests.sh --self-test` (default false)
 ##   fail_on_errors: bool  — a logged error fails the test (default true)

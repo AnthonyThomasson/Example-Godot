@@ -59,7 +59,7 @@ the test browser. Pressing Start also **disables the button**, because Main may 
 - `test_browser_window.gd` — the **test browser window** (`TestBrowserWindow` CanvasLayer, hosted by the
   Testing domain's `test_browser.tscn`). `open(tests, results, matcher, filter, selected)` builds a
   full-screen window: a search box (filtered by the host's `matcher(test, text)`), a `Tree` of tests grouped
-  by domain (marked ✓/✗/⏱/– by last result, `[manual]` / `[Von]` tags), a details pane (description, world,
+  by domain (marked ✓/✗/⏱/– by last result, `[Von]` tag), a separate SANDBOXES section after the tests (`open(tests, sandboxes, …)`), a details pane (description, world,
   tags, switches with off in red, Von need) and Run all / a status line / Back / Play. Play,
   double-click or Enter emit `play_requested(path)`; Back emits `back_requested`; typing emits
   `filter_changed(text)`; Run all, or the ▶ `Tree` button on a domain row, emits `run_requested(domain)`

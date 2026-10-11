@@ -300,7 +300,7 @@ func _select_from_cli(args: PackedStringArray) -> void:
 			break
 		words.append(a)
 	var filter := " ".join(words)
-	for e in TestCatalog.discover():
+	for e in TestCatalog.discover() + TestCatalog.discover_sandboxes():
 		if TestCatalog.matches(e, filter):
 			Engine.set_meta(TestCatalog.META_SELECTION, e["path"])
 			return
@@ -406,14 +406,9 @@ func _run_batch(args: PackedStringArray) -> void:
 		if _stopped:
 			break
 		for run in repeat:
-			var result: Dictionary
 			var started := Time.get_ticks_msec()
-			if entry["manual"]:
-				result = { "id": entry["id"], "name": entry["name"], "domain": entry["domain"], "status": "SKIPPED",
-					"reason": "manual sandbox", "time": 0.0, "checks": [], "logs": [], "manual": true }
-			else:
-				await _start(entry)
-				result = await _close()
+			await _start(entry)
+			var result: Dictionary = await _close()
 			result["wall_ms"] = Time.get_ticks_msec() - started
 			results.append(result)
 			_print_result(result)
@@ -459,8 +454,6 @@ func _print_list(entries: Array) -> void:
 		var flags := PackedStringArray()
 		if e["requires_von"]:
 			flags.append("von")
-		if e["manual"]:
-			flags.append("manual")
 		print("%-45s %-12s [%s]  %s" % [e["id"], ",".join(flags), ", ".join(PackedStringArray(e["tags"])), e["name"]])
 	print("%d test(s)" % entries.size())
 

@@ -25,6 +25,8 @@ const RUN_ICON_SIZE := 22
 static var _icon_cache: Texture2D = null
 
 var _tests: Array = []
+## Hand-played sandboxes: their own section below the tests, never part of a run.
+var _sandboxes: Array = []
 var _matcher: Callable
 var _results: Dictionary = {}
 var _search: LineEdit
@@ -42,8 +44,9 @@ var _running := false
 
 ## Build the window over `tests`, marking `results`, with `filter` prefilled and `selected` (a test
 ## path) highlighted. `matcher(test, text) -> bool` decides which tests a search shows.
-func open(tests: Array, results: Dictionary, matcher: Callable, filter := "", selected := "") -> void:
+func open(tests: Array, sandboxes: Array, results: Dictionary, matcher: Callable, filter := "", selected := "") -> void:
 	_tests = tests
+	_sandboxes = sandboxes
 	_matcher = matcher
 	_results = results
 	_build_ui()
@@ -181,8 +184,6 @@ func _refresh(keep: String) -> void:
 		var status: String = _results.get(t["id"], "")
 		var mark: String = STATUS_MARKS.get(status, " ")
 		var suffix := ""
-		if t.get("manual", false):
-			suffix += "  [manual]"
 		if t.get("requires_von", false):
 			suffix += "  [Von]"
 		item.set_text(0, "%s  %s%s" % [mark, t["name"], suffix])
@@ -195,7 +196,24 @@ func _refresh(keep: String) -> void:
 			first = item
 		if t["path"] == keep:
 			keep_item = item
-	_count.text = "%d / %d" % [shown, _tests.size()]
+	var sandbox_group: TreeItem = null
+	for t in _sandboxes:
+		if not _matcher.call(t, _search.text):
+			continue
+		shown += 1
+		if sandbox_group == null:
+			sandbox_group = _tree.create_item(root)
+			sandbox_group.set_text(0, "SANDBOXES  (play by hand, not tests)")
+			sandbox_group.set_selectable(0, false)
+			sandbox_group.set_custom_color(0, Color(0.85, 0.75, 0.5))
+		var sandbox_item := _tree.create_item(sandbox_group)
+		sandbox_item.set_text(0, "    " + String(t["name"]))
+		sandbox_item.set_metadata(0, t)
+		if first == null:
+			first = sandbox_item
+		if t["path"] == keep:
+			keep_item = sandbox_item
+	_count.text = "%d / %d" % [shown, _tests.size() + _sandboxes.size()]
 	var pick := keep_item if keep_item != null else first
 	if pick != null:
 		pick.select(0)
@@ -211,10 +229,9 @@ func _on_group_button(item: TreeItem, _column: int, _id: int, mouse_button: int)
 		run_requested.emit(item.get_metadata(0))
 
 
-## How many of `domain`'s tests a run will actually execute (manual sandboxes are skipped), whatever
-## the search shows.
+## How many of `domain`'s tests a run will execute, whatever the search shows.
 func _runnable_count(domain: String) -> int:
-	return _tests.filter(func(t): return t["domain"] == domain and not t.get("manual", false)).size()
+	return _tests.filter(func(t): return t["domain"] == domain).size()
 
 
 ## The ▶ icon for a domain's run button: a green right-pointing triangle, drawn once.
@@ -257,7 +274,7 @@ func _show_details() -> void:
 	if t.get("requires_von", false):
 		lines.append("Needs the Von decision server (skipped without one).")
 	if t.get("manual", false):
-		lines.append("Manual sandbox: play it yourself (WASD, mouse, F, Space).")
+		lines.append("Sandbox: play it yourself (WASD, mouse, F, Space).")
 	var status: String = _results.get(t["id"], "")
 	if status != "":
 		lines.append("Last result: %s" % status)

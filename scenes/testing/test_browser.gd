@@ -32,7 +32,7 @@ func _ready() -> void:
 	window.back_requested.connect(_on_back)
 	window.run_requested.connect(_on_run)
 	window.filter_changed.connect(func(t: String): Engine.set_meta(META_FILTER, t))
-	window.open(TestCatalog.discover(), Engine.get_meta(TestCatalog.META_RESULTS, {}), TestCatalog.matches,
+	window.open(TestCatalog.discover(), TestCatalog.discover_sandboxes(), Engine.get_meta(TestCatalog.META_RESULTS, {}), TestCatalog.matches,
 		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(TestCatalog.META_SELECTION, "")))
 
 

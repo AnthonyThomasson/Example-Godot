@@ -17,7 +17,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   line per test (`PASS/FAIL/TIMEOUT/SKIPPED  <id>  (<sim s> sim, <ms> ms)`, failed checks indented with ✗), then a
   summary, and writes `report.json`. Exit code 1 means a test failed or timed out, or an
   error/warning was logged outside any test. Filter words are word prefixes over id, name, domain,
-  description and tags (`ai` matches the ai domain, not "chair"). Manual sandboxes are always skipped.
+  description and tags (`ai` matches the ai domain, not "chair"). Sandboxes live apart in `sandboxes/` and are never run.
   `requires_von` tests are skipped unless `--include-von` is passed (`--require-von` runs them and
   fails when no server is live), and are then paced in real time
   (see below). Run with the Bash sandbox disabled, like every Godot launch.
@@ -35,7 +35,7 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **Selecting:** `--domain=NAME[,NAME]` (exact domain(s); the filter words are word prefixes, so `ai` also
   catches a test that mentions "aim"), `--id=ID[,ID]` (exact ids), `--failed` (wrapper only: the tests
   that FAILED / TIMED OUT in the previous run of this checkout, read from its merged report in `$TMPDIR`),
-  `--list [words]` (id, von/manual flags, tags; runs nothing). Domain/id selection is decided from the file
+  `--list [words]` (id, von flag, tags; runs nothing). Domain/id selection is decided from the file
   path, so unselected test scripts are never loaded.
 - **Speed:** `--jobs=N|auto` (wrapper only) splits the run over N parallel godot processes via the runner's
   `--shard=I/N` (longest `timeout` first onto the lightest shard, so they finish together; Von tests all stay in shard 0), merges their output into one
@@ -91,6 +91,8 @@ and controller contract, EventBus and character signals) and never reaches into 
 
 One file `tests/<domain>/<name>_test.gd` that `extends GameTest`. Id = `<domain>/<name>`.
 
+**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one).
+
 ```gdscript
 extends GameTest
 
@@ -114,7 +116,7 @@ func run(t: TestContext) -> void:
 ```
 
 - **`describe()`** (all optional): `name`, `domain`, `description`, `tags`, `timeout` (sim s, default
-  10), `requires_von`, `manual` (a sandbox to play: no assertions or timeout, skipped in batch),
+  10), `requires_von`,
   `fail_on_errors` / `fail_on_warnings` (default true), `allowed_logs` (regexes).
 - **`configure(s: TestSetup)`** is data only, and the browser also calls it to list the switches.
   - World: `arena(rect, { floor, walls, thickness })` (a walled room in the house style, with the same
@@ -149,7 +151,7 @@ func run(t: TestContext) -> void:
   - `t.trace(name, value)` samples a number over time (a distance, a health) for the failure output.
   - Assertions: `check(cond, msg)` (soft), `require(cond, msg)` (ends the test; follow it with
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
-    A non-manual test that asserts nothing fails.
+    A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
   (straight line, no pathing), `walk(dir)`, `stop()`, `select_slot(n)`, `punch()`, `shoot()`,
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on

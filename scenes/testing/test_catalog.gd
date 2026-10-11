@@ -10,6 +10,10 @@ extends RefCounted
 
 const ROOT := "res://tests"
 const SUFFIX := "_test.gd"
+## Sandboxes (`res://sandboxes/**/*_sandbox.gd`, also `GameTest` scripts) are played by hand: a separate
+## catalog that `discover()` never returns, so batch runs and the test list never include them.
+const SANDBOX_ROOT := "res://sandboxes"
+const SANDBOX_SUFFIX := "_sandbox.gd"
 const DEFAULT_TIMEOUT := 10.0
 ## Engine metas shared by the browser and the runner: the test to play, and the last status per test id.
 const META_SELECTION := "test_selection"
@@ -37,16 +41,28 @@ static func discover(root := ROOT, domains: Array = [], ids: Array = []) -> Arra
 	return out
 
 
-## The descriptor for the test script at `path`.
-static func describe(path: String, root := ROOT) -> Dictionary:
-	var rel := path.trim_prefix(root + "/").trim_suffix(SUFFIX)
+## Every sandbox under `root`, sorted by id; each is `manual` (no assertions, no timeout).
+static func discover_sandboxes(root := SANDBOX_ROOT) -> Array:
+	var out: Array = []
+	for path in _find(root, SANDBOX_SUFFIX):
+		out.append(describe(path, root))
+	out.sort_custom(func(a, b): return a["id"] < b["id"])
+	return out
+
+
+## The descriptor for the test or sandbox script at `path`.
+static func describe(path: String, root := "") -> Dictionary:
+	var sandbox := path.begins_with(SANDBOX_ROOT + "/")
+	if root == "":
+		root = SANDBOX_ROOT if sandbox else ROOT
+	var rel := path.trim_prefix(root + "/").trim_suffix(SANDBOX_SUFFIX if sandbox else SUFFIX)
 	var parts := rel.split("/")
 	var entry := {
 		"id": rel, "path": path,
 		"name": parts[parts.size() - 1].capitalize(),
 		"domain": parts[0] if parts.size() > 1 else "general",
 		"description": "", "tags": [], "timeout": DEFAULT_TIMEOUT,
-		"requires_von": false, "manual": false, "internal": false, "switches": {}, "world": "", "error": "",
+		"requires_von": false, "manual": sandbox, "internal": false, "switches": {}, "world": "", "error": "",
 	}
 	var script := load(path) as GDScript
 	if script == null or not script.can_instantiate():
@@ -59,6 +75,7 @@ static func describe(path: String, root := ROOT) -> Dictionary:
 	var info: Dictionary = test.describe()
 	for key in info:
 		entry[key] = info[key]
+	entry["manual"] = sandbox
 	var setup := TestSetup.new()
 	test.configure(setup)
 	entry["switches"] = setup.switches
@@ -83,17 +100,17 @@ static func matches(entry: Dictionary, text: String) -> bool:
 	return true
 
 
-## Test file paths under `dir_path`, found recursively.
-static func _find(dir_path: String) -> Array:
+## Script paths ending in `suffix` under `dir_path`, found recursively.
+static func _find(dir_path: String, suffix := SUFFIX) -> Array:
 	var out: Array = []
 	var dir := DirAccess.open(dir_path)
 	if dir == null:
 		return out
 	for sub in dir.get_directories():
-		out.append_array(_find(dir_path + "/" + sub))
+		out.append_array(_find(dir_path + "/" + sub, suffix))
 	for file in dir.get_files():
 		var f := file.trim_suffix(".remap")
-		if f.ends_with(SUFFIX):
+		if f.ends_with(suffix):
 			out.append(dir_path + "/" + f)
 	return out
 
