@@ -50,6 +50,10 @@ func is_pending() -> bool:
 ## Returns whether the request started; on failure to start it also emits `failed()`.
 func ask(state_text: String, instructions: String, options: Dictionary) -> bool:
 	_options = options
+	if DecisionStub.active:
+		_pending = true
+		_answer_from_stub.call_deferred(state_text, instructions, options)
+		return true
 	var body := {
 		"model": model,
 		"state": state_text,
@@ -61,6 +65,19 @@ func ask(state_text: String, instructions: String, options: Dictionary) -> bool:
 		return true
 	_fail("request failed to start")
 	return false
+
+
+## Test seam (decision_stub.gd): answer the in-flight question from the scripted stub, a frame later like a
+## real reply. Dropped if the request was cancelled meanwhile.
+func _answer_from_stub(state_text: String, instructions: String, options: Dictionary) -> void:
+	if not _pending:
+		return
+	_pending = false
+	var pick := DecisionStub.answer(state_text, instructions, options)
+	if pick == "":
+		_fail("scripted failure")
+	else:
+		answered.emit(pick, {})
 
 
 ## Abandon the in-flight request (its answer is no longer wanted); no signal is emitted for it.

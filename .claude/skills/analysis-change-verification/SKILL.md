@@ -207,6 +207,13 @@ A change that doesn't parse fails everything above by default. Run the `godot-de
 headless load check (run `--import` first if the change added a `class_name` or new file). Report
 a clean load, or the exact `SCRIPT ERROR` / `Parse Error` lines.
 
+Then run the game tests: `tools/run_tests.sh` (Bash sandbox disabled; AI changes are covered without a
+server by the scripted-Von tests, and `--include-von` adds the live-server ones). When the change touches
+`scenes/testing/` or the Von stub, also run `tools/run_tests.sh --self-test` (the harness's own tests);
+`tools/run_tests.sh --changed` runs just the touched domains (and the self-tests for `scenes/testing/`). Report the summary line and every FAIL / TIMEOUT with its ✗ lines; exit code 1
+also covers an engine error/warning logged during a test. A change that adds or alters behaviour should
+add or update a test in `tests/<domain>/` (see the `domain-testing` skill) — flag it if none covers it.
+
 If the change alters **behaviour** (movement, combat, items, interactions, world-gen), a clean
 load isn't enough — exercise it in the running game. Use the `godot-drive` skill: launch via
 `mcp__godot__run_project`, drive the player with the dev command server (`python3 tools/gcmd.py
@@ -239,8 +246,9 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 - [ ] `scenes/physics/physics.gd:33` — comment describes the old signature ("(parent, hit, exclude)"). Fix: state the current 5-arg form.
 - [x] Every staged method/property is documented; no history framing.
 
-### Load check
+### Load check & tests
 - [x] Headless load clean — no SCRIPT ERROR / Parse Error.
+- [x] `tools/run_tests.sh`: 6 passed, 0 failed, 2 skipped.
 
 **Verdict:** 3 issues to address before commit.
 ```

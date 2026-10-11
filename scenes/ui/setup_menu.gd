@@ -14,6 +14,8 @@ extends CanvasLayer
 ## `{ has_player: bool, seed: int, defenders: int, invaders: int, debug: bool }` — `debug` is the single
 ## switch for the AI debug overlays and their in-game toggle bar. Main applies these and builds the world.
 signal start_requested(config: Dictionary)
+## Emitted when the Tests button is pressed: Main opens the test browser instead of a match.
+signal tests_requested
 
 const _MAX_COUNT := 8  ## Upper bound per side in the spinboxes; spawn spread handles any count in range.
 
@@ -92,6 +94,12 @@ func _build_ui(defaults: Dictionary) -> void:
 	_start_button.add_theme_font_size_override("font_size", 32)
 	_start_button.pressed.connect(_on_start)
 	box.add_child(_start_button)
+
+	var tests_button := Button.new()
+	tests_button.text = "Tests"
+	tests_button.add_theme_font_size_override("font_size", 28)
+	tests_button.pressed.connect(tests_requested.emit)
+	box.add_child(tests_button)
 
 
 ## A labelled seed row (label + LineEdit), added to `parent`; returns the LineEdit so the caller can

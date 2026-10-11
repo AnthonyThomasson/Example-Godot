@@ -1,0 +1,16 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_character"]
+[ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/character/character_hands.gd" id="2_hands"]
+[ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/character_visuals.gd" id="3_visuals"]
+
+[node name="Character" type="CharacterBody2D"]
+script = ExtResource("1_character")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+
+[node name="Hands" type="Node2D" parent="."]
+script = ExtResource("2_hands")
+
+[node name="Visuals" type="Node2D" parent="."]
+script = ExtResource("3_visuals")

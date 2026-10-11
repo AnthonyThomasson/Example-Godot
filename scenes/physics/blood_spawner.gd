@@ -42,7 +42,7 @@ static func _new_pool(position: Vector2, parent: Node) -> Node:
 	visuals.script = BloodPoolVisuals
 	pool.add_child(visuals)
 
-	parent.add_child(pool)
+	parent.add_child(pool, true)  # readable names (BloodPool, BloodPool2, …) so observers can tell pools apart
 	# `position` is a world point; place the pool there regardless of the parent's transform (a
 	# world-root parent may be offset from the origin).
 	pool.global_position = position

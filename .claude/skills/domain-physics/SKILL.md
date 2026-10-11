@@ -87,6 +87,10 @@ rim); wound spatter keeps the drop model.
 
 ## Tuning
 
+`PhysicsConfig.debris_enabled` and `BloodConfig.enabled` are master switches (off: `Physics.spawn_debris`
+spawns nothing; `Physics.spawn_blood` / `bleed_out` spawn nothing and return null — used by the Testing
+domain's `physics.debris` / `physics.blood` switches). `BloodSpawner` adds each pool with a readable
+name (`BloodPool`, `BloodPool2`, …) so observers can tell pools apart.
 `PhysicsConfig` tunes impact + deformation and the ragdoll solver (`ragdoll_*`), and holds `wall_mask`
 (the layer the ragdoll sweep and the blood queries treat as blocking); `BloodConfig`
 tunes blood pooling. Both are `class_name` static holders — there is no `Config` autoload.

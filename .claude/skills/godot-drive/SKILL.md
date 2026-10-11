@@ -23,6 +23,10 @@ Spawn `Agent` with `model: "haiku"` (general-purpose), and give it:
 
 Judge the reply yourself. Only read raw logs directly if the summary is ambiguous.
 
+## Try a test first
+
+If the behaviour can be scripted, prefer a `tests/<domain>/*_test.gd` and `tools/run_tests.sh` (deterministic, rerunnable; `domain-testing` skill). Drive the live game only for exploration or what a puppet cannot reach.
+
 ## Environment caveats
 
 - **Disable the Bash sandbox** for every Godot / `gcmd.py` command (`dangerouslyDisableSandbox:

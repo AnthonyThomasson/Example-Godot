@@ -63,7 +63,11 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
   open archway. `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
   `rooms` metadata. `main.gd` positions the front entrance, fixes draw order, builds the nav map, and
-  drops the NPC in — all via `get_rooms`; it never touches world-gen internals.
+  drops the NPC in — all via `get_rooms`; it never touches world-gen internals. Read-only catalogue
+  lookups for outside builders (the Testing domain's arenas and placed pieces):
+  `WorldGen.object_definition(key)` (`ObjectDefinitions.get_definition`),
+  `WorldGen.floor_definition(key)` (`GeneralCatalog.FLOORS`) and `WorldGen.wall_style()`
+  (`GeneralCatalog.WALL`).
 - **World Generation → Objects** (interface 2, the only way world-gen makes entities):
   `ObjectFactory.spawn(definition, position, parent, opts) -> Node`,
   `WallFactory.spawn(rect, thickness, openings, name, parent, style) -> Node`,

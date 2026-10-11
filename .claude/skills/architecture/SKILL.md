@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the twelve isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Example_Godot) — the thirteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Example_Godot architecture
@@ -8,7 +8,7 @@ description: The architecture map for this Godot project (Example_Godot) — the
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a pistol that
 fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
-organized into **twelve isolated domains** so each can be changed on its own.
+organized into **thirteen isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
@@ -20,7 +20,7 @@ isolated (cross-domain connections go only through the interfaces below), keeps 
 the domain skills* in sync when the architecture or a domain's internals change, and enforces
 concise current-state comments.
 
-## The twelve domains (one folder each under `scenes/`)
+## The thirteen domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
@@ -34,11 +34,13 @@ concise current-state comments.
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
-| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout. |
+| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout, test browser window, test result banner. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
+| **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`. |
 
-`scenes/main.gd` (`main.tscn`) is the **composition root** — the only file that knows every
-domain. It asks World-Gen for a house and holds the player. `project.godot` autoloads only
+`scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
+(interface 13), the only code that knows every domain. It asks World-Gen for a house and holds the
+player; the setup window's **Tests** button sends it to the test browser instead. `project.godot` autoloads only
 `Keybinds`, `Despawner` and `EventBus` (all General).
 
 On a fresh launch Main opens the UI setup window and builds nothing until Start, then **awaits the
@@ -58,6 +60,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 the house; every doorway is an open archway.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
+   - Read-only catalogue lookups (used by the Testing domain to place single pieces):
+	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
+	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
+	 `WorldGen.wall_style() -> Dictionary` (the house wall `style` for `WallFactory.spawn`).
    `main.gd` positions the front entrance, fixes draw order, builds the nav map from the rooms
    (interface 9), drops the defender NPC into a random room and the invader NPC just outside the
    house (all via `get_rooms`); it never touches
@@ -98,7 +104,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 and `Physics.spawn_blood(...)` (character, on a hit), `Physics.bleed_out(parent, source, exclude)`
 	 (a dead character, once its body comes to rest: one slow, wide pool). A blood source may expose
 	 `blood_origin() -> Vector2` (where its blood leaves it, in world space); pools emerge there instead
-	 of at its position, so a fallen body bleeds from where it lies.
+	 of at its position, so a fallen body bleeds from where it lies. Master switches:
+	 `BloodConfig.enabled` off → `spawn_blood` / `bleed_out` spawn nothing and return null;
+	 `PhysicsConfig.debris_enabled` off → `spawn_debris` spawns nothing. Blood pools are added with
+	 readable names (`BloodPool`, `BloodPool2`, …).
    - `Ragdoll` (`RefCounted`, character on death): a generic 3D point-mass body over the floor plane
 	 (x/y + height z). Built with `add_point(at, radius, mass)`, `add_bone(a, b)` / `add_rigid(indices)`,
 	 `add_frame(origin, up, right, forward_hint)`, `add_swing(frame, joint, child, rest, limits)`
@@ -222,6 +231,21 @@ interface(s) and describes how they're implemented; this list is authoritative f
     Objects' painters + `ObjectArt` registry, Character's body/hand painters and Items' pistol
     painter all render through these; Art imports nothing from other domains.
 
+13. **Testing → every domain** (a second composition root, like `main.gd`)
+    `scenes/testing/` builds a test's world and drives it through the interfaces above only:
+    WorldGen (1, incl. the catalogue lookups) or an arena from the three factories (2), `NavBuilder`
+    + `nav_updater.gd` (9), the character scenes plus the controller contract (7) — a puppet
+    `ScriptedController` or `player_controller.gd` on `character/character_base.tscn` (the
+    controller-less character) — and `EventBus` / character signals (7, 10) for its event log.
+    Behaviour switches set existing exported props and config-holder `static var`s by name
+    (duck-typed, like Main's overlay flags); a test can also script the Von answers through the AI
+    decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`) so AI
+    wiring runs without a server. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
+    `PhysicsConfig.debris_enabled` master switches; statics are restored after each test. Main
+    reaches it only by changing scene to `testing/test_browser.tscn`; the UI widgets it shows
+    (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
+    depends on Testing.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -236,6 +260,8 @@ Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
+main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
+TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles)
 ```
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
@@ -262,9 +288,19 @@ Two conventions hold across domains; the per-domain specifics live in each domai
 
 ## Running & verifying
 
-- Main scene `res://scenes/main.tscn`. Use the **`godot-debug` skill** for a headless load check
-  (run `--import` first when you add a `class_name`) and the **`godot-drive` skill** for driving the
-  running game via the dev command server (`tools/gcmd.py`).
+- Main scene `res://scenes/main.tscn`.
+- **Verification ladder** — use the cheapest rung that proves the change:
+  1. **Loads?** `godot-debug` skill: headless load check (run `--import` first when you add a `class_name`).
+  2. **Behaves?** `tools/run_tests.sh [words]` runs `tests/**/*_test.gd` headless and deterministically
+     (exit 1 on any failure, or any engine error/warning logged during a test). Useful flags: `--list`,
+     `--changed` (only domains with uncommitted changes), `--repeat=N` (flaky check), `--seed=N`,
+     `--json`, `--include-von` / `--require-von`. A failure prints actor state and a `bundle:` JSON path.
+     Writing tests: `domain-testing` skill; debugging one: `test-debug` skill. In the game, the setup
+     window's **Tests** button opens the browser to play one.
+  3. **Exploratory / not yet scriptable?** `godot-drive` skill: drive the live game through the dev
+     command server (`tools/gcmd.py`).
+  4. **Whole-AI outcomes?** `tools/match.py` scores full defender-vs-invader matches.
+  A bugfix starts with a failing test on rung 2 (`test-debug` skill).
 - Use the **`analysis-change-verification` skill** before committing (domain isolation, doc/skill sync,
   comment hygiene, load check).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house

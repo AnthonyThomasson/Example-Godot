@@ -97,6 +97,9 @@ done
 Also worth a look: scripts no scene or `preload` references, and `.gd` files with an orphaned
 `.uid` (or the reverse).
 
+**Test coverage:** run `python3 tools/test_coverage.py` for domains with no tests, switches no test uses and
+interfaces no test calls; list the gaps worth filling.
+
 **Every hit here is advisory until you confirm it by hand.** This project leans on dynamic
 dispatch that no grep can follow, and each of these is a real mechanism in use:
 

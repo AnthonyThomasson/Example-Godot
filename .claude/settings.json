@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/tools/stop_hook_tests.sh",
+            "timeout": 240,
+            "statusMessage": "Running affected game tests…"
+          }
+        ]
+      }
+    ]
+  }
+}

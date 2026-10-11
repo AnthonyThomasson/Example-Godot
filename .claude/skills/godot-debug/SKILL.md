@@ -81,6 +81,10 @@ global class cache is stale. Rebuild it, then rerun Step 2 (ignore its `progress
 "$GODOT" --headless --path . --import
 ```
 
+## Next rung
+
+A clean load only proves it parses. For behaviour run `tools/run_tests.sh <domain>` first (deterministic, headless; see the `domain-testing` and `test-debug` skills) before reaching for live driving.
+
 ## When to use
 
 - After editing any `.gd` script or `.tscn` scene, before saying the change works.

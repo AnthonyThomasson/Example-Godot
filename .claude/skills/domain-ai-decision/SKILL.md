@@ -15,6 +15,7 @@ Files:
 - `decision_tree.gd` — the tree, `const NODES` (data only).
 - `decision_planner.gd` — the walk (a `Node`): gating, entry rules, per-level state, Von calls.
 - `decision_client.gd` — the Von HTTP transport (a `Node` owning its `HTTPRequest`).
+- `decision_stub.gd` (`class_name DecisionStub`) — test seam: scripted picks that stand in for the server.
 - `decision_server_launcher.gd` — dev-only `von serve` launcher (a node in `main.tscn`).
 
 ## `decision_tree.gd` — the tree as data
@@ -87,6 +88,11 @@ question (`pick`) to `/v1/systemone`; `cancel()`; `is_pending()`.
 - `signal answered(pick, probabilities)` — Von's top pick: the argmax `choice` when it is one of the
   offered ids, else the highest-probability offered id (a stale/foreign id can never be chosen). Von's
   distributions are flat, so taking the top pick — not sampling — keeps the NPC decisive.
+- **Test seam:** while `DecisionStub.active`, `ask()` answers from `decision_stub.gd` a frame later, with no
+  HTTP request. `DecisionStub.rules` is an ordered `[{ pick, question? }]` (first rule whose id is offered,
+  and whose `question` text occurs in the level's question, wins; else the first offered id), `fail` makes
+  every ask fail (server down), `requests` logs `{ state, question, options, pick }` per ask. Only the
+  Testing domain sets these (`TestSetup.von_script` / `von_down`; statics restored after each test).
 - `signal failed()` — request couldn't start, transport failure, non-200, malformed or no offered id.
   **A transport failure and an HTTP error answer are reported as different faults**: a 4xx/5xx prints
   the server's own `{"detail": …}`, never "unreachable". An identical failure is logged only ONCE per

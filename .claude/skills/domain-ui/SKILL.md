@@ -1,6 +1,6 @@
 ---
 name: domain-ui
-description: Deep implementation detail for the UI domain (scenes/ui/) — debug player panel, spectator match HUD, pre-game setup window, and seed readout. Use when editing scenes/ui/ or working on any in-game overlay, the setup menu, or the seed label. All four are decoupled observers: they read only the Character public API/signals, the AI controller's current_act()/goal, and the EventBus — never domain internals. Complements the `architecture` skill.
+description: Deep implementation detail for the UI domain (scenes/ui/) — debug player panel, spectator match HUD, pre-game setup window, seed readout, overlay toggles, and the test browser window + test result banner. Use when editing scenes/ui/ or working on any in-game overlay, the setup menu, the seed label, or the test browser UI. All are decoupled observers: they read only the Character public API/signals, the AI controller's current_act()/goal, and the EventBus — never domain internals. Complements the `architecture` skill.
 ---
 
 # UI domain (`scenes/ui/`)
@@ -33,10 +33,25 @@ the domains.
   the bar), and a Start button. Pressing Start emits `start_requested({ has_player, seed, defenders,
   invaders, debug })`. Main opens it on a fresh launch on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
-  Start button 32pt. Pressing Start also **disables the button**, because Main may hold the start
+  Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
+the test browser. Pressing Start also **disables the button**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
   shows "Waiting for the decision server…" there so that pause is never silent.
+
+- `test_browser_window.gd` — the **test browser window** (`TestBrowserWindow` CanvasLayer, hosted by the
+  Testing domain's `test_browser.tscn`). `open(tests, results, matcher, filter, selected)` builds a
+  full-screen window: a search box (filtered by the host's `matcher(test, text)`), a `Tree` of tests grouped
+  by domain (marked ✓/✗/⏱/– by last result, `[manual]` / `[Von]` tags), a details pane (description, world,
+  tags, switches with off in red, Von need) and Back / Play. Play, double-click or Enter emit
+  `play_requested(path)`; Back emits `back_requested`; typing emits `filter_changed(text)`. Takes plain test
+  descriptor dicts — knows nothing of the Testing classes.
+
+- `test_result_hud.gd` — the **test result banner** (`TestResultHUD` CanvasLayer, layer 10, top-left, built by
+  the test runner in interactive mode). `show_running(entry)` names the test, `show_status(text)` shows a wait
+  line, `show_result(result)` shows the verdict (PASS / FAIL / TIMEOUT / SKIPPED, or MANUAL for a passing
+  sandbox) with each check ✓/✗, the sim time and, for a failure, each actor's final state (`result.snapshot`). Rerun / Back buttons emit `rerun_requested` /
+  `back_requested`; they take no focus so keys stay with the game underneath.
 
 - `overlay_registry.gd` — the ONE table of debug overlays (`ENTRIES`: `flag`, `label`, `group`, `default`;
   `defaults()`; `NAV_HOLES` and `PERF`, the global non-per-NPC flags, listed in `GLOBAL` / `is_global(flag)`).

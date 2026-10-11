@@ -13,6 +13,9 @@ class_name BloodConfig
 ## trails blood. Drops creep out from the wound, slide around walls and furniture, and settle there.
 ## A dead body also bleeds out one slow, wide pool (`bleed_out_*`) from where it came to rest.
 
+## Master switch for blood: off = hits leave no wound pool and dead bodies no bleed-out
+## (Physics.spawn_blood / bleed_out spawn nothing).
+static var enabled: bool = true
 ## Drops one hit adds. Also the density reference: `pool_radius_base` holds about this many drops, and
 ## the disc widens only for volume beyond the first hit, so a single wound stays a small solid pool.
 static var particle_count: int = 36

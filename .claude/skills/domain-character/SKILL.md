@@ -179,6 +179,9 @@ character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never de
 `character/npc.tscn` (the house defender) is a generic goal-driven agent driven by
 `ai/goal_controller.gd` (see the `domain-ai` skill); `character/npc_invader.tscn` is an inherited
 scene of it that only overrides data (faction, goal, hostility exports, colour). The player uses
+`player_controller.gd`. `character/character_base.tscn` is the bare character (body, shape, Hands,
+Visuals) with **no controller**: a composer adds any `control()` child before it enters the tree
+(`_find_controller()` runs at `_ready`) — the Testing domain adds its puppet `ScriptedController` or
 `player_controller.gd`.
 
 Every character has an exported `faction` (`&"player"` by default; the NPC presets set

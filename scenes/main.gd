@@ -58,6 +58,8 @@ const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
 const OVERLAY_TOGGLES := preload("res://scenes/ui/overlay_toggles.gd")
+## The test browser scene (Testing domain), opened from the setup window's Tests button.
+const TEST_BROWSER := "res://scenes/testing/test_browser.tscn"
 ## The performance overlay (docks left of the toggle bar).
 const PERFORMANCE_OVERLAY := preload("res://scenes/ui/performance_overlay.gd")
 
@@ -94,6 +96,7 @@ func _ready() -> void:
 		if _debug_ui:
 			_debug_ui.visible = false
 		_setup_menu.start_requested.connect(_on_setup_chosen)
+		_setup_menu.tests_requested.connect(_open_tests)
 		_setup_menu.open({
 			"has_player": not spectator_mode,
 			"seed": house_seed,
@@ -123,6 +126,12 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	if _debug_ui:
 		_debug_ui.visible = true  # restored here; _setup_spectator frees it in spectator mode
 	_spawn_world()
+
+
+## The setup window's Tests button: leave for the test browser (Testing domain), which plays single
+## game tests and returns here on Back.
+func _open_tests() -> void:
+	get_tree().change_scene_to_file(TEST_BROWSER)
 
 
 ## Wait for the Von decision server to settle before the world is built. Returns at once when the

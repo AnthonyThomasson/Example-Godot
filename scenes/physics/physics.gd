@@ -19,8 +19,11 @@ static func impact_impulse(hit: HitInfo) -> Vector2:
 ## Spray material-styled chips out of a hit, added under `parent` (placed by world position,
 ## so `parent` may be offset from the origin). `surface` is the struck object's
 ## `get_surface()` — its `color` and `material` style the chips. Chips fly out along the
-## surface normal, or back along the shot when the normal is degenerate.
+## surface normal, or back along the shot when the normal is degenerate. Nothing while
+## PhysicsConfig.debris_enabled is off.
 static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> void:
+	if not PhysicsConfig.debris_enabled:
+		return
 	var base_color: Color = surface.get("color", Color(0.6, 0.6, 0.6))
 	var material: String = surface.get("material", "")
 	var spray := hit.normal if hit.normal.length() > 0.001 else -hit.direction
@@ -34,14 +37,20 @@ static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> voi
 ## out the wound face (the surface normal), or back along the shot when the normal is degenerate.
 ## `exclude` is the wounded body's RID(s), so its own collider never traps the blood, and `source` is
 ## that body, whose live position drops emerge from. This is a self-contained reaction, independent
-## of the debris and deformation a hit also produces.
+## of the debris and deformation a hit also produces. Returns null (no pool) while BloodConfig.enabled
+## is off.
 static func spawn_blood(parent: Node, hit: HitInfo, exclude: Array, source: Node2D, active: Node) -> Node:
+	if not BloodConfig.enabled:
+		return null
 	var spill := hit.normal if hit.normal.length() > 0.001 else -hit.direction
 	return BloodSpawner.add_blood(active, hit.position, spill, parent, exclude, source)
 
 
 ## Start a dead body's bleed-out: one slow, flowing pool (BloodConfig.bleed_out_*) spreading from where
 ## its blood leaves it — `source.blood_origin()` if it has one (where it lies), else its position —
-## added under `parent`. `exclude` is the body's RID(s). Returns the pool.
+## added under `parent`. `exclude` is the body's RID(s). Returns the pool (null while
+## BloodConfig.enabled is off).
 static func bleed_out(parent: Node, source: Node2D, exclude: Array) -> Node:
+	if not BloodConfig.enabled:
+		return null
 	return BloodSpawner.bleed(parent, source, exclude)

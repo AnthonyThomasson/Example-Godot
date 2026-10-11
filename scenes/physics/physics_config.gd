@@ -12,6 +12,9 @@ class_name PhysicsConfig
 ## flows' collision queries all test against it.
 static var wall_mask: int = 1
 
+## Master switch for debris: off = hits spray no chips (Physics.spawn_debris spawns nothing).
+static var debris_enabled: bool = true
+
 # --- Impact force (a hit shoves the struck object) ---
 ## Base impulse magnitude at full speed and a head-on hit. Scaled by the hit's speed
 ## factor (speed / muzzle speed) and by the penetration multipliers below.
