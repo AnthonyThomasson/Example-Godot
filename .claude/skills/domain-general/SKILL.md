@@ -73,7 +73,8 @@ consumed by allied AIs.
   `frame_margin` (clamped by `min_zoom`/`max_zoom`), dropping any whose `is_dead` is true — used by
   the spectator match view.
   - **Zoom** (both modes): the `ZOOM_IN`/`ZOOM_OUT` actions (mouse wheel) scale the zoom by `zoom_step`
-    per notch (fractional for trackpads). The scale (`_zoom_bias`) is lasting and multiplies the
+    per notch. A trackpad's two-finger scroll arrives as `InputEventPanGesture` (no wheel events on macOS) and
+    counts `trackpad_zoom_sensitivity` notches per unit of its `delta.y` (up zooms in); it isn't rebindable. The scale (`_zoom_bias`) is lasting and multiplies the
     automatic zoom (`_base_zoom`: 1 when following, the clamped fit when framing), so it works the same
     in both modes, can go beyond the fit's `min_zoom`/`max_zoom`, and is limited only by
     `wheel_min_zoom`/`wheel_max_zoom`. The zoom eases at `follow_speed`. Read in `_unhandled_input`, so

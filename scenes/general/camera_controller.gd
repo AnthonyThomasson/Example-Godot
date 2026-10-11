@@ -29,6 +29,8 @@ var _frame_targets: Array[Node2D] = []  ## The nodes to keep framed (the match c
 
 ## Each wheel notch scales the zoom by this factor (> 1; larger = bigger steps).
 @export var zoom_step: float = 1.1
+## Notches of zoom per unit of a trackpad's two-finger scroll (its pan-gesture delta).
+@export var trackpad_zoom_sensitivity: float = 0.03
 ## Limits on the zoom the wheel can reach, whatever the automatic zoom is.
 @export var wheel_min_zoom: float = 0.25  ## Most zoomed-out.
 @export var wheel_max_zoom: float = 4.0   ## Most zoomed-in.
@@ -67,22 +69,28 @@ func _input(event: InputEvent) -> void:
 		_mouse_in_window = true
 
 
-## The mouse wheel (or whatever ZOOM_IN / ZOOM_OUT are bound to) scales the zoom in either mode and
-## the scale stays; UI that scrolls with the wheel gets it first.
+## The mouse wheel (or whatever ZOOM_IN / ZOOM_OUT are bound to) and a trackpad's two-finger scroll
+## scale the zoom in either mode and the scale stays; UI that scrolls gets the event first.
 func _unhandled_input(event: InputEvent) -> void:
-	var direction := 0.0
-	if event.is_action_pressed(Keybinds.ZOOM_IN):
-		direction = 1.0
+	var notches := 0.0  # signed: positive zooms in
+	if event is InputEventPanGesture:
+		# Scrolling up (negative delta) zooms in, like wheel-up.
+		notches = -event.delta.y * trackpad_zoom_sensitivity
+	elif event.is_action_pressed(Keybinds.ZOOM_IN):
+		notches = _wheel_notches(event)
 	elif event.is_action_pressed(Keybinds.ZOOM_OUT):
-		direction = -1.0
+		notches = -_wheel_notches(event)
 	else:
 		return
-	# A trackpad scroll arrives as fractional wheel notches.
-	var notches := 1.0
-	if event is InputEventMouseButton and event.factor > 0.0:
-		notches = event.factor
-	_zoom_bias = clampf(_zoom_bias * pow(zoom_step, direction * notches),
+	_zoom_bias = clampf(_zoom_bias * pow(zoom_step, notches),
 			wheel_min_zoom / _base_zoom, wheel_max_zoom / _base_zoom)
+
+
+## How many notches a zoom press counts for: a wheel's own amount (fractional for some mice), else 1.
+func _wheel_notches(event: InputEvent) -> float:
+	if event is InputEventMouseButton and event.factor > 0.0:
+		return event.factor
+	return 1.0
 
 
 func _process(delta: float) -> void:
