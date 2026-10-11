@@ -3,7 +3,7 @@ extends RefCounted
 ## Testing domain: finds every test (`res://tests/**/*_test.gd`) and describes it as a plain dict the
 ## browser and runner work from:
 ##   { id, path, name, domain, description, tags, timeout, requires_von, manual, internal, switches, world,
-##     error }
+##     locked, error }
 ## `id` is the path under tests/ without the suffix (e.g. "projectile/pistol_shot_wounds"); `error` is
 ## set (and the rest defaulted) when the script fails to load. `configure()` is called on a scratch
 ## TestSetup to read which switches and world a test uses — it only records data.
@@ -18,6 +18,10 @@ const DEFAULT_TIMEOUT := 10.0
 ## Engine metas shared by the browser and the runner: the test to play, and the last status per test id.
 const META_SELECTION := "test_selection"
 const META_RESULTS := "test_results"
+## The ids ticked in the browser (kept across a round trip through a test), and the ordered script paths of
+## the queued headed run the browser hands the runner.
+const META_CHECKED := "test_checked"
+const META_QUEUE := "test_queue"
 static var _WORD: RegEx = null
 ## Whether `discover()` also returns harness self-tests (`internal: true`); the runner's `--self-test`.
 static var show_internal := false
@@ -62,7 +66,7 @@ static func describe(path: String, root := "") -> Dictionary:
 		"name": parts[parts.size() - 1].capitalize(),
 		"domain": parts[0] if parts.size() > 1 else "general",
 		"description": "", "tags": [], "timeout": DEFAULT_TIMEOUT,
-		"requires_von": false, "manual": sandbox, "internal": false, "switches": {}, "world": "", "error": "",
+		"requires_von": false, "manual": sandbox, "internal": false, "switches": {}, "world": "", "locked": [], "error": "",
 	}
 	var script := load(path) as GDScript
 	if script == null or not script.can_instantiate():
@@ -80,6 +84,7 @@ static func describe(path: String, root := "") -> Dictionary:
 	test.configure(setup)
 	entry["switches"] = setup.switches
 	entry["world"] = setup.resolved_world()["kind"]
+	entry["locked"] = setup.locked
 	return entry
 
 

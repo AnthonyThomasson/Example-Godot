@@ -5,7 +5,8 @@ extends Node
 ## returns to the main scene. The search text and last results live in Engine metas, so they survive
 ## the round trip through a test. Run all, or a domain's ▶, spawns a separate headless run (its own `--out`
 ## dir and engine log, so it never shares files with this game or another run; a domain run passes
-## `--domain=<name>`) and folds its report into the marks.
+## `--domain=<name>`) and folds its report into the marks. "Run N checked" instead plays the ticked tests one
+## after another in the runner scene, with a head.
 
 const TestCatalog = preload("res://scenes/testing/test_catalog.gd")
 const BROWSER_WINDOW := preload("res://scenes/ui/test_browser_window.gd")
@@ -31,14 +32,26 @@ func _ready() -> void:
 	window.play_requested.connect(_on_play)
 	window.back_requested.connect(_on_back)
 	window.run_requested.connect(_on_run)
+	window.run_queue_requested.connect(_on_run_queue)
+	window.checked_changed.connect(func(ids: Array): Engine.set_meta(TestCatalog.META_CHECKED, ids))
 	window.filter_changed.connect(func(t: String): Engine.set_meta(META_FILTER, t))
 	window.open(TestCatalog.discover(), TestCatalog.discover_sandboxes(), Engine.get_meta(TestCatalog.META_RESULTS, {}), TestCatalog.matches,
-		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(TestCatalog.META_SELECTION, "")))
+		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(TestCatalog.META_SELECTION, "")),
+		Engine.get_meta(TestCatalog.META_CHECKED, []))
 
 
 ## Play: remember the pick and open the runner.
 func _on_play(path: String) -> void:
 	Engine.set_meta(TestCatalog.META_SELECTION, path)
+	get_tree().change_scene_to_file(RUNNER_SCENE)
+
+
+## Run checked: hand the runner the ticked tests' paths to play one by one with a head.
+func _on_run_queue(paths: Array) -> void:
+	if _pid != -1 or paths.is_empty():
+		return
+	Engine.set_meta(TestCatalog.META_QUEUE, paths)
+	Engine.remove_meta(TestCatalog.META_SELECTION)
 	get_tree().change_scene_to_file(RUNNER_SCENE)
 
 

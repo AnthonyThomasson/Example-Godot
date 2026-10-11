@@ -10,6 +10,10 @@ extends CanvasLayer
 signal rerun_requested
 ## Back pressed: return to the test browser.
 signal back_requested
+## Next pressed during a queued run: skip the pause and start the next test.
+signal next_requested
+## Pause / Resume pressed: freeze or resume the world under the banner.
+signal pause_requested
 
 const STATUS_COLORS := {
 	"PASS": Color(0.45, 0.9, 0.45), "FAIL": Color(1.0, 0.4, 0.35), "TIMEOUT": Color(1.0, 0.6, 0.25),
@@ -20,10 +24,14 @@ var _title: Label
 var _status: Label
 var _details: RichTextLabel
 var _rerun: Button
+var _queue_line: Label
+var _next: Button
+var _pause: Button
 
 
 func _ready() -> void:
 	layer = 10
+	process_mode = Node.PROCESS_MODE_ALWAYS  # the buttons keep working while the world is paused
 	var panel := PanelContainer.new()
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.offset_left = 10.0
@@ -37,6 +45,11 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 8)
 	margin.add_child(box)
+	_queue_line = Label.new()
+	_queue_line.add_theme_font_size_override("font_size", 22)
+	_queue_line.modulate = Color(1, 1, 1, 0.7)
+	_queue_line.visible = false
+	box.add_child(_queue_line)
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 34)
 	box.add_child(_status)
@@ -55,7 +68,10 @@ func _ready() -> void:
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
 	box.add_child(buttons)
+	_pause = _button(buttons, "Pause", pause_requested.emit)
 	_rerun = _button(buttons, "Rerun", rerun_requested.emit)
+	_next = _button(buttons, "Next ▸", next_requested.emit)
+	_next.visible = false
 	_button(buttons, "Back (Esc)", back_requested.emit)
 
 
@@ -65,6 +81,37 @@ func show_running(entry: Dictionary) -> void:
 	_title.text = "%s  ·  %s" % [entry.get("name", "?"), entry.get("id", "")]
 	_details.text = String(entry.get("description", ""))
 	_rerun.disabled = true
+	_next.disabled = true
+
+
+## Show or hide the Pause button (a test can lock the interaction).
+func set_pause_enabled(on: bool) -> void:
+	_pause.visible = on
+
+
+## Show whether the world is paused: the pause button offers the opposite.
+func set_paused(paused: bool) -> void:
+	_pause.text = "Resume" if paused else "Pause"
+
+
+## A queued run is on test `index` of `total` (1-based): show the progress line and Next, hide Rerun.
+func show_queue(index: int, total: int) -> void:
+	_queue_line.text = "Queue  %d / %d" % [index, total]
+	_queue_line.visible = true
+	_rerun.visible = false
+	_next.visible = true
+	_next.disabled = true
+
+
+## Whether Next may skip the pause (a queued test's verdict is up).
+func set_next_ready(ready: bool) -> void:
+	_next.disabled = not ready
+
+
+## The queue finished: show its `summary` and drop Next.
+func show_queue_done(summary: String) -> void:
+	_queue_line.text = "Queue done  ·  " + summary
+	_next.visible = false
 
 
 ## A status line while the test waits on something (e.g. the decision server).

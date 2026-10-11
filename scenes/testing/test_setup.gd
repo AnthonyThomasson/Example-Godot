@@ -23,6 +23,12 @@ var camera_targets: Array = []
 ## Debug overlay flags (overlay_registry.gd `show_<x>` names) to turn on for every actor; the rest
 ## start off. Toggle them live with the in-game overlay bar in an interactive run.
 var overlays: Array = []
+## Interactions a person could use in a headed run that would change this test's result, which the runner
+## switches off (see `lock_interaction`).
+var locked: Array = []
+## What `lock_interaction` knows: `camera` (the user's wheel / trackpad / camera-key events and the
+## runner's own hand-pan), `pause` (the banner's Pause button and Space), `overlays` (the overlay bar).
+const LOCKABLE := [&"camera", &"pause", &"overlays"]
 
 
 ## A walled single-room arena covering `rect`. `opts`: `floor` (a catalogue floor key, default
@@ -109,6 +115,18 @@ func von_down() -> TestSetup:
 ## Start these debug overlays on (e.g. `["show_vision", "show_actions"]`).
 func show_overlays(flags: Array) -> TestSetup:
 	overlays = flags
+	return self
+
+
+## Switch off the listed user interactions while this test runs in the in-game runner, because a person
+## using them would change the result (a camera test must not be zoomed by the user's own wheel). Events the
+## test sends itself through `TestContext.inject` still get through; keys held down are polled state and
+## cannot be told apart, so a person should not hold a camera key during a camera test.
+func lock_interaction(what: Array) -> TestSetup:
+	for name in what:
+		if not LOCKABLE.has(name):
+			push_error("TestSetup: unknown interaction '%s' (known: %s)" % [name, LOCKABLE])
+	locked = what
 	return self
 
 

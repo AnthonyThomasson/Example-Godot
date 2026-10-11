@@ -4,6 +4,9 @@ extends Node2D
 ##   interactive — plays the test the browser picked (`Engine` meta `test_selection`, or the first
 ##                 match of `-- --play <filter>`), shows the result banner and keeps the world
 ##                 running; Rerun rebuilds it, Back/Escape returns to the browser;
+##   queued      — the browser's "Run N checked" (`Engine` meta `test_queue`, ordered paths): interactive,
+##                 but plays each test in turn, pausing on its verdict then freeing it and starting the
+##                 next; Back/Escape cancels the rest;
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
 ##                 --run-tests [filter] [--domain=a,b] [--id=a,b] [--failed=<report>] [--shard=I/N]
 ##                 [--fail-fast] [--summary] [--include-von]` runs every matching test (`--domain` / `--id`
@@ -23,12 +26,16 @@ const LogWatch = preload("res://scenes/testing/log_watch.gd")
 const LAUNCHER = preload("res://scenes/ai/decision/decision_server_launcher.gd")
 const RESULT_HUD = preload("res://scenes/ui/test_result_hud.gd")
 const OVERLAY_TOGGLES = preload("res://scenes/ui/overlay_toggles.gd")
+const OVERLAY_REGISTRY = preload("res://scenes/ui/overlay_registry.gd")
+const PERFORMANCE_OVERLAY = preload("res://scenes/ui/performance_overlay.gd")
 const BROWSER_SCENE := "res://scenes/testing/test_browser.tscn"
 const REPORT_PATH := "user://test_report.json"
 ## Failed/timed-out tests write their event log, final state and traces here (one JSON per test id).
 const BUNDLE_DIR := "user://test_failures"
 ## Frame rate a Von-dependent test is paced to in real time (matches the batch run's --fixed-fps 60).
 const REALTIME_FPS := 60
+## Seconds a queued run holds each verdict before the next test starts (the HUD's Next skips it).
+const QUEUE_PAUSE := 2.0
 
 @onready var _camera: Camera2D = $MainCamera
 
@@ -66,6 +73,13 @@ var _stray_logs: Array = []
 ## Interactive only: the result banner and the overlay toggle bar.
 var _hud: CanvasLayer = null
 var _toggles: CanvasLayer = null
+var _perf: CanvasLayer = null
+## Whether the open test has a human-driven player (Space is then its INTERACT, not pause).
+var _has_player := false
+## The open test's locked interactions (`TestSetup.lock_interaction`).
+var _locked: Array = []
+## A queued run is going (false once it was cancelled, so a loop parked on a wait stops).
+var _queue_active := false
 
 
 func _ready() -> void:
@@ -81,13 +95,23 @@ func _ready() -> void:
 	if args.has("--run-tests"):
 		_batch = true
 		_run_batch.call_deferred(args)
-	elif Engine.has_meta(TestCatalog.META_SELECTION):
+	elif Engine.has_meta(TestCatalog.META_QUEUE) or Engine.has_meta(TestCatalog.META_SELECTION):
 		_hud = RESULT_HUD.new()
 		_hud.name = "TestResultHUD"
 		add_child(_hud)
 		_hud.rerun_requested.connect(_on_rerun)
 		_hud.back_requested.connect(_back_to_browser)
-		_run_interactive.call_deferred(String(Engine.get_meta(TestCatalog.META_SELECTION)))
+		_hud.pause_requested.connect(func(): _set_paused(not get_tree().paused))
+		# The runner keeps processing while paused (Esc / Space still work); each test's world is made
+		# pausable in `_start`, and the test clock below stops with the tree.
+		process_mode = Node.PROCESS_MODE_ALWAYS
+		if Engine.has_meta(TestCatalog.META_QUEUE):
+			var paths: Array = Engine.get_meta(TestCatalog.META_QUEUE)
+			Engine.remove_meta(TestCatalog.META_QUEUE)  # consumed: a later visit to the runner plays a single test
+			_queue_active = true
+			_run_queue.call_deferred(paths)
+		else:
+			_run_interactive.call_deferred(String(Engine.get_meta(TestCatalog.META_SELECTION)))
 	else:
 		get_tree().change_scene_to_file.call_deferred(BROWSER_SCENE)
 
@@ -105,6 +129,8 @@ func _process(_delta: float) -> void:
 func _physics_process(delta: float) -> void:
 	for entry in _watch.poll():
 		_route_log(entry)
+	if get_tree().paused:
+		return  # the test clock (and so its timeout and waits) stops with the world
 	if _ctx != null and not _ctx.is_finished:
 		_ctx.time += delta
 		if not _entry.get("manual", false) and _ctx.time >= float(_entry.get("timeout", TestCatalog.DEFAULT_TIMEOUT)):
@@ -113,21 +139,47 @@ func _physics_process(delta: float) -> void:
 
 
 func _exit_tree() -> void:
+	get_tree().paused = false
 	if _ctx != null:
 		_ctx.free()
 		_ctx = null
 
 
+## While a test locks the camera, drop the user's own camera events (wheel, trackpad, camera keys) before any
+## camera sees them; the ones the test injects itself carry `TestContext.INJECTED_META` and pass.
+func _input(event: InputEvent) -> void:
+	if _locked.has(&"camera") and not event.has_meta(TestContext.INJECTED_META) \
+			and (event is InputEventPanGesture or event.is_action(Keybinds.ZOOM_IN) or event.is_action(Keybinds.ZOOM_OUT)
+			or event.is_action(Keybinds.CAMERA_LEFT) or event.is_action(Keybinds.CAMERA_RIGHT)
+			or event.is_action(Keybinds.CAMERA_UP) or event.is_action(Keybinds.CAMERA_DOWN)):
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if not _batch and event.is_action_pressed(Keybinds.MENU) and not event.is_echo():
+	if _batch or event.is_echo():
+		return
+	if event.is_action_pressed(Keybinds.MENU):
 		_back_to_browser()
+	elif event.is_action_pressed(Keybinds.PAUSE) and not _has_player and not _locked.has(&"pause"):
+		_set_paused(not get_tree().paused)
+
+
+## Freeze or resume the open test's world (the banner, overlay bar and this runner keep running).
+func _set_paused(on: bool) -> void:
+	get_tree().paused = on
+	if _hud != null:
+		_hud.set_paused(on)
 
 
 # --- Running one test -----------------------------------------------------------------------
 
 ## Build and run the test `entry`, leaving its world open. Returns once it has ended.
 func _start(entry: Dictionary) -> void:
+	_set_paused(false)
 	_entry = entry
+	_locked = []
+	if _hud != null:
+		_hud.set_pause_enabled(true)
 	_concluded = false
 	var skip_reason := ""
 	if entry["requires_von"]:
@@ -157,8 +209,13 @@ func _start(entry: Dictionary) -> void:
 	var test: GameTest = load(entry["path"]).new()
 	var setup := TestSetup.new()
 	test.configure(setup)
+	_locked = setup.locked
+	if _hud != null:
+		_hud.set_pause_enabled(not _locked.has(&"pause"))
 	_world = TestWorldScript.new()
 	_world.name = "TestWorld"
+	_world.process_mode = Node.PROCESS_MODE_PAUSABLE  # not inherited from the always-on runner
+	_has_player = setup.actors.any(func(a): return a["kind"] == &"player")
 	add_child(_world)
 	_world.child_entered_tree.connect(func(n: Node): _on_event(&"spawned", { "node": n, "name": String(n.name) }))
 	_world.child_exiting_tree.connect(func(n: Node): _on_event(&"removed", { "node": n, "name": String(n.name) }))
@@ -168,7 +225,7 @@ func _start(entry: Dictionary) -> void:
 	for id in _world.actors:
 		_observe_actor(id, _world.actors[id])
 	_frame_camera(setup)
-	if not _batch:
+	if not _batch and not _locked.has(&"overlays"):
 		_build_toggles()
 	_drive(test, _ctx)
 	if not _ctx.is_finished:
@@ -194,6 +251,9 @@ func _close() -> Dictionary:
 	if is_instance_valid(_toggles):
 		_toggles.queue_free()
 	_toggles = null
+	if is_instance_valid(_perf):
+		_perf.queue_free()
+	_perf = null
 	if is_instance_valid(_world):
 		_world.restore()
 		_world.queue_free()
@@ -261,7 +321,7 @@ func _observe_actor(id: StringName, actor: Node) -> void:
 ## Frame the setup's camera targets (default: every actor; an empty world frames its first room).
 ## A world with a human-driven player keeps WASD for walking, so the camera's hand-pan is off there.
 func _frame_camera(setup: TestSetup) -> void:
-	_camera.set("pan_enabled", not setup.actors.any(func(a): return a["kind"] == &"player"))
+	_camera.set("pan_enabled", not _has_player and not _locked.has(&"camera"))
 	var targets: Array = []
 	for id in (setup.camera_targets if not setup.camera_targets.is_empty() else _world.actors.keys()):
 		var a: Node = _world.actors.get(id)
@@ -317,6 +377,42 @@ func _run_interactive(path: String) -> void:
 	_hud.show_result(result)
 
 
+## Play `paths` one after another: each runs to its verdict, which is held for QUEUE_PAUSE (or until Next), then
+## its world is freed and the next starts. A failure does not stop the queue; the last test's world stays up
+## under a summary.
+func _run_queue(paths: Array) -> void:
+	var counts := {}
+	for i in paths.size():
+		var entry := TestCatalog.describe(paths[i])
+		_hud.show_queue(i + 1, paths.size())
+		_hud.show_running(entry)
+		await _start(entry)
+		if not _queue_active:
+			return
+		var result := _result()
+		_remember(result)
+		counts[result["status"]] = counts.get(result["status"], 0) + 1
+		_hud.show_result(result)
+		if i < paths.size() - 1:
+			_hud.set_next_ready(true)
+			await _queue_pause()
+			if not _queue_active:
+				return
+			await _close()
+	_hud.show_queue_done("%d passed, %d failed, %d timed out, %d skipped" % [counts.get("PASS", 0),
+		counts.get("FAIL", 0), counts.get("TIMEOUT", 0), counts.get("SKIPPED", 0)])
+
+
+## Hold the shown verdict for QUEUE_PAUSE seconds of wall time, or until the HUD's Next is pressed.
+func _queue_pause() -> void:
+	var timer := get_tree().create_timer(QUEUE_PAUSE, false)  # not always-on: pausing holds the verdict
+	var skip := func(): timer.time_left = 0.0
+	_hud.next_requested.connect(skip, CONNECT_ONE_SHOT)
+	await timer.timeout
+	if is_instance_valid(_hud) and _hud.next_requested.is_connected(skip):
+		_hud.next_requested.disconnect(skip)
+
+
 ## Rerun: tear the world down and play the same test again.
 func _on_rerun() -> void:
 	var path: String = _entry.get("path", "")
@@ -326,6 +422,8 @@ func _on_rerun() -> void:
 
 ## Back / Escape: restore statics and return to the browser (the scene change frees the world).
 func _back_to_browser() -> void:
+	_queue_active = false  # cancels the rest of a queued run
+	get_tree().paused = false
 	if is_instance_valid(_world):
 		_world.restore()
 	get_tree().change_scene_to_file(BROWSER_SCENE)
@@ -337,8 +435,16 @@ func _build_toggles() -> void:
 	_toggles.name = "OverlayToggles"
 	add_child(_toggles)
 	_toggles.setup(_world.overlay_flags())
+	# The performance panel is the runner's own (it needs no world); the rest go to the world.
+	_perf = PERFORMANCE_OVERLAY.new()
+	_perf.name = "PerformanceOverlay"
+	add_child(_perf)
+	_perf.set_shown(_world.overlay_flags().get(OVERLAY_REGISTRY.PERF, false))
 	_toggles.overlay_toggled.connect(func(flag: String, on: bool):
-		if is_instance_valid(_world):
+		if flag == OVERLAY_REGISTRY.PERF:
+			if is_instance_valid(_perf):
+				_perf.set_shown(on)
+		elif is_instance_valid(_world):
 			_world.set_overlay(flag, on))
 
 

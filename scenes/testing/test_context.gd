@@ -92,6 +92,19 @@ func controller(id: StringName, method := &"control") -> Node:
 	return null
 
 
+# --- Input ----------------------------------------------------------------------------------
+
+## Marks an input event a test sent itself, so a locked interaction (`TestSetup.lock_interaction`) lets it
+## through while still dropping the same kind of event from a person.
+const INJECTED_META := &"test_injected"
+
+
+## Send `event` into the game as the test's own input (instead of a bare `Input.parse_input_event`).
+static func inject(event: InputEvent) -> void:
+	event.set_meta(INJECTED_META, true)
+	Input.parse_input_event(event)
+
+
 # --- Waiting (sim time) ---------------------------------------------------------------------
 
 ## Wait `duration` seconds of simulated time.

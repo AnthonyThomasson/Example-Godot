@@ -259,7 +259,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
     Behaviour switches set existing exported props and config-holder `static var`s by name
     (duck-typed, like Main's overlay flags); a test can also script the Von answers through the AI
     decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`) so AI
-    wiring runs without a server. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
+    wiring runs without a server. In the in-game runner a test can switch off user interactions that
+    would change its result with `TestSetup.lock_interaction` (`camera` / `pause` / `overlays`), sending
+    its own input through `TestContext.inject` so the lock lets it through; the runner also builds the
+    Navigation domain's draw-only `nav_debug.gd` (via the world, kept current by `nav_updater.gd`) and the
+    UI's `PerformanceOverlay` for the overlay bar's global toggles. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
     `PhysicsConfig.debris_enabled` master switches; statics are restored after each test. Main
     reaches it only by changing scene to `testing/test_browser.tscn`; the UI widgets it shows
     (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
@@ -297,7 +301,8 @@ Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)─
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
-TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles)
+TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
+TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 ```
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is

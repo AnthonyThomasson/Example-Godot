@@ -16,6 +16,7 @@ func describe() -> Dictionary:
 
 
 func configure(s: TestSetup) -> void:
+	s.lock_interaction([&"camera"])  # a person's wheel or camera keys would change what is measured
 	s.arena(Rect2(0, 0, 800, 500))
 
 
@@ -60,7 +61,7 @@ func run(t: TestContext) -> void:
 func _scroll(amount: float) -> void:
 	var event := InputEventPanGesture.new()
 	event.delta = Vector2(0.0, amount)
-	Input.parse_input_event(event)
+	TestContext.inject(event)
 
 
 ## One wheel notch, as the OS delivers it.
@@ -68,4 +69,4 @@ func _wheel(button: MouseButton) -> void:
 	var event := InputEventMouseButton.new()
 	event.button_index = button
 	event.pressed = true
-	Input.parse_input_event(event)
+	TestContext.inject(event)

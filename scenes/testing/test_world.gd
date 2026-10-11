@@ -10,6 +10,7 @@ const TestSwitches = preload("res://scenes/testing/test_switches.gd")
 const ScriptedController = preload("res://scenes/testing/scripted_controller.gd")
 const PlayerController = preload("res://scenes/character/player_controller.gd")
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
+const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
 const ACTOR_SCENES := {
 	&"puppet": "res://scenes/character/character_base.tscn",
@@ -27,6 +28,8 @@ var objects: Dictionary = {}
 ## Original values of overridden statics: `[script, prop, value]`.
 var _saved_statics: Array = []
 var _overlay_flags: Dictionary = {}
+## The navmesh-holes overlay (the "Nav holes" toggle), kept in step with re-bakes by the updater.
+var _nav_debug: Node2D = null
 
 
 ## Build everything `setup` declares. Statics and switches are applied before anything spawns, so
@@ -42,11 +45,10 @@ func build(setup: TestSetup) -> void:
 		var opts: Dictionary = o["opts"].duplicate()
 		opts["name"] = String(o["id"])
 		objects[o["id"]] = ObjectFactory.spawn(o["definition"], house.to_local(o["position"]), house, opts)
-	_build_nav()
 	_overlay_flags = {}
 	for flag in OVERLAY_REGISTRY.defaults():
-		if not OVERLAY_REGISTRY.is_global(flag):
-			_overlay_flags[flag] = setup.overlays.has(flag)
+		_overlay_flags[flag] = setup.overlays.has(flag)
+	_build_nav()
 	for a in setup.actors:
 		actors[a["id"]] = _spawn_actor(a, setup.switches)
 	_apply_world_switches(setup.switches)
@@ -66,14 +68,22 @@ func overlay_flags() -> Dictionary:
 
 
 ## Turn one per-NPC debug overlay on/off on every actor (duck-typed by property, like main.gd).
+## The global flags: the navmesh holes live here; the performance panel belongs to the runner.
+## A redraw is forced because a paused overlay's own `_process` may not run.
 func set_overlay(flag: String, on: bool) -> void:
 	_overlay_flags[flag] = on
+	if flag == OVERLAY_REGISTRY.NAV_HOLES:
+		if is_instance_valid(_nav_debug):
+			_nav_debug.show_holes = on
+			_nav_debug.queue_redraw()
+		return
 	for id in actors:
 		var a: Node = actors[id]
 		if is_instance_valid(a):
 			for child in a.get_children():
 				if flag in child:
 					child.set(flag, on)
+					child.queue_redraw()
 
 
 ## Apply the switch rows' static knobs, then the explicit `set_static` overrides.
@@ -107,10 +117,15 @@ func _build_world(world: Dictionary) -> void:
 ## Bake the nav map (after the objects, so they are carved) and add the re-baker.
 func _build_nav() -> void:
 	var region := NavBuilder.build(house, rooms, self)
+	_nav_debug = NAV_DEBUG.new()
+	_nav_debug.name = "NavDebug"
+	add_child(_nav_debug)
+	_nav_debug.setup(house)
+	_nav_debug.show_holes = _overlay_flags.get(OVERLAY_REGISTRY.NAV_HOLES, false)
 	var updater: Node = NAV_UPDATER.new()
 	updater.name = "NavUpdater"
 	add_child(updater)
-	updater.setup(region, house, rooms)
+	updater.setup(region, house, rooms, _nav_debug)
 
 
 ## Instance actor `a`, inject its controller and props/switches/overlays, then add it to the world.

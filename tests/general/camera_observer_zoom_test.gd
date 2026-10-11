@@ -16,6 +16,7 @@ func describe() -> Dictionary:
 
 
 func configure(s: TestSetup) -> void:
+	s.lock_interaction([&"camera"])  # a person's wheel or camera keys would change what is measured
 	s.arena(Rect2(0, 0, 1000, 640))
 	s.actor(&"a", &"puppet", Vector2(300, 300))
 	s.actor(&"b", &"puppet", Vector2(700, 300))
@@ -51,4 +52,4 @@ func _wheel(button: MouseButton) -> void:
 	var event := InputEventMouseButton.new()
 	event.button_index = button
 	event.pressed = true
-	Input.parse_input_event(event)
+	TestContext.inject(event)

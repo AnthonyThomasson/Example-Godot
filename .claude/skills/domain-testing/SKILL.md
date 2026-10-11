@@ -86,6 +86,25 @@ and controller contract, EventBus and character signals) and never reaches into 
   `user://test_runs/<n>/` dir as above), show elapsed time, then fold `report.json` into the marks (only
   the ids in the report change) and the status line (failure bundles are under that dir). The buttons are
   disabled while a run is going.
+- **Headed queue:** tick tests in the browser (checkbox per test, bulk buttons per domain and in the header; they
+  respect the search) and press **Run N checked**. The browser stores the ordered paths in the `test_queue` meta
+  (`TestCatalog.META_QUEUE`; the ticks themselves are `test_checked`, `META_CHECKED`) and opens the runner, which
+  plays them one by one in the real window: each verdict is held `QUEUE_PAUSE` (2 s, or until the banner's Next ▸),
+  then the world is freed and the next test starts. A failure does not stop the queue; Esc/Back cancels the rest.
+  Results fold into the browser's marks as for a single Play; a summary shows after the last test.
+- **Pause and overlays (headed runs):** the banner's **Pause / Resume** (and Space, unless the test has a `player`
+  actor, where Space is INTERACT) freezes the world. The runner stays `PROCESS_MODE_ALWAYS`, each `TestWorld` is
+  explicitly pausable, and the test clock (`ctx.time`, so waits and the timeout) stops with the tree; the tree is
+  always unpaused on a new test, Back and exit. The overlay bar works on the test's actors; its **Nav holes**
+  (a `NavDebug` the `TestWorld` builds and the re-baker keeps current) and **Performance** (the runner's own
+  panel) toggles work too.
+- **Locking interactions:** `s.lock_interaction([&"camera", &"pause", &"overlays"])` in `configure` switches off
+  what a person could do in a headed run that would change the result. `camera` drops the user's wheel /
+  trackpad / camera-key events and the runner camera's hand-pan; `pause` hides the Pause button and ignores
+  Space; `overlays` leaves out the overlay bar. A test that sends its own input must use
+  `TestContext.inject(event)` (not bare `Input.parse_input_event`), which tags it so the lock lets it through.
+  Held keys are polled state and cannot be told apart. The three `tests/general/camera_*_test.gd` use it; the
+  browser's details pane lists "Locked while it runs".
 
 ## Writing a test
 
@@ -139,6 +158,7 @@ func run(t: TestContext) -> void:
     ids (`combat`, `flank`, `engage`, …) and option ids. Keep `requires_von` tests for judging Von itself.
   - Presentation: `show_overlays(["show_vision", …])` and `camera_follow([ids])` (default frames all
     actors; the camera's hand-pan is off when a `player` actor is present, since WASD walks it).
+    `lock_interaction([&"camera", …])` switches off user interactions in a headed run (see below).
 - **`run(t: TestContext)`**, a coroutine. Always wait through `t`. A raw `await get_tree()…` can
   resume into a torn-down world.
   - Waits, all in sim time: `await t.seconds(s)`, `await t.frames(n)`,
