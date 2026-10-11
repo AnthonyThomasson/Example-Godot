@@ -207,10 +207,11 @@ A change that doesn't parse fails everything above by default. Run the `godot-de
 headless load check (run `--import` first if the change added a `class_name` or new file). Report
 a clean load, or the exact `SCRIPT ERROR` / `Parse Error` lines.
 
-Then run the game tests: `tools/run_tests.sh` (Bash sandbox disabled; AI changes are covered without a
-server by the scripted-Von tests, and `--include-von` adds the live-server ones). When the change touches
-`scenes/testing/` or the Von stub, also run `tools/run_tests.sh --self-test` (the harness's own tests);
-`tools/run_tests.sh --changed` runs just the touched domains (and the self-tests for `scenes/testing/`). Report the summary line and every FAIL / TIMEOUT with its ✗ lines; exit code 1
+Then run the game tests (Bash sandbox disabled; AI changes are covered without a server by the scripted-Von
+tests, and `--include-von` adds the live-server ones): `tools/run_tests.sh --changed --summary` runs the touched
+domains plus the domains that compose them (and the self-tests for `scenes/testing/` or the Von stub); a change
+to worldgen, art, general or `main.gd` makes it run everything, so add `--jobs=auto` there. Report the totals line
+and every FAIL / TIMEOUT with its ✗ lines; exit code 1
 also covers an engine error/warning logged during a test. A change that adds or alters behaviour should
 add or update a test in `tests/<domain>/` (see the `domain-testing` skill) — flag it if none covers it.
 

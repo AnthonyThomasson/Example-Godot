@@ -28,8 +28,8 @@ rather than adding a near-duplicate.
 ## 3. Reproduce (red)
 
 Write the smallest test that triggers the symptom through the published interfaces only (world/`house()`
-plus behaviour switches per `domain-testing`; `--seed=N` if it depends on layout). Run it with the Bash
-sandbox disabled and require it to **FAIL**, then check it fails *for the bug's reason*: read the `✗`
+plus behaviour switches per `domain-testing`; `--seed=N` if it depends on layout). Run it with
+`tools/run_tests.sh --id=<domain>/<name>` (Bash sandbox disabled) and require it to **FAIL**, then check it fails *for the bug's reason*: read the `✗`
 lines and the `bundle:` JSON. A parse error, a fixed-sleep race or a harness mistake is not a repro
 (`test-debug` §3) — fix the test and rerun. If it passes straight away, the repro is wrong or the bug is
 already gone: say so and stop rather than "fixing" anything.
@@ -47,11 +47,11 @@ delete the test to get green, and don't special-case the test's scenario.
 
 ## 5. Green
 
-Rerun the test until it PASSES (`--repeat=10` for an intermittent bug; no `FLAKY`). Then run
-`tools/run_tests.sh --changed` and the full `tools/run_tests.sh`. Delegate those two noisy runs to a Haiku
-subagent (`model: "haiku"`, sandbox disabled, no edits) asking for only the summary line, every
-FAIL/TIMEOUT with its `✗` and `bundle:` lines, and any `Logged outside any test` lines. Report unrelated
-failures; don't paper over them.
+Rerun the test until it PASSES (`--id=<id> --repeat=10` for an intermittent bug; no `FLAKY`). Then run
+`tools/run_tests.sh --changed --summary`, and last the full `tools/run_tests.sh --summary --jobs=auto`.
+`--summary` prints only the totals plus every FAIL/TIMEOUT with its `✗` and `bundle:` lines (and any
+`Logged outside any test` lines), so no subagent is needed to trim the output. If something fails, fix and
+rerun just that with `tools/run_tests.sh --failed`. Report unrelated failures; don't paper over them.
 
 ## 6. Wrap up
 

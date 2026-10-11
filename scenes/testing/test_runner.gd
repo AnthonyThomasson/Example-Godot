@@ -5,9 +5,11 @@ extends Node2D
 ##                 match of `-- --play <filter>`), shows the result banner and keeps the world
 ##                 running; Rerun rebuilds it, Back/Escape returns to the browser;
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
-##                 --run-tests [filter] [--domain=<name>] [--include-von]` runs every matching test
-##                 (`--domain` keeps only that exact domain, unlike the prefix-matching filter) in turn, prints one
-##                 line each plus a summary, writes `user://test_report.json` and exits 1 on any
+##                 --run-tests [filter] [--domain=a,b] [--id=a,b] [--failed=<report>] [--shard=I/N]
+##                 [--fail-fast] [--summary] [--include-von]` runs every matching test (`--domain` / `--id`
+##                 keep only those exact domains / ids, unlike the prefix-matching filter; `--shard` takes
+##                 one balanced slice of the run) in turn, prints one
+##                 line each (just the non-passing ones with `--summary`) plus a summary, writes `user://test_report.json` and exits 1 on any
 ##                 failure (or any error/warning logged outside a test). `--out=<dir>` puts the report
 ##                 and failure bundles in <dir> instead; started with `--log-file <dir>/godot.log` it
 ##                 also owns its engine log, so parallel runs and a running game never share files.
@@ -40,6 +42,10 @@ var _bundle_dir := BUNDLE_DIR
 var _include_von := false
 ## `--require-von`: a Von test fails instead of skipping when no server is live.
 var _require_von := false
+## `--fail-fast`: stop after the first FAIL / TIMEOUT. `--summary`: print only non-passing tests and the totals.
+var _fail_fast := false
+var _stopped := false  ## A `--fail-fast` failure has ended the run.
+var _compact := false  ## `--summary` is on.
 ## `--shots`: save screenshots of failed tests into the bundle dir (needs a rendering run, not headless).
 var _shots := false
 ## The Von launcher, created by the first requires_von test, and its settled answer.
@@ -365,34 +371,55 @@ func _run_batch(args: PackedStringArray) -> void:
 	var repeat := maxi(1, int(_option(args, "--repeat", "1")))
 	TestSetup.seed_override = int(_option(args, "--seed", "0"))
 	var domain := _option(args, "--domain", "")
+	var domains := TestCatalog.csv(domain)
+	var ids := TestCatalog.csv(_option(args, "--id", ""))
+	var failed_from := _option(args, "--failed", "")
+	if failed_from != "":
+		ids.append_array(_failed_ids(failed_from))
+		if ids.is_empty():
+			ids.append("<no failed test in the last report>")  # selects nothing, rather than everything
+	_fail_fast = args.has("--fail-fast")
+	_compact = args.has("--summary")
 	var self_test := args.has("--self-test")
 	TestCatalog.show_internal = self_test
-	var picked := TestCatalog.discover().filter(func(e): return (e["internal"] or not self_test) \
-		and (domain == "" or e["domain"] == domain) and TestCatalog.matches(e, filter))
+	var picked := TestCatalog.discover(TestCatalog.ROOT, domains, ids).filter(func(e): return (e["internal"] or not self_test) \
+		and TestCatalog.matches(e, filter))
+	var shard := _option(args, "--shard", "")
+	if shard != "":
+		picked = TestCatalog.shard(picked, shard)
 	if args.has("--list"):
 		_print_list(picked)
 		get_tree().quit(0)
 		return
 	if not _watch.available():
 		print("NOTE  log file not found — errors/warnings cannot fail tests this run")
-	print("Godot %s  fixed-fps %d  Von tests: %s%s%s" % [Engine.get_version_info()["string"], Engine.physics_ticks_per_second,
-		"required" if _require_von else ("included" if _include_von else "skipped"),
-		"" if repeat == 1 else "  repeat x%d" % repeat,
-		"" if TestSetup.seed_override == 0 else "  seed %d" % TestSetup.seed_override])
-	print("Running %d test(s)%s%s" % [picked.size(), "" if domain == "" else " in domain '%s'" % domain,
-		"" if filter == "" else " matching '%s'" % filter])
+	if not _compact:
+		print("Godot %s  fixed-fps %d  Von tests: %s%s%s" % [Engine.get_version_info()["string"], Engine.physics_ticks_per_second,
+			"required" if _require_von else ("included" if _include_von else "skipped"),
+			"" if repeat == 1 else "  repeat x%d" % repeat,
+			"" if TestSetup.seed_override == 0 else "  seed %d" % TestSetup.seed_override])
+	if not _compact:
+		print("Running %d test(s)%s%s%s" % [picked.size(), "" if domain == "" else " in domain '%s'" % domain,
+			"" if filter == "" else " matching '%s'" % filter, "" if shard == "" else "  shard " + shard])
 	var results: Array = []
 	for entry in picked:
+		if _stopped:
+			break
 		for run in repeat:
 			var result: Dictionary
+			var started := Time.get_ticks_msec()
 			if entry["manual"]:
 				result = { "id": entry["id"], "name": entry["name"], "domain": entry["domain"], "status": "SKIPPED",
 					"reason": "manual sandbox", "time": 0.0, "checks": [], "logs": [], "manual": true }
 			else:
 				await _start(entry)
 				result = await _close()
+			result["wall_ms"] = Time.get_ticks_msec() - started
 			results.append(result)
 			_print_result(result)
+			if _fail_fast and (result["status"] == "FAIL" or result["status"] == "TIMEOUT"):
+				_stopped = true
+				break
 			if result["status"] == "SKIPPED":
 				break  # a skip repeats identically
 	for entry in _watch.poll(true):
@@ -402,6 +429,20 @@ func _run_batch(args: PackedStringArray) -> void:
 	if args.has("--json"):
 		print("JSON: " + JSON.stringify({ "results": results, "stray_logs": _stray_logs }))
 	get_tree().quit(code)
+
+
+## The ids that FAILED or TIMED OUT in the report at `path` (empty when it is missing or unreadable).
+func _failed_ids(path: String) -> Array:
+	var out: Array = []
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return out
+	var data: Variant = JSON.parse_string(f.get_as_text())
+	if data is Dictionary:
+		for r in data.get("results", []):
+			if r["status"] == "FAIL" or r["status"] == "TIMEOUT":
+				out.append(r["id"])
+	return out
 
 
 ## The value of a `--name=value` argument, or `fallback`.
@@ -426,8 +467,10 @@ func _print_list(entries: Array) -> void:
 
 ## One result line, plus each failed check indented.
 func _print_result(r: Dictionary) -> void:
+	if _compact and (r["status"] == "PASS" or r["status"] == "SKIPPED"):
+		return
 	var tail: String = "" if r["reason"] == "" else "  — " + String(r["reason"])
-	print("%-7s %s  (%.1fs)%s" % [r["status"], r["id"], r["time"], tail])
+	print("%-7s %s  (%.1fs sim, %d ms)%s" % [r["status"], r["id"], r["time"], r.get("wall_ms", 0), tail])
 	for c in r["checks"]:
 		if not c["ok"]:
 			print("        ✗ %s" % c["message"])
@@ -476,6 +519,11 @@ func _summarize(results: Array, repeat := 1) -> int:
 		for id in tally:
 			if tally[id][0] != tally[id][1]:
 				print("%s  %d/%d passed%s" % ["FLAKY  " if tally[id][0] > 0 else "FAILING", tally[id][0], tally[id][1], "  " + id])
+	if not _compact:
+		var timed := results.filter(func(r): return r["status"] != "SKIPPED" and r.has("wall_ms"))
+		timed.sort_custom(func(a, b): return a["wall_ms"] > b["wall_ms"])
+		if timed.size() > 1:
+			print("Slowest: " + ", ".join(timed.slice(0, 5).map(func(r): return "%s %d ms" % [r["id"], r["wall_ms"]])))
 	print("%d passed, %d failed, %d timed out, %d skipped" % [counts["PASS"], counts["FAIL"], counts["TIMEOUT"], counts["SKIPPED"]])
 	var bad: int = counts["FAIL"] + counts["TIMEOUT"] + (1 if not _stray_logs.is_empty() else 0)
 	return 1 if bad > 0 else 0

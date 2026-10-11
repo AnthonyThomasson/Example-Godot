@@ -14,7 +14,7 @@ game, follow up with the **`godot-drive`** skill.
 The run is mechanical and its raw output is noisy. Don't run it in your own context. Spawn `Agent`
 (general-purpose) with **`model: "haiku"`** and a prompt like:
 
-> In `/Users/athomasson/Documents/projects.nosync/Example_Godot`, run the commands below with the
+> In the worktree root (`cd` to the checkout you are working in, never another copy), run the commands below with the
 > Bash sandbox disabled (`dangerouslyDisableSandbox: true` — under the sandbox Godot hangs with no
 > output). Do not edit any files. Reply with ONLY: `PASS` or `FAIL`, and if FAIL the matching error
 > lines verbatim (file:line included), max 20 lines. No commentary.
@@ -43,14 +43,15 @@ Loads the main scene + autoloads, runs a few frames, then quits. `--quit-after` 
 hang (there is no `timeout` command on macOS). **Sandbox disabled.**
 
 ```bash
-cd /Users/athomasson/Documents/projects.nosync/Example_Godot
-"$GODOT" --headless --path . --quit-after 30 2>&1 | tee /tmp/godot_check.log
+# from the checkout root; $LOG is a scratch file (use the session scratchpad dir)
+LOG="${TMPDIR:-/tmp}/godot_check.log"
+"$GODOT" --headless --path . --quit-after 30 2>&1 | tee "$LOG"
 ```
 
 To check a single script instead of the whole project:
 
 ```bash
-"$GODOT" --headless --path . --check-only --script scenes/player/player.gd 2>&1
+"$GODOT" --headless --path . --check-only --script scenes/character/character.gd 2>&1
 ```
 
 ## Step 3 — pass/fail by GREPPING the output, not the exit code
@@ -58,7 +59,7 @@ To check a single script instead of the whole project:
 Godot exits `0` even when a script fails to parse. Judge by the output:
 
 ```bash
-grep -nE 'SCRIPT ERROR|Parse Error|ERROR:|Failed to load|Cannot infer' /tmp/godot_check.log \
+grep -nE 'SCRIPT ERROR|Parse Error|ERROR:|Failed to load|Cannot infer' "$LOG" \
   && echo "FAIL: errors found (see above)" \
   || echo "PASS: no errors — project loads and runs"
 ```
@@ -67,7 +68,7 @@ Error lines include file and line, e.g.:
 
 ```
 SCRIPT ERROR: Parse Error: Expected expression ... after "=".
-   at: GDScript::reload (scenes/player/player.gd:42)
+   at: GDScript::reload (scenes/character/character.gd:42)
 ```
 
 A clean run prints only the engine version banner (plus any `print()` output).
@@ -83,7 +84,7 @@ global class cache is stale. Rebuild it, then rerun Step 2 (ignore its `progress
 
 ## Next rung
 
-A clean load only proves it parses. For behaviour run `tools/run_tests.sh <domain>` first (deterministic, headless; see the `domain-testing` and `test-debug` skills) before reaching for live driving.
+A clean load only proves it parses. For behaviour run `tools/run_tests.sh --changed --summary` (only the domains your edit can break; add `--jobs=auto` for a big one; see the `domain-testing` and `test-debug` skills) before reaching for live driving. `tools/run_tests.sh` also imports a fresh checkout by itself, so after a `class_name` change it is often the only check you need; keep this skill for scene/autoload-only edits and quick parse errors.
 
 ## When to use
 

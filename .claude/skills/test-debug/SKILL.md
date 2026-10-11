@@ -15,8 +15,10 @@ event → the shot never fired; target `health` unchanged → it hit cover).
 
 ## 2. Narrow, then reproduce
 
-- One test: `tools/run_tests.sh pistol` (filter words are ANDed word-prefixes of id/name/domain/tags;
-  `--list` shows what exists). Run with the Bash sandbox disabled.
+- One test: `tools/run_tests.sh --id=projectile/pistol_shot_wounds` (exact id; `--list` shows ids). Words
+  (`tools/run_tests.sh pistol`) are ANDed word-prefixes of id/name/domain/tags and can match more than you
+  mean; `--domain=ai` is exact. After a red run, `tools/run_tests.sh --failed` reruns only what failed last
+  time (add `--fail-fast` to stop at the first). Run with the Bash sandbox disabled.
 - Flaky? `--repeat=10 <words>` names `FLAKY` (some pass) vs `FAILING` (none). `--seed=N` pins every
   `house()` test to one layout to separate layout luck from logic.
 - Add `t.trace("gap", value)` inside the wait loop to see *why* a threshold was missed, rerun, read the
@@ -38,11 +40,12 @@ event → the shot never fired; target `health` unchanged → it hit cover).
 ## 4. Bugfix = red test first
 
 Before fixing a behavioural bug, write `tests/<domain>/<name>_test.gd` that reproduces it and confirm it
-FAILS with the bug's symptom; fix; confirm it PASSES; then run `tools/run_tests.sh --changed` and the
-full suite.
+FAILS with the bug's symptom; fix; confirm it PASSES; then run `tools/run_tests.sh --changed --summary` and
+the full suite (`--jobs=auto --summary`).
 
-## Delegating
+## Keeping output small
 
-`tools/run_tests.sh` output is noisy (engine banners, game prints). From the parent, delegate to a Haiku
-subagent like `godot-debug` does and ask it to reply with only the summary line, every FAIL/TIMEOUT with
-its ✗ and `bundle:` lines, and any `Logged outside any test` lines.
+Add `--summary`: it prints only the failing tests (✗ lines, actor state, `bundle:`), any
+`Logged outside any test` lines and the totals, so there is nothing to trim or delegate. Every run ends
+with a `Slowest:` line (wall-clock ms) when a test is suspiciously slow. A hang with no output usually
+means the project was never imported (the wrapper does that on a fresh checkout) or a parse error.

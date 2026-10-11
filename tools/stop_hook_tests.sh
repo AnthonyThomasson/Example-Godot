@@ -22,12 +22,12 @@ state="${TMPDIR:-/tmp}/example_godot_tests_fingerprint"
 [[ -f "$state" && "$(cat "$state")" == "$fingerprint" ]] && exit 0
 echo "$fingerprint" > "$state"
 
-out=$(tools/run_tests.sh --changed 2>&1)
+out=$(tools/run_tests.sh --changed --summary --jobs=auto 2>&1)
 code=$?
 [[ $code -eq 0 ]] && exit 0
 
 {
-  echo "Game tests failed after your changes (tools/run_tests.sh --changed). Fix them or the tests:"
+  echo "Game tests failed after your changes (tools/run_tests.sh --changed --summary --jobs=auto). Fix them or the tests:"
   echo "$out" | grep -E '^(==|FAIL|TIMEOUT|        [✗·~]|        bundle:|        shot:|Logged outside|[0-9]+ passed)' 
   echo "See the test-debug skill; bundles hold the event log and final state."
 } >&2

@@ -12,8 +12,9 @@ and controller contract, EventBus and character signals) and never reaches into 
 ## Running tests
 
 - **CLI:** `tools/run_tests.sh [filter words] [--include-von]` runs
-  `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. It prints one
-  line per test (`PASS/FAIL/TIMEOUT/SKIPPED  <id>  (<sim s>)`, failed checks indented with ✗), then a
+  `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. A fresh checkout
+  (no `.godot/` class cache) is imported first, since without it every script fails to parse. It prints one
+  line per test (`PASS/FAIL/TIMEOUT/SKIPPED  <id>  (<sim s> sim, <ms> ms)`, failed checks indented with ✗), then a
   summary, and writes `report.json`. Exit code 1 means a test failed or timed out, or an
   error/warning was logged outside any test. Filter words are word prefixes over id, name, domain,
   description and tags (`ai` matches the ai domain, not "chair"). Manual sandboxes are always skipped.
@@ -31,13 +32,40 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **Quiet by default:** the game's own log of what happens (shots, punches, house seed, Von decisions, the
   `PERF …` numbers) goes through `GameLog.say` (General), which a batch run turns off; pass `--verbose` to
   see it (e.g. to read the `PERF` lines when re-baselining). Engine errors/warnings are never gated.
-- **Other flags:** `--domain=NAME` (only tests whose domain is exactly NAME; the filter words are word
-  prefixes, so `ai` also catches a test that mentions "aim"), `--list [words]` (id, von/manual flags, tags; runs nothing), `--repeat=N` (each test
-  N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every `house()` uses that seed), `--json` (one
-  `JSON: {…}` line with all results), and, in the wrapper only, `--changed` (runs `tests/<d>/` for each
-  `scenes/<d>/` or `tests/<d>/` with uncommitted changes). Options take the `--name=value` form.
+- **Selecting:** `--domain=NAME[,NAME]` (exact domain(s); the filter words are word prefixes, so `ai` also
+  catches a test that mentions "aim"), `--id=ID[,ID]` (exact ids), `--failed` (wrapper only: the tests
+  that FAILED / TIMED OUT in the previous run of this checkout, read from its merged report in `$TMPDIR`),
+  `--list [words]` (id, von/manual flags, tags; runs nothing). Domain/id selection is decided from the file
+  path, so unselected test scripts are never loaded.
+- **Speed:** `--jobs=N|auto` (wrapper only) splits the run over N parallel godot processes via the runner's
+  `--shard=I/N` (longest `timeout` first onto the lightest shard, so they finish together; Von tests all stay in shard 0), merges their output into one
+  combined total and one `--failed` report. `auto` = cores, at most 4. Not used with `--list`/`--self-test`
+  (the `_a`/`_b` restore pairs need one process in id order). Perf tests budget wall-clock ms about 4x
+  their baseline, so heavy CPU contention is the thing to suspect if one trips only under `--jobs`.
+  `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
+- **Output:** `--summary` prints only non-passing tests and the totals; every run reports wall-clock ms
+  per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` as before.
+- **Other flags:** `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
+  `house()` uses that seed), and, in the wrapper only, `--changed` (see below). Options take the
+  `--name=value` form.
+- **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
+  runs those domains plus the ones that compose them (its `affected()` table, from the architecture
+  dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art and general
+  run everything, and `scenes/testing/` / the Von stub add `--self-test`.
+- **Which command?**
+
+  | Situation | Command |
+  |---|---|
+  | One test | `tools/run_tests.sh --id=<domain>/<name>` |
+  | Just saw failures, fixed something | `tools/run_tests.sh --failed` |
+  | Finished an edit | `tools/run_tests.sh --changed --summary` |
+  | Before committing / big change | `tools/run_tests.sh --jobs=auto --summary` |
+  | Intermittent | `--id=<id> --repeat=10` (`--seed=N` pins the layout) |
+  | What exists? | `tools/run_tests.sh --list [words]` |
+  | Edited `scenes/testing/` | `tools/run_tests.sh --self-test` (`--changed` adds it) |
+
 - **`--self-test`:** runs the harness's own tests (`tests/_harness/`, `internal: true` in `describe()`;
-  hidden from the browser and normal runs): verdict rules, LogWatch really seeing engine logs, and the
+  hidden from the browser and normal runs): verdict rules, catalog selection and shard partitioning, LogWatch really seeing engine logs, and the
   statics / Von-stub restore pairs (`*_a` then `*_b`, run in id order). Run it after editing
   `scenes/testing/`. `--changed` does this automatically when `scenes/testing/` changed.
 - **`--shots`:** `tools/run_tests.sh --shots words` runs windowed (not headless) and saves
@@ -211,7 +239,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `test_switches.gd` | The switch table. |
 | (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test). |
 | `log_watch.gd` | The log tail. |
-| `test_catalog.gd` | `discover()`, `describe(path)` (descriptor dicts) and `matches(entry, text)`. |
+| `test_catalog.gd` | `discover(root, domains, ids)`, `describe(path)` (descriptor dicts), `matches(entry, text)`, and the CLI selection helpers `csv()` / `shard()`. |
 | `test_runner.gd` / `.tscn` | Interactive and batch modes, one `TestWorld` child per test, a lazily created `DecisionServerLauncher` kept for the session, real-time pacing for Von tests, the JSON report. |
 | `test_browser.gd` / `.tscn` | Hosts the UI browser window. Engine metas `test_selection` / `test_results` / `test_filter` survive the round trip through a test. |
 

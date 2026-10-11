@@ -45,17 +45,17 @@ the ticket and prints its own command port (use `gcmd.py --port`).
 Prefer the MCP so output can be read back:
 
 ```
-mcp__godot__run_project(projectPath="/Users/athomasson/Documents/projects.nosync/Example_Godot")
+mcp__godot__run_project(projectPath="<absolute path of this checkout: `pwd` at its root>")
 ```
 
 Or windowed from Bash (sandbox disabled), logging to a file:
 
 ```bash
-"$GODOT" --path . > /tmp/godot_run.log 2>&1 &
+"$GODOT" --path . > "$TMPDIR/godot_run.log" 2>&1 &
 ```
 
 Wait a few seconds and confirm the server is up: look for `[cmd] listening on 127.0.0.1:9080` in
-`get_debug_output`, or `grep listening /tmp/godot_run.log`. `get_debug_output` only sees a game the
+`get_debug_output`, or `grep listening "$TMPDIR/godot_run.log"`. `get_debug_output` only sees a game the
 MCP itself started, and is empty while the process is still initializing.
 
 The command server exists only in an **editor build** and only when
@@ -68,7 +68,7 @@ the control channel. Each line is a curated verb or, failing that, raw GDScript 
 the command-server node. Sandbox disabled.
 
 ```bash
-cd /Users/athomasson/Documents/projects.nosync/Example_Godot
+# from the checkout root; in a worktree add --port <the port tools/editor.sh printed>
 python3 tools/gcmd.py help                 # list the verbs
 python3 tools/gcmd.py pos                   # -> (440.0, 470.0)
 python3 tools/gcmd.py "tp 600 300"          # teleport the player
@@ -96,7 +96,7 @@ known contacts (hostile + why + visible + distance), the commitment timers, and 
 
 Each command replies on the socket (`ok`, a value, or `error: …`) **and** is echoed in the game's
 output as `[cmd] <line> -> <reply>`, alongside the gameplay lines it triggers (`Shot penetrated …`,
-`Punch (hand 0) hit …`). MCP launches: `get_debug_output`. Bash launches: `tail /tmp/godot_run.log`.
+`Punch (hand 0) hit …`). MCP launches: `get_debug_output`. Bash launches: `tail "$TMPDIR/godot_run.log"`.
 
 ## 4. Clean up
 

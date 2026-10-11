@@ -32,7 +32,7 @@ uncommitted. Local branch only: never push, force, or touch `main`'s checkout.
      resolve the same way, then `git reset` so they stay unstaged. Keep the stash entry until the
      tree is right; to bail out, `git stash apply <sha>` from `git stash list --format='%H %gs'`.
 6. **Verify.** If `main` added `class_name` scripts, run `godot --headless --path . --import`. Run
-   `tools/run_tests.sh --changed` (sandbox disabled) and fix failures the merge caused.
+   `tools/run_tests.sh --changed --summary` (sandbox disabled) and fix failures the merge caused.
 7. **Report.** Commits replayed onto which `origin/main` commit, each conflict and its resolution,
    files deleted in step 3 (with backup paths), the test result, the pre-rebase tip, and that the
    uncommitted changes are re-applied (or what remains in the stash). With an upstream, warn that

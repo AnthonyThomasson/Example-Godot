@@ -20,10 +20,16 @@ static var show_internal := false
 
 
 ## Every test under `root`, sorted by id (so grouped by domain). Harness self-tests (`internal: true`
-## in `describe()`) are left out unless `show_internal`.
-static func discover(root := ROOT) -> Array:
+## in `describe()`) are left out unless `show_internal`. `domains` / `ids` (when non-empty) keep only
+## tests of those domains / with those exact ids, decided from the path so the rest are never loaded.
+static func discover(root := ROOT, domains: Array = [], ids: Array = []) -> Array:
 	var out: Array = []
 	for path in _find(root):
+		var rel: String = path.trim_prefix(root + "/").trim_suffix(SUFFIX)
+		if not ids.is_empty() and not ids.has(rel):
+			continue
+		if not domains.is_empty() and not domains.has(rel.get_slice("/", 0) if "/" in rel else "general"):
+			continue
 		var entry := describe(path, root)
 		if show_internal or not entry["internal"]:
 			out.append(entry)
@@ -89,4 +95,49 @@ static func _find(dir_path: String) -> Array:
 		var f := file.trim_suffix(".remap")
 		if f.ends_with(SUFFIX):
 			out.append(dir_path + "/" + f)
+	return out
+
+
+## The non-empty items of a comma-separated list.
+static func csv(text: String) -> Array:
+	var out: Array = []
+	for item in text.split(",", false):
+		out.append(item.strip_edges())
+	return out
+
+
+## Shard `spec` ("I/N", I from 0) of `entries`. Every shard computes the same split: tests that need Von
+## all go to shard 0 (they are paced in real time and share one launcher); the rest, longest `timeout`
+## first, each go to the shard with the least timeout so far, so the shards finish at about the same time.
+static func shard(entries: Array, spec: String) -> Array:
+	var parts := spec.split("/")
+	var count := maxi(1, int(parts[1])) if parts.size() == 2 else 1
+	var index := clampi(int(parts[0]), 0, count - 1)
+	var load: Array = []
+	load.resize(count)
+	load.fill(0.0)
+	var rest: Array = []
+	for e in entries:
+		if e["requires_von"]:
+			load[0] += float(e.get("timeout", 1.0))
+		else:
+			rest.append(e)
+	var order := rest.duplicate()
+	order.sort_custom(func(a, b):
+		var ta := float(a.get("timeout", 1.0))
+		var tb := float(b.get("timeout", 1.0))
+		return a["id"] < b["id"] if ta == tb else ta > tb)  # ties by id: sort_custom is not stable
+	var mine: Array = []
+	for e in order:
+		var lightest := 0
+		for k in count:
+			if load[k] < load[lightest]:
+				lightest = k
+		load[lightest] += float(e.get("timeout", 1.0))
+		if lightest == index:
+			mine.append(e)
+	var out: Array = []
+	for e in entries:
+		if mine.has(e) or (e["requires_von"] and index == 0):
+			out.append(e)
 	return out

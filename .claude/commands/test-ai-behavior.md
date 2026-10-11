@@ -10,7 +10,7 @@ If `$ARGUMENTS` names a specific behaviour (e.g. "flanking", "hostility", "visio
 
 1. Resolve the Godot binary: `ls /Applications/Godot*.app/Contents/MacOS/Godot | head -1`
 2. Run a headless smoke test first (sandbox disabled). If it fails, stop and report the errors — do not proceed with a broken build.
-3. Launch the game with `mcp__godot__run_project` on project path `/Users/athomasson/Documents/projects.nosync/Example_Godot`. Wait for `[cmd] listening` to appear in `mcp__godot__get_debug_output` before continuing. Retry once if the launch hangs (empty output after ~10 s).
+3. Launch the game with `mcp__godot__run_project` on project path = the absolute path of this checkout (its root, `pwd`). Wait for `[cmd] listening` to appear in `mcp__godot__get_debug_output` before continuing. Retry once if the launch hangs (empty output after ~10 s).
 4. Send `python3 tools/gcmd.py help` (sandbox disabled) to confirm the command server is up.
 5. Note whether the Von decision server is running. If it is not (the log shows `[von] server not found` or the NPCs hold permanently), note this and continue — behaviours that don't need Von (hostility, vision, navigation, territory gating) are still testable; Von-dependent tests (decision quality, section 10) will be marked **"Von offline — skipped"**.
 
