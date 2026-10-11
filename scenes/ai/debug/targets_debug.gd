@@ -16,10 +16,12 @@ const OBJECT := Color(1.0, 0.85, 0.3)
 const WATCH := Color(0.8, 0.5, 1.0)
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_targets
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var c := _read("debug_combat")
 	if c.is_empty():

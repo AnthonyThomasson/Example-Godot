@@ -14,10 +14,12 @@ const OUTSIDE := Color(1.0, 0.5, 0.3)
 const HOLD := Color(0.4, 0.65, 1.0)
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_territory
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var rooms: Array = _controller.debug_room_zones() if _controller.has_method("debug_room_zones") else []
 	if rooms.is_empty():

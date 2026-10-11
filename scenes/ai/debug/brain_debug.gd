@@ -23,10 +23,12 @@ const MAX_BARS := 4
 const FORCE_SHOW := 4.0
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_brain
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var b := _read("debug_brain")
 	if b.is_empty():

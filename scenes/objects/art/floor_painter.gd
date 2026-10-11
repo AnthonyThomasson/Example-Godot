@@ -66,6 +66,7 @@ static func _on_line(v: float, period: float, px: float, half_width: float) -> f
 	return 1.0 if minf(m, period - m) <= half_width else 0.0
 
 
+## 1 when `local` lies on a grid line of either axis, else 0.
 static func _on_grid(local: Vector2, period: float, px: float, half_width: float) -> float:
 	return maxf(_on_line(local.x, period, px, half_width), _on_line(local.y, period, px, half_width))
 

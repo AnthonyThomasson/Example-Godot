@@ -46,7 +46,7 @@ func _on_back() -> void:
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 
-## Run all: start a headless run of every test in a fresh output dir and watch it from `_process`.
+## Run all: start a headless run of every test (Von tests included) in a fresh output dir and watch it from `_process`.
 func _on_run_all() -> void:
 	if _pid != -1:
 		return
@@ -55,7 +55,7 @@ func _on_run_all() -> void:
 	_pid = OS.create_process(OS.get_executable_path(), [
 		"--headless", "--path", ProjectSettings.globalize_path("res://"), "--fixed-fps", "60",
 		"--log-file", _out_dir.path_join("godot.log"),
-		"res://scenes/testing/test_runner.tscn", "--", "--run-tests", "--out=" + _out_dir])
+		"res://scenes/testing/test_runner.tscn", "--", "--run-tests", "--include-von", "--out=" + _out_dir])
 	if _pid == -1:
 		_window.set_run_status("Could not start the test run")
 		return

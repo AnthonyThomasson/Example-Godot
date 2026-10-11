@@ -311,6 +311,7 @@ func plain_events() -> Array:
 	return events.map(func(e): return { "topic": String(e["topic"]), "time": snappedf(e["time"], 0.01), "data": _plain(e["data"]) })
 
 
+## Formats a Vector2 as a rounded "(x, y)" string.
 static func _vec(v: Vector2) -> String:
 	return "(%.0f, %.0f)" % [v.x, v.y]
 

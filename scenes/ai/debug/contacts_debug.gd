@@ -16,10 +16,12 @@ const LOST := Color(0.75, 0.45, 1.0)
 const GHOST_RADIUS := 14.0
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_contacts
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	if not _controller.has_method("known_contacts_for_display"):
 		return

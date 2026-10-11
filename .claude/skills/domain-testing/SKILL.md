@@ -48,7 +48,8 @@ and controller contract, EventBus and character signals) and never reaches into 
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
   offers Rerun and Back/Escape. The in-game overlay toggle bar works on the test's NPCs.
   `-- --play <filter>` on the command line opens the first matching test straight in the runner.
-  The browser's **Run all** button spawns a separate headless run of the whole suite (its own
+  The browser's **Run all** button spawns a separate headless run of the whole suite, Von tests included
+  (`--include-von`; they skip if no server comes up) (its own
   `user://test_runs/<n>/` dir as above), shows elapsed time, then folds `report.json` into the marks and
   the status line (failure bundles are under that dir).
 

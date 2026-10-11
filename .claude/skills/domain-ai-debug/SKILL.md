@@ -1,11 +1,11 @@
 ---
 name: domain-ai-debug
-description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the four draw-only overlays on an NPC. The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), the tactics overlay (the candidate navigation zones it weighed), and the search overlay (room-coverage points a searcher is seeing / still to see). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, the tactical-zone overlay, or the search-coverage overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the draw-only overlays on an NPC: the four core ones plus eight behaviour overlays (contacts, hearing, combat, territory, targets, brain, routes, stuck). The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), the tactics overlay (the candidate navigation zones it weighed), and the search overlay (room-coverage points a searcher is seeing / still to see). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, the tactical-zone overlay, or the search-coverage overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Debug sub-domain (`scenes/ai/debug/`)
 
-Optional, draw-only overlays that visualize an NPC's brain. Both follow the "draw on their own child
+Optional, draw-only overlays that visualize an NPC's brain. They follow the "draw on their own child
 `Node2D`" convention, read only the sibling controller's / nav agent's PUBLIC API, sense nothing and
 feed nothing back — so they can never affect behaviour. They are added as children of the NPC in the
 preset scene (`character/npc.tscn`).

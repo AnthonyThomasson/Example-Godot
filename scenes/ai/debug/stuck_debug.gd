@@ -15,10 +15,12 @@ const STUCK_FULL := 3.0
 const RING_RADIUS := 20.0
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_stuck
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var p := _read("debug_progress")
 	if p.is_empty():

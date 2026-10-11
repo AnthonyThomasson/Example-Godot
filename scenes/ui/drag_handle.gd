@@ -18,6 +18,7 @@ func setup(handle: Control, target: Control) -> void:
 	handle.gui_input.connect(_on_gui_input)
 
 
+## Starts or ends a drag on left-button press or release.
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		_dragging = event.pressed
@@ -40,6 +41,7 @@ func _move(delta: Vector2) -> void:
 	_shift(fix)
 
 
+## Moves the target panel by `delta`.
 func _shift(delta: Vector2) -> void:
 	_target.offset_left += delta.x
 	_target.offset_right += delta.x

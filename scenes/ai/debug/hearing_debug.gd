@@ -17,10 +17,12 @@ const CALLOUT_OUT := Color(1.0, 0.55, 0.9)
 const SENT_SHOW := 6.0
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_hearing
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var mem := _read("debug_memory")
 	if mem.is_empty():

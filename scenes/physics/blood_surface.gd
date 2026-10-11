@@ -19,6 +19,7 @@ static func register(rect: Rect2, groove: Callable, porous: bool = false) -> int
 	return id
 
 
+## Removes a registered surface by the id `register` returned.
 static func unregister(id: int) -> void:
 	_surfaces.erase(id)
 

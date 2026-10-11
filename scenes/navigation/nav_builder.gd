@@ -122,20 +122,27 @@ static func _signed_area(ring: PackedVector2Array) -> float:
 ## live `global_transform` on every call, so it reflects where the furniture stands NOW — `rebake`
 ## and `nav_updater.gd` rely on that to re-carve holes as pieces are shoved around in play. A damaged
 ## piece has its primitive collider rebuilt into several deformed ConvexPolygonShape2D pieces, so EACH
-## of a body's collision shapes contributes a footprint — otherwise a dented piece's hole would vanish.
+## of a body's collision shapes contributes to its footprint — otherwise a dented piece's hole would
+## vanish. A body's footprint is the convex hull of those shapes: a dent's notches are far smaller than
+## the agent, and baked in they leave sub-pixel navmesh edges the NavigationServer cannot merge
+## ("navigation map synchronization error").
 static func furniture_holes(house: Node2D) -> Array:
 	var out: Array = []
 	for node in _descendants(house):
 		var body := node as RigidBody2D
 		if body == null or body.freeze:
 			continue
+		var points := PackedVector2Array()
 		for child in body.get_children():
 			var col := child as CollisionShape2D
 			if col == null or col.shape == null:
 				continue
-			var outline := _footprint_world(col)
-			if outline.size() >= 3:
-				out.append(outline)
+			points.append_array(_footprint_world(col))
+		var hull := Geometry2D.convex_hull(points)
+		if hull.size() > 1:
+			hull.remove_at(hull.size() - 1)  # convex_hull closes the ring by repeating the first point
+		if hull.size() >= 3:
+			out.append(hull)
 	return out
 
 
@@ -162,8 +169,13 @@ static func _on_grid(outlines: Array) -> Array:
 	for outline in outlines:
 		var snapped_outline := PackedVector2Array()
 		for p in outline:
-			snapped_outline.append(p.round())
-		out.append(snapped_outline)
+			var q: Vector2 = p.round()
+			if snapped_outline.is_empty() or snapped_outline[snapped_outline.size() - 1] != q:
+				snapped_outline.append(q)
+		if snapped_outline.size() > 1 and snapped_outline[0] == snapped_outline[snapped_outline.size() - 1]:
+			snapped_outline.remove_at(snapped_outline.size() - 1)
+		if snapped_outline.size() >= 3:
+			out.append(snapped_outline)
 	return out
 
 

@@ -22,7 +22,10 @@ collider is rebuilt into (`environment_object._rebuild_collider`), inflated by `
 outline, so paths route **around** furniture and reroute through another doorway when the near one is
 blocked (and a piece that seals the only route leaves the far side unreachable — the AI's cue to shove
 through). Handling every shape (not just the primitives) is what keeps a dented piece's hole from
-vanishing on a re-bake. The bake runs in the
+vanishing on a re-bake. A body's footprint is the **convex hull** of all its collider shapes: a dent's
+notches are far smaller than the agent, and baked in they leave sub-pixel navmesh edges the
+NavigationServer cannot merge ("navigation map synchronization error"). Overlapping footprints are
+then fused (`_union_outlines`) and every outline is snapped to the 1 px grid with repeated points dropped (`_on_grid`). The bake runs in the
 house's local frame and the region is offset by `house.position`, so the map lands in world space.
 `main.gd` calls it once after `WorldGen.generate`. `build` and every re-bake share one private
 `_bake_polygon` helper, so both carve furniture holes identically.

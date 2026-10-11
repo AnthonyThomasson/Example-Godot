@@ -74,6 +74,7 @@ static func matches(entry: Dictionary, text: String) -> bool:
 	return true
 
 
+## Test file paths under `dir_path`, found recursively.
 static func _find(dir_path: String) -> Array:
 	var out: Array = []
 	var dir := DirAccess.open(dir_path)

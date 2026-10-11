@@ -17,10 +17,12 @@ const COVER := Color(0.4, 0.65, 1.0)
 const DEST := Color(0.9, 0.9, 0.3)
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_combat
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var c := _read("debug_combat")
 	if c.is_empty():

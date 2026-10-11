@@ -26,10 +26,12 @@ var _cache_ms := 0
 var _cache_from := Vector2.ZERO
 
 
+## Whether this overlay's toggle is on.
 func _on() -> bool:
 	return show_routes
 
 
+## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
 	var map: RID = _character.get_world_2d().get_navigation_map()
 	var me := _character.global_position
