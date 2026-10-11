@@ -73,12 +73,16 @@ consumed by allied AIs.
   `frame_margin` (clamped by `min_zoom`/`max_zoom`), dropping any whose `is_dead` is true — used by
   the spectator match view.
   - **Zoom** (both modes): the `ZOOM_IN`/`ZOOM_OUT` actions (mouse wheel) scale the zoom by `zoom_step`
-    per notch (fractional for trackpads), clamped by `min_zoom`/`max_zoom` and eased in at
-    `follow_speed`. Read in `_unhandled_input`, so scrolling UI gets the wheel first.
+    per notch (fractional for trackpads). The scale (`_zoom_bias`) is lasting and multiplies the
+    automatic zoom (`_base_zoom`: 1 when following, the clamped fit when framing), so it works the same
+    in both modes, can go beyond the fit's `min_zoom`/`max_zoom`, and is limited only by
+    `wheel_min_zoom`/`wheel_max_zoom`. The zoom eases at `follow_speed`. Read in `_unhandled_input`, so
+    scrolling UI gets the wheel first.
   - **Hand control** (framing mode only): the camera keys or the mouse within `edge_pan_margin` px of
-    a screen edge pan the camera at `pan_speed` (screen px/s, so zoom-independent). Any camera input —
-    pan or wheel — sets `_manual`, which suspends the automatic framing (position and zoom); after
-    `manual_hold` (5) seconds without input `_manual` clears and the framing eases back in. Edge
+    a screen edge pan the camera at `pan_speed` (screen px/s, so zoom-independent). Panning
+    sets `_manual`, which suspends the automatic framing position (the zoom keeps auto-fitting, scaled
+    by the wheel); after `manual_hold` (5) seconds without panning `_manual` clears and the framing
+    eases back in. Edge
     panning only runs while the pointer has been seen moving over the window (`_mouse_in_window`,
     cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
     never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the

@@ -1,7 +1,7 @@
 extends GameTest
 
 ## The mouse wheel zooms a following camera: in on wheel-up, out on wheel-down, never past its
-## min_zoom / max_zoom.
+## wheel_min_zoom / wheel_max_zoom.
 
 const CameraController = preload("res://scenes/general/camera_controller.gd")
 
@@ -39,12 +39,12 @@ func run(t: TestContext) -> void:
 	for i in 60:
 		_wheel(MOUSE_BUTTON_WHEEL_DOWN)
 	await t.seconds(2.0)
-	t.expect_near(cam.zoom.x, cam.min_zoom, 0.02, "zoom stops at min_zoom")
+	t.expect_near(cam.zoom.x, cam.wheel_min_zoom, 0.02, "zoom stops at wheel_min_zoom")
 
 	for i in 120:
 		_wheel(MOUSE_BUTTON_WHEEL_UP)
 	await t.seconds(2.0)
-	t.expect_near(cam.zoom.x, cam.max_zoom, 0.02, "zoom stops at max_zoom")
+	t.expect_near(cam.zoom.x, cam.wheel_max_zoom, 0.02, "zoom stops at wheel_max_zoom")
 
 
 ## One wheel notch, as the OS delivers it.

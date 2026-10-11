@@ -1,9 +1,10 @@
 extends Camera2D
 
 ## Camera behavior: centers on player, but leads toward the mouse when it approaches screen edges.
-## The mouse wheel zooms. In framing mode (the spectator view) the viewer can also take the camera
-## by hand — pan with the camera keys or by pushing the mouse to a screen edge — and after
-## `manual_hold` seconds without camera input the automatic framing eases back in.
+## The mouse wheel zooms, in either mode, as a lasting scale on the automatic zoom. In framing mode
+## (the spectator view) the viewer can also take the camera by hand — pan with the camera keys or by
+## pushing the mouse to a screen edge — and after `manual_hold` seconds without panning the
+## automatic framing eases back in.
 ## This file owns all camera tuning and follows the input pattern.
 
 ## Higher = slower, smoother follow (the camera lerps by 1/follow_speed each frame).
@@ -20,15 +21,17 @@ var _player: Node2D  ## The resolved target node.
 ## Framing group: extra world-space padding kept around the framed combatants so they aren't flush
 ## to the screen edge.
 @export var frame_margin: float = 160.0
-## Clamp for every zoom, the fit-to-combatants framing and the mouse wheel alike (Camera2D zoom:
-## larger = more zoomed in).
-@export var min_zoom: float = 0.4   ## Most zoomed-out the camera is allowed to get.
-@export var max_zoom: float = 2.0   ## Most zoomed-in the camera is allowed to get.
+## Clamp for the fit-to-combatants zoom (Camera2D zoom: larger = more zoomed in).
+@export var min_zoom: float = 0.4   ## Most zoomed-out the framing is allowed to get.
+@export var max_zoom: float = 2.0   ## Most zoomed-in the framing is allowed to get.
 var _frame_mode: bool = false       ## When on, frames `_frame_targets` instead of following `_player`.
 var _frame_targets: Array[Node2D] = []  ## The nodes to keep framed (the match combatants).
 
 ## Each wheel notch scales the zoom by this factor (> 1; larger = bigger steps).
 @export var zoom_step: float = 1.1
+## Limits on the zoom the wheel can reach, whatever the automatic zoom is.
+@export var wheel_min_zoom: float = 0.25  ## Most zoomed-out.
+@export var wheel_max_zoom: float = 4.0   ## Most zoomed-in.
 ## Whether the viewer may pan a framing camera by hand. Off where WASD already drives a character.
 @export var pan_enabled: bool = true
 ## Hand-pan speed, in screen pixels per second (so it feels the same at any zoom).
@@ -37,15 +40,15 @@ var _frame_targets: Array[Node2D] = []  ## The nodes to keep framed (the match c
 @export var edge_pan_margin: float = 24.0
 ## Seconds without camera input before a hand-steered framing camera returns to automatic framing.
 @export var manual_hold: float = 5.0
-var _manual: bool = false        ## Framing mode only: the viewer has taken over position and zoom.
-var _idle: float = 0.0           ## Seconds since the last camera input while `_manual`.
-var _zoom_level: float = 1.0     ## The zoom the camera eases toward whenever it isn't auto-fitting.
+var _manual: bool = false        ## Framing mode only: the viewer has taken over the position.
+var _idle: float = 0.0           ## Seconds since the last pan while `_manual`.
+var _base_zoom: float = 1.0      ## The automatic zoom the wheel scales: 1 when following, the fit when framing.
+var _zoom_bias: float = 1.0      ## The wheel's lasting scale on `_base_zoom`.
 var _mouse_pos := Vector2.ZERO   ## Last mouse position seen over the window.
 var _mouse_in_window: bool = false  ## Edge panning needs a live pointer: not yet seen, or left, = off.
 
 
 func _ready() -> void:
-	_zoom_level = zoom.x
 	_player = get_node_or_null(target_path)
 	if not _player:
 		push_warning("Camera: could not find target node at %s" % target_path)
@@ -64,8 +67,8 @@ func _input(event: InputEvent) -> void:
 		_mouse_in_window = true
 
 
-## The mouse wheel (or whatever ZOOM_IN / ZOOM_OUT are bound to) zooms in either mode; UI that
-## scrolls with the wheel gets it first.
+## The mouse wheel (or whatever ZOOM_IN / ZOOM_OUT are bound to) scales the zoom in either mode and
+## the scale stays; UI that scrolls with the wheel gets it first.
 func _unhandled_input(event: InputEvent) -> void:
 	var direction := 0.0
 	if event.is_action_pressed(Keybinds.ZOOM_IN):
@@ -78,22 +81,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	var notches := 1.0
 	if event is InputEventMouseButton and event.factor > 0.0:
 		notches = event.factor
-	_take_over()
-	_zoom_level = clampf(_zoom_level * pow(zoom_step, direction * notches), min_zoom, max_zoom)
+	_zoom_bias = clampf(_zoom_bias * pow(zoom_step, direction * notches),
+			wheel_min_zoom / _base_zoom, wheel_max_zoom / _base_zoom)
 
 
 func _process(delta: float) -> void:
 	if _frame_mode:
 		_steer_by_hand(delta)
-		if not _manual:
-			_frame_combatants()
-			return
+		_frame_combatants()
 	elif _player:
 		var target_pos := _calculate_target_position()
 		global_position = global_position.lerp(target_pos, 1.0 / follow_speed)
-	else:
-		return
-	zoom = zoom.lerp(Vector2(_zoom_level, _zoom_level), 1.0 / follow_speed)
+		_ease_zoom()
 
 
 ## Switch to framing mode: ease to keep every live node in `targets` on screen (used by the
@@ -120,15 +119,17 @@ func _steer_by_hand(delta: float) -> void:
 			_manual = false
 
 
-## Framing mode: the viewer just used the camera. Freeze the automatic framing where it is and
-## restart the idle clock. (Following has no manual state — the wheel only moves `_zoom_level`.)
+## Framing mode: the viewer just panned. Freeze the automatic position where it is and restart the
+## idle clock.
 func _take_over() -> void:
-	if not _frame_mode:
-		return
 	_idle = 0.0
-	if not _manual:
-		_manual = true
-		_zoom_level = zoom.x
+	_manual = true
+
+
+## Ease the zoom toward the automatic zoom scaled by the wheel.
+func _ease_zoom() -> void:
+	var z := clampf(_base_zoom * _zoom_bias, wheel_min_zoom, wheel_max_zoom)
+	zoom = zoom.lerp(Vector2(z, z), 1.0 / follow_speed)
 
 
 ## Pan direction from the mouse pushing against a screen edge: each axis -1, 0 or 1.
@@ -141,8 +142,9 @@ func _edge_pan() -> Vector2:
 		float(_mouse_pos.y >= size.y - edge_pan_margin) - float(_mouse_pos.y <= edge_pan_margin))
 
 
-## Centre on the midpoint of the live framed targets and zoom to fit them plus `frame_margin`. A
-## downed combatant drops out of the framing; once all are down it holds on the last positions.
+## Centre on the midpoint of the live framed targets (unless the viewer holds the position) and zoom
+## to fit them plus `frame_margin`. A downed combatant drops out of the framing; once all are down it
+## holds on the last positions.
 func _frame_combatants() -> void:
 	var live: Array[Node2D] = []
 	for t in _frame_targets:
@@ -158,11 +160,12 @@ func _frame_combatants() -> void:
 	for t in live:
 		box = box.expand(t.global_position)
 	box = box.grow(frame_margin)
-	global_position = global_position.lerp(box.get_center(), 1.0 / follow_speed)
+	if not _manual:
+		global_position = global_position.lerp(box.get_center(), 1.0 / follow_speed)
 	var vp := get_viewport_rect().size
 	var fit := minf(vp.x / maxf(box.size.x, 1.0), vp.y / maxf(box.size.y, 1.0))
-	var z := clampf(fit, min_zoom, max_zoom)
-	zoom = zoom.lerp(Vector2(z, z), 1.0 / follow_speed)
+	_base_zoom = clampf(fit, min_zoom, max_zoom)
+	_ease_zoom()
 
 
 ## The point the camera eases toward: the target, offset toward the mouse as it nears a
