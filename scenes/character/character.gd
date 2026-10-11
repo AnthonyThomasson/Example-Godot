@@ -76,6 +76,8 @@ var _interaction: Node  ## The CharacterInteraction child, built in _ready().
 
 
 func _ready() -> void:
+	# Top-down: no floor/ceiling, so a moving body it touches is never ridden as a platform.
+	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	# Build the body's collision circle to match `radius`.
 	var circle := CircleShape2D.new()
 	circle.radius = radius
@@ -136,7 +138,7 @@ func _physics_process(delta: float) -> void:
 	velocity = move_input * speed * _push_slow + _knockback
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
-	_push_slow = _apply_pushes()
+	_push_slow = _ease_push_slow(_apply_pushes(), delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
 	pose.update(delta, facing, get_real_velocity(), speed, _aiming_hands())
 
@@ -411,13 +413,28 @@ func _apply_pushes() -> float:
 		if collider == null or not collider.has_method("apply_impulse"):
 			continue
 		# The normal points back toward the character, so "into the object" is -normal.
-		collider.apply_impulse(-collision.get_normal() * CharacterConfig.push_impulse * input_strength)
+		var dir := -collision.get_normal()
+		var impulse := CharacterConfig.push_impulse * input_strength * get_physics_process_delta_time()
+		# Carry the object along rather than launch it: never drive it faster than we walk.
+		if collider.has_method("get_mass") and "linear_velocity" in collider:
+			var along: float = collider.linear_velocity.dot(dir)
+			var gap := maxf(move_input.dot(dir) * speed * CharacterConfig.push_carry_factor - along, 0.0)
+			impulse = minf(impulse, gap * collider.get_mass())
+		collider.apply_impulse(dir * impulse)
 		if collider.has_method("get_mass"):
 			heaviest = maxf(heaviest, collider.get_mass())
 
 	if heaviest <= 0.0:
 		return 1.0
 	return clampf(1.0 - heaviest * CharacterConfig.push_slow_per_weight, CharacterConfig.push_slow_min, 1.0)
+
+
+## Slow down at once on contact, but recover toward full speed gradually so losing contact for a
+## frame doesn't snap the speed back.
+func _ease_push_slow(target: float, delta: float) -> float:
+	if target <= _push_slow:
+		return target
+	return minf(target, _push_slow + CharacterConfig.push_slow_release * delta)
 
 
 ## First child that can drive this character (has a `control` method).

@@ -147,6 +147,15 @@ Ordering: a parent's `_physics_process` runs before its children's, so the hands
 character's fresh `facing`, and the character pulls its controller's intent at the top of its own
 `_physics_process` (lag-free).
 
+## Walking into furniture
+
+`_apply_pushes()` shoves each pushable the body slid into with `push_impulse` per *second* of contact
+(× `delta`), capped so the object is carried at no more than `speed × push_carry_factor` along the
+push (it is never launched ahead of the walker; the cap uses the walker's intent along the contact normal).
+The body runs in `MOTION_MODE_FLOATING` (top-down: no floor), otherwise a body it walks "down" into would be ridden as a platform and lend the character its launch velocity. The resulting slow-down (`push_slow_per_weight`,
+floored by `push_slow_min`) applies at once but eases back at `push_slow_release`/s, so a lost-contact
+frame doesn't snap speed. Test: `tests/character/walk_into_furniture_speed_test.gd`.
+
 ## Facing & hands
 
 - **Facing:** `character.gd` points `facing` from itself to `aim_point` (the mouse, set by the

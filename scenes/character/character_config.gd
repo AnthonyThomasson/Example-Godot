@@ -9,14 +9,20 @@ class_name CharacterConfig
 ## uses, divided by the object's mass. Pushing also slows the character (heavier =
 ## slower), and a fast object sliding into the character shoves them back.
 
-## Base impulse the character imparts to an object per physics frame of contact, scaled
-## by how hard the character is moving into it (input strength 0–1).
-static var push_impulse: float = 900.0
+## Base impulse per second of contact the character imparts to an object, scaled by how
+## hard the character is moving into it (input strength 0–1). Frame-rate independent.
+static var push_impulse: float = 54000.0
 ## How much each unit of the pushed object's `mass` reduces the character's speed while
 ## pushing (speed_mult = 1 − heaviest_mass × this, floored by `push_slow_min`).
 static var push_slow_per_weight: float = 0.02
 ## Floor on the character's speed multiplier while pushing.
 static var push_slow_min: float = 0.15
+## Fraction of the character's walk speed an object it pushes may be driven up to (1 = it is
+## carried at walking pace, never launched ahead of the character).
+static var push_carry_factor: float = 1.0
+## How fast (multiplier units per second) the push slow-down eases back to full speed once
+## contact is lost, so a one-frame gap doesn't snap the character's speed.
+static var push_slow_release: float = 3.0
 ## The character's mass for *incoming* knockback: an object sliding into the character
 ## shoves them by impulse / this. Higher = the character shrugs off hits unless struck hard.
 static var player_mass: float = 40.0
