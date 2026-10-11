@@ -1,30 +1,75 @@
 class_name BloodConfig
 
-## Tuning for the blood pooling system (scenes/physics/blood_*.gd): the pool of blood a flesh
-## hit leaves, oozing out gradually and packing next to itself. A `class_name` holder of
-## `static var`s — read as `BloodConfig.<name>`; there is no instance and no autoload.
+## Tuning for the blood system (scenes/physics/blood_*.gd). A `class_name` holder of `static var`s —
+## read as `BloodConfig.<name>`; there is no instance and no autoload.
 ##
-## Blood pooling is its own physical reaction, kept separate from the debris and deformation
-## knobs in PhysicsConfig. A wounded body bleeds into one accumulating pool: each hit adds
-## `particle_count` drops (released steadily at a rate set by `spill_duration`) and widens the fill
-## disc from `pool_radius_base` toward `pool_radius_max`, so a still victim shot repeatedly pools out
-## wide while a lone wound stays small. Total volume per pool is capped at `max_pool_volume`. A body
-## that moves off its pool (farther than its radius + `detection_margin`) starts a fresh one, so it
-## trails blood. Drops creep out from the wound, slide around walls and furniture, and settle there.
-## A dead body also bleeds out one slow, wide pool (`bleed_out_*`) from where it came to rest.
+## Blood is its own physical reaction, kept separate from the debris and deformation knobs in
+## PhysicsConfig. A wounded body (BloodWound) throws a quick spray of splatters when it is hit, then keeps
+## dripping: one drop every `drip_interval_min`..`drip_interval_max` seconds while the wound lasts, each
+## landing as a BloodSplat. A dead body also bleeds out one slow, wide pool (`bleed_out_*`) from where it
+## came to rest.
 
-## Master switch for blood: off = hits leave no wound pool and dead bodies no bleed-out
-## (Physics.spawn_blood / bleed_out spawn nothing).
+## Master switch for blood: off = hits leave no splatter or drips and dead bodies no bleed-out
+## (BloodWound.record / Physics.bleed_out spawn nothing).
 static var enabled: bool = true
-## Drops one hit adds. Also the density reference: `pool_radius_base` holds about this many drops, and
-## the disc widens only for volume beyond the first hit, so a single wound stays a small solid pool.
-static var particle_count: int = 36
-## Cap on the drops one body's pool may hold, bounding how much blood a single character can pool at
-## once. Reached after about `max_pool_volume / particle_count` hits on a still victim.
-static var max_pool_volume: int = 210
-## Seconds one hit's worth of drops takes to emerge. Sets the steady release rate
-## (particle_count / spill_duration drops per second); lower = blood appears faster.
-static var spill_duration: float = 72.0
+
+## --- Wound: the drip budget and timing ---
+## Seconds between one drip and the next, re-rolled uniformly in [min, max] after every drip (and for the
+## first drip after a hit).
+static var drip_interval_min: float = 3.0
+static var drip_interval_max: float = 10.0
+## Drips a hit adds to the wound's budget per point of damage (rounded up, at least 1). The wound keeps
+## dripping until the budget is spent, so a harder hit bleeds for longer.
+static var drips_per_damage: float = 0.2
+## Cap on the drips a wound may owe at once (repeated hits stop adding past it).
+static var max_pending_drips: int = 12
+## Seconds a drip falls before it lands: it keeps the body's walking velocity meanwhile, so a moving
+## body's drops land ahead of where they left it.
+static var drip_fall_time: float = 0.18
+## Random offset (px) added to where a drip lands.
+static var drip_jitter: float = 3.0
+## Body speed (px/s) at which a drip lands with full energy (a fully stretched, forward-flung splat).
+static var drip_full_energy_speed: float = 120.0
+
+## --- Hit spray ---
+## Damage per spray splatter a hit throws (rounded up, at least 1), and the most one hit throws.
+static var hit_splat_damage: float = 8.0
+static var hit_splat_max: int = 5
+## How far (px) from the wound a spray splatter lands, in [min, max], along the wound's exit side
+## (the surface normal) with a random spread of `hit_spray_spread` radians either side.
+static var hit_spray_reach_min: float = 10.0
+static var hit_spray_reach_max: float = 48.0
+static var hit_spray_spread: float = 0.6
+## Energy (0..1) of a spray splatter: how stretched along its flight and how far its satellites scatter.
+static var hit_spray_energy: float = 0.8
+
+## --- Splatter shape (BloodSplat) ---
+## Core blob radius (px) of a drip, in [min, max]; spray splatters are scaled by `hit_splat_size`.
+static var drip_size_min: float = 2.5
+static var drip_size_max: float = 4.5
+static var hit_splat_size: float = 0.7
+## Crown spikes radiating from the core, and the satellite droplets scattered around it, in [min, max].
+static var splat_spikes_min: int = 4
+static var splat_spikes_max: int = 10
+static var splat_satellites_min: int = 4
+static var splat_satellites_max: int = 12
+## How far a splatter stretches along its direction at full energy (core length = radius * (1 + this)).
+static var splat_stretch: float = 0.9
+## How lumpy the core outline is (1 +- this per vertex). 0 = a clean disc.
+static var splat_wobble: float = 0.22
+## Spike length, in core radii, in [min, max]; and how far satellites land, in core radii.
+static var splat_spike_length_min: float = 0.4
+static var splat_spike_length_max: float = 1.6
+static var splat_satellite_reach_min: float = 1.4
+static var splat_satellite_reach_max: float = 3.4
+## Seconds a splatter takes to dry from `color` to `dried_color`.
+static var splat_dry_time: float = 90.0
+## Wet highlight painted on the core (a lighter fleck); alpha 0 hides it.
+static var splat_highlight: Color = Color(0.75, 0.12, 0.12, 0.45)
+## Cap on the splatters one body keeps in the world; the oldest are freed past it.
+static var max_splats_per_body: int = 60
+
+## --- Death bleed-out ---
 ## A body bleeding out where it came to rest after death (Physics.bleed_out): how many grid cells
 ## its flowing pool claims (area = cells * flow_cell_size²) and the seconds its edge takes to sweep
 ## out across them.
@@ -54,44 +99,10 @@ static var porous_resist: float = 3.0
 static var groove_half_width: float = 2.0
 ## Brightness drop of rim cells vs. the deep centre (0 none .. 1 black).
 static var flow_edge_darken: float = 0.25
-## Radius (px) a single wound's pool fills — the small "immediate surroundings" puddle.
-static var pool_radius_base: float = 13.0
-## Radius (px) a pool grows to at most, reached when a body is bled repeatedly in one spot.
-static var pool_radius_max: float = 90.0
-## Extra reach (px) beyond a pool's own radius within which a fresh hit still counts as landing on it
-## (and so grows it). Larger = a body can drift further while bleeding and keep one growing pool.
-static var detection_margin: float = 12.0
-## Extra fill radius (px) per drop of accumulated volume above the first hit. Higher = the pool pools
-## out to its max in fewer hits.
-static var spread_per_volume: float = 0.5
-## Random multiplier applied to each drop's target distance so the packing ring is uneven and
-## the edge reads as organic rather than a perfect circle. Each drop draws from [min, max].
-static var target_jitter_min: float = 0.85
-static var target_jitter_max: float = 1.05
-## Speed range (px/s) at which a released drop creeps from the wound to its spot in the pool.
-static var speed_min: float = 50.0
-static var speed_max: float = 90.0
-## How far each drop's outward direction leans toward the shot direction, from none (0) to
-## fully along the shot (1), so the puddle skews to the exit side of the wound.
-static var directional_bias: float = 0.25
-## Drawn blob radius (px): a drop grows from min toward max as it reaches its spot, so the
-## pool reads as spreading blood rather than scattered dots. Max should exceed the packing
-## spacing (≈ pool_radius_base / sqrt(particle_count)) so neighboring blobs merge into one puddle;
-## the count scales with area as a pool spreads, so the spacing stays about constant.
-static var drop_radius_min: float = 3.0
-static var drop_radius_max: float = 6.5
-## Radius (px) of the collision probe each drop sweeps to slide around obstacles. Small, so
-## blood creeps right up to a surface before hugging it.
-static var query_radius: float = 2.0
-## How lumpy each pool's outline is: the fill radius is warped by a per-pool random ring of radius
-## multipliers spanning 1 ± this, so no two pools share a silhouette. 0 = a clean disc; higher =
-## more pronounced bulges and pinches.
-static var edge_irregularity: float = 0.5
-## How far each drawn blob's radius varies per vertex (1 ± this), so blobs read as organic splats
-## rather than circles. 0 = plain circles.
-static var blob_wobble: float = 0.35
-## Base pool color — dark red, semi-transparent, distinct from the debris "blood" chip tint
+## Base blood color — dark red, semi-transparent, distinct from the debris "blood" chip tint
 ## so the two systems stay visually independent.
 static var color: Color = Color(0.42, 0.02, 0.03, 0.85)
-## Draw order: negative so pools sit under the player and furniture (like spent casings).
+## What blood dries to (see `splat_dry_time`).
+static var dried_color: Color = Color(0.24, 0.04, 0.03, 0.85)
+## Draw order: negative so blood sits under the player and furniture (like spent casings).
 static var z_index: int = -2

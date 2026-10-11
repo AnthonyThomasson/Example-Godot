@@ -63,7 +63,7 @@ func run(t: TestContext) -> void:
 
 	await t.seconds(8.0)  # let projectiles, casings and chips drain
 	var grown := Perf.nodes() - nodes_before
-	print("PERF barrage node growth after drain %d (Despawner tracks %d)" % [grown, Despawner.count()])
+	GameLog.say("PERF barrage node growth after drain %d (Despawner tracks %d)" % [grown, Despawner.count()])
 	t.trace("node growth after drain", grown)
 	t.check(grown <= NODE_GROWTH_AFTER_DRAIN, "node growth after the barrage drains: %d, budget %d" % [grown, NODE_GROWTH_AFTER_DRAIN])
 	t.check(Despawner.count() <= Despawner.max_scene_objects, "the Despawner cap still holds (%d tracked)" % Despawner.count())

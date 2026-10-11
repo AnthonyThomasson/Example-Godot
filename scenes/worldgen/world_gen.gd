@@ -15,7 +15,7 @@ static func generate(rng_seed: int, force_plan: String, front_entrance_world: Ve
 	var all_plans: Array = HouseDefinitions.get_all()
 	var pick: String = all_plans[rng.randi() % all_plans.size()]
 	var plan_key: String = force_plan if force_plan != "" else pick
-	print("House: ", plan_key, "  seed: ", rng.seed)
+	GameLog.say("House: %s  seed: %s" % [plan_key, rng.seed])
 	return HouseSpawner.spawn(plan_key, front_entrance_world, rng, parent)
 
 

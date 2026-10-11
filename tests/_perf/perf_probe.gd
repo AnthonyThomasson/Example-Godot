@@ -50,7 +50,7 @@ static func nodes() -> int:
 ## Record `value` as the measurement `label` (printed as `PERF label value`, traced, kept in the failure
 ## bundle) and check it stays within `limit`. Returns whether it did.
 static func within(t: TestContext, label: String, value: float, limit: float) -> bool:
-	print("PERF %s %.2f (budget %.2f)" % [label, value, limit])
+	GameLog.say("PERF %s %.2f (budget %.2f)" % [label, value, limit])
 	t.trace(label, value)
 	return t.check(value <= limit, "%s: %.2f is over its budget of %.2f" % [label, value, limit])
 

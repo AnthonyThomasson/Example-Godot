@@ -198,9 +198,9 @@ func _launch_and_await_ready() -> void:
 func _announce_ready() -> void:
 	var secs: float = (Time.get_ticks_msec() - _start_ms) / 1000.0
 	if _pid > 0:
-		print("[von] Decision server live on port %d, %.1fs after scene load (pid %d)." % [port, secs, _pid])
+		GameLog.say("[von] Decision server live on port %d, %.1fs after scene load (pid %d)." % [port, secs, _pid])
 	else:
-		print("[von] Reusing the decision server already running on port %d." % port)
+		GameLog.say("[von] Reusing the decision server already running on port %d." % port)
 	_resolve(true)
 
 
@@ -214,7 +214,7 @@ func _end_probing() -> void:
 ## Start `von serve` with its output piped back to us, and a thread to read it.
 func _launch() -> void:
 	if von_path.is_empty():
-		print("[von] No server on port %d and von_path is empty — set it on DecisionServerLauncher to auto-start Von." % port)
+		GameLog.say("[von] No server on port %d and von_path is empty — set it on DecisionServerLauncher to auto-start Von." % port)
 		return
 	# `exec` makes the shell become the server, so the pid we kill is the server itself.
 	var command := "exec '%s' serve --host 127.0.0.1 --port %d --device %s 2>&1" % [von_path, port, device]
@@ -226,7 +226,7 @@ func _launch() -> void:
 	_pipe = process["stdio"]
 	_reader = Thread.new()
 	_reader.start(_read_output)
-	print("[von] Started decision server (pid %d); log: %s" % [_pid, ProjectSettings.globalize_path(LOG_PATH)])
+	GameLog.say("[von] Started decision server (pid %d); log: %s" % [_pid, ProjectSettings.globalize_path(LOG_PATH)])
 
 
 ## Reader thread: copy each server line into the log file (and Output) until the pipe closes.
@@ -244,7 +244,7 @@ func _read_output() -> void:
 			log_file.store_line(line)
 			log_file.flush()
 		if echo_to_output:
-			print("[von] ", line)
+			GameLog.say("[von] " + line)
 
 
 ## Stop the server we launched (never a reused one) and wait for the reader thread to see the

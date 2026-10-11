@@ -207,7 +207,7 @@ func _report_hits() -> void:
 		if pushed:
 			body.apply_impulse(impulse)
 		var damage := CharacterConfig.punch_damage * motion
-		print("Punch (hand %d) hit %s for %.1f damage, push %.0f (%s, %.0f%% swing)" % [
+		GameLog.say("Punch (hand %d) hit %s for %.1f damage, push %.0f (%s, %.0f%% swing)" % [
 			_active_hand, body.name, damage, impulse.length(),
 			"pushable" if pushed else "fixed", motion * 100.0])
 		punched.emit(_active_hand, body, damage)

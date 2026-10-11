@@ -656,7 +656,7 @@ func _check_salient() -> void:
 ## (a combat or investigation decision) over the radio.
 func _on_decided(leaf: Dictionary) -> void:
 	_behavior.set_leaf(leaf)
-	print("%s (Von) %s  [%s]" % [_npc_name(), " - ".join(leaf["labels"]), _planner.walk_digest()])
+	GameLog.say("%s (Von) %s  [%s]" % [_npc_name(), " - ".join(leaf["labels"]), _planner.walk_digest()])
 	if send_callouts and _character != null and not leaf["path"].is_empty() \
 			and str(leaf["path"][0]) in ["combat", "investigate"]:
 		_post_callout(leaf)

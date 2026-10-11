@@ -121,7 +121,7 @@ func _fail(reason: String) -> void:
 	if reason == _last_error:
 		return
 	_last_error = reason
-	print("%s (Von) %s — holding steady" % [_npc_name, reason])
+	GameLog.say("%s (Von) %s — holding steady" % [_npc_name, reason])
 
 
 ## The server's own explanation for a non-200 (`{ "detail": … }`), so a configuration fault is

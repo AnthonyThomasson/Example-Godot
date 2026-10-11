@@ -87,7 +87,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage,
    speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then hands
    the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
-   (interface 4), the character spawns blood instead (`Physics.spawn_blood`, interface 4). The
+   (interface 4), the character bleeds instead (its `BloodWound` component, interface 4). The
    projectile is the only striker that uses this; a melee punch shoves through the "pushable"
    contract below and does **not** deform.
 
@@ -101,13 +101,15 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 optional for a caller drawing them over later layers with `draw_marks` — so pixel art is drawn
 	 through the dented silhouette).
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
-	 and `Physics.spawn_blood(...)` (character, on a hit), `Physics.bleed_out(parent, source, exclude)`
+	 `BloodWound` (Node child, character: `record(hit)` on a hit throws a splatter spray and owes drips, one
+	 `BloodSplat` every `BloodConfig.drip_interval_min..max` s from the body's blood origin; `stop()` on death)
+	 and `Physics.bleed_out(parent, source, exclude)`
 	 (a dead character, once its body comes to rest: one slow, wide pool). A blood source may expose
 	 `blood_origin() -> Vector2` (where its blood leaves it, in world space); pools emerge there instead
 	 of at its position, so a fallen body bleeds from where it lies. Master switches:
-	 `BloodConfig.enabled` off → `spawn_blood` / `bleed_out` spawn nothing and return null;
-	 `PhysicsConfig.debris_enabled` off → `spawn_debris` spawns nothing. Blood pools are added with
-	 readable names (`BloodPool`, `BloodPool2`, …).
+	 `BloodConfig.enabled` off → `BloodWound.record` / `bleed_out` spawn nothing (`bleed_out` returns null);
+	 `PhysicsConfig.debris_enabled` off → `spawn_debris` spawns nothing. Splatters and bleed-out
+	 pools are added with readable names (`BloodSplat`, `BloodSplat2`, … / `BloodPool`, …).
    - `BloodSurface` (static registry): `register(rect, groove: Callable(world, half_width) -> 0..1, porous) -> id` /
 	 `unregister(id)` — Objects' `Floor` registers its room so a bleed-out flow runs along grout/seams
 	 (`resistance(pos)` is read only by Physics' `BloodFlow`; `BloodConfig.surface_flow` off ignores floors).
@@ -262,6 +264,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
       `back_requested`. It takes plain dicts and knows nothing of `Keybinds`/`Settings`; Main opens it from the
       setup window's `settings_requested`, applies each signal to `Settings` and redraws with `set_rows`.
 
+15. **Any domain → General (`GameLog`)** — `GameLog.say(message)` (`general/game_log.gd`, a `class_name` static
+    holder) is how every domain prints its "what is happening" log (shots, punches, house seed, Von decisions,
+    perf numbers). `GameLog.enabled` is true in the game; the batch test runner sets it from `--verbose`, so
+    test runs are quiet unless asked. Plain `print` is not used for gameplay logs.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -285,7 +292,7 @@ Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code
 `Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
 only on Godot's `Image`). Tuning is split into six `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
-push + punch + the character's art, pose and fall), `BloodConfig` (blood pooling), `ArtConfig` (the shared pixel-art light,
+push + punch + the character's art, pose and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes) and `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles). There is no `Config` autoload. A seventh static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`

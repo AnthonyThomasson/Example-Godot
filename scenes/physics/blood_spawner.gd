@@ -2,24 +2,21 @@ class_name BloodSpawner
 
 const BloodPool = preload("res://scenes/physics/blood_pool.gd")
 const BloodPoolVisuals = preload("res://scenes/physics/blood_pool_visuals.gd")
+const BloodSplat = preload("res://scenes/physics/blood_splat.gd")
 
 
-## Add one wound's blood for a body and return the pool it went into (the body keeps this and passes
-## it back so its bleeding accumulates). If `active` is still valid, the body is still standing on it
-## (within its reach) and it has not hit the per-character cap, the hit grows that pool so a still
-## victim pools out wider with each shot; otherwise a fresh pool is spawned at `position`. Drops
-## emerge from `source`'s live position (a moving body trails blood), and `exclude` is its RID(s) so
-## its own collider never traps the blood. `parent` holds the pool (placed by world position).
-static func add_blood(active: Node, position: Vector2, direction: Vector2, parent: Node, exclude: Array, source: Node2D) -> Node:
-	if is_instance_valid(active) \
-			and active.global_position.distance_to(position) <= active.spread() + BloodConfig.detection_margin \
-			and active.blood_volume() < BloodConfig.max_pool_volume:
-		active.add_hit(direction)
-		return active
-
-	var pool := _new_pool(position, parent)
-	pool.seed(direction, exclude, source)
-	return pool
+## Add one splatter (BloodSplat) of core radius `size` at world `position` under `parent`, thrown toward
+## `direction` with `energy` 0..1; `exclude` is the bleeding body's RID(s), ignored by its wall clipping.
+## Returns the splat (Despawner-tracked).
+static func splat(parent: Node, position: Vector2, size: float, direction: Vector2, energy: float, exclude: Array) -> Node:
+	var node := Node2D.new()
+	node.name = "BloodSplat"
+	node.script = BloodSplat
+	parent.add_child(node, true)  # readable names (BloodSplat, BloodSplat2, …)
+	node.global_position = position
+	Despawner.track(node)
+	node.call(&"setup", size, direction, energy, exclude)
+	return node
 
 
 ## Start `source`'s bleed-out pool where its blood leaves it (`blood_origin()`, else its position):
@@ -27,7 +24,7 @@ static func add_blood(active: Node, position: Vector2, direction: Vector2, paren
 static func bleed(parent: Node, source: Node2D, exclude: Array) -> Node:
 	var at: Vector2 = source.blood_origin() if source.has_method("blood_origin") else source.global_position
 	var pool := _new_pool(at, parent)
-	pool.seed_bleed_out(BloodConfig.bleed_out_cells, BloodConfig.bleed_out_duration, exclude, source)
+	pool.seed_bleed_out(BloodConfig.bleed_out_cells, BloodConfig.bleed_out_duration, exclude)
 	return pool
 
 

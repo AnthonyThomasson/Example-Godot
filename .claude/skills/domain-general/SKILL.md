@@ -119,7 +119,10 @@ consumed by allied AIs.
     cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
     never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the
     test runner turns it off for a world with a human-driven player, where WASD walks.
-- `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood pools);
+- `game_log.gd` (`GameLog`, a `class_name` static holder) — the one way any domain logs what is happening:
+  `GameLog.say(message)` prints while `GameLog.enabled` (default true). The batch test runner turns it off
+  unless `--verbose`; never route errors/warnings through it.
+- `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood splatters and pools);
   domains register spawns with it.
 
 HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) have moved to

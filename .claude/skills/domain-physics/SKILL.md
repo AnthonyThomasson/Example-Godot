@@ -59,31 +59,31 @@ plus z = height; gravity pulls to z = 0.
   `ragdoll_max_time`; then `asleep` is true and `step` does nothing.
 - Reading: `point(i)`, `point_count()`, `frame_basis(f)`.
 
-## Blood pooling (self-contained, separate from debris/deformation)
+## Blood (self-contained, separate from debris/deformation)
 
-`BloodSpawner` / `BloodPool` / `BloodPoolVisuals`. `Physics.spawn_blood(parent, hit, exclude,
-source, active) -> Node` adds a flesh wound's blood to the body's pool and returns it; each drop
-emerges from `source`'s live position, pushes outward and slides around walls/furniture
-(`cast_motion` on layer 1) until it settles into a persistent, `Despawner`-tracked stain drawn
-beneath everything.
+Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and a dead body's **bleed-out**.
 
-Spread is accumulation-based per character: each character bleeds into one active pool
-(`take_hit` keeps the returned pool in `_blood_pool`); a hit that lands on that pool grows it —
-adding volume and widening its radius toward `pool_radius_max`, capped at `max_pool_volume` — so a
-still victim shot repeatedly pools out wide, while moving off the pool starts a new one and trails
-blood. Only the character's `take_hit` calls it (furniture bleeds no blood).
-
-Drops emerge at the source's `blood_origin()` when it has one (else its position): the character
-returns its trunk's middle once fallen, so a pool still filling at death flows from the body as it
-falls and rests. Each pool releases at its own rate. `Physics.bleed_out(parent, source, exclude)`
-(`BloodSpawner.bleed`) starts a dead body's bleed-out where its blood leaves it: a pool holding
-`BloodConfig.bleed_out_cells` grid cells claimed by a `BloodFlow` flood-fill
-(`BloodPool.seed_bleed_out`): cheapest-first with noise-roughened cost (`flow_*` tuning), cells
-overlapping a `PhysicsConfig.wall_mask` collider never fill, so the puddle is one continuous irregular
-shape wrapping around walls and furniture. All cells are claimed up front (a batch per frame); a front
-then sweeps through flow-cost over `bleed_out_duration`, so each cell's fill rises continuously. Drawn by
-blurring the fill field into a small image and thresholding it in a shader (one smooth outline, darker
-rim); wound spatter keeps the drop model.
+- `BloodWound` (`class_name`, a Node the character composes like `Knockback`): `record(hit)` throws
+  `ceil(damage / hit_splat_damage)` splatters (max `hit_splat_max`) out the wound's exit side at once, then adds
+  `ceil(damage * drips_per_damage)` to a drip budget (cap `max_pending_drips`). While it lasts, one drop falls
+  every random `drip_interval_min..max` s (3..10) from the host's `blood_origin()`; it keeps the host's
+  `velocity` for `drip_fall_time`, so a walker's drops land ahead and splat stretched along its heading
+  (`energy` = speed / `drip_full_energy_speed`). `stop()` on death ends dripping. Each body keeps at most
+  `max_splats_per_body` splatters (oldest freed); the global `Despawner` cap applies too.
+- `BloodSplat` (`blood_splat.gd`, built by `BloodSpawner.splat`, named `BloodSplat`, `Despawner`-tracked,
+  colliderless): one impact, built once in `setup(radius, direction, energy, exclude)` and then static. A lumpy
+  core stretched along the throw, tapered crown spikes (forward ones longer with energy; some throw a tail
+  droplet), and satellite droplets, all clipped by walls/furniture (a ray from the centre, `PhysicsConfig.wall_mask`)
+  and merged (`Geometry2D.merge_polygons`) into opaque outlines so overlaps don't darken. A wet highlight fleck
+  fades and the colour dries to `dried_color` over `splat_dry_time`. Shape knobs: `splat_*`, `drip_size_*`.
+- Bleed-out: `Physics.bleed_out(parent, source, exclude)` (`BloodSpawner.bleed`) starts a dead body's pool where
+  its blood leaves it (`blood_origin()`: the trunk's middle once fallen): a `BloodPool` holding
+  `BloodConfig.bleed_out_cells` grid cells claimed by a `BloodFlow` flood-fill: cheapest-first with
+  noise-roughened cost (`flow_*` tuning), cells overlapping a `PhysicsConfig.wall_mask` collider never fill, so the
+  puddle is one continuous irregular shape wrapping around walls and furniture. All cells are claimed up front (a
+  batch per frame); a front then sweeps through flow-cost over `bleed_out_duration`, so each cell's fill rises
+  continuously. Drawn by blurring the fill field into a small image and thresholding it in a shader (one smooth
+  outline, darker rim).
 
 The floor steers the flow: each cell's step cost is multiplied by `BloodSurface.resistance(world_pos)` —
 surfaces (Objects' floors) register a world rect + a `groove` Callable, so blood runs cheaply along grooves
@@ -94,17 +94,16 @@ surfaces (Objects' floors) register a world rect + a `groove` Callable, so blood
 ## Tuning
 
 `PhysicsConfig.debris_enabled` and `BloodConfig.enabled` are master switches (off: `Physics.spawn_debris`
-spawns nothing; `Physics.spawn_blood` / `bleed_out` spawn nothing and return null — used by the Testing
-domain's `physics.debris` / `physics.blood` switches). `BloodSpawner` adds each pool with a readable
-name (`BloodPool`, `BloodPool2`, …) so observers can tell pools apart.
+spawns nothing; `BloodWound.record` / `Physics.bleed_out` spawn nothing — used by the Testing
+domain's `physics.debris` / `physics.blood` switches). `BloodSpawner` adds each splatter and pool with a readable
+name (`BloodSplat`, `BloodSplat2`, … / `BloodPool`, …) so observers can tell them apart.
 `PhysicsConfig` tunes impact + deformation and the ragdoll solver (`ragdoll_*`), and holds `wall_mask`
 (the layer the ragdoll sweep and the blood queries treat as blocking); `BloodConfig`
-tunes blood pooling. Both are `class_name` static holders — there is no `Config` autoload.
+tunes blood (splatter, drips, bleed-out). Both are `class_name` static holders — there is no `Config` autoload.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
-  call `Physics.impact_impulse` / `Physics.spawn_debris`. The character's `take_hit` calls
-  `Physics.spawn_blood`, and its death builds its fallen body on a `Ragdoll` and, once it rests,
+  call `Physics.impact_impulse` / `Physics.spawn_debris`. The character composes a `BloodWound` (its `take_hit` calls `record`, its death `stop`), and its death builds its fallen body on a `Ragdoll` and, once it rests,
   calls `Physics.bleed_out`. Debris / casings
   despawn via the Despawner.

@@ -43,7 +43,7 @@ static var ROWS := {
 		"world": { "node": "NavUpdater", "props": ["enabled"] },
 	},
 	&"physics.blood": {
-		"description": "Wounds pool blood and dead bodies bleed out.",
+		"description": "Wounds splatter and drip blood and dead bodies bleed out.",
 		"static": [[BloodConfig, &"enabled"]],
 	},
 	&"physics.debris": {

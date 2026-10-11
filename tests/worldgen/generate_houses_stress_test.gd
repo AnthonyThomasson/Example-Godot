@@ -44,7 +44,7 @@ func run(t: TestContext) -> void:
 	var before := Perf.nodes()
 	var house := WorldGen.generate(FIXED_SEED, "", Vector2.ZERO, t.world)
 	var count := Perf.nodes() - before
-	print("PERF house nodes %d" % count)
+	GameLog.say("PERF house nodes %d" % count)
 	t.trace("house nodes", count)
 	t.check(count >= NODE_BAND[0] and count <= NODE_BAND[1], "a house spawns %d nodes, expected %d..%d" % [count, NODE_BAND[0], NODE_BAND[1]])
 	house.free()

@@ -1,25 +1,25 @@
 extends GameTest
 
 ## Performance guard: hundreds of hits land on one chair and one character. Deformation, debris and blood
-## each have a cap (`deform_max_impacts`, the Despawner, merged blood pools); the caps hold and frame
+## each have a cap (`deform_max_impacts`, the Despawner, the per-body splatter cap); the caps hold and frame
 ## cost stays within budget while the hits land.
 
 const Perf := preload("res://tests/_perf/perf_probe.gd")
 
 const HITS_PER_FRAME := 4
 const FRAMES := 150
-# Baseline: avg ~17 / p95 ~30 / max ~35 ms per frame, 100 blood pools. Time budgets ~4-5x; the pool limit is
+# Baseline: avg ~17 / p95 ~30 / max ~35 ms per frame, N BloodSplat (re-measure). Time budgets ~4-5x; the pool limit is
 # a count, so it is tight.
 const AVG_MS := 80.0
 const P95_MS := 130.0
 const MAX_MS := 160.0
-const BLOOD_POOL_LIMIT := 150
+const BLOOD_SPLAT_LIMIT := 80  # BloodConfig.max_splats_per_body, plus slack for ones not yet freed
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "Hundreds of hits keep deformation, debris and blood capped",
-		"description": "600 hits land on a chair and 600 on a sturdy character; recorded dents, tracked debris and blood pools stay capped and frame cost stays within budget.",
+		"description": "600 hits land on a chair and 600 on a sturdy character; recorded dents, tracked debris and blood splatters stay capped and frame cost stays within budget.",
 		"tags": ["perf", "stress", "deformation", "debris", "blood"],
 		"timeout": 30.0,
 	}
@@ -66,8 +66,8 @@ func run(t: TestContext) -> void:
 	t.check(deformable.impacts.size() <= PhysicsConfig.deform_max_impacts,
 		"recorded dents stay capped (%d, cap %d)" % [deformable.impacts.size(), PhysicsConfig.deform_max_impacts])
 	t.check(Despawner.count() <= Despawner.max_scene_objects, "the Despawner cap holds (%d tracked)" % Despawner.count())
-	var pools := t.spawned("BloodPool").size()
-	print("PERF hit overload blood pools %d" % pools)
-	t.trace("blood pools", pools)
-	t.check(pools <= BLOOD_POOL_LIMIT, "blood pools spawned: %d, limit %d" % [pools, BLOOD_POOL_LIMIT])
+	var live := t.world.find_children("BloodSplat*", "Node2D", true, false).size()
+	GameLog.say("PERF hit overload live blood splats %d" % live)
+	t.trace("live blood splats", live)
+	t.check(live <= BLOOD_SPLAT_LIMIT, "live blood splats: %d, limit %d" % [live, BLOOD_SPLAT_LIMIT])
 	t.check(not victim.is_dead, "the victim survived the hits")
