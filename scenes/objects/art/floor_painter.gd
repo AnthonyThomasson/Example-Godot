@@ -28,6 +28,48 @@ static func tile_size(opts: Dictionary) -> Vector2:
 	return Vector2(cell * 4, cell * 4)
 
 
+## Whether the floor `pattern` soaks liquid up instead of letting it run (carpet).
+static func porous(opts: Dictionary) -> bool:
+	return String(opts.get("pattern", "planks")) == "carpet"
+
+
+## 1 where `local` (px from the floor's origin) lies within `half_width` of a groove the pattern
+## paints (grout, plank seam, slab joint, strip edge), else 0. Mirrors the geometry of the painters
+## below; the random butt joints and hairline cracks are not modelled.
+static func groove(local: Vector2, opts: Dictionary, half_width: float) -> float:
+	var px := ArtConfig.pixel_size
+	match String(opts.get("pattern", "planks")):
+		"planks":
+			var row_h := maxi(3, roundi(ObjectArtConfig.floor_plank_px / px)) * px
+			return _on_line(local.y, row_h, px, half_width)
+		"parquet":
+			var side := float(ObjectArtConfig.floor_parquet_px)
+			var cell := Vector2(fposmod(local.x, side), fposmod(local.y, side))
+			var gx := int(floor(local.x / side))
+			var gy := int(floor(local.y / side))
+			var strip := side / maxi(2, roundi(side / px) / 4)
+			var along_x := (gx + gy) % 2 == 0
+			var edge := maxf(_on_line(cell.x, side, px, half_width), _on_line(cell.y, side, px, half_width))
+			return maxf(edge, _on_line(cell.y if along_x else cell.x, strip, px, half_width))
+		"tiles", "checker":
+			return _on_grid(local, maxi(4, roundi(ObjectArtConfig.floor_tile_px / px)) * px, px, half_width)
+		"mosaic":
+			return _on_grid(local, maxi(3, roundi(ObjectArtConfig.floor_mosaic_px / px)) * px, px, half_width)
+		"concrete":
+			return _on_grid(local, float(ObjectArtConfig.floor_slab_px), px, half_width)
+	return 0.0
+
+
+## 1 if `v` is within `half_width` of a line painted at every multiple of `period` (one art pixel wide).
+static func _on_line(v: float, period: float, px: float, half_width: float) -> float:
+	var m := fposmod(v - px * 0.5, period)
+	return 1.0 if minf(m, period - m) <= half_width else 0.0
+
+
+static func _on_grid(local: Vector2, period: float, px: float, half_width: float) -> float:
+	return maxf(_on_line(local.x, period, px, half_width), _on_line(local.y, period, px, half_width))
+
+
 ## Paint one tile of the floor `pattern` onto `c` in `base`.
 static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)

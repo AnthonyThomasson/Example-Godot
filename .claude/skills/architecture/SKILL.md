@@ -108,6 +108,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `BloodConfig.enabled` off → `spawn_blood` / `bleed_out` spawn nothing and return null;
 	 `PhysicsConfig.debris_enabled` off → `spawn_debris` spawns nothing. Blood pools are added with
 	 readable names (`BloodPool`, `BloodPool2`, …).
+   - `BloodSurface` (static registry): `register(rect, groove: Callable(world, half_width) -> 0..1, porous) -> id` /
+	 `unregister(id)` — Objects' `Floor` registers its room so a bleed-out flow runs along grout/seams
+	 (`resistance(pos)` is read only by Physics' `BloodFlow`; `BloodConfig.surface_flow` off ignores floors).
    - `Ragdoll` (`RefCounted`, character on death): a generic 3D point-mass body over the floor plane
 	 (x/y + height z). Built with `add_point(at, radius, mass)`, `add_bone(a, b)` / `add_rigid(indices)`,
 	 `add_frame(origin, up, right, forward_hint)`, `add_swing(frame, joint, child, rest, limits)`

@@ -12,5 +12,21 @@ extends Node2D
 @export var art_opts: Dictionary = {}  ## Painter options, e.g. { "pattern": "planks" }.
 
 
+const FloorPainter = preload("res://scenes/objects/art/floor_painter.gd")
+
+var _surface_id := -1  ## BloodSurface registration of this floor.
+
+
 func _ready() -> void:
 	z_index = ObjectArtConfig.floor_z_index
+	# Tell the Physics blood flow where this floor's grooves are, so blood follows grout and seams.
+	_surface_id = BloodSurface.register(Rect2(global_position, size), flow_groove, FloorPainter.porous(art_opts))
+
+
+func _exit_tree() -> void:
+	BloodSurface.unregister(_surface_id)
+
+
+## 1 where world point `at` is on a groove of this floor's pattern (BloodSurface callback).
+func flow_groove(at: Vector2, half_width: float) -> float:
+	return FloorPainter.groove(at - global_position, art_opts, half_width)

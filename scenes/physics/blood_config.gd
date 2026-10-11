@@ -42,6 +42,16 @@ static var flow_aim_bias: float = 0.3
 ## Softness of the advancing edge, in cells of flow cost: how far behind the front a cell is still
 ## filling in. Larger = a wider, gentler fade at the edge.
 static var flow_soft_edge: float = 3.0
+## Floor texture steering a bleed-out flow (BloodSurface): off = the floor is ignored. Flow-cost
+## multipliers per cell: on a groove (grout, plank seam, slab joint), on smooth surface between
+## grooves, and on a porous surface (carpet). Low = blood runs there easily.
+static var surface_flow: bool = true
+static var groove_resist: float = 0.3
+static var smooth_resist: float = 2.2
+static var porous_resist: float = 3.0
+## Half width (px) around a groove line that still counts as on it; about half a flow cell so a cell
+## centre reliably lands in a 1-px groove.
+static var groove_half_width: float = 2.0
 ## Brightness drop of rim cells vs. the deep centre (0 none .. 1 black).
 static var flow_edge_darken: float = 0.25
 ## Radius (px) a single wound's pool fills — the small "immediate surroundings" puddle.

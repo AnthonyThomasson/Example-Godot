@@ -85,6 +85,12 @@ then sweeps through flow-cost over `bleed_out_duration`, so each cell's fill ris
 blurring the fill field into a small image and thresholding it in a shader (one smooth outline, darker
 rim); wound spatter keeps the drop model.
 
+The floor steers the flow: each cell's step cost is multiplied by `BloodSurface.resistance(world_pos)` —
+surfaces (Objects' floors) register a world rect + a `groove` Callable, so blood runs cheaply along grooves
+(`groove_resist`), slowly across smooth surface (`smooth_resist`) and barely at all over porous carpet
+(`porous_resist`); outdoors = 1. Newest-registered surface wins on overlap. Master switch
+`BloodConfig.surface_flow`.
+
 ## Tuning
 
 `PhysicsConfig.debris_enabled` and `BloodConfig.enabled` are master switches (off: `Physics.spawn_debris`

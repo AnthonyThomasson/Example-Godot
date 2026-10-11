@@ -68,6 +68,11 @@ shots, navigation and AI perception all pass over it) holding `size`, `art`, `co
 casings and rugs). `floor_visuals.gd` repeats `ObjectArt.tile(...)` across the rect
 (`texture_repeat` on, nearest filter, scaled by `pixel_size`).
 
+A floor registers itself with Physics' `BloodSurface` (`_ready`; unregisters on exit) with `flow_groove(world, half)`,
+which asks `FloorPainter.groove(local, opts, half)` — analytic, mirroring the painted geometry (tile/mosaic/
+slab grid lines, plank row seams, parquet borders + strips; butt joints and cracks aren't modelled) — and
+`FloorPainter.porous(opts)` (carpet), so blood follows the texture.
+
 ## Pixel art (`objects/art/`, private to Objects)
 
 Every catalogue piece, every wall and every floor is drawn as procedural top-down pixel art,

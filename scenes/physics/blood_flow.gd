@@ -36,6 +36,8 @@ var _noise := FastNoiseLite.new()
 var _probe := RectangleShape2D.new()
 ## Cells known to be blocked (true) or open (false), so each is queried once.
 var _blocked: Dictionary = {}
+## Floor-texture flow multiplier per cell, looked up once each.
+var _resist: Dictionary = {}
 ## Frontier: Vector2i -> accumulated cost to reach it.
 var _frontier: Dictionary = {}
 ## The cell blood leaves the body at.
@@ -100,7 +102,8 @@ func step(count: int, space: PhysicsDirectSpaceState2D, origin_global: Vector2) 
 			var dir := Vector2(d).normalized()
 			var rough := 1.0 + _noise.get_noise_2d(n.x, n.y) * BloodConfig.flow_noise_strength
 			var lean := 1.0 - BloodConfig.flow_aim_bias * dir.dot(_aim)
-			var next := cost + Vector2(d).length() * maxf(rough, 0.15) * maxf(lean, 0.2)
+			var next := cost + Vector2(d).length() * maxf(rough, 0.15) * maxf(lean, 0.2) \
+					* _surface_resist(n, origin_global)
 			if not _frontier.has(n) or next < _frontier[n]:
 				_frontier[n] = next
 
@@ -114,6 +117,13 @@ func _pop_cheapest() -> Vector2i:
 			best_cost = _frontier[c]
 			best = c
 	return best
+
+
+## Floor-texture flow multiplier for cell `c` (cached per cell; see BloodSurface).
+func _surface_resist(c: Vector2i, origin_global: Vector2) -> float:
+	if not _resist.has(c):
+		_resist[c] = BloodSurface.resistance(origin_global + _cell_center(c))
+	return _resist[c]
 
 
 ## Whether a wall or furniture collider overlaps cell `c` (cached per cell).
