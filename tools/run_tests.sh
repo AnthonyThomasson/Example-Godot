@@ -10,6 +10,8 @@
 #   tools/run_tests.sh --list [words]     list matching tests (id, flags, tags, name) and exit
 #   tools/run_tests.sh --repeat=5 words   run each match 5 times; names FLAKY / FAILING tests
 #   tools/run_tests.sh --seed=42 words    pin every house() test to seed 42
+#   tools/run_tests.sh --verbose words    also print the game's log of what happens (shots, punches, Von
+#                                         decisions, PERF numbers); a run is quiet by default
 #   tools/run_tests.sh --json words       also print the full results as one `JSON: {...}` line
 #   tools/run_tests.sh --self-test       the harness's own tests (tests/_harness, hidden from normal runs)
 #   tools/run_tests.sh --shots words      windowed run (not headless) that saves a PNG of each failed test

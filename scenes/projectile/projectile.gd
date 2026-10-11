@@ -102,7 +102,7 @@ func _resolve(result: Dictionary) -> void:
 	var flyover_chance := clampf((1.0 - coverage / 100.0) * BallisticsConfig.cover_flyover_scale, 0.0, 1.0)
 	if randf() < flyover_chance:
 		_exclude.append(rid)
-		print("Shot flew over %s" % body.name)
+		GameLog.say("Shot flew over %s" % body.name)
 		return
 
 	# 2. Ricochet off hard material at a glancing angle: reflect at reduced speed/damage.
@@ -112,14 +112,14 @@ func _resolve(result: Dictionary) -> void:
 		direction = direction.bounce(n).normalized()
 		rotation = direction.angle()
 		speed *= BallisticsConfig.bounce_speed_retention
-		print("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
+		GameLog.say("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
 		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false))
 		return
 
 	var dealt := damage * squareness * speed_factor
 	# 3a. Too slow to punch through: deal the impact and embed (zeroed speed frees the bullet).
 	if speed < BallisticsConfig.penetration_min_speed:
-		print("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
+		GameLog.say("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
 		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false))
 		return
@@ -130,7 +130,7 @@ func _resolve(result: Dictionary) -> void:
 	direction = direction.rotated(randf_range(-j, j))
 	rotation = direction.angle()
 	_exclude.append(rid)
-	print("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
+	GameLog.say("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 	_deal(body, _hit_info(result, incoming, speed_factor, dealt, true))
 
 

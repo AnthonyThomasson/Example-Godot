@@ -1,7 +1,7 @@
 extends GameTest
 
 ## A one-hit target is shot dead: it dies, its body falls and comes to rest, and once at rest it
-## bleeds out a second pool beside the wound's (Physics.bleed_out). Pair: death_without_blood.
+## bleeds out a pool beside the wound's splatter (Physics.bleed_out). Pair: death_without_blood.
 
 
 func describe() -> Dictionary:
@@ -29,5 +29,5 @@ func run(t: TestContext) -> void:
 	if not t.require(await t.until(func(): return t.happened(&"died", func(d): return d["actor"] == &"target"), 2.0), "the target dies"):
 		return
 	t.check(t.actor(&"target").is_dead, "is_dead is set")
-	t.check(not t.spawned("BloodPool").is_empty(), "the wound left a blood pool")
-	await t.until(func(): return t.spawned("BloodPool").size() >= 2, 8.0, "a bleed-out pool spreads once the body rests")
+	t.check(not t.spawned("BloodSplat").is_empty(), "the wound left a splatter")
+	await t.until(func(): return not t.spawned("BloodPool").is_empty(), 8.0, "a bleed-out pool spreads once the body rests")

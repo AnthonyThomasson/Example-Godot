@@ -162,7 +162,7 @@ the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
   the alpha, so overlaps don't stack. Redrawing stops once the body has settled.
 
 **Bleeding out:** `blood_origin()` is the character's position while alive and its trunk's middle
-once fallen (blood pools sample it). When the ragdoll first settles the character calls
+once fallen (blood drips and pools sample it). When the ragdoll first settles the character calls
 `Physics.bleed_out(get_parent(), self, [get_rid()])`, so a pool spreads out from under the body.
 
 ## Pixel art
@@ -269,8 +269,8 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
   `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.
-- **Character → Physics** (interface 4): `Deformable` / `Deformation` for wounds, `spawn_blood` on a
-  hit, and the generic `Ragdoll` the fallen body is built on.
+- **Character → Physics** (interface 4): `Deformable` / `Deformation` for wounds, a `BloodWound`
+  child (splatter spray + timed drips on a hit, stopped on death), and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
   `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`; and reads the item's

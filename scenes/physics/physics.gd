@@ -30,22 +30,6 @@ static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> voi
 	DebrisSpawner.spawn(hit.position, spray, parent, base_color, material)
 
 
-## Add a flesh hit's blood to the body's persistent pool, added under `parent` (placed by world
-## position), and return the pool so the caller can pass it back on its next hit to accumulate. Pass
-## the body's current pool as `active`, or null for its first wound; hits that land on the active
-## pool grow it (a still victim pools out wider), while moving off it starts a new one. Blood spreads
-## out the wound face (the surface normal), or back along the shot when the normal is degenerate.
-## `exclude` is the wounded body's RID(s), so its own collider never traps the blood, and `source` is
-## that body, whose live position drops emerge from. This is a self-contained reaction, independent
-## of the debris and deformation a hit also produces. Returns null (no pool) while BloodConfig.enabled
-## is off.
-static func spawn_blood(parent: Node, hit: HitInfo, exclude: Array, source: Node2D, active: Node) -> Node:
-	if not BloodConfig.enabled:
-		return null
-	var spill := hit.normal if hit.normal.length() > 0.001 else -hit.direction
-	return BloodSpawner.add_blood(active, hit.position, spill, parent, exclude, source)
-
-
 ## Start a dead body's bleed-out: one slow, flowing pool (BloodConfig.bleed_out_*) spreading from where
 ## its blood leaves it — `source.blood_origin()` if it has one (where it lies), else its position —
 ## added under `parent`. `exclude` is the body's RID(s). Returns the pool (null while

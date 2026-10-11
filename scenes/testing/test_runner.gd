@@ -352,6 +352,7 @@ func _run_batch(args: PackedStringArray) -> void:
 		if not a.begins_with("--"):
 			words.append(a)
 	var filter := " ".join(words)
+	GameLog.enabled = args.has("--verbose")  # a batch run shows verdicts only unless asked
 	_include_von = args.has("--include-von")
 	_require_von = args.has("--require-von")
 	_shots = args.has("--shots")

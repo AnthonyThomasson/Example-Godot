@@ -48,6 +48,6 @@ func run(t: TestContext) -> void:
 	Perf.within_frames(t, "npc crowd", stats, AVG_MS, P95_MS, MAX_MS)
 	t.check(not t.von_requests().is_empty(), "the NPCs asked for decisions (%d asks)" % t.von_requests().size())
 	var grown := Perf.nodes() - nodes_before
-	print("PERF npc crowd node growth %d, %d decisions asked" % [grown, t.von_requests().size()])
+	GameLog.say("PERF npc crowd node growth %d, %d decisions asked" % [grown, t.von_requests().size()])
 	t.trace("node growth", grown)
 	t.check(grown <= NODE_GROWTH, "node growth over the run: %d, budget %d" % [grown, NODE_GROWTH])

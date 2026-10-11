@@ -145,7 +145,7 @@ func happened(topic: StringName, filter := Callable()) -> bool:
 	return not events_of(topic, filter).is_empty()
 
 
-## Nodes that entered the world root whose name contains `name_part` (e.g. "BloodPool").
+## Nodes that entered the world root whose name contains `name_part` (e.g. "BloodSplat").
 func spawned(name_part: String) -> Array:
 	var out: Array = []
 	for data in events_of(&"spawned"):

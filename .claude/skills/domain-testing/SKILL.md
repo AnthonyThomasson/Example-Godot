@@ -28,6 +28,9 @@ and controller contract, EventBus and character signals) and never reaches into 
   game being played meanwhile, never share a log (a new process rotates the old `user://logs/godot.log`,
   and `LogWatch` tails by path) or overwrite each other's report. Without `--out` the runner falls back
   to `user://test_report.json` and `user://test_failures/`.
+- **Quiet by default:** the game's own log of what happens (shots, punches, house seed, Von decisions, the
+  `PERF …` numbers) goes through `GameLog.say` (General), which a batch run turns off; pass `--verbose` to
+  see it (e.g. to read the `PERF` lines when re-baselining). Engine errors/warnings are never gated.
 - **Other flags:** `--domain=NAME` (only tests whose domain is exactly NAME; the filter words are word
   prefixes, so `ai` also catches a test that mentions "aim"), `--list [words]` (id, von/manual flags, tags; runs nothing), `--repeat=N` (each test
   N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every `house()` uses that seed), `--json` (one
@@ -114,7 +117,7 @@ func run(t: TestContext) -> void:
     Topics are every EventBus topic (`&"hit"`: position, victim, source, attacker, direction, damage;
     `&"callout"`), `&"died"` / `&"hit_landed"` per actor (`actor` = its id; hit_landed adds body,
     damage, hand, −1 = shot), and `&"spawned"` / `&"removed"` for direct children of the world root
-    (blood pools, debris, projectiles, dropped items).
+    (blood splatters and pools, debris, projectiles, dropped items).
   - `t.trace(name, value)` samples a number over time (a distance, a health) for the failure output.
   - Assertions: `check(cond, msg)` (soft), `require(cond, msg)` (ends the test; follow it with
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
@@ -142,13 +145,12 @@ load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/f
 - **Budgets** are `const`s at the top of each test, about 4x the measured baseline (stated in the comment
   above them). `Perf.within` prints `PERF <label> <value> (budget <limit>)`, traces it, and fails the
   check with the value. Counts are asserted tightly; times loosely, so only real regressions trip them.
-- **Re-baselining:** run `tools/run_tests.sh perf --repeat=5`, read the `PERF` lines, set each budget to
+- **Re-baselining:** run `tools/run_tests.sh perf --repeat=5 --verbose`, read the `PERF` lines, set each budget to
   about 4x the worst observed value, and update the baseline comment. A deliberate cost increase is a
   budget change in the same commit.
 - **Gotchas:** a lambda captures ints by value (count into an Array); `nav.rebake` is off in tests that
   shove or shoot furniture into overlaps (re-baking overlapping holes logs a nav sync error; the nav
-  test covers re-baking); a shooter must not stand in another's line of fire (a `spawn_blood` call can
-  receive a freed blood pool after the Despawner reclaims it); world-gen's first run in a process is
+  test covers re-baking); world-gen's first run in a process is
   slower (cold caches), so its budget covers the cold case.
 
 ## Errors and warnings fail the test (`log_watch.gd`)
@@ -194,7 +196,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 
 To add a switch, add a row. When the behaviour has no knob yet, add a master `static var` to that
 domain's config holder, guarded at its one spawn point (the way `BloodConfig.enabled` gates
-`Physics.spawn_blood`).
+`BloodWound.record`).
 
 ## Files
 

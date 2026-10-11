@@ -1,11 +1,8 @@
 extends Node2D
 
-## Draw layer for a blood pool. A wound pool is one lumpy filled blob per particle, in the shared
-## blood color: each blob is a polygon built from the drop's stored per-vertex shape, so it reads as an
-## organic splat rather than a circle and no two blobs match; overlapping blobs merge into a single,
-## ragged puddle. A bleed-out pool draws its flow's cells through a threshold shader instead (see
-## `_draw_flow`). Sits at a negative z_index so the pool draws beneath the player and furniture (like
-## spent casings). Reads the particles or the flow from its parent control node (blood_pool.gd).
+## Draw layer for a bleed-out pool: its flow's cells drawn through a threshold shader (see `_draw_flow`).
+## Sits at a negative z_index so the pool draws beneath the player and furniture (like spent casings).
+## Reads the flow from its parent control node (blood_pool.gd).
 
 ## The threshold runs per screen pixel on the bilinearly magnified field (edge width ~1 px via
 ## fwidth), so the outline is crisp yet smooth rather than a blurred alpha ramp.
@@ -41,23 +38,10 @@ func _ready() -> void:
 
 
 func _draw() -> void:
-	if _pool.flow:
-		_draw_flow()
-		return
-	var color: Color = BloodConfig.color
-	for p in _pool.particles:
-		var center: Vector2 = p["pos"]
-		var radius: float = p["radius"]
-		var shape: PackedFloat32Array = p["shape"]
-		var verts := shape.size()
-		var points := PackedVector2Array()
-		for i in verts:
-			var angle := TAU * i / verts
-			points.append(center + Vector2(cos(angle), sin(angle)) * radius * shape[i])
-		draw_colored_polygon(points, color)
+	_draw_flow()
 
 
-## A flowing pool: the claimed cells' fill levels are written to a small field, box-blurred so single
+## The claimed cells' fill levels are written to a small field, box-blurred so single
 ## cells at the frontier melt into their neighbours, drawn magnified with linear
 ## filtering through a threshold shader. The contour is one smooth outline that creeps outward, never
 ## separate dots.

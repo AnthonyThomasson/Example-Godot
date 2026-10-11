@@ -61,5 +61,5 @@ func run(t: TestContext) -> void:
 	var resting := await Perf.frame_stats(t, RESTING_FRAMES)
 	Perf.within(t, "furniture pile resting avg ms/frame", resting["avg_ms"], RESTING_AVG_MS)
 	var grown := Perf.nodes() - nodes_before
-	print("PERF furniture pile node growth %d" % grown)
+	GameLog.say("PERF furniture pile node growth %d" % grown)
 	t.check(grown <= 2, "shoving furniture neither spawns nor leaks nodes (grew by %d)" % grown)

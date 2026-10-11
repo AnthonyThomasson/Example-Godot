@@ -54,9 +54,8 @@ var _push_slow := 1.0
 ## Damage dents/chunks recorded when the character is shot; read by the visuals and the
 ## collider rebuild. The character is flesh — a hittable surface like furniture.
 var _deformable: Deformable
-## The blood pool this character is currently bleeding into; hits accumulate here while it stands on
-## the pool, and a new one starts once it moves off. Goes invalid when the pool is despawned.
-var _blood_pool: Node
+## Splatter and dripping from this character's wounds (Physics domain component).
+var _wound: BloodWound
 
 ## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
@@ -100,6 +99,9 @@ func _ready() -> void:
 	_deformable.allow_chunks = CharacterConfig.flesh_allow_chunks
 	_deformable.max_impacts = CharacterConfig.flesh_deform_max_impacts
 	add_child(_deformable)
+
+	_wound = BloodWound.new()
+	add_child(_wound)
 
 	_interaction = CharacterInteraction.new()
 	add_child(_interaction)
@@ -322,15 +324,13 @@ func get_surface() -> Dictionary:
 
 ## Take a hit: shove along the impact (folded into locomotion via the pushable path),
 ## record the deformation relative to the shoulders (it dents the drawn body and hands and turns
-## with them), spray blood debris, and feed a blood pool on the floor. The striker fills in a HitInfo.
-## Each hit accumulates into `_blood_pool` while this body stands on it (pooling out wider),
-## starting a new pool once it moves off. The pool excludes this body's collider so the blood
-## spreading out of the wound is not trapped inside it.
+## with them), spray blood debris, and start bleeding: a splatter spray now, then drips every few
+## seconds (BloodWound). The striker fills in a HitInfo.
 func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
 	_deformable.record(hit, pose.torso_angle)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
-	_blood_pool = Physics.spawn_blood(get_parent(), hit, [get_rid()], self, _blood_pool)
+	_wound.record(hit)
 	_apply_damage(hit.damage, hit.direction)
 
 
@@ -354,8 +354,7 @@ func _apply_damage(amount: float, direction := Vector2.ZERO) -> void:
 ## the hand lets go of what it held. Emits `died` for observers.
 func _die(direction: Vector2) -> void:
 	is_dead = true
-	if is_instance_valid(_blood_pool):
-		_blood_pool.stop_emitting()
+	_wound.stop()
 	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,
 	# punches, sight lines and the dropped item, all on layer 1) pass right over it instead of being
 	# blocked, and draw it beneath them.
