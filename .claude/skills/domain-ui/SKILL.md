@@ -1,6 +1,6 @@
 ---
 name: domain-ui
-description: Deep implementation detail for the UI domain (scenes/ui/) — debug player panel, spectator match HUD, pre-game setup window, seed readout, overlay toggles, and the test browser window + test result banner. Use when editing scenes/ui/ or working on any in-game overlay, the setup menu, the seed label, or the test browser UI. All are decoupled observers: they read only the Character public API/signals, the AI controller's current_act()/goal, and the EventBus — never domain internals. Complements the `architecture` skill.
+description: Deep implementation detail for the UI domain (scenes/ui/) — debug player panel, spectator match HUD, pre-game setup window, settings page (Debug + key rebinding), seed readout, overlay toggles, and the test browser window + test result banner. Use when editing scenes/ui/ or working on any in-game overlay, the setup menu, the settings page, the seed label, or the test browser UI. All are decoupled observers: they read only the Character public API/signals, the AI controller's current_act()/goal, and the EventBus — never domain internals. Complements the `architecture` skill.
 ---
 
 # UI domain (`scenes/ui/`)
@@ -28,16 +28,32 @@ the domains.
 
 - `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open(defaults)` shows a
   full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox,
-  "Seed" text field (blank = random), Defenders/Invaders spinboxes, a single "Debug" checkbox (the master
-  switch for the AI overlays: off = every overlay hidden and no toggle bar; on = the toggle bar, every overlay starting off, plus
-  the bar), and a Start button. Pressing Start emits `start_requested({ has_player, seed, defenders,
-  invaders, debug })`. Main opens it on a fresh launch on a fresh launch; a scripted `restart` sets the
+  "Seed" text field (blank = random), Defenders/Invaders spinboxes, and a Start button. (The Debug switch
+  lives on the settings page.) Pressing Start emits `start_requested({ has_player, seed, defenders,
+  invaders })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
 the test browser. Pressing Start also **disables the button**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
-  shows "Waiting for the decision server…" there so that pause is never silent.
+  shows "Waiting for the decision server…" there so that pause is never silent. A **Settings** button
+  (28pt) below Tests emits `settings_requested`; Main opens the settings page over this window.
+
+- `settings_menu.gd` — the **settings page** (`SettingsMenu` CanvasLayer, layer 20 so it opens over the
+  setup window, built by Main on `settings_requested`). A plain-data window like the test browser: it
+  takes `open({ debug, rows })` (rows = `{ action, label, group, text, conflicts: [labels], changed }`,
+  in display order) and `set_rows(rows)` to redraw, and only emits signals — `debug_changed(on)`,
+  `rebind_requested(action, event)`, `reset_requested(action)`, `reset_all_requested`, `back_requested`.
+  It knows nothing of `Keybinds` or `Settings`; Main applies each change and answers with `set_rows`.
+  Layout: an opaque full-screen page (title 44pt, Debug checkbox 26pt) over a scrolling list grouped by
+  `group` (28pt headings; rows 22pt: name, key button, a red "also: <labels>" note when another action
+  shares the binding, Reset — disabled until the row differs from the default), then Reset all keys / Back.
+  **Capture:** clicking a key button swaps it for "Press a key…" and the next key or mouse-button press is
+  emitted as `rebind_requested` (the host may still refuse it); Esc cancels. Escape (cancel, else
+  `back_requested`) and every key press during a capture are consumed in `_input`, which runs before
+  Main's `_unhandled_input`, so Escape never triggers Main's "return to setup" and a captured key never
+  reaches the game; so Esc itself can't be bound. A redraw keeps the list's scroll position. Key and
+  Reset buttons take no focus (Space/Enter must not re-press them). Tested by `tests/ui/settings_menu_test.gd`.
 
 - `test_browser_window.gd` — the **test browser window** (`TestBrowserWindow` CanvasLayer, hosted by the
   Testing domain's `test_browser.tscn`). `open(tests, results, matcher, filter, selected)` builds a

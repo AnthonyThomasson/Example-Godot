@@ -33,8 +33,8 @@ concise current-state comments.
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
-| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, seed readout, test browser window, test result banner. |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
+| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`. |
 
@@ -152,8 +152,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    damage, for injury sensing) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing` and `damage_taken()` — but only while it can SEE that character
    (aim and visible wounds are things it perceives).
-   `player_controller.gd` is the human one and
-   is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
+   `player_controller.gd` is the human one — the gameplay reader of `Keybinds` (`main.gd`, the spectator
+   inspector and the dev command server each read an action too; see `domain-general`). Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
@@ -250,12 +250,24 @@ interface(s) and describes how they're implemented; this list is authoritative f
     (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
     depends on Testing.
 
+14. **Main → General settings, UI settings page** (the composition root wires them; they never meet)
+    - `Settings` (`general/settings.gd`, a `class_name` static holder): `load_file()` (Main calls it once in
+      `_ready`, after seeding `Settings.debug` from its own export — not `Keybinds._ready`, so tests never
+      read a developer's file), the saving mutators `set_debug(on)`, `rebind(action, event) -> bool`,
+      `reset(action)`, `reset_all()`, and `binding_rows() -> Array` (plain dicts for the page). It persists
+      the Debug switch and the `Keybinds` bindings that differ from the defaults to `user://settings.json`.
+    - `SettingsMenu` (`ui/settings_menu.gd`): `open({ debug, rows })`, `set_rows(rows)`; signals
+      `debug_changed`, `rebind_requested(action, event)`, `reset_requested`, `reset_all_requested`,
+      `back_requested`. It takes plain dicts and knows nothing of `Keybinds`/`Settings`; Main opens it from the
+      setup window's `settings_requested`, applies each signal to `Settings` and redraws with `set_rows`.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
 main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory ─▶ Objects ─▶ Physics
 main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
+main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals only, no dependency on Settings)
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
 Objects / Character / Item ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)

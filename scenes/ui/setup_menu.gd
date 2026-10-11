@@ -11,11 +11,12 @@ extends CanvasLayer
 ## dict it emits.
 
 ## Emitted when the player presses Start, carrying the chosen parameters:
-## `{ has_player: bool, seed: int, defenders: int, invaders: int, debug: bool }` — `debug` is the single
-## switch for the AI debug overlays and their in-game toggle bar. Main applies these and builds the world.
+## `{ has_player: bool, seed: int, defenders: int, invaders: int }`. Main applies these and builds the world.
 signal start_requested(config: Dictionary)
 ## Emitted when the Tests button is pressed: Main opens the test browser instead of a match.
 signal tests_requested
+## Emitted when the Settings button is pressed: Main opens the settings page over this window.
+signal settings_requested
 
 const _MAX_COUNT := 8  ## Upper bound per side in the spinboxes; spawn spread handles any count in range.
 
@@ -23,13 +24,12 @@ var _player_check: CheckBox         ## Checked = a human player; unchecked = the
 var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
 var _defender_spin: SpinBox         ## How many defenders to drop into the house.
 var _invader_spin: SpinBox          ## How many invaders to spawn outside the house.
-var _debug_check: CheckBox          ## Checked = AI debug overlays (and their in-game toggle bar) are enabled.
 var _start_button: Button           ## Disabled on press, so holding the start can't be triggered twice.
 var _status: Label                  ## Status line Main shows while it holds the start (hidden when blank).
 
 
-## Build the window seeded from `defaults` (`{ has_player, seed, defenders, invaders,
-## debug }`) and show it. Called by Main before the world is spawned.
+## Build the window seeded from `defaults` (`{ has_player, seed, defenders, invaders }`) and show it.
+## Called by Main before the world is spawned.
 func open(defaults: Dictionary) -> void:
 	_build_ui(defaults)
 
@@ -77,12 +77,6 @@ func _build_ui(defaults: Dictionary) -> void:
 	_defender_spin = _spin_row(box, "Defenders", int(defaults.get("defenders", 1)))
 	_invader_spin = _spin_row(box, "Invaders", int(defaults.get("invaders", 1)))
 
-	_debug_check = CheckBox.new()
-	_debug_check.text = "Debug"
-	_debug_check.button_pressed = bool(defaults.get("debug", true))
-	_debug_check.add_theme_font_size_override("font_size", 30)
-	box.add_child(_debug_check)
-
 	_status = Label.new()
 	_status.add_theme_font_size_override("font_size", 24)
 	_status.modulate = Color(1, 1, 1, 0.75)
@@ -100,6 +94,12 @@ func _build_ui(defaults: Dictionary) -> void:
 	tests_button.add_theme_font_size_override("font_size", 28)
 	tests_button.pressed.connect(tests_requested.emit)
 	box.add_child(tests_button)
+
+	var settings_button := Button.new()
+	settings_button.text = "Settings"
+	settings_button.add_theme_font_size_override("font_size", 28)
+	settings_button.pressed.connect(settings_requested.emit)
+	box.add_child(settings_button)
 
 
 ## A labelled seed row (label + LineEdit), added to `parent`; returns the LineEdit so the caller can
@@ -164,6 +164,5 @@ func _on_start() -> void:
 		"seed": _seed_edit.text.strip_edges().to_int(),
 		"defenders": int(_defender_spin.value),
 		"invaders": int(_invader_spin.value),
-		"debug": _debug_check.button_pressed,
 	})
 

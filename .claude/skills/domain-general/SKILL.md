@@ -1,12 +1,12 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), despawner, camera, the dev command server, and shared physics-layer ids (PhysicsLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the dev command server (gcmd), camera follow, the despawn cap, or a cross-domain physics-layer constant. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, and shared physics-layer ids (PhysicsLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, or a cross-domain physics-layer constant. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
 
-Infrastructure: input (Keybinds), despawner, event bus, camera, dev command server, shared
-physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
+Infrastructure: input (Keybinds), saved settings (Settings), despawner, event bus, camera, dev command
+server, shared physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
 HUDs and menus have moved to the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
 
 `physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
@@ -21,10 +21,38 @@ All input flows through the `Keybinds` autoload; gameplay never hard-codes actio
 `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`, and expose
 a typed helper. `player_controller.gd` (Character domain) is the one gameplay consumer of
 Keybinds; the only other is `command_server.gd` (dev-only), which reads the action *names* to
-inject real input when driving the game from outside. `rebind()` / `rebind_mouse()` remap at
-runtime (basis for a future config UI). `project.godot [input]` just keeps the editor's Input Map
-panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it shares
-Space with `INTERACT`, harmless because the spectator match has no player to interact.
+inject real input when driving the game from outside. `project.godot [input]` just keeps the editor's
+Input Map panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it
+shares Space with `INTERACT`, harmless because the spectator match has no player to interact.
+
+Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button; `FIRE`
+defaults to the left mouse button (`DEFAULT_MOUSE`), the rest to `DEFAULTS`. `LABELS` (settings-page
+order + names) and `GROUPS` list every rebindable action; a new action needs a row in each. Runtime API:
+`bind(action, event)` (key or mouse button; refuses the wheel and anything else), `rebind` / `rebind_mouse`
+(thin wrappers), `reset(action)` / `reset_all()`, `default_event`, `event_of`, `text_of` ("W", "Space",
+"Mouse Left"; skips the layout lookup on the headless display server, which logs an error for it),
+`conflicts_of(action)` (other actions on the same input, minus the deliberately shared `SHARED` pairs —
+Interact/Pause), and `overrides()` / `apply_overrides(d)` (only the bindings that differ from the
+defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skipped one by one).
+`Keybinds._ready` applies the defaults only.
+
+## Saved settings
+
+`settings.gd` (`class_name Settings`, a static holder like the config holders — no instance, no autoload)
+keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays) and the key-binding
+overrides in one JSON file, `Settings.path` (`user://settings.json`):
+`{ "debug": bool, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
+the defaults are stored, so a changed default still reaches an action the player never touched.
+- **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`; a
+  missing file keeps the defaults, an unreadable one `push_warning`s and does the same, and a file that
+  doesn't name `debug` leaves it as it was.
+- **Main calls it, not `Keybinds._ready`**, once in `_ready` (after seeding `Settings.debug` from its own
+  export), so the headless test runner — which never loads `main.tscn` — never reads a developer's file.
+- **Mutators save at once:** `set_debug(on)`, `rebind(action, event) -> bool`, `reset(action)`,
+  `reset_all()` (leaves `debug`). `binding_rows()` reshapes the bindings into the plain dicts the settings
+  page draws: `{ action, label, group, text, conflicts: [labels], changed }`.
+- Tests point `Settings.path` at a scratch file with `set_static` (`tests/general/settings_file_test.gd`);
+  `Keybinds` state is not restored by the harness, so a test that rebinds ends with `Keybinds.reset_all()`.
 
 ## Dev command server
 
@@ -88,3 +116,6 @@ wiring lives in `main.gd`; the General observers only read published contracts.
   public API/signals plus the AI controller's observer reads `current_act()` / `goal` (interface 7).
   `player_controller.gd` and `command_server.gd` are the gameplay consumers of `Keybinds`; `main.gd`
   (`MENU`) and `spectator_inspector.gd` (`PAUSE`) read one action each for top-level/spectator control.
+- `main.gd` (the composition root) is the one caller of `Settings`: it loads the file at startup and routes
+  the UI settings page's signals to `Settings.set_debug` / `rebind` / `reset` / `reset_all`, redrawing the
+  page from `Settings.binding_rows()`. The UI window itself knows nothing of `Keybinds` or `Settings`.

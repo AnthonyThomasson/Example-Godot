@@ -24,7 +24,8 @@ extends Node2D
 ## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
 @export var spectator_mode: bool = true
 ## Master switch for the AI debug overlays: off = every overlay is hidden and the in-game toggle bar is
-## not built. Chosen as the single "Debug" checkbox in the setup window on a fresh launch.
+## not built. This export is the default; on a fresh launch the saved `Settings.debug` (the settings
+## page's Debug checkbox) takes over, while a scripted restart keeps this value.
 @export var debug_overlays: bool = true
 ## Initial state of the debug overlays. The authoritative set is `_overlay_flags` (one entry per row of
 ## `overlay_registry.gd`), seeded from these exports for the overlays they name, from the setup window on
@@ -62,6 +63,8 @@ const OVERLAY_TOGGLES := preload("res://scenes/ui/overlay_toggles.gd")
 const TEST_BROWSER := "res://scenes/testing/test_browser.tscn"
 ## The performance overlay (docks left of the toggle bar).
 const PERFORMANCE_OVERLAY := preload("res://scenes/ui/performance_overlay.gd")
+## The settings page (UI), opened over the setup window by its Settings button.
+const SETTINGS_MENU := preload("res://scenes/ui/settings_menu.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
@@ -81,9 +84,16 @@ var _inspector: Node = null
 var _nav_debug: Node2D = null
 ## The performance overlay (the other global overlay); null when Debug is off.
 var _perf_overlay: CanvasLayer = null
+## The settings page while it is open over the setup window, else null.
+var _settings_menu: CanvasLayer = null
 
 
 func _ready() -> void:
+	# The saved settings (key bindings, Debug) are layered over the defaults here, in the composition
+	# root, so the headless test runner never reads a developer's file. The Debug export seeds the
+	# setting first, so a file that doesn't name it leaves the export standing.
+	Settings.debug = debug_overlays
+	Settings.load_file()
 	_overlay_flags = _initial_overlays()
 	# A scripted restart (the dev command server's `restart`) sets `skip_setup` so a reloaded scene
 	# builds immediately — the headless match harness never clicks the setup window. A fresh launch
@@ -97,12 +107,12 @@ func _ready() -> void:
 			_debug_ui.visible = false
 		_setup_menu.start_requested.connect(_on_setup_chosen)
 		_setup_menu.tests_requested.connect(_open_tests)
+		_setup_menu.settings_requested.connect(_open_settings)
 		_setup_menu.open({
 			"has_player": not spectator_mode,
 			"seed": house_seed,
 			"defenders": defender_count,
 			"invaders": invader_count,
-			"debug": debug_overlays,
 		})
 
 
@@ -113,7 +123,7 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	house_seed = int(config.get("seed", house_seed))
 	defender_count = int(config.get("defenders", defender_count))
 	invader_count = int(config.get("invaders", invader_count))
-	debug_overlays = bool(config.get("debug", debug_overlays))
+	debug_overlays = Settings.debug
 	_overlay_flags = _initial_overlays()  # Recomputed now that the master switch is chosen.
 	# Hold the start until the decision server is live, so the NPCs' first decisions don't fail
 	# against a booting server and leave them holding steady. The window stays up (showing why)
@@ -132,6 +142,45 @@ func _on_setup_chosen(config: Dictionary) -> void:
 ## game tests and returns here on Back.
 func _open_tests() -> void:
 	get_tree().change_scene_to_file(TEST_BROWSER)
+
+
+## The setup window's Settings button: open the settings page over it. The page only reports what the
+## player changed; each change goes to `Settings` (which saves it) and the page's rows are redrawn from it.
+func _open_settings() -> void:
+	if _settings_menu != null:
+		return
+	_settings_menu = SETTINGS_MENU.new()
+	add_child(_settings_menu)
+	_settings_menu.debug_changed.connect(Settings.set_debug)
+	_settings_menu.rebind_requested.connect(_on_rebind_requested)
+	_settings_menu.reset_requested.connect(_on_reset_requested)
+	_settings_menu.reset_all_requested.connect(_on_reset_all_requested)
+	_settings_menu.back_requested.connect(_close_settings)
+	_settings_menu.open({ "debug": Settings.debug, "rows": Settings.binding_rows() })
+
+
+## The page captured a key or button for `action`: bind it and redraw the page.
+func _on_rebind_requested(action: String, event: InputEvent) -> void:
+	if Settings.rebind(action, event):
+		_settings_menu.set_rows(Settings.binding_rows())
+
+
+## The page reset one action: restore its default and redraw.
+func _on_reset_requested(action: String) -> void:
+	Settings.reset(action)
+	_settings_menu.set_rows(Settings.binding_rows())
+
+
+## The page reset every key: restore all defaults and redraw.
+func _on_reset_all_requested() -> void:
+	Settings.reset_all()
+	_settings_menu.set_rows(Settings.binding_rows())
+
+
+## Close the settings page, back to the setup window.
+func _close_settings() -> void:
+	_settings_menu.queue_free()
+	_settings_menu = null
 
 
 ## Wait for the Von decision server to settle before the world is built. Returns at once when the
