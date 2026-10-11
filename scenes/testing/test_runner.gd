@@ -7,7 +7,9 @@ extends Node2D
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
 ##                 --run-tests [filter] [--include-von]` runs every matching test in turn, prints one
 ##                 line each plus a summary, writes `user://test_report.json` and exits 1 on any
-##                 failure (or any error/warning logged outside a test).
+##                 failure (or any error/warning logged outside a test). `--out=<dir>` puts the report
+##                 and failure bundles in <dir> instead; started with `--log-file <dir>/godot.log` it
+##                 also owns its engine log, so parallel runs and a running game never share files.
 ## Each test gets a fresh TestWorld child, freed between tests. The Von launcher is created only when
 ## a test needs it and then kept for the session, so a server it started isn't killed between tests.
 ## Every engine error/warning logged while a test is open fails it (log_watch.gd).
@@ -32,11 +34,15 @@ const REALTIME_FPS := 60
 
 var _watch := LogWatch.new()
 var _batch := false
+## Where the report and failure bundles go; `--out=<dir>` moves them off the shared `user://` paths so
+## concurrent runs (and a running game) never overwrite each other.
+var _report_path := REPORT_PATH
+var _bundle_dir := BUNDLE_DIR
 ## Batch: run requires_von tests (else they are skipped).
 var _include_von := false
 ## `--require-von`: a Von test fails instead of skipping when no server is live.
 var _require_von := false
-## `--shots`: save screenshots of failed tests into BUNDLE_DIR (needs a rendering run, not headless).
+## `--shots`: save screenshots of failed tests into the bundle dir (needs a rendering run, not headless).
 var _shots := false
 ## The Von launcher, created by the first requires_von test, and its settled answer.
 var _launcher: Node = null
@@ -59,8 +65,13 @@ var _toggles: CanvasLayer = null
 
 
 func _ready() -> void:
-	_watch.begin()
 	var args := OS.get_cmdline_user_args()
+	# A run given `--out=<dir>` was also started with `--log-file <dir>/godot.log` (the engine consumes that
+	# flag, so it is not visible here and does not update the project setting): follow the moved log.
+	var out := _option(args, "--out", "")
+	if out != "":
+		_watch.path_override = out.path_join("godot.log")
+	_watch.begin()
 	if args.has("--play"):
 		_select_from_cli(args)
 	if args.has("--run-tests"):
@@ -131,7 +142,7 @@ func _start(entry: Dictionary) -> void:
 					return
 	_ctx = TestContext.new(get_tree(), entry)
 	if _shots:
-		_ctx.shot_prefix = "%s/%s" % [BUNDLE_DIR, String(entry["id"]).replace("/", "__")]
+		_ctx.shot_prefix = "%s/%s" % [_bundle_dir, String(entry["id"]).replace("/", "__")]
 	if entry["error"] != "":
 		_ctx.check(false, "Test script " + String(entry["error"]))
 		_ctx.finish("FAIL")
@@ -346,6 +357,10 @@ func _run_batch(args: PackedStringArray) -> void:
 	_shots = args.has("--shots")
 	if _shots and DisplayServer.get_name() == "headless":
 		print("NOTE  --shots needs a rendering run; tools/run_tests.sh --shots drops --headless")
+	var out := _option(args, "--out", "")
+	if out != "":
+		_report_path = out.path_join("report.json")
+		_bundle_dir = out.path_join("failures")
 	var repeat := maxi(1, int(_option(args, "--repeat", "1")))
 	TestSetup.seed_override = int(_option(args, "--seed", "0"))
 	var self_test := args.has("--self-test")
@@ -426,10 +441,10 @@ func _print_result(r: Dictionary) -> void:
 			print("        shot:   %s" % shot)
 
 
-## Write a failed result (events, snapshot, traces included) to BUNDLE_DIR; returns the file's path.
+## Write a failed result (events, snapshot, traces included) to the bundle dir; returns the file's path.
 func _write_bundle(r: Dictionary) -> String:
-	DirAccess.make_dir_recursive_absolute(BUNDLE_DIR)
-	var path := "%s/%s.json" % [BUNDLE_DIR, String(r["id"]).replace("/", "__")]
+	DirAccess.make_dir_recursive_absolute(_bundle_dir)
+	var path := "%s/%s.json" % [_bundle_dir, String(r["id"]).replace("/", "__")]
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f != null:
 		f.store_string(JSON.stringify(r, "  "))
@@ -462,10 +477,10 @@ func _summarize(results: Array, repeat := 1) -> int:
 	return 1 if bad > 0 else 0
 
 
-## Write the JSON report (results + stray logs) to REPORT_PATH.
+## Write the JSON report (results + stray logs) to the report path.
 func _write_report(results: Array) -> void:
-	var f := FileAccess.open(REPORT_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(_report_path, FileAccess.WRITE)
 	if f == null:
 		return
 	f.store_string(JSON.stringify({ "results": results, "stray_logs": _stray_logs }, "  "))
-	print("Report: %s" % ProjectSettings.globalize_path(REPORT_PATH))
+	print("Report: %s" % ProjectSettings.globalize_path(_report_path))

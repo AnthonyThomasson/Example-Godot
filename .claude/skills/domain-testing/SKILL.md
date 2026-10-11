@@ -14,12 +14,20 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **CLI:** `tools/run_tests.sh [filter words] [--include-von]` runs
   `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. It prints one
   line per test (`PASS/FAIL/TIMEOUT/SKIPPED  <id>  (<sim s>)`, failed checks indented with ✗), then a
-  summary, and writes `user://test_report.json`. Exit code 1 means a test failed or timed out, or an
+  summary, and writes `report.json`. Exit code 1 means a test failed or timed out, or an
   error/warning was logged outside any test. Filter words are word prefixes over id, name, domain,
   description and tags (`ai` matches the ai domain, not "chair"). Manual sandboxes are always skipped.
   `requires_von` tests are skipped unless `--include-von` is passed (`--require-von` runs them and
   fails when no server is live), and are then paced in real time
   (see below). Run with the Bash sandbox disabled, like every Godot launch.
+- **Per-run output dir:** the wrapper gives every invocation a fresh `mktemp -d`, passed as
+  `--log-file <dir>/godot.log` (engine flag) plus `--out=<dir>`. The report, failure bundles and shots go
+  under `<dir>` (`Report:` / `bundle:` lines print the paths) and the runner's `LogWatch` follows
+  `<dir>/godot.log` (`--log-file` is consumed by the engine, so it is not in `get_cmdline_args()` and does
+  not change the project setting — the runner derives the log from `--out`). So concurrent runs, and a
+  game being played meanwhile, never share a log (a new process rotates the old `user://logs/godot.log`,
+  and `LogWatch` tails by path) or overwrite each other's report. Without `--out` the runner falls back
+  to `user://test_report.json` and `user://test_failures/`.
 - **Other flags:** `--list [words]` (id, von/manual flags, tags; runs nothing), `--repeat=N` (each test
   N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every `house()` uses that seed), `--json` (one
   `JSON: {…}` line with all results), and, in the wrapper only, `--changed` (runs `tests/<d>/` for each
@@ -34,12 +42,15 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **Coverage:** `python3 tools/test_coverage.py` lists untested domains, unused switches and interfaces
   no test calls.
 - **Failures:** a FAIL/TIMEOUT prints each actor's final state and the `t.trace` series ranges, and writes
-  `user://test_failures/<id>.json` (path printed as `bundle:`) with the full time-stamped event log, the
+  `<out dir>/failures/<id>.json` (path printed as `bundle:`) with the full time-stamped event log, the
   final snapshot, traces and logged errors. See the `test-debug` skill.
 - **In game:** the setup window's **Tests** button opens `test_browser.tscn`. Search, pick, then Play,
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
   offers Rerun and Back/Escape. The in-game overlay toggle bar works on the test's NPCs.
   `-- --play <filter>` on the command line opens the first matching test straight in the runner.
+  The browser's **Run all** button spawns a separate headless run of the whole suite (its own
+  `user://test_runs/<n>/` dir as above), shows elapsed time, then folds `report.json` into the marks and
+  the status line (failure bundles are under that dir).
 
 ## Writing a test
 

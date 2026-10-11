@@ -19,6 +19,8 @@ const GLOBAL_ALLOWED := [
 	"[von] ",  # the Von launcher's diagnostics; a requires_von test is SKIPPED without a live server
 ]
 
+## Set to watch a log other than the project's (a run started with `--log-file`).
+var path_override := ""
 var _path := ""
 var _offset := 0
 ## A trailing line not yet terminated by a newline (kept until the rest arrives).
@@ -98,6 +100,8 @@ func _feed(line: String, out: Array) -> void:
 
 ## The absolute path of the engine log file.
 func _log_path() -> String:
+	if path_override != "":
+		return path_override
 	return ProjectSettings.globalize_path(String(ProjectSettings.get_setting("debug/file_logging/log_path", "user://logs/godot.log")))
 
 

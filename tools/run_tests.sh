@@ -18,7 +18,8 @@
 #                                         art and general run everything; testing adds --self-test.
 #                                         Other flags pass through.
 # A failed test prints its final actor state and a `bundle:` path to a JSON with its event log,
-# state and traces (also under user://test_failures/).
+# state and traces. Each invocation gets its own engine log, report and bundles in a fresh temp dir
+# (printed as `Report:` / `bundle:`), so concurrent runs and a running game never share files.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 GODOT="${GODOT:-$( command -v godot || command -v godot4 \
@@ -32,7 +33,10 @@ HEADLESS=--headless
 for a in "$@"; do [[ "$a" == "--shots" ]] && HEADLESS=; done
 
 run() {
-  "$GODOT" $HEADLESS --path . --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests "$@"
+  local out
+  out=$(mktemp -d "${TMPDIR:-/tmp}/game_tests.XXXXXX")
+  "$GODOT" $HEADLESS --path . --fixed-fps 60 --log-file "$out/godot.log" \
+    res://scenes/testing/test_runner.tscn -- --run-tests --out="$out" "$@"
 }
 
 # Which test domains a change to scenes/<domain>/ can break: the domain itself plus everything that

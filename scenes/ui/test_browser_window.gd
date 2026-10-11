@@ -2,13 +2,16 @@ extends CanvasLayer
 
 ## UI domain, test browser window: lists every game test grouped by domain, with a search box (matched
 ## by the host's `matcher`), the last result per test, and a details
-## pane. Play (or double-click / Enter) emits `play_requested`; Back emits `back_requested`. Built in
-## code like the other UI windows; it knows nothing of the Testing domain — only the descriptor dicts
+## pane. Play (or double-click / Enter) emits `play_requested`; Back emits `back_requested`; Run all
+## emits `run_all_requested` and the host answers with `set_run_status` / `set_results`. Built in code like the other UI windows; it knows nothing of the
+## Testing domain — only the descriptor dicts
 ## (`{ id, path, name, domain, description, tags, requires_von, manual, switches, world, error }`) and
 ## the `{ id: status }` results it is handed.
 
 signal play_requested(path: String)
 signal back_requested
+## Run every test (the host spawns the run and reports back through `set_run_status` / `set_results`).
+signal run_all_requested
 ## The search text changed (so the host can restore it next time).
 signal filter_changed(text: String)
 
@@ -25,6 +28,8 @@ var _search: LineEdit
 var _tree: Tree
 var _details: RichTextLabel
 var _play: Button
+var _run_all: Button
+var _run_status: Label
 var _count: Label
 
 
@@ -99,8 +104,19 @@ func _build_ui() -> void:
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 16)
-	buttons.alignment = BoxContainer.ALIGNMENT_END
 	box.add_child(buttons)
+	_run_all = Button.new()
+	_run_all.text = "Run all"
+	_run_all.add_theme_font_size_override("font_size", 28)
+	_run_all.pressed.connect(run_all_requested.emit)
+	buttons.add_child(_run_all)
+	_run_status = Label.new()
+	_run_status.add_theme_font_size_override("font_size", 22)
+	_run_status.modulate = Color(1, 1, 1, 0.8)
+	_run_status.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_run_status.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_run_status.clip_text = true
+	buttons.add_child(_run_status)
 	var back := Button.new()
 	back.text = "Back"
 	back.add_theme_font_size_override("font_size", 28)
@@ -111,6 +127,19 @@ func _build_ui() -> void:
 	_play.add_theme_font_size_override("font_size", 28)
 	_play.pressed.connect(_play_selected)
 	buttons.add_child(_play)
+
+
+## Show the host's run progress / outcome next to the buttons; `running` disables Run all.
+func set_run_status(text: String, running := false) -> void:
+	_run_status.text = text
+	_run_all.disabled = running
+
+
+## Replace the `{ id: status }` marks (after a run) and redraw the list.
+func set_results(results: Dictionary) -> void:
+	_results = results
+	_refresh(_selected_path())
+	_show_details()
 
 
 ## Rebuild the list for the current search, keeping `keep` (a path) selected when it is still shown,
