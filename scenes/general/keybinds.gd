@@ -20,6 +20,15 @@ const MENU := "menu"
 ## Pause/resume the game (spectator inspector only — shares Space with INTERACT, which is unused in the
 ## player-less spectator match).
 const PAUSE := "pause"
+## Pan the spectator camera by hand (camera_controller.gd). Shares WASD with the MOVE_* actions —
+## harmless because the spectator match has no player to move.
+const CAMERA_LEFT := "camera_left"
+const CAMERA_RIGHT := "camera_right"
+const CAMERA_UP := "camera_up"
+const CAMERA_DOWN := "camera_down"
+## Zoom the camera (default: mouse wheel).
+const ZOOM_IN := "zoom_in"
+const ZOOM_OUT := "zoom_out"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -41,6 +50,10 @@ const DEFAULTS := {
 	INTERACT: KEY_SPACE,
 	MENU: KEY_ESCAPE,
 	PAUSE: KEY_SPACE,
+	CAMERA_LEFT: KEY_A,
+	CAMERA_RIGHT: KEY_D,
+	CAMERA_UP: KEY_W,
+	CAMERA_DOWN: KEY_S,
 	ITEM_1: KEY_1,
 	ITEM_2: KEY_2,
 	ITEM_3: KEY_3,
@@ -52,6 +65,14 @@ const DEFAULTS := {
 	ITEM_9: KEY_9,
 }
 
+## Default mouse button for each pointer-bound action (`MouseButton` values aren't `Key`s, so they
+## live apart from DEFAULTS). Remap one at runtime with `rebind_mouse()`.
+const MOUSE_DEFAULTS := {
+	FIRE: MOUSE_BUTTON_LEFT,
+	ZOOM_IN: MOUSE_BUTTON_WHEEL_UP,
+	ZOOM_OUT: MOUSE_BUTTON_WHEEL_DOWN,
+}
+
 
 func _ready() -> void:
 	# Make sure every action exists in the InputMap and matches DEFAULTS, even if
@@ -61,9 +82,9 @@ func _ready() -> void:
 			InputMap.add_action(action)
 		rebind(action, DEFAULTS[action])
 
-	# FIRE is bound to a mouse button, which isn't a Key value, so it lives
-	# outside the keyboard DEFAULTS dict and is registered separately here.
-	rebind_mouse(FIRE, MOUSE_BUTTON_LEFT)
+	# Mouse buttons aren't Key values, so they're registered from their own table.
+	for action in MOUSE_DEFAULTS:
+		rebind_mouse(action, MOUSE_DEFAULTS[action])
 
 
 ## Point the given action at a single physical key, replacing any existing events.
@@ -91,6 +112,11 @@ func rebind_mouse(action: StringName, button: MouseButton) -> void:
 ## Movement direction from the four move actions, ready to multiply by speed.
 func get_move_vector() -> Vector2:
 	return Input.get_vector(MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN)
+
+
+## Manual camera pan direction from the four camera actions (length <= 1).
+func get_camera_vector() -> Vector2:
+	return Input.get_vector(CAMERA_LEFT, CAMERA_RIGHT, CAMERA_UP, CAMERA_DOWN)
 
 
 ## True on the frame the punch key is pressed. Goes through the same rebindable

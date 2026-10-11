@@ -256,7 +256,9 @@ func _observe_actor(id: StringName, actor: Node) -> void:
 
 
 ## Frame the setup's camera targets (default: every actor; an empty world frames its first room).
+## A world with a human-driven player keeps WASD for walking, so the camera's hand-pan is off there.
 func _frame_camera(setup: TestSetup) -> void:
+	_camera.set("pan_enabled", not setup.actors.any(func(a): return a["kind"] == &"player"))
 	var targets: Array = []
 	for id in (setup.camera_targets if not setup.camera_targets.is_empty() else _world.actors.keys()):
 		var a: Node = _world.actors.get(id)

@@ -24,7 +24,11 @@ Keybinds; the only other is `command_server.gd` (dev-only), which reads the acti
 inject real input when driving the game from outside. `rebind()` / `rebind_mouse()` remap at
 runtime (basis for a future config UI). `project.godot [input]` just keeps the editor's Input Map
 panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it shares
-Space with `INTERACT`, harmless because the spectator match has no player to interact.
+Space with `INTERACT`, harmless because the spectator match has no player to interact. Keyboard
+defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `ZOOM_IN` /
+`ZOOM_OUT` wheel up/down); both tables are registered in `_ready()`. `CAMERA_LEFT/RIGHT/UP/DOWN`
+(default WASD, read through `get_camera_vector()`) and `ZOOM_IN/OUT` are read only by the camera; the
+camera keys share WASD with `MOVE_*`, harmless because the spectator match has no player to move.
 
 ## Dev command server
 
@@ -68,6 +72,17 @@ consumed by allied AIs.
   following one target it eases to the midpoint of the live targets and zooms to fit them plus
   `frame_margin` (clamped by `min_zoom`/`max_zoom`), dropping any whose `is_dead` is true — used by
   the spectator match view.
+  - **Zoom** (both modes): the `ZOOM_IN`/`ZOOM_OUT` actions (mouse wheel) scale the zoom by `zoom_step`
+    per notch (fractional for trackpads), clamped by `min_zoom`/`max_zoom` and eased in at
+    `follow_speed`. Read in `_unhandled_input`, so scrolling UI gets the wheel first.
+  - **Hand control** (framing mode only): the camera keys or the mouse within `edge_pan_margin` px of
+    a screen edge pan the camera at `pan_speed` (screen px/s, so zoom-independent). Any camera input —
+    pan or wheel — sets `_manual`, which suspends the automatic framing (position and zoom); after
+    `manual_hold` (5) seconds without input `_manual` clears and the framing eases back in. Edge
+    panning only runs while the pointer has been seen moving over the window (`_mouse_in_window`,
+    cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
+    never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the
+    test runner turns it off for a world with a human-driven player, where WASD walks.
 - `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood pools);
   domains register spawns with it.
 

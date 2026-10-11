@@ -103,7 +103,7 @@ func run(t: TestContext) -> void:
     asked with `t.von_requests()` (`{ state, question, options, pick }`). Ids are the decision tree's node
     ids (`combat`, `flank`, `engage`, …) and option ids. Keep `requires_von` tests for judging Von itself.
   - Presentation: `show_overlays(["show_vision", …])` and `camera_follow([ids])` (default frames all
-    actors).
+    actors; the camera's hand-pan is off when a `player` actor is present, since WASD walks it).
 - **`run(t: TestContext)`**, a coroutine. Always wait through `t`. A raw `await get_tree()…` can
   resume into a torn-down world.
   - Waits, all in sim time: `await t.seconds(s)`, `await t.frames(n)`,

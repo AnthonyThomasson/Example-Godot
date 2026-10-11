@@ -153,7 +153,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    another character's `facing` and `damage_taken()` — but only while it can SEE that character
    (aim and visible wounds are things it perceives).
    `player_controller.gd` is the human one and
-   is the ONLY file besides `keybinds.gd` that touches `Keybinds`. Signals:
+   is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main / the test runner `MENU`,
+   the spectator inspector `PAUSE`, the camera its pan and zoom actions). Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
