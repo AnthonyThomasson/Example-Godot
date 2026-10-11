@@ -37,6 +37,16 @@ const Rig = preload("res://scenes/character/character_rig.gd")  # The joint indi
 var _shadow: Node2D
 var _settled_drawn := false  ## The fallen body has been drawn at rest: nothing left to redraw.
 
+## A standing body is repainted only when what it draws has changed: its joints, the angles its parts are
+## turned by, what is held and its wounds, each rounded to a step below a visible pixel at the body's size
+## (positions in px, angles in rad). A character standing still drifts by less than a step most frames
+## (breath, glance), and repainting an identical body is most of an idle crowd's frame cost.
+const REDRAW_POS_STEP := 0.1
+const REDRAW_ANGLE_STEP := 0.02
+var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
+var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
+var redraws := 0  ## How many times the standing body has been drawn (tests read it).
+
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
@@ -46,8 +56,12 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var ragdoll = _character.ragdoll
 	if ragdoll == null:
-		queue_redraw()  # facing / items change continuously.
-		_shadow.queue_redraw()
+		_rig = _character.rig()
+		var key := _redraw_key_of(_rig)
+		if key != _redraw_key:
+			_redraw_key = key
+			queue_redraw()
+			_shadow.queue_redraw()
 		return
 	if _settled_drawn:
 		return
@@ -56,12 +70,38 @@ func _process(_delta: float) -> void:
 	_shadow.queue_redraw()
 
 
+## The inputs of the standing draw for `rig`, each rounded to its redraw step: the joints and feet (which
+## carry the lunge, the head's offset and the hands' places), the angles the shoulders, head, fists and
+## weapon are turned by, the held slot, and the wounds that dent and darken the parts.
+func _redraw_key_of(rig) -> PackedInt32Array:
+	var pose = _character.pose
+	var key := PackedInt32Array()
+	for i in 17:
+		var p: Vector3 = rig.point(i)
+		key.append(roundi(p.x / REDRAW_POS_STEP))
+		key.append(roundi(p.y / REDRAW_POS_STEP))
+		key.append(roundi(p.z / REDRAW_POS_STEP))
+	for i in 2:
+		var toes: Vector3 = rig.toes(i)
+		key.append(roundi(toes.x / REDRAW_ANGLE_STEP))
+		key.append(roundi(toes.y / REDRAW_ANGLE_STEP))
+	for angle in [pose.torso_angle, pose.head_angle, pose.hand_angles[0], pose.hand_angles[1], pose.weapon_angle]:
+		key.append(roundi(angle / REDRAW_ANGLE_STEP))
+	key.append(_character.current_slot())
+	var deformable = _character._deformable
+	if deformable:
+		key.append(deformable.impacts.size())
+		key.append(roundi(deformable.damage_total * 100.0))
+	return key
+
+
 func _draw() -> void:
 	if _character.ragdoll:
 		_draw_fallen(_character.ragdoll)
 		return
+	redraws += 1
 	var pose = _character.pose
-	var rig = _character.rig()
+	var rig = _rig if _rig != null else _character.rig()
 	var lunge: Vector2 = pose.torso_offset
 	var torso: float = pose.torso_angle - PI * 0.5  # Canonical art faces +y.
 	var size := _shoulder_size()
@@ -111,7 +151,7 @@ func _shoulder_art(angle: float) -> Texture2D:
 ## the light by its height.
 func _draw_standing_shadow() -> void:
 	var pose = _character.pose
-	var rig = _character.rig()
+	var rig = _rig if _rig != null else _character.rig()
 	var cast := _shadow_caster()
 	var deformable = _character._deformable
 	var impacts := _turned(deformable.impacts if deformable else [], pose.torso_angle)

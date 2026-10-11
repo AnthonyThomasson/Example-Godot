@@ -27,6 +27,16 @@ its own child `Node2D`.
   (sleeve, then forearm), the shoulders (at the pose's lunge), the head (with its shadow on the
   shoulders), then `item.draw_weapon()`, then both fists (on top, gripping the weapon), then the
   wound marks over all of it. Once dead it draws the fallen body instead (below).
+  **A standing body is repainted only when its drawing changes.** Each frame `_process` solves the rig once
+  (shared by the body's and the shadow's draw) and rounds its inputs to a key: every joint and foot, the
+  shoulder / head / fist / weapon angles, the held slot, and the wound count and damage. The key is rounded
+  to `REDRAW_POS_STEP` (0.1 px) and `REDRAW_ANGLE_STEP` (0.02 rad), below a visible pixel at the body's
+  size; `queue_redraw()` (body and shadow) runs only when the key changes. A character standing still drifts
+  by less than a step most frames (breath, glance), so it repaints about once in 15 frames; a walking one
+  every frame. `redraws` counts the standing body's draws for tests. A new input to the standing draw must
+  join `_redraw_key_of`, or the body will not repaint when it changes. Test:
+  `tests/character/standing_body_repaints_on_change_test.gd`; the idle crowd's frame cost is guarded by
+  `tests/physics/crowd_deaths_stress_test.gd`.
 
 ## Pose (the living motion)
 
@@ -188,7 +198,8 @@ The character is top-down pixel art rendered through the Art domain (interface 1
   shadow (living and fallen alike) is one `CanvasGroup` of opaque shapes carrying
   `ArtConfig.drop_shadow_alpha` — the shoulders' own deformed silhouette, each limb's capsule, the
   fists and the head — every point shifted away from the light by `body_shadow_per_height × height`,
-  so overlaps don't darken twice. It is redrawn every frame while alive.
+  so overlaps don't darken twice. It is redrawn with the body (see the Draw layer above), so only when
+  the standing body's drawing changes.
 - **Wounds turn with the shoulders:** `take_hit` records impacts relative to them
   (`Deformable.record(hit, pose.torso_angle)`) and the visuals turn them back to the current
   `torso_angle`, so a dent stays on the shoulder or hand that was hit. A part (hand or head) is
