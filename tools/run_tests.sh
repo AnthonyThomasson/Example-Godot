@@ -4,6 +4,7 @@
 #
 #   tools/run_tests.sh                    every test (Von tests skipped)
 #   tools/run_tests.sh projectile         only tests matching "projectile" (id, name, domain, tag)
+#   tools/run_tests.sh --domain=ai        only the tests of exactly that domain (no word-prefix matching)
 #   tools/run_tests.sh --include-von ai   also run tests that need the Von decision server
 #   tools/run_tests.sh --require-von ai   Von tests FAIL instead of skipping when no server is live
 #   tools/run_tests.sh --list [words]     list matching tests (id, flags, tags, name) and exit

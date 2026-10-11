@@ -5,7 +5,8 @@ extends Node2D
 ##                 match of `-- --play <filter>`), shows the result banner and keeps the world
 ##                 running; Rerun rebuilds it, Back/Escape returns to the browser;
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
-##                 --run-tests [filter] [--include-von]` runs every matching test in turn, prints one
+##                 --run-tests [filter] [--domain=<name>] [--include-von]` runs every matching test
+##                 (`--domain` keeps only that exact domain, unlike the prefix-matching filter) in turn, prints one
 ##                 line each plus a summary, writes `user://test_report.json` and exits 1 on any
 ##                 failure (or any error/warning logged outside a test). `--out=<dir>` puts the report
 ##                 and failure bundles in <dir> instead; started with `--log-file <dir>/godot.log` it
@@ -363,9 +364,11 @@ func _run_batch(args: PackedStringArray) -> void:
 		_bundle_dir = out.path_join("failures")
 	var repeat := maxi(1, int(_option(args, "--repeat", "1")))
 	TestSetup.seed_override = int(_option(args, "--seed", "0"))
+	var domain := _option(args, "--domain", "")
 	var self_test := args.has("--self-test")
 	TestCatalog.show_internal = self_test
-	var picked := TestCatalog.discover().filter(func(e): return (e["internal"] or not self_test) and TestCatalog.matches(e, filter))
+	var picked := TestCatalog.discover().filter(func(e): return (e["internal"] or not self_test) \
+		and (domain == "" or e["domain"] == domain) and TestCatalog.matches(e, filter))
 	if args.has("--list"):
 		_print_list(picked)
 		get_tree().quit(0)
@@ -376,7 +379,8 @@ func _run_batch(args: PackedStringArray) -> void:
 		"required" if _require_von else ("included" if _include_von else "skipped"),
 		"" if repeat == 1 else "  repeat x%d" % repeat,
 		"" if TestSetup.seed_override == 0 else "  seed %d" % TestSetup.seed_override])
-	print("Running %d test(s)%s" % [picked.size(), "" if filter == "" else " matching '%s'" % filter])
+	print("Running %d test(s)%s%s" % [picked.size(), "" if domain == "" else " in domain '%s'" % domain,
+		"" if filter == "" else " matching '%s'" % filter])
 	var results: Array = []
 	for entry in picked:
 		for run in repeat:

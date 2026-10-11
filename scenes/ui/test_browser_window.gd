@@ -2,16 +2,18 @@ extends CanvasLayer
 
 ## UI domain, test browser window: lists every game test grouped by domain, with a search box (matched
 ## by the host's `matcher`), the last result per test, and a details
-## pane. Play (or double-click / Enter) emits `play_requested`; Back emits `back_requested`; Run all
-## emits `run_all_requested` and the host answers with `set_run_status` / `set_results`. Built in code like the other UI windows; it knows nothing of the
+## pane. Play (or double-click / Enter) emits `play_requested`; Back emits `back_requested`; Run all, or
+## the ▶ button on a domain's row, emits `run_requested` and the host answers with `set_run_status` /
+## `set_results`. Built in code like the other UI windows; it knows nothing of the
 ## Testing domain — only the descriptor dicts
 ## (`{ id, path, name, domain, description, tags, requires_von, manual, switches, world, error }`) and
 ## the `{ id: status }` results it is handed.
 
 signal play_requested(path: String)
 signal back_requested
-## Run every test (the host spawns the run and reports back through `set_run_status` / `set_results`).
-signal run_all_requested
+## Run the tests of `domain` — every test when it is "" (the host spawns the run and reports back
+## through `set_run_status` / `set_results`).
+signal run_requested(domain: String)
 ## The search text changed (so the host can restore it next time).
 signal filter_changed(text: String)
 
@@ -20,6 +22,10 @@ const STATUS_COLORS := {
 	"PASS": Color(0.45, 0.9, 0.45), "FAIL": Color(1.0, 0.4, 0.35), "TIMEOUT": Color(1.0, 0.6, 0.25),
 	"SKIPPED": Color(0.75, 0.75, 0.75),
 }
+## Side of the ▶ run button's icon on a domain row, in pixels.
+const RUN_ICON_SIZE := 22
+
+static var _icon_cache: Texture2D = null
 
 var _tests: Array = []
 var _matcher: Callable
@@ -31,6 +37,10 @@ var _play: Button
 var _run_all: Button
 var _run_status: Label
 var _count: Label
+## The current list's domain rows (domain → TreeItem), each carrying a ▶ button.
+var _groups: Dictionary = {}
+## A run is going: Run all and every domain's ▶ are disabled.
+var _running := false
 
 
 ## Build the window over `tests`, marking `results`, with `filter` prefilled and `selected` (a test
@@ -93,6 +103,7 @@ func _build_ui() -> void:
 	_tree.add_theme_font_size_override("font_size", 24)
 	_tree.item_selected.connect(_show_details)
 	_tree.item_activated.connect(_play_selected)
+	_tree.button_clicked.connect(_on_group_button)
 	split.add_child(_tree)
 	_details = RichTextLabel.new()
 	_details.bbcode_enabled = true
@@ -108,7 +119,7 @@ func _build_ui() -> void:
 	_run_all = Button.new()
 	_run_all.text = "Run all"
 	_run_all.add_theme_font_size_override("font_size", 28)
-	_run_all.pressed.connect(run_all_requested.emit)
+	_run_all.pressed.connect(run_requested.emit.bind(""))
 	buttons.add_child(_run_all)
 	_run_status = Label.new()
 	_run_status.add_theme_font_size_override("font_size", 22)
@@ -129,10 +140,15 @@ func _build_ui() -> void:
 	buttons.add_child(_play)
 
 
-## Show the host's run progress / outcome next to the buttons; `running` disables Run all.
+## Show the host's run progress / outcome next to the buttons; `running` disables Run all and the
+## domain ▶ buttons.
 func set_run_status(text: String, running := false) -> void:
 	_run_status.text = text
 	_run_all.disabled = running
+	if running != _running:
+		_running = running
+		for g: TreeItem in _groups.values():
+			g.set_button_disabled(0, 0, running)
 
 
 ## Replace the `{ id: status }` marks (after a run) and redraw the list.
@@ -147,7 +163,7 @@ func set_results(results: Dictionary) -> void:
 func _refresh(keep: String) -> void:
 	_tree.clear()
 	var root := _tree.create_item()
-	var groups := {}
+	_groups.clear()
 	var first: TreeItem = null
 	var keep_item: TreeItem = null
 	var shown := 0
@@ -156,13 +172,15 @@ func _refresh(keep: String) -> void:
 			continue
 		shown += 1
 		var domain: String = t["domain"]
-		if not groups.has(domain):
+		if not _groups.has(domain):
 			var g := _tree.create_item(root)
 			g.set_text(0, domain.to_upper())
 			g.set_selectable(0, false)
 			g.set_custom_color(0, Color(0.7, 0.75, 0.85))
-			groups[domain] = g
-		var item := _tree.create_item(groups[domain])
+			g.set_metadata(0, domain)
+			g.add_button(0, _run_icon(), 0, _running, "Run the %d %s tests" % [_runnable_count(domain), domain])
+			_groups[domain] = g
+		var item := _tree.create_item(_groups[domain])
 		var status: String = _results.get(t["id"], "")
 		var mark: String = STATUS_MARKS.get(status, " ")
 		var suffix := ""
@@ -188,6 +206,33 @@ func _refresh(keep: String) -> void:
 	else:
 		_details.text = "[i]No tests match.[/i]"
 	_play.disabled = pick == null
+
+
+## A domain row's ▶ was clicked: ask the host to run that domain (ignored while a run is going).
+func _on_group_button(item: TreeItem, _column: int, _id: int, mouse_button: int) -> void:
+	if mouse_button == MOUSE_BUTTON_LEFT and not _running and item.get_metadata(0) is String:
+		run_requested.emit(item.get_metadata(0))
+
+
+## How many of `domain`'s tests a run will actually execute (manual sandboxes are skipped), whatever
+## the search shows.
+func _runnable_count(domain: String) -> int:
+	return _tests.filter(func(t): return t["domain"] == domain and not t.get("manual", false)).size()
+
+
+## The ▶ icon for a domain's run button: a green right-pointing triangle, drawn once.
+static func _run_icon() -> Texture2D:
+	if _icon_cache == null:
+		var size := RUN_ICON_SIZE
+		var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
+		var color: Color = STATUS_COLORS["PASS"]
+		for y in size:
+			# The triangle's right edge narrows linearly from the full width at the middle row to a point at the ends.
+			var reach := int(size * (1.0 - absf((y + 0.5) / size - 0.5) * 2.0))
+			for x in reach:
+				img.set_pixel(x, y, color)
+		_icon_cache = ImageTexture.create_from_image(img)
+	return _icon_cache
 
 
 ## Fill the details pane for the selected test.

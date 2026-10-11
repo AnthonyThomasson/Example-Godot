@@ -28,7 +28,8 @@ and controller contract, EventBus and character signals) and never reaches into 
   game being played meanwhile, never share a log (a new process rotates the old `user://logs/godot.log`,
   and `LogWatch` tails by path) or overwrite each other's report. Without `--out` the runner falls back
   to `user://test_report.json` and `user://test_failures/`.
-- **Other flags:** `--list [words]` (id, von/manual flags, tags; runs nothing), `--repeat=N` (each test
+- **Other flags:** `--domain=NAME` (only tests whose domain is exactly NAME; the filter words are word
+  prefixes, so `ai` also catches a test that mentions "aim"), `--list [words]` (id, von/manual flags, tags; runs nothing), `--repeat=N` (each test
   N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every `house()` uses that seed), `--json` (one
   `JSON: {…}` line with all results), and, in the wrapper only, `--changed` (runs `tests/<d>/` for each
   `scenes/<d>/` or `tests/<d>/` with uncommitted changes). Options take the `--name=value` form.
@@ -48,10 +49,12 @@ and controller contract, EventBus and character signals) and never reaches into 
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
   offers Rerun and Back/Escape. The in-game overlay toggle bar works on the test's NPCs.
   `-- --play <filter>` on the command line opens the first matching test straight in the runner.
-  The browser's **Run all** button spawns a separate headless run of the whole suite, Von tests included
+  The browser's **Run all** button, and the ▶ button on each domain row (which passes `--domain=<name>`),
+  spawn a separate headless run of the whole suite or just that domain, Von tests included
   (`--include-von`; they skip if no server comes up) (its own
-  `user://test_runs/<n>/` dir as above), shows elapsed time, then folds `report.json` into the marks and
-  the status line (failure bundles are under that dir).
+  `user://test_runs/<n>/` dir as above), show elapsed time, then fold `report.json` into the marks (only
+  the ids in the report change) and the status line (failure bundles are under that dir). The buttons are
+  disabled while a run is going.
 
 ## Writing a test
 
@@ -123,6 +126,30 @@ func run(t: TestContext) -> void:
   aim, wait a moment, then fire.
 - Make randomness deterministic where the assertion depends on it (e.g. `projectile.flyover` off,
   since a character is partial cover).
+
+## Performance stress tests (tag `perf`)
+
+Regression guards for speed and runaway object counts. They are ordinary tests in the domain they
+load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/furniture_pile_stress`,
+`physics/crowd_deaths_stress`, `physics/hit_overload_stress`, `projectile/bullet_barrage_stress`,
+`worldgen/generate_houses_stress`), so `--changed` runs them with their domain and
+`tools/run_tests.sh perf` runs just them. The shared helper is `tests/_perf/perf_probe.gd`
+(`const Perf := preload(...)`; not a test).
+
+- **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
+  outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms
+  (`Perf.time_ms`), and exact counts (`Perf.nodes()`, `Despawner.count()`, dent / blood-pool caps).
+- **Budgets** are `const`s at the top of each test, about 4x the measured baseline (stated in the comment
+  above them). `Perf.within` prints `PERF <label> <value> (budget <limit>)`, traces it, and fails the
+  check with the value. Counts are asserted tightly; times loosely, so only real regressions trip them.
+- **Re-baselining:** run `tools/run_tests.sh perf --repeat=5`, read the `PERF` lines, set each budget to
+  about 4x the worst observed value, and update the baseline comment. A deliberate cost increase is a
+  budget change in the same commit.
+- **Gotchas:** a lambda captures ints by value (count into an Array); `nav.rebake` is off in tests that
+  shove or shoot furniture into overlaps (re-baking overlapping holes logs a nav sync error; the nav
+  test covers re-baking); a shooter must not stand in another's line of fire (a `spawn_blood` call can
+  receive a freed blood pool after the Despawner reclaims it); world-gen's first run in a process is
+  slower (cold caches), so its budget covers the cold case.
 
 ## Errors and warnings fail the test (`log_watch.gd`)
 

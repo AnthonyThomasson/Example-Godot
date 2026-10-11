@@ -45,9 +45,11 @@ the test browser. Pressing Start also **disables the button**, because Main may 
   by domain (marked ✓/✗/⏱/– by last result, `[manual]` / `[Von]` tags), a details pane (description, world,
   tags, switches with off in red, Von need) and Run all / a status line / Back / Play. Play,
   double-click or Enter emit `play_requested(path)`; Back emits `back_requested`; typing emits
-  `filter_changed(text)`; Run all emits `run_all_requested`, and
-  the host answers with `set_run_status(text, running)` (running disables Run all) and `set_results(results)`
-  (redraws the marks). Takes plain test descriptor dicts — knows nothing of the Testing classes.
+  `filter_changed(text)`; Run all, or the ▶ `Tree` button on a domain row, emits `run_requested(domain)`
+  (`""` = every test; the row's button always means the whole domain, whatever the search shows), and
+  the host answers with `set_run_status(text, running)` (running disables Run all and every ▶) and
+  `set_results(results)` (redraws the marks). Takes plain test descriptor dicts — knows nothing of the
+  Testing classes.
 
 - `test_result_hud.gd` — the **test result banner** (`TestResultHUD` CanvasLayer, layer 10, top-left, built by
   the test runner in interactive mode). `show_running(entry)` names the test, `show_status(text)` shows a wait

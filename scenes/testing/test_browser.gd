@@ -3,8 +3,9 @@ extends Node
 ## Testing domain: the test browser scene — reached from the setup window's Tests button. Hosts the UI
 ## domain's browser window over the discovered tests; Play stores the pick and opens the runner, Back
 ## returns to the main scene. The search text and last results live in Engine metas, so they survive
-## the round trip through a test. Run all spawns a separate headless run (its own `--out` dir and engine
-## log, so it never shares files with this game or another run) and folds its report into the marks.
+## the round trip through a test. Run all, or a domain's ▶, spawns a separate headless run (its own `--out`
+## dir and engine log, so it never shares files with this game or another run; a domain run passes
+## `--domain=<name>`) and folds its report into the marks.
 
 const TestCatalog = preload("res://scenes/testing/test_catalog.gd")
 const BROWSER_WINDOW := preload("res://scenes/ui/test_browser_window.gd")
@@ -19,6 +20,8 @@ var _window: CanvasLayer
 var _pid := -1
 var _out_dir := ""
 var _started_msec := 0
+## What the run covers, for the status text: "all" or a domain name.
+var _run_label := ""
 
 
 func _ready() -> void:
@@ -29,7 +32,7 @@ func _ready() -> void:
 	add_child(window)
 	window.play_requested.connect(_on_play)
 	window.back_requested.connect(_on_back)
-	window.run_all_requested.connect(_on_run_all)
+	window.run_requested.connect(_on_run)
 	window.filter_changed.connect(func(t: String): Engine.set_meta(META_FILTER, t))
 	window.open(TestCatalog.discover(), Engine.get_meta(META_RESULTS, {}), TestCatalog.matches,
 		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(META_SELECTION, "")))
@@ -46,28 +49,33 @@ func _on_back() -> void:
 	get_tree().change_scene_to_file(MAIN_SCENE)
 
 
-## Run all: start a headless run of every test (Von tests included) in a fresh output dir and watch it from `_process`.
-func _on_run_all() -> void:
+## Run: start a headless run of every test, or only `domain`'s when it is not "" (Von tests included), in a
+## fresh output dir and watch it from `_process`.
+func _on_run(domain: String) -> void:
 	if _pid != -1:
 		return
 	_out_dir = ProjectSettings.globalize_path("user://test_runs/%d" % Time.get_ticks_usec())
 	DirAccess.make_dir_recursive_absolute(_out_dir)
-	_pid = OS.create_process(OS.get_executable_path(), [
+	var args := PackedStringArray([
 		"--headless", "--path", ProjectSettings.globalize_path("res://"), "--fixed-fps", "60",
 		"--log-file", _out_dir.path_join("godot.log"),
 		"res://scenes/testing/test_runner.tscn", "--", "--run-tests", "--include-von", "--out=" + _out_dir])
+	if domain != "":
+		args.append("--domain=" + domain)
+	_pid = OS.create_process(OS.get_executable_path(), args)
 	if _pid == -1:
 		_window.set_run_status("Could not start the test run")
 		return
+	_run_label = domain if domain != "" else "all"
 	_started_msec = Time.get_ticks_msec()
-	_window.set_run_status("Running all tests…", true)
+	_window.set_run_status("Running %s tests…" % _run_label, true)
 	set_process(true)
 
 
 ## While a run is going: show elapsed time, and fold in its report when the process ends.
 func _process(_delta: float) -> void:
 	if OS.is_process_running(_pid):
-		_window.set_run_status("Running all tests… %d s" % ((Time.get_ticks_msec() - _started_msec) / 1000), true)
+		_window.set_run_status("Running %s tests… %d s" % [_run_label, (Time.get_ticks_msec() - _started_msec) / 1000], true)
 		return
 	set_process(false)
 	_pid = -1
@@ -88,7 +96,7 @@ func _finish_run() -> void:
 		counts[r["status"]] = counts.get(r["status"], 0) + 1
 	Engine.set_meta(META_RESULTS, results)
 	var bad: int = counts.get("FAIL", 0) + counts.get("TIMEOUT", 0)
-	var summary := "%d passed, %d failed, %d timed out, %d skipped" % [counts.get("PASS", 0),
+	var summary := "%s: %d passed, %d failed, %d timed out, %d skipped" % [_run_label, counts.get("PASS", 0),
 		counts.get("FAIL", 0), counts.get("TIMEOUT", 0), counts.get("SKIPPED", 0)]
 	if not (parsed.get("stray_logs", []) as Array).is_empty():
 		summary += ", %d stray log line(s)" % (parsed["stray_logs"] as Array).size()
