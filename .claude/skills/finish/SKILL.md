@@ -1,14 +1,14 @@
 ---
 name: finish
-description: Commit this worktree's work, merge it into main and push main. Manual only — invoked as `/finish`.
+description: Commit this worktree's work, merge it into main, push main, then close its ticket and remove the Orca workspace. Manual only — invoked as `/finish`.
 disable-model-invocation: true
 model: haiku
 ---
 
 # Finish
 
-Commit the work in this worktree, land it on `main` and push `main`. Run from the worktree root.
-Push `main` only: do not push the branch, and do not delete the branch or the worktree.
+Commit the work in this worktree, land it on `main`, push `main`, close the ticket and remove the
+Orca workspace. Run from the worktree root. Push `main` only: do not push the branch.
 
 1. **Preconditions.** Get the branch (`git branch --show-current`) and the directory where `main`
    is checked out (the `worktree` entry with `branch refs/heads/main` in
@@ -29,5 +29,17 @@ Push `main` only: do not push the branch, and do not delete the branch or the wo
 6. **Push.** `git -C <main dir> push origin main`. If the push is rejected because `origin/main`
    moved, run `git -C <main dir> pull --ff-only origin main`; if that brings in changes, go back to
    step 4 so they are merged into the branch and tested, then land and push again. Never force-push.
-7. **Report.** Say which commits landed on `main` (hashes and subjects), that `origin/main` now
-   matches, and anything left out of the commit.
+7. **Close the ticket.** Read the workspace's links with `orca worktree current --json` (resolve
+   the Orca CLI as the `orca-cli` skill says; on macOS it is `orca`): `result.worktree.id`,
+   `linkedIssue` (GitHub), `linkedLinearIssue` and `linkedGitLabIssue`. Note the worktree `id` now;
+   step 9 needs it.
+   - GitHub issue: `gh issue close <number> --comment "Fixed in <short hash>, merged to main."`
+   - Linear issue: load the `orca-linear` skill and finish the ticket as it describes.
+   - GitLab issue, or no link: skip it and say so. Never guess a ticket.
+   If closing fails, report the error and skip step 9 so the workspace stays.
+8. **Report.** Say which commits landed on `main` (hashes and subjects), that `origin/main` now
+   matches, which ticket was closed, and anything left out of the commit. Write this before step 9.
+9. **Remove the workspace, last.** `orca worktree rm --worktree id:<worktree id> --json`, using the
+   id from step 7 (not `current`: this directory is about to be deleted). No `--force` and no
+   `--run-hooks`. Orca removes the git worktree and its merged local branch. If it refuses (for
+   example uncommitted changes), report the error and stop. Nothing runs after this command.
