@@ -152,8 +152,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
    damage, for injury sensing) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing` and `damage_taken()` — but only while it can SEE that character
    (aim and visible wounds are things it perceives).
-   `player_controller.gd` is the human one — the gameplay reader of `Keybinds` (`main.gd`, the spectator
-   inspector and the dev command server each read an action too; see `domain-general`). Signals:
+   `player_controller.gd` is the human one and
+   is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main / the test runner `MENU`,
+   the spectator inspector `PAUSE`, the camera its pan and zoom actions). Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by

@@ -22,6 +22,15 @@ const MENU := "menu"
 ## Pause/resume the game (spectator inspector only — shares Space with INTERACT, which is unused in the
 ## player-less spectator match).
 const PAUSE := "pause"
+## Pan the spectator camera by hand (camera_controller.gd). Shares WASD with the MOVE_* actions —
+## harmless because the spectator match has no player to move.
+const CAMERA_LEFT := "camera_left"
+const CAMERA_RIGHT := "camera_right"
+const CAMERA_UP := "camera_up"
+const CAMERA_DOWN := "camera_down"
+## Zoom the camera (default: mouse wheel).
+const ZOOM_IN := "zoom_in"
+const ZOOM_OUT := "zoom_out"
 const ITEM_1 := "item_1"
 const ITEM_2 := "item_2"
 const ITEM_3 := "item_3"
@@ -43,6 +52,10 @@ const DEFAULTS := {
 	INTERACT: KEY_SPACE,
 	MENU: KEY_ESCAPE,
 	PAUSE: KEY_SPACE,
+	CAMERA_LEFT: KEY_A,
+	CAMERA_RIGHT: KEY_D,
+	CAMERA_UP: KEY_W,
+	CAMERA_DOWN: KEY_S,
 	ITEM_1: KEY_1,
 	ITEM_2: KEY_2,
 	ITEM_3: KEY_3,
@@ -54,14 +67,16 @@ const DEFAULTS := {
 	ITEM_9: KEY_9,
 }
 
-## Default mouse button for the actions bound to the pointer (a mouse button isn't a Key value, so it
-## lives outside the keyboard DEFAULTS).
-const DEFAULT_MOUSE := {
+## Default mouse button for each pointer-bound action (`MouseButton` values aren't `Key`s, so they
+## live apart from DEFAULTS). Remap one at runtime with `rebind_mouse()`.
+const MOUSE_DEFAULTS := {
 	FIRE: MOUSE_BUTTON_LEFT,
+	ZOOM_IN: MOUSE_BUTTON_WHEEL_UP,
+	ZOOM_OUT: MOUSE_BUTTON_WHEEL_DOWN,
 }
 
-## Every rebindable action in settings-page order, with its display label. The set of actions the
-## settings page lists and the file may override.
+## The settings-page label of each action, in page order. Every action in DEFAULTS / MOUSE_DEFAULTS
+## needs a row here and in GROUPS (a test enforces it).
 const LABELS := {
 	MOVE_UP: "Move up",
 	MOVE_DOWN: "Move down",
@@ -79,6 +94,12 @@ const LABELS := {
 	ITEM_7: "Item 7",
 	ITEM_8: "Item 8",
 	ITEM_9: "Item 9",
+	CAMERA_UP: "Pan up",
+	CAMERA_DOWN: "Pan down",
+	CAMERA_LEFT: "Pan left",
+	CAMERA_RIGHT: "Pan right",
+	ZOOM_IN: "Zoom in",
+	ZOOM_OUT: "Zoom out",
 	PAUSE: "Pause (spectator)",
 	MENU: "Back to setup",
 }
@@ -101,21 +122,36 @@ const GROUPS := {
 	ITEM_7: "Items",
 	ITEM_8: "Items",
 	ITEM_9: "Items",
+	CAMERA_UP: "Camera",
+	CAMERA_DOWN: "Camera",
+	CAMERA_LEFT: "Camera",
+	CAMERA_RIGHT: "Camera",
+	ZOOM_IN: "Camera",
+	ZOOM_OUT: "Camera",
 	PAUSE: "System",
 	MENU: "System",
 }
 
-## Action pairs that deliberately share a binding (Interact is unused in the player-less spectator
-## match where Pause lives), so `conflicts_of()` doesn't flag them.
-const SHARED := [[INTERACT, PAUSE]]
+## Action pairs that deliberately share a binding, so `conflicts_of()` doesn't flag them: Interact and
+## Pause (the player-less spectator match has nothing to interact with) and each camera pan key with
+## its move key (the spectator match has no player to move).
+const SHARED := [
+	[INTERACT, PAUSE],
+	[MOVE_UP, CAMERA_UP],
+	[MOVE_DOWN, CAMERA_DOWN],
+	[MOVE_LEFT, CAMERA_LEFT],
+	[MOVE_RIGHT, CAMERA_RIGHT],
+]
 
-## The mouse buttons an action may be bound to, with their display names (the wheel is not bindable).
+## The mouse buttons an action may be bound to, with their display names (the horizontal wheel is not bindable).
 const MOUSE_NAMES := {
 	MOUSE_BUTTON_LEFT: "Mouse Left",
 	MOUSE_BUTTON_RIGHT: "Mouse Right",
 	MOUSE_BUTTON_MIDDLE: "Mouse Middle",
 	MOUSE_BUTTON_XBUTTON1: "Mouse 4",
 	MOUSE_BUTTON_XBUTTON2: "Mouse 5",
+	MOUSE_BUTTON_WHEEL_UP: "Wheel Up",
+	MOUSE_BUTTON_WHEEL_DOWN: "Wheel Down",
 }
 
 
@@ -160,14 +196,19 @@ func reset(action: String) -> void:
 
 ## Put every action back on its default binding (and create any that are missing from the InputMap).
 func reset_all() -> void:
-	for action in LABELS:
+	for action in actions():
 		reset(action)
+
+
+## Every action that has a default binding (keyboard first, then pointer).
+func actions() -> Array:
+	return DEFAULTS.keys() + MOUSE_DEFAULTS.keys()
 
 
 ## The binding `action` ships with, or null for an action with none.
 func default_event(action: String) -> InputEvent:
-	if DEFAULT_MOUSE.has(action):
-		return _mouse_event(DEFAULT_MOUSE[action])
+	if MOUSE_DEFAULTS.has(action):
+		return _mouse_event(MOUSE_DEFAULTS[action])
 	if DEFAULTS.has(action):
 		return _key_event(DEFAULTS[action])
 	return null
@@ -203,7 +244,7 @@ func conflicts_of(action: String) -> Array:
 	var out := []
 	if mine.is_empty():
 		return out
-	for other in LABELS:
+	for other in actions():
 		if other != action and not _is_shared(action, other) and _serialize(event_of(other)) == mine:
 			out.append(other)
 	return out
@@ -222,7 +263,7 @@ func _is_shared(a: String, b: String) -> bool:
 ## the player never touched.
 func overrides() -> Dictionary:
 	var out := {}
-	for action in LABELS:
+	for action in actions():
 		var current := _serialize(event_of(action))
 		if current != _serialize(default_event(action)):
 			out[action] = current
@@ -233,7 +274,7 @@ func overrides() -> Dictionary:
 ## entries are skipped one by one; actions not named keep their current binding.
 func apply_overrides(data: Dictionary) -> void:
 	for action in data:
-		if LABELS.has(action):
+		if actions().has(action):
 			bind(action, _deserialize(data[action]))
 
 
@@ -287,6 +328,11 @@ func _deserialize(value: Variant) -> InputEvent:
 ## Movement direction from the four move actions, ready to multiply by speed.
 func get_move_vector() -> Vector2:
 	return Input.get_vector(MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN)
+
+
+## Manual camera pan direction from the four camera actions (length <= 1).
+func get_camera_vector() -> Vector2:
+	return Input.get_vector(CAMERA_LEFT, CAMERA_RIGHT, CAMERA_UP, CAMERA_DOWN)
 
 
 ## True on the frame the punch key is pressed. Goes through the same rebindable

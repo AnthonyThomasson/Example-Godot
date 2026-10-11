@@ -25,16 +25,20 @@ inject real input when driving the game from outside. `project.godot [input]` ju
 Input Map panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it
 shares Space with `INTERACT`, harmless because the spectator match has no player to interact.
 
-Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button; `FIRE`
-defaults to the left mouse button (`DEFAULT_MOUSE`), the rest to `DEFAULTS`. `LABELS` (settings-page
-order + names) and `GROUPS` list every rebindable action; a new action needs a row in each. Runtime API:
-`bind(action, event)` (key or mouse button; refuses the wheel and anything else), `rebind` / `rebind_mouse`
+Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button. Keyboard
+defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `ZOOM_IN` /
+`ZOOM_OUT` wheel up/down); `actions()` is their union and what resets, overrides and loading cover.
+`CAMERA_LEFT/RIGHT/UP/DOWN` (default WASD, read through `get_camera_vector()`) and `ZOOM_IN/OUT` are read
+only by the camera; the camera keys share WASD with `MOVE_*`, harmless because the spectator match has no
+player to move. `LABELS` (settings-page order + names) and `GROUPS` must cover every action (a test
+enforces it). Runtime API: `bind(action, event)` (key or mouse button incl. wheel up/down; refuses the
+horizontal wheel and anything else), `rebind` / `rebind_mouse`
 (thin wrappers), `reset(action)` / `reset_all()`, `default_event`, `event_of`, `text_of` ("W", "Space",
 "Mouse Left"; skips the layout lookup on the headless display server, which logs an error for it),
 `conflicts_of(action)` (other actions on the same input, minus the deliberately shared `SHARED` pairs —
-Interact/Pause), and `overrides()` / `apply_overrides(d)` (only the bindings that differ from the
+Interact/Pause and each camera pan key with its move key), and `overrides()` / `apply_overrides(d)` (only the bindings that differ from the
 defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skipped one by one).
-`Keybinds._ready` applies the defaults only.
+`Keybinds._ready` registers the defaults only.
 
 ## Saved settings
 
@@ -96,6 +100,22 @@ consumed by allied AIs.
   following one target it eases to the midpoint of the live targets and zooms to fit them plus
   `frame_margin` (clamped by `min_zoom`/`max_zoom`), dropping any whose `is_dead` is true — used by
   the spectator match view.
+  - **Zoom** (both modes): the `ZOOM_IN`/`ZOOM_OUT` actions (mouse wheel) scale the zoom by `zoom_step`
+    per notch. A trackpad's two-finger scroll arrives as `InputEventPanGesture` (no wheel events on macOS) and
+    counts `trackpad_zoom_sensitivity` notches per unit of its `delta.y` (up zooms in); it isn't rebindable. The scale (`_zoom_bias`) is lasting and multiplies the
+    automatic zoom (`_base_zoom`: 1 when following, the clamped fit when framing), so it works the same
+    in both modes, can go beyond the fit's `min_zoom`/`max_zoom`, and is limited only by
+    `wheel_min_zoom`/`wheel_max_zoom`. The zoom eases at `follow_speed`. Read in `_unhandled_input`, so
+    scrolling UI gets the wheel first.
+  - **Hand control** (framing mode only): the camera keys or the mouse within `edge_pan_margin` px of
+    a screen edge pan the camera at `pan_speed` (screen px/s, so zoom-independent). Panning
+    sets `_manual`, which suspends the automatic framing position (the zoom keeps auto-fitting, scaled
+    by the wheel); after `manual_hold` (5) seconds without panning `_manual` clears and the framing
+    eases back in. Edge
+    panning only runs while the pointer has been seen moving over the window (`_mouse_in_window`,
+    cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
+    never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the
+    test runner turns it off for a world with a human-driven player, where WASD walks.
 - `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood pools);
   domains register spawns with it.
 

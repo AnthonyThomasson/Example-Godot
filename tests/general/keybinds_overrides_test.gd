@@ -20,6 +20,10 @@ func run(t: TestContext) -> void:
 	t.expect_eq(Keybinds.text_of(Keybinds.INTERACT), "Space", "Interact starts on Space")
 	t.expect_eq(Keybinds.text_of(Keybinds.FIRE), "Mouse Left", "Fire starts on the left mouse button")
 	t.check(Keybinds.overrides().is_empty(), "a fresh run has no overrides")
+	for action in Keybinds.actions():
+		t.check(Keybinds.LABELS.has(action) and Keybinds.GROUPS.has(action), "%s has a settings label and group" % action)
+	t.expect_eq(Keybinds.text_of(Keybinds.ZOOM_IN), "Wheel Up", "Zoom in starts on the wheel")
+	t.check(Keybinds.conflicts_of(Keybinds.CAMERA_UP).is_empty(), "a camera key sharing its move key is not a conflict")
 	t.check(Keybinds.conflicts_of(Keybinds.INTERACT).is_empty(), "Interact and Pause share Space without a conflict")
 
 	# A key, stored by its physical position.
@@ -36,15 +40,15 @@ func run(t: TestContext) -> void:
 	t.check(Keybinds.bind(Keybinds.FIRE, right_click), "a mouse button can be bound")
 	t.expect_eq(Keybinds.text_of(Keybinds.FIRE), "Mouse Right", "the button is described")
 	var wheel := InputEventMouseButton.new()
-	wheel.button_index = MOUSE_BUTTON_WHEEL_UP
-	t.check(not Keybinds.bind(Keybinds.FIRE, wheel), "the wheel is refused")
+	wheel.button_index = MOUSE_BUTTON_WHEEL_LEFT
+	t.check(not Keybinds.bind(Keybinds.FIRE, wheel), "the horizontal wheel is refused")
 	t.check(not Keybinds.bind(Keybinds.FIRE, InputEventMouseMotion.new()), "a non-button event is refused")
 	t.check(not Keybinds.bind(Keybinds.FIRE, InputEventKey.new()), "an empty key is refused")
 	t.expect_eq(Keybinds.text_of(Keybinds.FIRE), "Mouse Right", "refused binds change nothing")
 
 	# Two actions on one input are flagged, from both sides.
 	Keybinds.bind(Keybinds.PUNCH, _key(KEY_W))
-	t.expect_eq(Keybinds.conflicts_of(Keybinds.PUNCH), [Keybinds.MOVE_UP], "Punch on W conflicts with Move up")
+	t.expect_eq(Keybinds.conflicts_of(Keybinds.PUNCH), [Keybinds.MOVE_UP, Keybinds.CAMERA_UP], "Punch on W conflicts with Move up and Pan up")
 	t.expect_eq(Keybinds.conflicts_of(Keybinds.MOVE_UP), [Keybinds.PUNCH], "and Move up with Punch")
 
 	# Resetting puts defaults back; the report empties as the differences go.
