@@ -138,6 +138,9 @@ static var stances: Dictionary = {
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.3, 0.0, -1.0) },
 	&"support": { "forward": 22.0, "lateral": -1.5, "height": 5.7, "swing": 0.0, "steady": true,
 		"recoil_share": 0.7, "elbow_pole": Vector3(0.6, -0.1, -1.0) },
+	# Reloading: the supporting hand drops to the belt for the next magazine.
+	&"reload": { "forward": 1.0, "lateral": 11.5, "height": 4.4, "swing": 0.0, "steady": false,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.1, -0.8, -0.2) },
 }
 ## How fast a hand eases from one stance to another (1/s).
 static var stance_ease: float = 12.0

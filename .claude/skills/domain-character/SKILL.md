@@ -94,7 +94,8 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 `steady` (aim-style spring: follows the aim closely, only drifts), `recoil_share` and `elbow_pole`
 (out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
-`support` (the other hand cupping it: the pistol's two-handed hold). A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
+`support` (the other hand cupping it: the pistol's two-handed hold) and `reload` (that hand dropped to the belt
+for the next magazine, named by the pistol's support hand while it reloads). A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
 and have an item name it. `CharacterConfig.muzzle_ahead` is how far past the weapon hand bullets
 leave (`muzzle_origin(hand)`).
 
@@ -261,6 +262,20 @@ step. All go through `torso_offset`, so the rig, wounds and fall follow. The lea
 leads); the side shift is added after it, so the head stays steady over the rocking shoulders.
 Test: `tests/character/run_pose_test.gd`.
 
+## Ammo and reloading
+
+The character carries spare magazines (`_magazines`, `Magazine` items) beside its inventory: they are never in
+`_items`, so no number key or interaction can select them. They come from the exports `spare_magazine_types`
+(`MagazineConfig.types` ids, default two `standard`) and `start_rounds` (what the starting gun is loaded with;
+negative = full), which tests and sandboxes set through `actor(..., props)`. `reload()` (R, or the AI's reload
+primitive) starts a timer of the held item's `reload_time()` on it if its `can_reload(self)` says a carried
+magazine would add rounds, and sets the item's `reloading` flag (the pistol's support hand eases to the `reload`
+stance while it is up). `_update_reload` runs right after the controller: it cancels the reload when the character
+is busy, running or no longer holds that item, else counts down and calls `item.finish_reload(self)`. `shoot()` is
+ignored mid-reload; switching slot or dying cancels it; magazines are lost with the body. Reads: `is_reloading()`,
+`ammo(slot)`, `ammo_capacity(slot)`, `can_reload(slot)`, `spare_magazines()`. Tests: `tests/items/reload_swaps_magazine_test.gd`,
+`tests/character/reload_blocked_test.gd`.
+
 ## Walking into furniture
 
 `_apply_pushes()` shoves each pushable the body slid into with `push_impulse` per *second* of contact
@@ -330,5 +345,6 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   `character_footsteps.gd` on each footfall, and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-  `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`; and reads the item's
-  `hand_stance(hand)` (how each hand is held), calling its `drop(user, velocity)` on death.
+  `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`, `best_magazine(gun)` / `take_magazine(gun)` /
+  `stow_magazine(m)`; and reads the item's `hand_stance(hand)` (how each hand is held), calling its
+  `drop(user, velocity)` on death.

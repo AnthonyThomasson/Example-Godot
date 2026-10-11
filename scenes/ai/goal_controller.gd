@@ -132,6 +132,8 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var hurt_threshold: float = 15.0
 ## Accumulated damage at or above which a character reads as "badly wounded".
 @export var critical_threshold: float = 35.0
+## A gun holding this fraction of its magazine or less reads as "nearly empty" (and offers a reload).
+@export var low_ammo_fraction: float = 0.34
 ## Most contacts described in the decision state (hostiles first, then nearest).
 @export var max_contacts_in_state: int = 4
 
@@ -213,6 +215,9 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## Running: may the NPC sprint (spending stamina) on the way to a destination when its decision-tree
 ## node asks for it (`run`) or it is under fire.
 @export var run_enabled: bool = true
+## Reload an empty pistol on its own (holding steady, or ducked in cover) when a spare magazine is carried,
+## whatever the decision tree chose: the NPC is never left unarmed for lack of a decision.
+@export var auto_reload: bool = true
 ## Only run when the destination is farther than this (px), so short hops don't burn stamina.
 @export var run_min_distance: float = 150.0
 ## Stamina fraction (0..1) needed to start a run; once running it goes on until the Character runs dry.
@@ -315,6 +320,7 @@ func _apply_config() -> void:
 	_perception.investigate_distance = investigate_distance
 	_perception.hurt_threshold = hurt_threshold
 	_perception.critical_threshold = critical_threshold
+	_perception.low_ammo_fraction = low_ammo_fraction
 	_perception.max_contacts_in_state = max_contacts_in_state
 	_perception.cover_min = cover_min
 	_perception.max_options_per_level = max_options_per_level
@@ -361,6 +367,7 @@ func _apply_config() -> void:
 	_behavior.reposition_interval = reposition_interval
 	_behavior.arrive_dist = arrive_dist
 	_behavior.run_enabled = run_enabled
+	_behavior.auto_reload = auto_reload
 	_behavior.run_min_distance = run_min_distance
 	_behavior.run_start_fraction = run_start_fraction
 	_behavior.apply_config()
@@ -684,6 +691,8 @@ func _post_callout(leaf: Dictionary) -> void:
 		status.append("badly wounded")
 	elif dmg >= _perception.hurt_threshold:
 		status.append("hurt")
+	if leaf["primitive"] == &"reload" or _character.is_reloading():
+		status.append("reloading")
 	_last_callout = { "position": _character.global_position, "point": params.get("point", _character.global_position),
 		"label": " - ".join(leaf["labels"]), "at": Time.get_ticks_msec() }
 	EventBus.post(&"callout", {

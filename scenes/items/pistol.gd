@@ -15,10 +15,15 @@ const ART_SIZE := Vector2(5.0, 13.0)
 ## How far the grip end sits behind the hand's center (px).
 const GRIP_BACK := 2.0
 
+## The kind of magazine it takes (`Magazine.gun`).
+const GUN := &"pistol"
+
 ## Damage added on top of the projectile's own base damage at fire time.
 var damage := 15.0
 ## Pistol art color (the slide's metal).
 var color := Color(0.3, 0.3, 0.3)
+## The magazine it is loaded with (null = unloaded); every shot spends one of its rounds.
+var magazine: Magazine
 
 
 func _init() -> void:
@@ -26,9 +31,45 @@ func _init() -> void:
 	reach = 32.0
 
 
-## The weapon hand aims the pistol and the other hand cups its grip.
+## The weapon hand aims the pistol; the other hand cups its grip, or while reloading drops to the belt
+## for the next magazine.
 func hand_stance(hand: int) -> StringName:
-	return &"aim" if hand == WEAPON_HAND else &"support"
+	if hand == WEAPON_HAND:
+		return &"aim"
+	return &"reload" if reloading else &"support"
+
+
+## Rounds left in the loaded magazine (0 when unloaded).
+func rounds_loaded() -> int:
+	return magazine.rounds if magazine else 0
+
+
+## Rounds the loaded magazine holds when full (0 when unloaded).
+func ammo_capacity() -> int:
+	return magazine.capacity if magazine else 0
+
+
+## `MagazineConfig.reload_time`.
+func reload_time() -> float:
+	return MagazineConfig.reload_time
+
+
+## A carried magazine holds more rounds than the one loaded.
+func can_reload(user) -> bool:
+	var best: Magazine = user.best_magazine(GUN)
+	return best != null and best.rounds > rounds_loaded()
+
+
+## Seat the fullest carried magazine; the one it replaces goes back into the carried store unless it is
+## empty (nothing refills a magazine, so an empty one is dropped).
+func finish_reload(user) -> void:
+	var fresh: Magazine = user.take_magazine(GUN)
+	if fresh == null:
+		return
+	var spent := magazine
+	magazine = fresh
+	if spent != null and spent.rounds > 0:
+		user.stow_magazine(spent)
 
 
 ## F: a melee jab with the weapon hand.
@@ -37,8 +78,11 @@ func primary(user) -> void:
 
 
 ## LMB: fire a bullet from the muzzle and eject a casing (both live in world space); the gun kicks
-## the hand back.
+## the hand back. Spends a round; an empty (or mid-reload) gun does nothing.
 func secondary(user) -> void:
+	if reloading or rounds_loaded() <= 0:
+		return
+	magazine.rounds -= 1
 	var proj := ProjectileSpawner.spawn(user.muzzle_origin(WEAPON_HAND), user.facing, user.world_root(), user, damage)
 	proj.hit.connect(func(body: Node, dmg: float) -> void: user.report_shot(body, dmg))
 	CasingSpawner.spawn(user.hand_world(WEAPON_HAND), user.facing, user.world_root())

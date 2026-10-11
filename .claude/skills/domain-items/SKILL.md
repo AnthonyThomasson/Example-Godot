@@ -13,9 +13,22 @@ lives in the item, not the character.
 Number keys 1–9 select a slot (`ItemRegistry`):
 - **1** unarmed — no hands, F/LMB do nothing.
 - **2** fists — both hands, F alternates (alternation state lives in the item).
-- **3** pistol — right hand + pistol art; F jabs, LMB fires.
+- **3** pistol — right hand + pistol art; F jabs, LMB fires, R reloads.
 - **4** key — inert carryable; it exists so a `requires_item: 4` interaction has something to
   gate on (gates the wardrobe's "Rummage" interaction).
+
+## Ammo, magazines and reloading
+
+`Magazine` (`magazine.gd`, an `Item` subclass; `Magazine.create(type, loaded := -1)`) holds `rounds` of a `capacity`
+for a `gun`. Types, capacities, `default_loaded` and `reload_time` live in `MagazineConfig` (a static-var holder; add a
+row to `types` for a new magazine). Magazines are **carried by the character, never held**: they are not in any slot, so
+nothing can switch to them, and several can be carried (`ItemRegistry.create_magazines(type_ids)`).
+The pistol (`magazine: Magazine`) spends one round per shot (`secondary` does nothing when empty or reloading, with no
+casing and no recoil) and reports `rounds_loaded()` / `ammo_capacity()`. `reload_time()` is `MagazineConfig.reload_time`. `can_reload(user)` is true when a carried magazine
+holds more rounds than the loaded one; `finish_reload(user)` seats the fullest compatible spare (`user.take_magazine`) and
+stows the old one with its remaining rounds (`user.stow_magazine`), dropping it only if empty. `ItemRegistry.create(3, rounds)`
+builds a pistol loaded with a `default_loaded` magazine (`rounds` < 0 = full). The base `Item` keeps all of this inert
+(`rounds_loaded()` = -1). The reload timer and R binding are the Character's, see `domain-character`.
 
 ## Adding an item
 
@@ -61,5 +74,7 @@ The pistol is the one place Items reaches into the Projectile System
   `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate, opts)`.
   The character API an item may call: `facing`, `punch(hand)`, `hand_position(hand)`,
   `hand_world(hand)`, `muzzle_origin(hand)` (`CharacterConfig.muzzle_ahead` past the hand),
-  `world_root()`, `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`.
+  `world_root()`, `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`, and for reloading
+  `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Ammo hooks on `Item`: `rounds_loaded()`,
+  `ammo_capacity()`, `reload_time()`, `can_reload(user)`, `finish_reload(user)`, `reloading`.
 - **Items → Art** (interface 12): the pistol's art via `PixelArt.render_turned` / `snap_angle`.

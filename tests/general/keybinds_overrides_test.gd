@@ -20,6 +20,7 @@ func run(t: TestContext) -> void:
 	t.expect_eq(Keybinds.text_of(Keybinds.INTERACT), "Space", "Interact starts on Space")
 	t.expect_eq(Keybinds.text_of(Keybinds.FIRE), "Mouse Left", "Fire starts on the left mouse button")
 	t.expect_eq(Keybinds.text_of(Keybinds.RUN), "Shift", "Run starts on Shift")
+	t.expect_eq(Keybinds.text_of(Keybinds.RELOAD), "R", "Reload starts on R")
 	t.check(Keybinds.overrides().is_empty(), "a fresh run has no overrides")
 	for action in Keybinds.actions():
 		t.check(Keybinds.LABELS.has(action) and Keybinds.GROUPS.has(action), "%s has a settings label and group" % action)

@@ -96,6 +96,11 @@ func shoot() -> void:
 	_pending.append(func(c): c.shoot())
 
 
+## Reload the held item (R): swap in the fullest carried magazine.
+func reload() -> void:
+	_pending.append(func(c): c.reload())
+
+
 ## Start interaction `id` on `object`; a refusal is recorded in `failed_interactions`.
 func interact(object: Node, id: String) -> void:
 	_pending.append(func(c):

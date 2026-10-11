@@ -26,7 +26,7 @@ func _ready() -> void:
 	_label.anchor_right = 1.0
 	_label.anchor_bottom = 1.0
 	_label.offset_left = -440.0
-	_label.offset_top = -230.0
+	_label.offset_top = -280.0
 	_label.offset_right = -10.0
 	_label.offset_bottom = -10.0
 	_label.text = ""
@@ -53,6 +53,15 @@ func _ready() -> void:
 		_character.hit_landed.connect(_on_hit_landed)
 
 
+## "Ammo: 7/12  (+2 mags)" for a held gun ("reloading…" mid-swap), "Ammo: —" for an item without ammo.
+func _ammo_line() -> String:
+	var rounds: int = _character.ammo()
+	if rounds < 0:
+		return "Ammo: —"
+	var line := "Ammo: %d/%d  (+%d mags)" % [rounds, _character.ammo_capacity(), _character.spare_magazines()]
+	return line + "  reloading…" if _character.is_reloading() else line
+
+
 func _process(_delta: float) -> void:
 	var item_name: String = _character.item_name()
 	var reach: float = _character.item_reach()
@@ -63,6 +72,7 @@ func _process(_delta: float) -> void:
 	var debug_lines := [
 		"=== DEBUG ===",
 		"Item: %d (%s)" % [_character.current_slot(), item_name],
+		_ammo_line(),
 		"Punch Active: %s" % ("YES" if attack_active else "NO"),
 		"Interaction: %s" % (interaction if interaction != "" else "—"),
 		"Reach: %.1f" % reach,

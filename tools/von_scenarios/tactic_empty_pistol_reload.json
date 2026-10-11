@@ -1,0 +1,17 @@
+{
+  "name": "tactic: empty pistol + spare magazines -> RELOAD",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the hallway, inside the house, holding a Pistol. You are unhurt.\nYour pistol is empty. You carry spare magazines.\nCurrent activity: COMBAT - Defender - ENGAGE - where you stand (in position, looking for a shot, for 4s).\nKnown hostiles: 1 (1 in sight). Allies near you: none.\nYou have a clear shot at Defender from where you stand. You are exposed to their fire.\nDefender — HOSTILE (seen) — in sight — close, in pistol range, north of you, in the kitchen — standing still — aiming at you — holding a Pistol.\nFlanks on Defender (you are on their front): their left side — free, clear shot, cover, medium hidden route.\nYou are being hit, from the north!\nDecided so far: COMBAT → Defender.",
+  "question": "How should you fight Defender? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+  "options": {
+    "flank": "Your line to Defender is blocked, or they are aiming at someone else (1 free side; best: their left side via the dining room, medium hidden route, cover)",
+    "advance": "Defender looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, standing still, holding a Pistol)",
+    "reload": "Your pistol is nearly empty or empty, and you carry spare magazines",
+    "retreat": "You are badly wounded and being hit (best: the bedroom, out of their sight; you are badly wounded)"
+  },
+  "expect": [
+    "reload"
+  ],
+  "ablate": [
+    "Your pistol is empty. You carry spare magazines."
+  ]
+}

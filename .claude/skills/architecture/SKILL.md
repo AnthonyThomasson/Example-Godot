@@ -147,18 +147,25 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (`CharacterConfig.muzzle_ahead`
    past the hand), `world_root()`, `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
-   drawn weapon direction, trailing the aim; shots still use `facing`). The pistol is the one
+   drawn weapon direction, trailing the aim; shots still use `facing`). **Ammo:** `Item` has inert hooks
+   `rounds_loaded()` / `ammo_capacity()` (-1 = no ammo), `reload_time()`, `can_reload(user)`, `finish_reload(user)` and a
+   `reloading` flag the character sets. A `Magazine` (an `Item` subclass, types in `MagazineConfig`) is carried
+   by the character, never held or selectable; the pistol loads one and each shot spends a round. For a reload
+   an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. The pistol is the one
    place Items reach into the Projectile System (`ProjectileSpawner`/`CasingSpawner`).
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. The controller writes `move_input` / `aim_point` / `run_input` (hold run: a
    faster pace that spends stamina while moving, dry = walk until it refills) and calls the
-   character's action API: `melee()` (F), `shoot()` (LMB; ignored while running), `select_slot(id)`, `try_interact()` /
+   character's action API: `melee()` (F), `shoot()` (LMB; ignored while running or reloading), `reload()` (R: a timed swap to
+   the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
+   dying), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing), `is_running()` / `stamina_fraction()` and `faction` (allegiance tag, for AI hostility). The AI also reads
-   another character's `facing` and `damage_taken()` — but only while it can SEE that character
-   (aim and visible wounds are things it perceives).
+   damage, for injury sensing), `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
+   `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   another character's `facing`, `damage_taken()` and `is_reloading()` — but only while it can SEE that character
+   (aim, visible wounds and a reload in progress are things it perceives).
    `player_controller.gd` is the human one and
    is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main / the test runner `MENU`,
    the spectator inspector `PAUSE`, the camera its pan and zoom actions). Signals:
@@ -295,13 +302,14 @@ TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayT
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
 `Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into seven `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into eight `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
 push + punch + the character's art, pose and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
-floor/wall tiles) and `WorldGenConfig` (World-Gen's furnishing fill pass). World-Gen's `LayoutRules`
-(which rooms may hold the front door or an exit, which room types may share a door) is a rules table
-in the same style, not tuning. There is no `Config` autoload. An eighth static holder, `PhysicsLayers`
+floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass) and `MagazineConfig` (Items: magazine
+types and capacities, reload time). World-Gen's `LayoutRules` (which rooms may hold the front door or an exit,
+which room types may share a door) is a rules table in the same style, not tuning. There is no `Config`
+autoload. A ninth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
 plays for doorway sides.
 
