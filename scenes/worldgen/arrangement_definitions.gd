@@ -19,9 +19,14 @@ class_name ArrangementDefinitions
 ##   tags:          an arrangement is skipped if a room already placed one with a
 ##                  shared tag (e.g. only one "fridge" per kitchen).
 ##
+##   ground:        a non-solid piece that lies under the furniture (a rug, runner, mat): it never
+##                  blocks the floor, avoids only other ground pieces, and is placed dead center first.
+##
 ## A recipe's `zones` are filled in order. Each zone picks `count` (min..max) distinct
-## arrangements from `options`; `required` zones warn if nothing could be placed. One
-## palette is picked per room and applied to every "wood"/"fabric" object.
+## arrangements from `options`; `required` zones warn if nothing could be placed. A recipe may
+## also carry `fill: { target, options }`: once the zones are placed it keeps adding random
+## `options` until solid footprints cover `target` (a fraction of the interior), bounded and scaled
+## by WorldGenConfig. One palette is picked per room and applied to every "wood"/"fabric" object.
 
 static var _arrangements: Dictionary = {}
 static var _recipes: Dictionary = {}
@@ -33,7 +38,8 @@ static func _all_arrangements() -> Dictionary:
 		for src in [GeneralCatalog.ARRANGEMENTS, LivingRoomCatalog.ARRANGEMENTS,
 				KitchenCatalog.ARRANGEMENTS, BedroomCatalog.ARRANGEMENTS, BathroomCatalog.ARRANGEMENTS,
 				DiningRoomCatalog.ARRANGEMENTS, HomeOfficeCatalog.ARRANGEMENTS, KidsRoomCatalog.ARRANGEMENTS,
-				EntryHallCatalog.ARRANGEMENTS, LaundryRoomCatalog.ARRANGEMENTS, GarageCatalog.ARRANGEMENTS]:
+				EntryHallCatalog.ARRANGEMENTS, HallwayCatalog.ARRANGEMENTS, LaundryRoomCatalog.ARRANGEMENTS,
+				GarageCatalog.ARRANGEMENTS]:
 			_arrangements.merge(src)
 	return _arrangements
 
@@ -43,7 +49,8 @@ static func _all_recipes() -> Dictionary:
 		for src in [GeneralCatalog.RECIPES, LivingRoomCatalog.RECIPES,
 				KitchenCatalog.RECIPES, BedroomCatalog.RECIPES, BathroomCatalog.RECIPES,
 				DiningRoomCatalog.RECIPES, HomeOfficeCatalog.RECIPES, KidsRoomCatalog.RECIPES,
-				EntryHallCatalog.RECIPES, LaundryRoomCatalog.RECIPES, GarageCatalog.RECIPES]:
+				EntryHallCatalog.RECIPES, HallwayCatalog.RECIPES, LaundryRoomCatalog.RECIPES,
+				GarageCatalog.RECIPES]:
 			_recipes.merge(src)
 	return _recipes
 

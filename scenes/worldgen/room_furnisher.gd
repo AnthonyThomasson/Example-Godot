@@ -52,12 +52,13 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 
 
 ## One attempt at the recipe's layout: `{ placements: [{ arrangement, spot }], missing: [options] }`
-## where `missing` lists the required zones that found no walkable spot.
+## where `missing` lists the required zones that found no walkable spot. The zones come first, then the
+## recipe's optional `fill` (see _fill).
 static func _plan(recipe: Dictionary, interior: Rect2, blocked: Array, rng: RandomNumberGenerator) -> Dictionary:
-	var occupied: Array = blocked.duplicate()
-	var used_tags := {}
-	var walk := _walk_state(interior, blocked)
-	var placements: Array = []
+	var state := {
+		"interior": interior, "occupied": blocked.duplicate(), "used_tags": {}, "walk": _walk_state(interior, blocked),
+		"placements": [], "ground": [],
+	}
 	var missing: Array = []
 
 	for zone in recipe["zones"]:
@@ -67,34 +68,79 @@ static func _plan(recipe: Dictionary, interior: Rect2, blocked: Array, rng: Rand
 		for key in _shuffled(zone["options"], rng):
 			if placed >= wanted:
 				break
-			var arrangement := ArrangementDefinitions.get_arrangement(key)
-			var tags: Array = arrangement.get("tags", [])
-			if tags.any(func(t: String) -> bool: return used_tags.has(t)):
-				continue
-			var spot := _find_spot(arrangement, interior, occupied, rng, walk)
-			if spot.is_empty():
-				continue
-			occupied.append(spot["rect"])
-			walk["grid"] = _stamp(walk, spot["rect"])
-			walk["furniture"].append(spot["rect"])
-			for tag in tags:
-				used_tags[tag] = true
-			placements.append({ "arrangement": arrangement, "spot": spot })
-			placed += 1
+			if _try_place(ArrangementDefinitions.get_arrangement(key), state, rng):
+				placed += 1
 		# A required zone that couldn't place any of its (large) options falls back to a
 		# guaranteed-small arrangement, so essentials always appear even in tight rooms.
 		if placed == 0 and wanted > 0 and zone.has("fallback"):
-			var fb := ArrangementDefinitions.get_arrangement(zone["fallback"])
-			var fb_spot := _find_spot(fb, interior, occupied, rng, walk)
-			if not fb_spot.is_empty():
-				occupied.append(fb_spot["rect"])
-				walk["grid"] = _stamp(walk, fb_spot["rect"])
-				walk["furniture"].append(fb_spot["rect"])
-				placements.append({ "arrangement": fb, "spot": fb_spot })
+			if _try_place(ArrangementDefinitions.get_arrangement(zone["fallback"]), state, rng):
 				placed = 1
 		if zone.get("required", false) and placed == 0 and wanted > 0:
 			missing.append(zone["options"])
-	return { "placements": placements, "missing": missing }
+
+	_fill(recipe.get("fill", {}), state, rng)
+	return { "placements": state["placements"], "missing": missing }
+
+
+## Place `arrangement` in the planned room if its tags are free and a spot fits; true if it was placed.
+## A "ground" arrangement (rug, runner, mat) is non-solid decor: it may lie under furniture, so it only avoids
+## other ground pieces and never touches the walkability grid.
+static func _try_place(arrangement: Dictionary, state: Dictionary, rng: RandomNumberGenerator) -> bool:
+	var tags: Array = arrangement.get("tags", [])
+	var used_tags: Dictionary = state["used_tags"]
+	if tags.any(func(t: String) -> bool: return used_tags.has(t)):
+		return false
+	var interior: Rect2 = state["interior"]
+	var ground: bool = arrangement.get("ground", false)
+	var spot := _find_ground_spot(arrangement, interior, state["ground"], rng) if ground \
+			else _find_spot(arrangement, interior, state["occupied"], rng, state["walk"])
+	if spot.is_empty():
+		return false
+	var rect: Rect2 = spot["rect"]
+	if ground:
+		state["ground"].append(rect)
+	else:
+		var walk: Dictionary = state["walk"]
+		state["occupied"].append(rect)
+		walk["grid"] = _stamp(walk, rect)
+		walk["furniture"].append(rect)
+	for tag in tags:
+		used_tags[tag] = true
+	state["placements"].append({ "arrangement": arrangement, "spot": spot })
+	return true
+
+
+## The recipe's fill pass: `{ target, options }` keeps drawing arrangements from `options` until the room's
+## solid footprints cover `target` (a fraction of the interior area), so big rooms are not left bare. Every
+## piece goes through the same placement checks as a zone. Each listed option is tried once, hit or miss (list
+## one twice to allow two of it): a miss can't turn into a hit later because a fuller room never gains a spot
+## and a taken tag stays taken, so a full room ends the pass quickly. Bounded and scaled by WorldGenConfig.
+static func _fill(fill: Dictionary, state: Dictionary, rng: RandomNumberGenerator) -> void:
+	if fill.is_empty() or not WorldGenConfig.fill_enabled:
+		return
+	var pool: Array = (fill["options"] as Array).duplicate()
+	var interior: Rect2 = state["interior"]
+	var goal: float = fill["target"] * WorldGenConfig.fill_scale * interior.get_area()
+	var covered := _covered(state["placements"])
+	var added := 0
+	var tries := 0
+	while not pool.is_empty() and covered < goal and added < WorldGenConfig.fill_max_pieces \
+			and tries < WorldGenConfig.fill_attempts:
+		tries += 1
+		var pick := rng.randi_range(0, pool.size() - 1)
+		if _try_place(ArrangementDefinitions.get_arrangement(pool[pick]), state, rng):
+			added += 1
+			covered = _covered(state["placements"])
+		pool.remove_at(pick)
+
+
+## Floor area (px^2) taken up by the planned solid arrangements (ground pieces lie beneath and don't count).
+static func _covered(placements: Array) -> float:
+	var area := 0.0
+	for placement: Dictionary in placements:
+		if not placement["arrangement"].get("ground", false):
+			area += (placement["spot"]["rect"] as Rect2).get_area()
+	return area
 
 
 ## Returns { rect, orient, mirror } for a free spot, or {} if none fits.
@@ -112,7 +158,7 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 			# First try dead center, then random spots.
 			var t := Vector2(0.5, 0.5) if i == 0 else Vector2(rng.randf(), rng.randf())
 			var rect := Rect2(interior.position + slack * t, size)
-			if _fits(rect, interior, occupied) and _keeps_walkable(rect, walk) and _leaves_no_slot(rect, walk):
+			if _fits(rect, interior, occupied) and _leaves_no_slot(rect, walk) and _keeps_walkable(rect, walk):
 				return { "rect": rect, "orient": orient, "mirror": mirror }
 		return {}
 
@@ -123,8 +169,26 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 			continue
 		for offset in _offsets(max_offset, arrangement.get("prefer_corner", false), rng):
 			var rect := _wall_rect(orient, offset, fp, interior)
-			if _fits(rect, interior, occupied) and _keeps_walkable(rect, walk) and _leaves_no_slot(rect, walk):
+			if _fits(rect, interior, occupied) and _leaves_no_slot(rect, walk) and _keeps_walkable(rect, walk):
 				return { "rect": rect, "orient": orient, "mirror": mirror }
+	return {}
+
+
+## Like a free-standing spot, but for a "ground" arrangement: dead center first, then random, rejecting only an
+## overlap with another ground piece. Returns { rect, orient, mirror }, or {} if none fits.
+static func _find_ground_spot(arrangement: Dictionary, interior: Rect2, ground: Array, rng: RandomNumberGenerator) -> Dictionary:
+	var fp: Vector2 = arrangement["footprint"]
+	var mirror := rng.randf() < 0.5
+	for i in range(CENTER_TRIES):
+		var orient: int = rng.randi_range(Orient.TOP, Orient.RIGHT)
+		var size := _oriented_size(fp, orient)
+		var slack := interior.size - size
+		if slack.x < 0.0 or slack.y < 0.0:
+			continue
+		var t := Vector2(0.5, 0.5) if i == 0 else Vector2(rng.randf(), rng.randf())
+		var rect := Rect2(interior.position + slack * t, size)
+		if ground.all(func(other: Rect2) -> bool: return not rect.intersects(other)):
+			return { "rect": rect, "orient": orient, "mirror": mirror }
 	return {}
 
 

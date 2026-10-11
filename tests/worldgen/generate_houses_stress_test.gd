@@ -7,10 +7,10 @@ const Perf := preload("res://tests/_perf/perf_probe.gd")
 
 const SEEDS := [101, 202, 303, 404, 505, 606, 707, 808, 909, 1010, 1111, 1212]
 const FIXED_SEED := 424242
-# Baseline (cold caches, the slowest case): 12 houses ~1050 ms, worst ~210 ms, ~206 nodes. Budgets ~4x.
-const TOTAL_BUDGET_MS := 4500.0
-const WORST_HOUSE_BUDGET_MS := 900.0
-const NODE_BAND := [150, 300]
+# Baseline (cold caches, the slowest case): 12 houses ~1560 ms, worst ~355 ms, ~334 nodes. Budgets ~4x.
+const TOTAL_BUDGET_MS := 6200.0
+const WORST_HOUSE_BUDGET_MS := 1400.0
+const NODE_BAND := [250, 420]
 
 
 func describe() -> Dictionary:

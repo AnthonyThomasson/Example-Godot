@@ -8,7 +8,8 @@ class_name WorldGen
 
 ## Build a house and return its root Node2D (parented under `parent`). `rng_seed` of 0 picks a
 ## fresh random layout each run; `force_plan` ("" = random) pins a specific floorplan. Every
-## doorway is an open archway.
+## doorway is an open archway; the house has one front entrance (on its south wall) and, in most
+## floorplans, a back/side/garage exit.
 static func generate(rng_seed: int, force_plan: String, front_entrance_world: Vector2, parent: Node) -> Node2D:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = rng_seed if rng_seed != 0 else randi()
@@ -27,8 +28,9 @@ static func get_rooms(house: Node2D) -> Array:
 	return house.get_meta("rooms", [])
 
 
-## The generated house's doorways as an Array of { pos, width, front, rooms } in WORLD space
-## (`rooms` = keys of the rooms the doorway joins; the front entrance has one). Empty for a null house.
+## The generated house's doorways as an Array of { pos, width, front, exit, rooms } in WORLD space
+## (`rooms` = keys of the rooms the doorway joins: two for an interior door, one for the front
+## entrance or an `exit`). Empty for a null house.
 static func get_openings(house: Node2D) -> Array:
 	if house == null:
 		return []

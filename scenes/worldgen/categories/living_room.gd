@@ -12,7 +12,7 @@ const OBJECTS := {
 
 const ARRANGEMENTS := {
 	"tv_wall_cozy": {
-		"placement": "wall", "footprint": Vector2(200, 175),
+		"placement": "wall", "footprint": Vector2(200, 175), "tags": ["rug"],
 		"items": [
 			{ "key": "tv", "pos": Vector2(100, 15) },
 			{ "key": "rug", "pos": Vector2(100, 105) },
@@ -22,7 +22,7 @@ const ARRANGEMENTS := {
 		],
 	},
 	"tv_wall_modern": {
-		"placement": "wall", "footprint": Vector2(240, 170),
+		"placement": "wall", "footprint": Vector2(240, 170), "tags": ["rug"],
 		"items": [
 			{ "key": "tv", "pos": Vector2(120, 15) },
 			{ "key": "rug", "pos": Vector2(120, 100) },
@@ -63,5 +63,6 @@ const RECIPES := {
 			{ "options": ["reading_nook", "entry_area"], "count": Vector2i(1, 2) },
 			{ "options": ["plant_corner", "side_table_lamp"], "count": Vector2i(0, 2) },
 		],
+		"fill": { "target": 0.4, "options": ["bookshelf_wall", "shelf_single", "lamp_corner", "lamp_corner", "plant_corner", "plant_corner", "side_table_lamp", "sofa_wall", "lounge_group", "reading_nook", "storage_wall"] },
 	},
 }

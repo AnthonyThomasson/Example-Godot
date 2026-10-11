@@ -28,5 +28,6 @@ const RECIPES := {
 			{ "options": ["laundry_sink"], "count": Vector2i(1, 1) },
 			{ "options": ["plant_corner"], "count": Vector2i(0, 1) },
 		],
+		"fill": { "target": 0.3, "options": ["storage_wall", "plant_corner", "shelf_single", "lamp_corner"] },
 	},
 }

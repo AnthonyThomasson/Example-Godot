@@ -4,7 +4,7 @@ class_name HouseSpawner
 ## domain's WallFactory, in the GeneralCatalog.WALL style, with every doorway opening cut into
 ## each wall it lies on), furniture per room (via RoomFurnisher) and each room's floor (via
 ## FloorFactory, the one its furnishing palette names). The house is positioned so its front
-## entrance lands on a point.
+## entrance lands on a point. A plan may also carry `exit` openings (a back/side/garage door).
 
 const Wall = preload("res://scenes/objects/wall/wall.gd")
 
@@ -70,8 +70,8 @@ static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNu
 	return house
 
 
-## Every doorway as `{ pos, width, front, rooms }` in WORLD space; `rooms` are the keys of the
-## rooms whose wall it cuts (one for the front entrance, two for an interior door).
+## Every doorway as `{ pos, width, front, exit, rooms }` in WORLD space; `rooms` are the keys of the
+## rooms whose wall it cuts (one for the front entrance or an exit, two for an interior door).
 static func _openings_world(rooms: Array, openings: Array, origin: Vector2) -> Array:
 	var result: Array = []
 	for opening in openings:
@@ -81,13 +81,13 @@ static func _openings_world(rooms: Array, openings: Array, origin: Vector2) -> A
 				keys.append(room["key"])
 		result.append({
 			"pos": origin + (opening["pos"] as Vector2), "width": opening["width"],
-			"front": opening.get("front", false), "rooms": keys,
+			"front": opening.get("front", false), "exit": opening.get("exit", false), "rooms": keys,
 		})
 	return result
 
 
-## Author-error checks (warnings only): overlapping rooms, an opening not on a shared
-## wall, and rooms unreachable from the front entrance.
+## Author-error checks (warnings only): overlapping rooms, an opening not on the wall(s) it should be on, and
+## anything LayoutRules finds illogical (a bathroom front door, a pass-through bathroom, a room nothing reaches).
 static func _validate(rooms: Array, openings: Array, plan_key: String) -> void:
 	for i in range(rooms.size()):
 		for j in range(i + 1, rooms.size()):
@@ -96,41 +96,17 @@ static func _validate(rooms: Array, openings: Array, plan_key: String) -> void:
 			if a.grow(-1.0).intersects(b.grow(-1.0)):
 				push_warning("House %s: rooms %s and %s overlap" % [plan_key, rooms[i]["key"], rooms[j]["key"]])
 
-	var adj: Array = []
-	for i in range(rooms.size()):
-		adj.append([])
-	var front_idx := -1
 	for opening in openings:
-		var touching: Array = []
-		for i in range(rooms.size()):
-			if not _openings_for(rooms[i]["rect"], [opening]).is_empty():
-				touching.append(i)
-		if opening.get("front", false):
-			if touching.size() != 1:
-				push_warning("House %s: front entrance at %s is not on exactly one room wall" % [plan_key, opening["pos"]])
-			elif front_idx == -1:
-				front_idx = touching[0]
-		elif touching.size() < 2:
+		var touching := rooms.filter(func(room: Dictionary) -> bool:
+			return not _openings_for(room["rect"], [opening]).is_empty()).size()
+		if opening.get("front", false) or opening.get("exit", false):
+			if touching != 1:
+				push_warning("House %s: %s at %s is not on exactly one room wall" % [plan_key, "front entrance" if opening.get("front", false) else "exit", opening["pos"]])
+		elif touching != 2:
 			push_warning("House %s: interior opening at %s is not on a shared wall" % [plan_key, opening["pos"]])
-		else:
-			for a in touching:
-				for b in touching:
-					if a != b:
-						adj[a].append(b)
 
-	if front_idx < 0:
-		return
-	var seen := { front_idx: true }
-	var stack := [front_idx]
-	while not stack.is_empty():
-		var n: int = stack.pop_back()
-		for m in adj[n]:
-			if not seen.has(m):
-				seen[m] = true
-				stack.append(m)
-	for i in range(rooms.size()):
-		if not seen.has(i):
-			push_warning("House %s: room %s is unreachable from the front entrance" % [plan_key, rooms[i]["key"]])
+	for problem: String in LayoutRules.check(rooms, _openings_world(rooms, openings, Vector2.ZERO)):
+		push_warning("House %s: %s" % [plan_key, problem])
 
 
 ## Flip the floorplan left-to-right for extra layout variety.

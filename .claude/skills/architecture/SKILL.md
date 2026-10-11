@@ -19,7 +19,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
-| **World Generation** | `worldgen/` | `domain-worldgen` | Picking a floorplan and building/furnishing a house. |
+| **World Generation** | `worldgen/` | `domain-worldgen` | Picking a logical floorplan (front door, exits, hallways) and building/furnishing a house. |
 | **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their painters (what each piece looks like). |
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
@@ -55,8 +55,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 the house; every doorway is an open archway.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
-   - `WorldGen.get_openings(house) -> Array` — the house's doorways as `{ pos, width, front, rooms }` dicts
-	 (world-space `pos`, `rooms` = keys of the rooms it joins), read from the house's `openings` metadata.
+   - `WorldGen.get_openings(house) -> Array` — the house's doorways as `{ pos, width, front, exit, rooms }` dicts
+	 (world-space `pos`, `rooms` = keys of the rooms it joins; `front` = the one front entrance, on the south
+	 wall, `exit` = a back/side/garage door, each with one room), read from the house's `openings` metadata.
    - Read-only catalogue lookups (used by the Testing domain to place single pieces):
 	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
@@ -301,11 +302,14 @@ TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayT
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
 `Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into seven `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into eight `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
 push + punch + the character's art, pose and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
-floor/wall tiles) and `MagazineConfig` (Items: magazine types and capacities, reload time). There is no `Config` autoload. An eighth static holder, `PhysicsLayers`
+floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass) and `MagazineConfig` (Items: magazine
+types and capacities, reload time). World-Gen's `LayoutRules` (which rooms may hold the front door or an exit,
+which room types may share a door) is a rules table in the same style, not tuning. There is no `Config`
+autoload. A ninth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
 plays for doorway sides.
 
