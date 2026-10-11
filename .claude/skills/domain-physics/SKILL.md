@@ -74,7 +74,10 @@ Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and
   colliderless): one impact, built once in `setup(radius, direction, energy, exclude)` and then static. A lumpy
   core stretched along the throw, tapered crown spikes (forward ones longer with energy; some throw a tail
   droplet), and satellite droplets, all clipped by walls/furniture (a ray from the centre, `PhysicsConfig.wall_mask`)
-  and merged (`Geometry2D.merge_polygons`) into opaque outlines so overlaps don't darken. A wet highlight fleck
+  and merged (`Geometry2D.merge_polygons`) into opaque outlines so overlaps don't darken. Each outline is
+  run through `BloodSplat.drawable` once built: about 1 splat in 100,000 unions into a polygon the engine
+  cannot triangulate, which is swapped for its convex hull (or dropped) instead of logging an error when drawn.
+  Test: `tests/physics/blood_splat_shapes_valid_test.gd`. A wet highlight fleck
   fades and the colour dries to `dried_color` over `splat_dry_time`. Shape knobs: `splat_*`, `drip_size_*`.
 - Bleed-out: `Physics.bleed_out(parent, source, exclude)` (`BloodSpawner.bleed`) starts a dead body's pool where
   its blood leaves it (`blood_origin()`: the trunk's middle once fallen): a `BloodPool` holding

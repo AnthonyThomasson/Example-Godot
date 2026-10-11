@@ -146,7 +146,10 @@ hands):
 
 **Drawing the fallen body** (`character_visuals.gd`, `_draw_fallen`): every part from its 3D
 points seen from above, sorted by height (lowest first), so a standing body hides its legs under
-the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
+the shoulders and a toppling one reveals them; lengths foreshorten as parts tip. The order carries
+over from the last frame (`_stack`): a pair swaps only once their heights differ by more than
+`STACK_BAND`, so a limb lying across the trunk doesn't flicker over and under it. Test:
+`tests/character/fallen_draw_order_stable_test.gd`.
 - Limbs are chains of tapered capsules between the projected joints (the true silhouette of a limb
   seen from any angle), widths per joint from `body_arm_widths` / `body_leg_widths` (hip,
   knee, calf, ankle) / `body_shoe_widths` / `body_neck_width`, so neighbours share a joint's
@@ -159,7 +162,10 @@ the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
 - The trunk is lofted: ellipse cross-sections across the spine, eased between
   `ragdoll_trunk_sections` (spine fraction, half-width, half-depth) and domed at both ends; its
   outline is the union of each neighbouring pair's hull — waisted and rounded from any side, the
-  shoulder ellipse from above. It fills with the shirt, then the art of the side most turned to the
+  shoulder ellipse from above. Each hull grows by `HULL_OVERLAP` so neighbours overlap in area
+  (seen edge-on they share only a line, and the union can come apart, flashing the torso as one
+  small slice for a frame as the body landed); a union still in pieces falls back to the two slices'
+  convex hull. Test: `tests/character/fallen_trunk_outline_steady_test.gd`. It fills with the shirt, then the art of the side most turned to the
   camera mapped across it (UVs from that side's projected axes): the standing `BodyPainter`
   shoulders on top, or `torso_painter.gd` (a full strip: shirt with collar and buttons down to a
   belt, pants on the hips; the back with a seam and the backpack; a flank), then a 1 px outline.

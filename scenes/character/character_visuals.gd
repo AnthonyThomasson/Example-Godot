@@ -36,6 +36,7 @@ const Rig = preload("res://scenes/character/character_rig.gd")  # The joint indi
 ## overlapping parts don't darken twice.
 var _shadow: Node2D
 var _settled_drawn := false  ## The fallen body has been drawn at rest: nothing left to redraw.
+var _fallen_order: Array[String] = []  ## The fallen parts' keys, lowest first, as last drawn (see `_stack`).
 
 ## A standing body is repainted only when what it draws has changed: its joints, the angles its parts are
 ## turned by, what is held and its wounds, each rounded to a step below a visible pixel at the body's size
@@ -287,6 +288,10 @@ const DOME_STEPS := 3
 ## How far past the end sections the domes reach (spine fractions): over the shoulders, under the hips.
 const DOME_TOP := 0.12
 const DOME_BOTTOM := 0.1
+## Px each slice of the trunk's outline grows by so neighbouring slices overlap in area, and the area
+## (px²) above which a piece of their union counts as a body part rather than a sliver.
+const HULL_OVERLAP := 0.5
+const PIECE_MIN_AREA := 1.0
 ## A wound shows once its patch of skin turns at least this far (its normal's z) to the camera.
 const WOUND_MIN_FACING := 0.3
 
@@ -312,11 +317,13 @@ func _draw_body_shadow() -> void:
 		_draw_fallen_shadow(rd)
 
 
+## Parts whose heights differ by less than this (px) keep the order they were drawn in last frame.
+const STACK_BAND := 3.0
+
+
 ## Every part of the fallen body, lowest first.
 func _draw_fallen(rd) -> void:
-	var parts := _fallen_parts(rd)
-	parts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return a["height"] < b["height"])
-	for part in parts:
+	for part in _stack(_fallen_parts(rd)):
 		match part["kind"]:
 			"chain":
 				_draw_chain(part)
@@ -326,6 +333,28 @@ func _draw_fallen(rd) -> void:
 				_draw_fallen_head(part)
 			"trunk":
 				_draw_trunk(rd)
+
+
+## `parts` lowest first. The order carries over from the last frame and a pair swaps only once their
+## heights differ by more than `STACK_BAND`, so a limb lying across the trunk (their heights jittering
+## around each other) stays on one side instead of flickering between over and under.
+func _stack(parts: Array) -> Array:
+	var rank := {}
+	for i in _fallen_order.size():
+		rank[_fallen_order[i]] = i
+	parts.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return rank.get(a["key"], 99) < rank.get(b["key"], 99))
+	for i in range(1, parts.size()):
+		var j := i
+		while j > 0 and (parts[j - 1]["height"] as float) - (parts[j]["height"] as float) > STACK_BAND:
+			var below = parts[j]
+			parts[j] = parts[j - 1]
+			parts[j - 1] = below
+			j -= 1
+	_fallen_order.clear()
+	for part in parts:
+		_fallen_order.append(part["key"])
+	return parts
 
 
 ## The fallen body's floor shadow: each part's silhouette with every point shifted away from the
@@ -352,19 +381,25 @@ func _fallen_parts(rd) -> Array:
 	var r: float = _character.radius
 	var parts := []
 	for i in 2:
-		parts.append(_arm_chain(rd, i))
-		parts.append(_leg_chain(rd, i))
+		parts.append(_keyed(_arm_chain(rd, i), "arm%d" % i))
+		parts.append(_keyed(_leg_chain(rd, i), "leg%d" % i))
 		var elbow: Vector3 = rd.point(Rig.ELBOW[i])
 		var hand: Vector3 = rd.point(Rig.HAND[i])
-		parts.append({ "kind": "hand", "at": hand, "height": hand.z + 0.5, "along": hand - elbow, "side": i })
+		parts.append({ "kind": "hand", "at": hand, "height": hand.z + 0.5, "key": "hand%d" % i, "along": hand - elbow, "side": i })
 	var head: Vector3 = rd.point(Rig.HEAD)
 	var chest: Vector3 = rd.point(Rig.CHEST)
 	var neck := CharacterConfig.body_neck_width
-	parts.append(_chain([_seg(chest, head, neck, neck,
-		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, skin_color, "")]))
-	parts.append({ "kind": "head", "at": head, "height": head.z, "face": rd.face(), "neck": chest - head })
-	parts.append({ "kind": "trunk", "height": (chest.z + rd.point(Rig.PELVIS).z) * 0.5 })
+	parts.append(_keyed(_chain([_seg(chest, head, neck, neck,
+		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, skin_color, "")]), "neck"))
+	parts.append({ "kind": "head", "key": "head", "at": head, "height": head.z, "face": rd.face(), "neck": chest - head })
+	parts.append({ "kind": "trunk", "key": "trunk", "height": (chest.z + rd.point(Rig.PELVIS).z) * 0.5 })
 	return parts
+
+
+## `part` tagged with the stable `key` its draw order is remembered by.
+func _keyed(part: Dictionary, key: String) -> Dictionary:
+	part["key"] = key
+	return part
 
 
 ## Side `i`'s arm as a limb chain from the joints of `j` (the rig or the ragdoll): the sleeve to the
@@ -537,22 +572,38 @@ func _trunk_outline(rd, project: Callable) -> PackedVector2Array:
 		rings.append(ring)
 	var outline := PackedVector2Array()
 	for k in range(1, rings.size()):
-		var hull := _open(Geometry2D.convex_hull(rings[k - 1] + rings[k]))
+		var hull := _grown(_open(Geometry2D.convex_hull(rings[k - 1] + rings[k])))
 		if outline.is_empty():
 			outline = hull
 			continue
-		# The union's outer boundary is its largest piece (any others would be holes).
 		var best := PackedVector2Array()
+		var outer := 0
 		for poly in Geometry2D.merge_polygons(outline, hull):
 			if _area(poly) > _area(best):
 				best = poly
-		outline = best if best.size() >= 3 else outline
+			if not Geometry2D.is_polygon_clockwise(poly) and _area(poly) > PIECE_MIN_AREA:
+				outer += 1
+		if outer > 1:
+			# The union came apart (two outer pieces): keep both slices in one hull rather than
+			# drop the body so far.
+			outline = _open(Geometry2D.convex_hull(outline + hull))
+		else:
+			# The union's outer boundary is its largest piece (any others would be holes).
+			outline = best if best.size() >= 3 else outline
 	if Geometry2D.triangulate_polygon(outline).is_empty():
 		var everything := PackedVector2Array()
 		for ring in rings:
 			everything.append_array(ring)
 		outline = _open(Geometry2D.convex_hull(everything))
 	return outline
+
+
+## `poly` grown by `HULL_OVERLAP`, so neighbouring slices of the trunk overlap in area. They share a
+## ring, which seen edge-on is a line, and slices touching along a line can come out of the union as
+## separate pieces.
+static func _grown(poly: PackedVector2Array) -> PackedVector2Array:
+	var grown := Geometry2D.offset_polygon(poly, HULL_OVERLAP, Geometry2D.JOIN_MITER)
+	return grown[0] if grown.size() == 1 else poly
 
 
 ## The area enclosed by `poly`, whichever way it winds.

@@ -23,7 +23,7 @@ var _radius := 3.0
 var _heading := 0.0
 ## Collider RIDs the clipping rays ignore (the body the blood came from).
 var _exclude: Array = []
-var _space: PhysicsDirectSpaceState2D
+var _space: PhysicsDirectSpaceState2D  ## The space the wall rays query.
 
 
 func _ready() -> void:
@@ -46,6 +46,12 @@ func setup(radius: float, direction: Vector2, energy: float, exclude: Array = []
 		polys.append(droplet)
 	for poly in polys:
 		_merge_in(poly)
+	var kept: Array[PackedVector2Array] = []
+	for outline in shapes:
+		var ok := drawable(outline)
+		if not ok.is_empty():
+			kept.append(ok)
+	shapes = kept
 	_add_highlight()
 	_dry()
 	queue_redraw()
@@ -138,6 +144,18 @@ func _droplet(at: Vector2, dir: Vector2, size: float, elong: float) -> PackedVec
 		var a := TAU * i / DROPLET_VERTS
 		points.append(_at(at + dir * cos(a) * size * elong + side * sin(a) * size))
 	return points
+
+
+## `poly` if the engine can triangulate it, else its convex hull, else empty. A union of random blobs
+## occasionally comes out self-touching (about 1 splat in 100,000), and drawing that logs "Invalid
+## polygon data, triangulation failed".
+static func drawable(poly: PackedVector2Array) -> PackedVector2Array:
+	if Deformation.is_valid_polygon(poly):
+		return poly
+	var hull := Geometry2D.convex_hull(poly)
+	if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.remove_at(hull.size() - 1)
+	return hull if Deformation.is_valid_polygon(hull) else PackedVector2Array()
 
 
 ## Fold `poly` into the merged outlines: union it with any outline it touches (so overlapping parts
