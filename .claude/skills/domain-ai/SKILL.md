@@ -61,7 +61,7 @@ pursuing — a hostile known → straight to COMBAT). A level with one option is
 Spawned by Main (`defender_count` / `invader_count`, default 1 each):
 - **Defender** — `character/npc_defender.tscn` (faction `household`): `hostile_on_trespass` +
   `hostile_on_attack`, `defend_territory` (combat options stay inside the house), familiar with the
-  house. Dropped into a random room.
+  house. Dropped at a clear spot in a random room (never inside solid furniture or on another defender).
 - **Invader** — `character/npc_invader.tscn`, an inherited scene overriding only data (faction
   `invader`): `hostile_on_sight`, not territorial, unfamiliar with the house (it learns rooms by
   sight and is offered unexplored areas by direction), a red body. Dropped just outside the house;

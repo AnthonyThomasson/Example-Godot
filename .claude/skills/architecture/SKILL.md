@@ -73,8 +73,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
 	 `WorldGen.wall_style() -> Dictionary` (the house wall `style` for `WallFactory.spawn`).
    `main.gd` positions the front entrance, fixes draw order, builds the nav map from the rooms
-   (interface 9), drops the defender NPC into a random room and the invader NPC just outside the
-   house (all via `get_rooms`); it never touches
+   (interface 9), drops the defender NPC at a clear spot in a random room (its centre unless solid
+   furniture or another defender is within `spawn_clearance` — read off `NavBuilder.furniture_holes` —
+   else a random clear point) and the invader NPC just outside the house (all via `get_rooms`); it never touches
    world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)

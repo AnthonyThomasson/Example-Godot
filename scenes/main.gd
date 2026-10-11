@@ -20,6 +20,10 @@ extends Node2D
 @export var invader_count: int = 1
 ## Distance (px) beyond the house's outer edge an invader starts at (inside the navmesh's outer band).
 @export var invader_margin: float = 80.0
+## Room (px) a defender is dropped with: its centre stays this far from every solid furniture footprint and
+## twice this from anyone already placed. A body spawned inside a piece is ejected along with it, and the
+## piece's momentum flings the character across the map.
+@export var spawn_clearance: float = 20.0
 ## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
 ## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
 @export var spectator_mode: bool = true
@@ -427,15 +431,14 @@ func _setup_spectator(combatants: Array) -> void:
 
 
 ## Put the human in the match as a member of `player_side`: that side's faction (so its NPCs treat them
-## as an ally) and a starting spot — a defender in a random room, an invader where the
+## as an ally) and a starting spot — a defender at a clear spot in a random room, an invader where the
 ## player stands in the scene (just outside the front entrance). Reparented under `World` so draw order
 ## stays house < player < NPCs.
 func _join_player(rooms: Array, rng: RandomNumberGenerator) -> void:
 	var defending := player_side == &"defender"
 	_player.set("faction", DEFENDER_FACTION if defending else INVADER_FACTION)
 	if defending and not rooms.is_empty():
-		var rect: Rect2 = rooms[rng.randi() % rooms.size()]["rect"]
-		_player.global_position = rect.position + rect.size * 0.5
+		_player.global_position = _clear_spot(rooms[rng.randi() % rooms.size()]["rect"], rng)
 	_player.reparent(_world, true)
 	_world.move_child(_player, 1)  # just above the house (child 0), below the NPCs
 
@@ -500,15 +503,55 @@ func _random_count(rng: RandomNumberGenerator, most: int) -> int:
 	return 0 if most <= 0 else rng.randi_range(1, most)
 
 
-## Drop defender number `index` at the center of a random room. `rng` is seeded from `house_seed` so a
-## pinned layout also pins the NPCs. Added after the house, so it draws above it. `rooms` is
-## WorldGen.get_rooms(house), already fetched by the caller.
+## Drop defender number `index` at a clear spot (`_clear_spot`) in a random room. `rng` is seeded from
+## `house_seed` so a pinned layout also pins the NPCs. Added after the house, so it draws above it. `rooms`
+## is WorldGen.get_rooms(house), already fetched by the caller.
 func _spawn_defender(rooms: Array, rng: RandomNumberGenerator, index: int) -> void:
 	if rooms.is_empty():
 		return
 	var room: Dictionary = rooms[rng.randi() % rooms.size()]
-	var rect: Rect2 = room["rect"]
-	_add_npc(DEFENDER_SCENE, _npc_name("Defender", index), rect.position + rect.size * 0.5, rooms)
+	_add_npc(DEFENDER_SCENE, _npc_name("Defender", index), _clear_spot(room["rect"], rng), rooms)
+
+
+## Random points tried in a room, after its centre, before `_clear_spot` gives up.
+const SPAWN_TRIES := 32
+
+
+## Where a character can be dropped in room `rect`: its centre when clear, else the first clear point of
+## SPAWN_TRIES drawn from `rng` (inset from the walls). Clear = at least `spawn_clearance` from every solid
+## furniture footprint (Navigation's `furniture_holes`, read off the shapes, so it is right on the frame the
+## house is built) and twice that from every combatant already placed. The centre when nothing is clear.
+func _clear_spot(rect: Rect2, rng: RandomNumberGenerator) -> Vector2:
+	var holes := NavBuilder.furniture_holes(_world)
+	var taken: Array = []
+	for c in _combatants:
+		if is_instance_valid(c):
+			taken.append((c as Node2D).global_position)
+	var centre := rect.get_center()
+	if _is_clear(centre, holes, taken):
+		return centre
+	var inner := rect.grow(-spawn_clearance * 2.0)
+	if inner.size.x > 0.0 and inner.size.y > 0.0:
+		for i in SPAWN_TRIES:
+			var p := inner.position + Vector2(rng.randf(), rng.randf()) * inner.size
+			if _is_clear(p, holes, taken):
+				return p
+	GameLog.say("No clear spawn spot in the room at %s; using its centre" % centre)
+	return centre
+
+
+## Whether `p` keeps `spawn_clearance` from every footprint in `holes` and twice that from every point in `taken`.
+func _is_clear(p: Vector2, holes: Array, taken: Array) -> bool:
+	for q in taken:
+		if p.distance_to(q) < spawn_clearance * 2.0:
+			return false
+	for poly: PackedVector2Array in holes:
+		if Geometry2D.is_point_in_polygon(p, poly):
+			return false
+		for i in poly.size():
+			if Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()]).distance_to(p) < spawn_clearance:
+				return false
+	return true
 
 
 ## Drop invader number `index` (of `count`) just outside the house (the rooms' bounding box),
