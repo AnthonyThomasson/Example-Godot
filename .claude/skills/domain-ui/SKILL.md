@@ -18,8 +18,11 @@ the domains.
   (punch left/right or gunshot), damage, and elapsed time. Listens to `hit_landed` on the character;
   freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
 
-- `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants)` wires it to
-  any number of NPCs; each combatant gets a compact floating panel (300×145 px, 28pt font) — name,
+- `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants, time_limit := 0.0, show_details := true)` wires it to
+  any number of characters (a human included); it is **re-entrant** (an endless run calls it for each new match),
+  emits `match_ended(verdict)` once when a faction is eliminated or `time_limit` seconds pass undecided
+  ("TIME UP - DRAW"), `set_countdown(text)` shows a line under the verdict (Main's next-match countdown), and
+  `show_details` off (a match with a human) hides the goal readout and combat feed, leaving the timer and result; each combatant gets a compact floating panel (300×145 px, 28pt font) — name,
   faction, health bar, current act (the controller's `debug_status()` — the full decision path,
   word-wrapped) — whose bottom-centre is placed 24 px above the NPC's on-screen origin each
   frame via `get_global_transform_with_canvas()` (clamped inside the viewport). Also: a top-centre
@@ -27,15 +30,20 @@ the domains.
   winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus
   `&"hit"`). Declares the winner once an entire faction is eliminated.
 
-- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ has_player, seed, defenders, invaders, ticket })` shows a
-  full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox,
-  "Seed" text field (blank = random), Defenders/Invaders spinboxes, and a Start button. (The Debug switch
+- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, defenders, invaders, weapons, ticket })` shows a
+  full-screen modal (40 px margins, VBox separation 20, the controls in a `ScrollContainer` fitted to the window
+  height) with: a "Play as" dropdown (Defender / Invader), a "Seed" text field (blank = random), two side
+  columns (Defenders | Invaders) each with Count, Weapon, Magazine and Spares rows (the Weapon / Magazine
+  choices arrive as plain data in `weapons`, `[{ id, label, magazines: [{ id, label }] }]`, from Main — the window
+  never sees Items; a weapon with no magazines hides the Magazine + Spares rows; `defenders` / `invaders` seed
+  `{ count, weapon, magazine, spares }` or a bare count), and three start buttons: **Start** (play as the chosen
+  side), **Watch** (AIs alone) and **Endless** (AIs alone, a fresh randomised match after each). (The Debug switch
   lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
-  muted) above the title. Pressing Start emits `start_requested({ has_player, seed, defenders,
-  invaders })`. Main opens it on a fresh launch; a scripted `restart` sets the
+  muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed,
+  defenders: { count, weapon, magazine, spares }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
-the test browser. Pressing Start also **disables the button**, because Main may hold the start
+the test browser. Pressing a start button also **disables all three**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
   shows "Waiting for the decision server…" there so that pause is never silent. A **Settings** button
@@ -143,6 +151,7 @@ the test browser. Pressing Start also **disables the button**, because Main may 
 - UI observers attach by exported node path (or node name duck-typed in `main.gd`) and read only the
   Character public API/signals plus `AIController.current_act()` / `goal_text()` (interface 7 in the
   `architecture` skill). EventBus `&"hit"` is the only cross-domain event consumed here.
-- `main.gd` calls `MatchHUD.begin(combatants)`, `SetupMenu.open(defaults)` /
+- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to
+  `match_ended`, `SetupMenu.open(defaults)` /
   `SetupMenu.set_status(text)`, and `SeedDisplay.show_seed(seed)` — the only outward calls the UI
   domain receives.

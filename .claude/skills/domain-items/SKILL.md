@@ -20,7 +20,7 @@ Number keys 1–9 select a slot (`ItemRegistry`):
 
 A gun's slot is the `slot` of its `GunConfig` row; `ItemRegistry.default_inventory()` has everything,
 `inventory_for(slots)` just some, and `loadout_for(gun_slot)` / `spares_for(gun_slot)` / `random_gun_slot(rng)` are what Main uses to
-give a spawn one random gun (see `domain-character`, `set_loadout`).
+arm a spawn (see `LoadoutConfig` below and `domain-character`, `set_loadout`).
 
 ## Guns (`gun.gd`, `gun_config.gd`)
 
@@ -85,6 +85,15 @@ builds a gun loaded with its `GunConfig.magazine` type (`rounds` < 0 = full). Th
 Write an `Item` subclass in `items/` and add a case in `ItemRegistry.create`. To add a **gun**: a row in `GunConfig.guns` (with a free
 `slot`), a `GunItem` subclass (painters, sizes, `grip_back`, stances — add any new stance rows to `CharacterConfig.stances`), a case in
 `ItemRegistry._new_gun`, and magazine rows in `MagazineConfig.types` for its `gun` id.
+
+## Loadouts
+
+`LoadoutConfig` (static holder) is what a match hands a character: `options()` is the plain-data list a UI shows — **Random**
+first, then every gun in `GunConfig.guns` by slot, each with its `MagazineConfig` types (its own `magazine` first) — so a gun
+added to `GunConfig` is offered automatically. `normalize(loadout)` makes a `{ weapon, magazine, spares }` dict valid,
+`apply(character, loadout, rng)` calls `Character.set_loadout` (bare hands, fists, key and the one gun, loaded with the chosen
+magazine and carrying `spares` of it; `random` draws a gun from `rng`) and returns the gun id, `random(rng)` draws a valid
+loadout. `ItemRegistry.create` / `inventory_for` take an optional loaded-`magazine` override.
 
 ## Gun art
 

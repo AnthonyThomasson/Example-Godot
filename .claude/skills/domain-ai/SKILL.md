@@ -74,8 +74,8 @@ Both know their ammo: the snapshot's `loadout` section and the `gun_loaded` / `w
 tactic in the decision tree, the `reload` primitive runs it, and the `auto_reload` export (default on) reloads an empty gun
 as a reflex. `low_ammo_fraction` sets where "nearly empty" starts.
 
-Nothing in the AI is written per weapon: it fights with `Character.gun_slot()` (whatever gun it carries — the presets hold a pistol, but the game
-spawns every NPC with one random gun) and reacts only to generic conditions the character reports. Notably, when its gun cannot fire because the
+Nothing in the AI is written per weapon: it fights with `Character.gun_slot()` (whatever gun it carries — the presets hold a pistol, but a match
+arms every NPC with a gun from its side's loadout, one random gun by default) and reacts only to generic conditions the character reports. Notably, when its gun cannot fire because the
 barrel is against a wall or object (`weapon_blocked()`, a long gun), it steps back until it can; a pistol is never blocked. See `domain-ai-behavior`.
 
 ## Key idea: Von picks, perceptions inform, behaviour executes

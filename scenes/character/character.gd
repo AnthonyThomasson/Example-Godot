@@ -315,11 +315,12 @@ func gun_slot() -> int:
 
 
 ## Carry only the items in `slots` (see `ItemRegistry`), holding `hold_slot`, with the spare magazines named by
-## `spare_types` (`MagazineConfig.types` ids): how a character spawns with one random gun. Starts every gun
-## loaded as `start_rounds` says; a reload in progress is dropped.
-func set_loadout(slots: Array, hold_slot: int, spare_types: Array) -> void:
+## `spare_types` (`MagazineConfig.types` ids): how a spawner arms a character with its gun. Starts every gun
+## loaded as `start_rounds` says (in `loaded_magazine` when that type fits the gun, else the gun's own); a reload
+## in progress is dropped. Safe after `add_child`, so a spawner can re-arm a scene-placed character.
+func set_loadout(slots: Array, hold_slot: int, spare_types: Array, loaded_magazine: StringName = &"") -> void:
 	_cancel_reload()
-	_items = ItemRegistry.inventory_for(slots, start_rounds)
+	_items = ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)
 	_magazines = ItemRegistry.create_magazines(spare_types)
 	_current_slot = hold_slot if hold_slot in _items else (_items.keys()[0] if not _items.is_empty() else hold_slot)
 	_raise = 0.0

@@ -148,7 +148,7 @@ func run(t: TestContext) -> void:
     example `max_health`, `start_slot`: 1 unarmed / 2 fists / 3 pistol / 4 key / 5 SMG / 6 assault rifle, `faction`, and the ammo props
     `start_rounds` (what the starting gun is loaded with; -1 = full) and `spare_magazine_types` (e.g. `[]` for none,
     `[&"extended"]`; the default is two standard magazines for each gun, so a test counting spares sets it)). Actors built here
-    keep `default_inventory()` (every item) and the weapon they ask for: only Main gives a spawn one random gun
+    keep `default_inventory()` (every item) and the weapon they ask for: only Main arms a spawn with its side's loadout
     (`Character.set_loadout`). To retune a gun for one test, `set_static(GunConfig, "guns", modified_copy)` (e.g. spread 0 for a
     straight shot). Use
     `set_props(id, "GoalController", {...})` for a child's exports. NPCs get `rooms` injected, as Main

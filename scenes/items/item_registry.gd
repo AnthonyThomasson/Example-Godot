@@ -13,8 +13,9 @@ const KEY_SLOT := 4
 
 
 ## Create the item for a slot id, or null if the slot is empty. A gun comes loaded with the magazine its
-## `GunConfig` row names, holding `rounds` (negative = full).
-static func create(id: int, rounds := -1) -> Item:
+## `GunConfig` row names (or `magazine`, a `MagazineConfig.types` id of that gun, when given), holding
+## `rounds` (negative = full).
+static func create(id: int, rounds := -1, magazine: StringName = &"") -> Item:
 	match id:
 		UNARMED_SLOT: return UnarmedItem.new()
 		FISTS_SLOT: return FistsItem.new()
@@ -24,7 +25,9 @@ static func create(id: int, rounds := -1) -> Item:
 		return null
 	var item := _new_gun(gun)
 	if item != null:
-		item.magazine = Magazine.create(StringName(GunConfig.row(gun).get("magazine", &"standard")), rounds)
+		var type := magazine if MagazineConfig.types.get(magazine, {}).get("gun", &"") == gun \
+				else StringName(GunConfig.row(gun).get("magazine", &"standard"))
+		item.magazine = Magazine.create(type, rounds)
 	return item
 
 
@@ -35,11 +38,12 @@ static func default_inventory(rounds := -1) -> Dictionary:
 	return inventory_for([UNARMED_SLOT, FISTS_SLOT, KEY_SLOT] + gun_slots(), rounds)
 
 
-## A fresh inventory of just the given slots (an empty slot id is skipped).
-static func inventory_for(slots: Array, rounds := -1) -> Dictionary:
+## A fresh inventory of just the given slots (an empty slot id is skipped). A gun comes loaded with
+## `magazine` when that type fits it.
+static func inventory_for(slots: Array, rounds := -1, magazine: StringName = &"") -> Dictionary:
 	var inv := {}
 	for id in slots:
-		var item := create(int(id), rounds)
+		var item := create(int(id), rounds, magazine)
 		if item != null:
 			inv[int(id)] = item
 	return inv

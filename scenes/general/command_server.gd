@@ -232,17 +232,21 @@ func _act_of(character: Node) -> String:
 	return "?"
 
 
-## Every AI combatant in the running scene, discovered rather than named: a scene-root child that has
-## an AI controller child (the same `current_act` duck-type `_act_of` uses). So the match status
-## covers every defender/invader in the scene, with no coupling to their node names.
+## Every AI combatant in the running scene, discovered rather than named: a child of the scene root
+## (or of a node in the `match_world` group, the container holding everything a match builds) that has
+## an AI controller child (the same `current_act` duck-type `_act_of` uses). So the match status covers every
+## defender/invader in the scene, with no coupling to their node names.
 func _combatants() -> Array:
 	var out: Array = []
 	var s := scene()
 	if s == null:
 		return out
-	for c in s.get_children():
-		if _act_of(c) != "?":
-			out.append(c)
+	var parents: Array = [s]
+	parents.append_array(get_tree().get_nodes_in_group(&"match_world"))
+	for parent in parents:
+		for c in parent.get_children():
+			if _act_of(c) != "?":
+				out.append(c)
 	return out
 
 
@@ -251,7 +255,7 @@ func _combatants() -> Array:
 ## The player character node, or null if the current scene has none.
 func player() -> Node:
 	var s := scene()
-	return null if s == null else s.get_node_or_null("Player")
+	return null if s == null else node("Player")
 
 
 ## The running scene's root (the composition-root Main node).
@@ -259,10 +263,19 @@ func scene() -> Node:
 	return get_tree().current_scene
 
 
-## The node at `path` under the scene root, or null if absent.
+## The node at `path` under the scene root (or, failing that, under a `match_world` group node), or null if absent.
 func node(path: String) -> Node:
 	var s := scene()
-	return null if s == null else s.get_node_or_null(path)
+	if s == null:
+		return null
+	var found := s.get_node_or_null(path)
+	if found != null:
+		return found
+	for container in get_tree().get_nodes_in_group(&"match_world"):
+		found = container.get_node_or_null(path)
+		if found != null:
+			return found
+	return null
 
 
 ## Hold `action` down (used for sustained movement) until a matching `release`.

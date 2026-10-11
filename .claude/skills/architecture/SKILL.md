@@ -36,12 +36,19 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
 (interface 13), the only code that knows every domain. It asks World-Gen for a house and holds the
 player; the setup window's **Tests** button sends it to the test browser instead. After the NPCs are placed it
-arms the player and every NPC with one random gun (`ItemRegistry.random_gun_slot` from an RNG seeded by the house
-seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement) through
-`Character.set_loadout`; tests and sandboxes never come through there and keep the weapon they ask for.
+arms the player and every NPC with its side's loadout (`LoadoutConfig.apply`: a chosen gun, or by default one random gun
+drawn from an RNG seeded by the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting
+placement) through `Character.set_loadout`; tests and sandboxes never come through there and keep the weapon they ask for.
 `project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General).
 
-On a fresh launch Main opens the UI setup window and builds nothing until Start, then **awaits the
+The setup window offers **Start** (a human joins the chosen side, on top of its NPC count, with the side's loadout
+and faction), **Watch** (AIs alone) and **Endless** (AIs alone; 5 s after each match ends — the MatchHUD's
+`match_ended` — Main frees its `World` node and builds a fresh match with a new seed, random counts up to the chosen
+ones and random loadouts; an undecided match is called a draw after `endless_time_limit`). Everything one match
+builds lives under Main's `World` node so it can be freed in place; weapon choices come from the Items domain's
+`LoadoutConfig` (Main hands the UI plain dicts and arms each character with `LoadoutConfig.apply` → `Character.set_loadout`; the choices are Random or any gun in `GunConfig`).
+
+On a fresh launch Main opens the UI setup window and builds nothing until a start button is pressed, then **awaits the
 AI domain's `DecisionServerLauncher.resolved(live)`** before `_spawn_world()`, so no NPC makes its
 first decision against a still-booting Von server. That launcher is a root node of `main.tscn`, so
 it begins probing/launching at scene load and usually resolves while the window is still open (no
@@ -150,8 +157,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
    as its user dies: a gun leaves a skidding `DroppedItem` in the world, the default leaves
    nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
    is which side landed up). The character
-   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id)` /
-   `default_inventory()` / `inventory_for(slots)` / `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. The
+   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` /
+   `default_inventory()` / `inventory_for(slots, rounds, magazine)` (an optional `magazine` type the gun starts loaded with) /
+   `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. `LoadoutConfig` (static holder) is what Main
+   hands a character: `options()` (plain dicts for the setup window: `RANDOM`, then every `GunConfig` gun with its magazines),
+   `normalize(loadout)`, `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout`) and `random(rng)`. The
    character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
    `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
@@ -179,8 +189,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    damage, for injury sensing), `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
-   `is_automatic()`, `set_loadout(slots, hold_slot, spare_types)` (carry only those slots, holding one, with those spare magazines: how Main
-   gives a spawn one random gun) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   `is_automatic()`, `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` (carry only those slots, holding one, with those spare
+   magazines, the gun loaded with that type when it fits: how Main arms a spawn with its side's loadout) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()` and `is_reloading()` — but only while it can SEE that character
    (aim, visible wounds and a reload in progress are things it perceives).
    `player_controller.gd` is the human one and
@@ -308,7 +318,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory ─▶ Objects ─▶ Physics
 main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
-main ─▶ ItemRegistry (random_gun_slot / loadout_for / spares_for) ─▶ Character.set_loadout
+main ─▶ LoadoutConfig ─▶ GunConfig / MagazineConfig / ItemRegistry (random_gun_slot / loadout_for / spares_for) ─▶ Character.set_loadout
 main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals only, no dependency on Settings)
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects

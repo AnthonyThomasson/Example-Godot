@@ -287,7 +287,7 @@ Test: `tests/character/run_pose_test.gd`.
 The character carries spare magazines (`_magazines`, `Magazine` items) beside its inventory: they are never in
 `_items`, so no number key or interaction can select them. They come from the exports `spare_magazine_types`
 (`MagazineConfig.types` ids, default two standard magazines for each gun) and `start_rounds` (what the starting gun is loaded with;
-negative = full), which tests and sandboxes set through `actor(..., props)`. `reload()` (R, or the AI's reload
+negative = full), which tests and sandboxes set through `actor(..., props)`. `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` re-arms a character after the fact (a match gives an NPC or the scene-placed player its gun this way; `loaded_magazine` picks the type the gun starts loaded with). `reload()` (R, or the AI's reload
 primitive) starts a timer of the held item's `reload_time()` on it if its `can_reload(self)` says a carried
 magazine would add rounds, and sets the item's `reloading` flag (a gun's support hand eases to the `reload`
 stance while it is up). `_update_reload` runs right after the controller: it cancels the reload when the character
@@ -302,8 +302,8 @@ is still cycling between rounds. `_physics_process` ticks every carried item (`I
 cooldown is in step with the frame that pulls the trigger. A controller re-presses `shoot()` every frame while the trigger is held when
 `is_automatic()` (`player_controller.gd` reads `Keybinds.is_fire_pressed()`; the test puppet has `hold_fire(on)`).
 
-**Loadout.** `set_loadout(slots, hold_slot, spare_types)` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds)`, the carried
-magazines and the held slot (dropping any reload, re-judging the raise). Main uses it to give the player and every NPC one random gun
+**Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)`, the carried
+magazines and the held slot (dropping any reload, re-judging the raise). Main uses it (through `LoadoutConfig.apply`) to arm the player and every NPC with its side's loadout — a chosen gun, or one random gun by default
 (`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
 
 ## Walking into furniture

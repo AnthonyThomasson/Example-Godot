@@ -73,7 +73,7 @@ false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a c
 `interact`, `aim X Y`, `match`, `ai`, `restart [seed]`) or, failing that, a GDScript `Expression`
 evaluated against the node (e.g. `scene().get_node("Player").speed`). Movement and actions are
 driven by injecting `Input` action presses through `Keybinds` names — the same path a human's
-keyboard/mouse uses — so no game domain is coupled to it. `match` prints a one-line, parseable
+keyboard/mouse uses — so no game domain is coupled to it. Combatants and the player are discovered under the scene root **or a node in the `match_world` group** (Main's container for everything a match builds). `match` prints a one-line, parseable
 status of both spectator combatants (`Defender`/`Invader`): each one's health, current act and
 alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
 controller's `current_act()`. `ai` is the diagnostic counterpart: it dumps every AI combatant's
