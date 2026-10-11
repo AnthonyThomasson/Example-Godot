@@ -46,6 +46,14 @@ static var ROWS := {
 		"description": "Wounds splatter and drip blood and dead bodies bleed out.",
 		"static": [[BloodConfig, &"enabled"]],
 	},
+	&"physics.footprints": {
+		"description": "Walkers who step in wet blood leave bloody footprints.",
+		"static": [[BloodConfig, &"footprints_enabled"]],
+	},
+	&"physics.smear": {
+		"description": "Objects pushed through wet blood smear it into streaks.",
+		"static": [[BloodConfig, &"smear_enabled"]],
+	},
 	&"physics.debris": {
 		"description": "Hits spray material chips.",
 		"static": [[PhysicsConfig, &"debris_enabled"]],

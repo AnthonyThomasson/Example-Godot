@@ -40,6 +40,7 @@ extends RigidBody2D
 ## Physics components, created in _ready() (runtime-shape convention).
 var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
 var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
+var _smear: BloodSmear  ## Drags blood out of a puddle as the piece slides through it (solid pieces only).
 
 
 func _ready() -> void:
@@ -53,6 +54,9 @@ func _ready() -> void:
 
 	if solid:
 		_build_collider()
+		_smear = BloodSmear.new()
+		add_child(_smear)
+		_smear.set_footprint(Deformation.shape_polygon(shape_type, size, _deformable.impacts))
 	else:
 		# Non-solid decor never moves or collides: freeze it (a shapeless RigidBody2D would
 		# be invalid) and draw it beneath everything else.
@@ -104,6 +108,7 @@ func _rebuild_collider() -> void:
 	var shapes := Deformation.convex_shapes(poly)
 	if shapes.is_empty():
 		return
+	_smear.set_footprint(poly)
 	for child in get_children():
 		if child is CollisionShape2D:
 			child.queue_free()

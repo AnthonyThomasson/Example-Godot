@@ -107,6 +107,12 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `BloodConfig.enabled` off → `BloodWound.record` / `bleed_out` spawn nothing (`bleed_out` returns null);
 	 `PhysicsConfig.debris_enabled` off → `spawn_debris` spawns nothing. Splatters and bleed-out
 	 pools are added with readable names (`BloodSplat`, `BloodSplat2`, … / `BloodPool`, …).
+   - `BloodField` (static registry, Physics-internal: `BloodSplat`/`BloodPool` register themselves) /
+	 `BloodDecals` (a batched layer under a world node, `BloodDecals.layer(parent)`) /
+	 `BloodFootprints` (Node child, character: `step(foot, at, direction, length, width, inner, speed)` on
+	 each footfall prints a sole if the foot is carrying wet blood) / `BloodSmear` (Node child, objects:
+	 `set_footprint(local_polygon)`, then drags blood out of a puddle as feathered, wandering ribbons while the body slides).
+	 Both need `BloodConfig.enabled` and their own switch (`footprints_enabled` / `smear_enabled`).
    - `BloodSurface` (static registry): `register(rect, groove: Callable(world, half_width) -> 0..1, porous) -> id` /
 	 `unregister(id)` — Objects' `Floor` registers its room so a bleed-out flow runs along grout/seams
 	 (`resistance(pos)` is read only by Physics' `BloodFlow`; `BloodConfig.surface_flow` off ignores floors).
@@ -311,9 +317,11 @@ Two conventions hold across domains; the per-domain specifics live in each domai
 ## Running & verifying
 
 - Main scene `res://scenes/main.tscn`.
-- **Worktree editor:** `tools/editor.sh TICKET [--autorun]` opens a Godot editor on the checkout with
-  `GAME_TICKET` set (Main passes it as `ticket` to the setup window, which shows it on top; a
-  `--ticket=` user arg works too) and its own free command-server port (`GODOT_CMD_PORT`), importing first in a fresh worktree. `--autorun`
+- **Worktree editor:** `tools/editor.sh [--autorun]` opens a Godot editor on the checkout, named after the
+  worktree directory (`GAME_TICKET`; Main passes it as `ticket` to the setup window, which shows it on top;
+  a `--ticket=` user arg overrides it, and a run from any editor falls back to the directory name), unless
+  one is already open there (it then prints that editor's pid, port and log). Each gets its own free
+  command-server port (`GODOT_CMD_PORT`), importing first in a fresh worktree. `--autorun`
   makes the editor plugin `addons/ticket_autorun/` press Play once it is up.
 - **Verification ladder** — use the cheapest rung that proves the change:
   1. **Loads?** `godot-debug` skill: headless load check (run `--import` first when you add a `class_name`).

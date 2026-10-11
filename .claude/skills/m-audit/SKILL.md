@@ -215,17 +215,19 @@ only with the sandbox disabled, and `mcp__godot__stop_project` orphans the Von s
 
 ## Step 6 — Show the finished change in a worktree editor
 
-Once the checks above are green, leave a live copy of the change running for the user, tagged with
-your ticket name (the Linear/branch ticket you are working on; ask if you have none):
+Once the checks above are green, leave a live copy of the change running for the user. The editor is
+named after the worktree (its directory name), so there is no name to pass:
 
 ```bash
-tools/editor.sh <TICKET> --autorun        # run from the worktree being verified (Bash sandbox disabled)
+tools/editor.sh --autorun        # run from the worktree root being verified (Bash sandbox disabled)
 ```
 
-It prints the editor pid, the command-server port and a log path. After ~10 s confirm the log
-(`$TMPDIR/editor_<TICKET>.log`) shows `[cmd] listening on 127.0.0.1:<port>` and no `SCRIPT ERROR`
+If an editor is already open on this worktree the script starts nothing and prints `editor already
+running` with its pid, port and log; report that and stop (Play is not pressed again). Otherwise it
+prints the editor pid, the command-server port and a log path. After ~10 s confirm the log
+(`$TMPDIR/editor_<worktree>.log`) shows `[cmd] listening on 127.0.0.1:<port>` and no `SCRIPT ERROR`
 (optionally `python3 tools/gcmd.py --port <port> 'scene().name'`). The game opens on the setup menu
-with the ticket name at the top. Report the ticket, port and pid; leave the editor open.
+with the worktree name at the top. Report the worktree name, port and pid; leave the editor open.
 
 ## Output — the checklist
 
@@ -256,7 +258,7 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 - [x] `tools/run_tests.sh`: 6 passed, 0 failed, 2 skipped.
 
 ### Worktree editor
-- [x] `tools/editor.sh ABC-123 --autorun` running (pid 4242, port 9345); setup menu shows ABC-123.
+- [x] `tools/editor.sh --autorun` running for `fix-the-flicker` (pid 4242, port 9345); setup menu shows `fix-the-flicker`.
 
 **Verdict:** 3 issues to address before commit.
 ```

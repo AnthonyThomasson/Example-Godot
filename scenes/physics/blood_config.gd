@@ -99,6 +99,76 @@ static var porous_resist: float = 3.0
 static var groove_half_width: float = 2.0
 ## Brightness drop of rim cells vs. the deep centre (0 none .. 1 black).
 static var flow_edge_darken: float = 0.25
+## --- Footprints and smears (BloodField, BloodDecals, BloodFootprints, BloodSmear) ---
+## A foot or a sliding object soaks up wet blood where it touches it, then deposits it with the load
+## fading, so a trail tapers off. Both switches also need `enabled`.
+static var footprints_enabled: bool = true
+static var smear_enabled: bool = true
+## Seconds a bleed-out pool stays wet enough to be picked up (splatters use `splat_dry_time`).
+static var pool_wet_time: float = 240.0
+## Wetness (0..1) of a fresh splatter, a thin film next to a pool's deep fill.
+static var splat_wetness: float = 0.7
+## Load (0..1) a carrier soaks from blood of wetness 1; it keeps the larger of its load and this.
+static var pickup_gain: float = 1.0
+## Wetness above which the spot is already thick blood: a footprint is not stamped there.
+static var thick_blood: float = 0.8
+## Cap on the prints and smear ribbons kept in the world; the oldest are dropped past it.
+static var print_max: int = 1000
+## Seconds a print or smear takes to dry from `color` to `dried_color`.
+static var print_dry_time: float = 90.0
+## Draw order of prints and smears; blood is drawn at `z_index`, so this puts them just above it.
+static var print_z_index: int = -2
+## Footprints: load a foot loses per print (so ~1/print_decay prints follow a soak), the load below
+## which a foot prints nothing, and the print's opacity at load 1 and at the threshold.
+static var print_decay: float = 0.09
+static var print_min_load: float = 0.12
+static var print_alpha_max: float = 0.85
+static var print_alpha_min: float = 0.25
+## Random placement offset (px) and turn (radians) of a print, and how far (px) a fast, heavy
+## print slips forward along the heading.
+static var print_jitter: float = 0.6
+static var print_turn_jitter: float = 0.12
+static var print_slip: float = 1.2
+## Smears: an object drags blood as feathered ribbons, one per "finger" across its footprint. Finger
+## spacing (px) and the most fingers; the speed (px/s) below which an object smears nothing; the distance
+## (px) between ribbon samples; the load a finger loses per px; ribbon width as a multiple of the spacing
+## (more than 1 so neighbours merge into one smudge); the opacity at load 1.
+static var smear_finger_spacing: float = 6.0
+static var smear_max_fingers: int = 14
+static var smear_min_speed: float = 12.0
+static var smear_segment_length: float = 3.0
+static var smear_decay_per_px: float = 0.007
+static var smear_width: float = 1.7
+static var smear_alpha_max: float = 0.95
+## How far a ribbon wanders sideways (in finger spacings) and how fast (cycles per px), so streaks
+## drift, converge and cross instead of running dead straight.
+static var smear_wobble: float = 0.6
+static var smear_wobble_freq: float = 0.03
+## Opacity at a ribbon's edges as a fraction of its centre (0 = fully soft, 1 = hard edge).
+static var smear_feather: float = 0.25
+## Below this load a ribbon starts to break into dry-brush dashes (more often the lower the load),
+## and the most samples one ribbon holds before another takes over.
+static var smear_break_load: float = 0.3
+static var smear_max_ribbon_points: int = 60
+## Blending into blood already on the floor: a new ribbon eases in over this many px, and is
+## see-through where the floor is already wet — fully so above `smear_absorb_hi` wetness, not at all
+## below `smear_absorb_lo` — so a smear grows out of its puddle with no edge.
+static var smear_fade_in: float = 12.0
+static var smear_absorb_lo: float = 0.1
+static var smear_absorb_hi: float = 0.6
+## The most a ribbon's opacity may rise per sample (it may fall at once), so a streak swells out of a
+## puddle's crisp edge instead of switching on there.
+static var smear_alpha_rise: float = 0.12
+## Blood pulled out of a pool extends the pool's own outline: a finger carrying at least
+## `smear_trail_min` load within `smear_trail_reach` px of a pool grows it by that load x
+## `smear_trail_gain`, and the pool keeps at most `pool_trail_max` such cells. No trail cell lies more
+## than `pool_trail_length` px from the pool's own flooded cells: the tongue tapers to nothing there, so
+## this is how far a pool can be dragged (a full load would otherwise carry about 100 px).
+static var smear_trail_min: float = 0.3
+static var smear_trail_reach: float = 10.0
+static var smear_trail_gain: float = 1.0
+static var pool_trail_max: int = 600
+static var pool_trail_length: float = 50.0
 ## Base blood color — dark red, semi-transparent, distinct from the debris "blood" chip tint
 ## so the two systems stay visually independent.
 static var color: Color = Color(0.42, 0.02, 0.03, 0.85)

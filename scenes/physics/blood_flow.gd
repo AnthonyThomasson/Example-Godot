@@ -17,6 +17,9 @@ const NEIGHBORS: Array[Vector2i] = [
 ## front (a few per frame); a front then sweeps through cost-space over time, so each cell's fill
 ## level rises continuously and the pool's edge moves smoothly instead of cells popping in.
 var cells: Dictionary = {}
+## Blood dragged out of the pool (BloodSmear): cell -> fill 0..1, for cells the flood-fill never claimed.
+## Drawn with the pool, so a smear grows out of the pool's own outline.
+var trail: Dictionary = {}
 ## Where the front has reached, in cost units.
 var front := 0.0
 ## How far the sweep has run, 0..1 of the duration.
@@ -74,10 +77,49 @@ func settled() -> bool:
 	return _progress >= 1.0
 
 
-## Fill level (0..1) of a claimed cell at the current front.
+## Fill level (0..1) of a cell: the flood-fill at the current front, or the dragged-out trail if more.
 func fill(c: Vector2i) -> float:
-	var t := clampf((front - cells[c]) / maxf(BloodConfig.flow_soft_edge, 0.001), 0.0, 1.0)
-	return t * t * (3.0 - 2.0 * t)
+	var flood := 0.0
+	if cells.has(c):
+		var t := clampf((front - cells[c]) / maxf(BloodConfig.flow_soft_edge, 0.001), 0.0, 1.0)
+		flood = t * t * (3.0 - 2.0 * t)
+	return maxf(flood, trail.get(c, 0.0))
+
+
+## Whether blood of any kind (flooded or dragged out) lies on cell `c`.
+func covers(c: Vector2i) -> bool:
+	return cells.has(c) or trail.has(c)
+
+
+## Drag blood out onto cell `c` and the ring around it: raise them to `level` (the centre) and a little
+## less (the ring), never lowering one. The level tapers linearly to nothing at
+## `BloodConfig.pool_trail_length` px from the flooded cells, and stops growing at `BloodConfig.pool_trail_max`
+## trail cells.
+func add_trail(c: Vector2i, level: float) -> void:
+	level *= 1.0 - clampf(_rim_distance(c) / maxf(BloodConfig.pool_trail_length, 0.001), 0.0, 1.0)
+	if level <= 0.0:
+		return
+	for dx in range(-1, 2):
+		for dy in range(-1, 2):
+			var n := c + Vector2i(dx, dy)
+			if not trail.has(n) and trail.size() >= BloodConfig.pool_trail_max:
+				continue
+			var l := level if dx == 0 and dy == 0 else level * 0.75
+			trail[n] = maxf(trail.get(n, 0.0), clampf(l, 0.0, 1.0))
+
+
+## Distance (px) from cell `c` to the nearest flooded cell (0 inside the pool), searched no farther than
+## `BloodConfig.pool_trail_length`; beyond that it returns the limit.
+func _rim_distance(c: Vector2i) -> float:
+	if cells.has(c):
+		return 0.0
+	var reach := ceili(BloodConfig.pool_trail_length / _size)
+	var best := float(reach)
+	for dx in range(-reach, reach + 1):
+		for dy in range(-reach, reach + 1):
+			if cells.has(c + Vector2i(dx, dy)):
+				best = minf(best, Vector2(dx, dy).length())
+	return best * _size
 
 
 ## Local centre of a cell.

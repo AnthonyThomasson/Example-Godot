@@ -49,6 +49,7 @@ func _draw_flow() -> void:
 	var flow: BloodFlow = _pool.flow
 	if flow.cells.is_empty():
 		return
+	var covered: Array = flow.cells.keys() + flow.trail.keys()
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	if _flow_material == null:
 		var shader := Shader.new()
@@ -63,7 +64,7 @@ func _draw_flow() -> void:
 
 	var lo := Vector2i(1 << 20, 1 << 20)
 	var hi := Vector2i(-(1 << 20), -(1 << 20))
-	for c in flow.cells:
+	for c in covered:
 		lo = Vector2i(mini(lo.x, c.x), mini(lo.y, c.y))
 		hi = Vector2i(maxi(hi.x, c.x), maxi(hi.y, c.y))
 	lo -= Vector2i(PAD, PAD)
@@ -73,7 +74,7 @@ func _draw_flow() -> void:
 
 	var field := PackedFloat32Array()
 	field.resize(w * h)
-	for c in flow.cells:
+	for c in covered:
 		field[(c.y - lo.y) * w + (c.x - lo.x)] = flow.fill(c)
 	for pass_i in BLUR_PASSES:
 		field = _box_blur(field, w, h)

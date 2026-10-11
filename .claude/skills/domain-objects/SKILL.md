@@ -40,6 +40,8 @@ and never learns what an interaction *means*.
 - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
   `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`.
 - `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
+- `BloodSmear` (Node child, solid pieces only): fed the footprint polygon (`Deformation.shape_polygon`, re-fed
+  when the collider is rebuilt); drags blood out of a puddle as streaks while the piece slides.
 - `Deformation` (static): silhouette/collider polygons + drawing.
 - `Physics.impact_impulse(hit) -> Vector2` and `Physics.spawn_debris(world, hit, surface)`.
 
@@ -50,7 +52,7 @@ and never learns what an interaction *means*.
   math (`wall_segments()`) and colliders.
 - `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
   decor is `freeze`d (no shape) and gets `z_index = -1`. Physics components (`Knockback`,
-  `Deformable`) are added as child Nodes in `environment_object._ready()`.
+  `Deformable`, `BloodSmear`) are added as child Nodes in `environment_object._ready()`.
 
 The editor shows "no shape" warnings on each `Wall` — expected; the shapes exist at runtime.
 

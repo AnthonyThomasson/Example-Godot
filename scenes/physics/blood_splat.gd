@@ -52,6 +52,7 @@ func setup(radius: float, direction: Vector2, energy: float, exclude: Array = []
 		if not ok.is_empty():
 			kept.append(ok)
 	shapes = kept
+	BloodField.add_splat(self, shapes)
 	_add_highlight()
 	_dry()
 	queue_redraw()

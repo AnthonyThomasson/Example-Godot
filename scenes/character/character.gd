@@ -63,6 +63,9 @@ var _push_slow := 1.0
 var _deformable: Deformable
 ## Splatter and dripping from this character's wounds (Physics domain component).
 var _wound: BloodWound
+## Bloody footprints from blood the feet walk through (Physics domain component), fed by `_footsteps`.
+var _footprints: BloodFootprints
+var _footsteps := CharacterFootsteps.new()  ## Detects footfalls and feeds `_footprints`.
 
 ## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
@@ -76,6 +79,7 @@ const CharacterInteraction = preload("res://scenes/interaction/character_interac
 const CharacterPose = preload("res://scenes/character/character_pose.gd")
 const CharacterRig = preload("res://scenes/character/character_rig.gd")
 const CharacterRagdoll = preload("res://scenes/character/character_ragdoll.gd")
+const CharacterFootsteps = preload("res://scenes/character/character_footsteps.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -109,6 +113,9 @@ func _ready() -> void:
 
 	_wound = BloodWound.new()
 	add_child(_wound)
+
+	_footprints = BloodFootprints.new()
+	add_child(_footprints)
 
 	_interaction = CharacterInteraction.new()
 	add_child(_interaction)
@@ -154,6 +161,7 @@ func _physics_process(delta: float) -> void:
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
 	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts())
+	_footsteps.update(self, _footprints)
 
 
 # --- Controller-facing API -------------------------------------------------------------

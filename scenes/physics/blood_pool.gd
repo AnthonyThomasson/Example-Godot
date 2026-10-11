@@ -21,6 +21,7 @@ var _flow_duration := 1.0
 ## over `duration` seconds once claimed. `exclude` is the body's RID(s), which the flow ignores.
 func seed_bleed_out(cells: int, duration: float, exclude: Array) -> void:
 	flow = BloodFlow.new(Vector2.RIGHT.rotated(randf() * TAU), exclude)
+	BloodField.add_pool(self)
 	_flow_left = cells
 	_flow_duration = duration
 	set_physics_process(true)
@@ -36,4 +37,13 @@ func _physics_process(delta: float) -> void:
 		flow.advance(delta, _flow_duration)
 		if flow.settled():
 			set_physics_process(false)
+	_visuals.queue_redraw()
+
+
+## Blood dragged out of the pool to world `pos` at `level` 0..1 (a smear): grows its outline there, drawn
+## by the pool itself.
+func drag_out(pos: Vector2, level: float) -> void:
+	if flow == null:
+		return
+	flow.add_trail(Vector2i(((pos - global_position) / BloodConfig.flow_cell_size).floor()), level)
 	_visuals.queue_redraw()

@@ -79,6 +79,14 @@ frame's pose.
   sway, steady drift, punch twist and lunge, bob, lean, breath, glance, recoil) and
   `CharacterConfig.stances` / `stance_ease`.
 
+## Footsteps (bloody footprints)
+
+`character_footsteps.gd` (a `RefCounted`, stepped by `character.gd` after the pose) spots each foot's landing:
+the foot is planted while `cos(stride_phase + (0|PI))` is >= 0, so a landing is cos rising through 0
+(only above `MIN_WALK` walk amount; none while an interaction holds the character or once dead). On a landing it
+solves the rig once and reports the sole (middle, toes, `body_foot` x radius long, `body_shoe_widths[0]` wide) to the
+`BloodFootprints` child (Physics), which decides whether it prints. Test: `tests/physics/footprints_trail_test.gd`.
+
 ## Stances (how a hand is held)
 
 `CharacterConfig.stances` is a data table: stance name → `forward` / `lateral` (px, in the hand's
@@ -318,7 +326,8 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
 - **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
   `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.
 - **Character → Physics** (interface 4): `Deformable` / `Deformation` for wounds, a `BloodWound`
-  child (splatter spray + timed drips on a hit, stopped on death), and the generic `Ragdoll` the fallen body is built on.
+  child (splatter spray + timed drips on a hit, stopped on death), a `BloodFootprints` child fed by
+  `character_footsteps.gd` on each footfall, and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
   `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`; and reads the item's

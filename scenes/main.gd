@@ -117,13 +117,16 @@ func _ready() -> void:
 		})
 
 
-## The ticket name this run is tagged with (`GAME_TICKET` env var, else a `--ticket=<name>` user arg);
-## blank when untagged. The setup window shows it at the top.
+## The name this run is tagged with: the `GAME_TICKET` env var (`tools/editor.sh` sets it to the worktree
+## name), else a `--ticket=<name>` user arg, else the worktree's directory name when run from the editor;
+## blank in an exported build. The setup window shows it at the top.
 func _ticket() -> String:
 	var ticket := OS.get_environment("GAME_TICKET")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--ticket="):
 			ticket = arg.trim_prefix("--ticket=")
+	if ticket.strip_edges().is_empty() and OS.has_feature("editor"):
+		ticket = ProjectSettings.globalize_path("res://").trim_suffix("/").get_file()
 	return ticket.strip_edges()
 
 
