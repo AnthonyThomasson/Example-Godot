@@ -228,11 +228,6 @@ func under_fire() -> bool:
 	return _memory.is_fresh(&"under_fire")
 
 
-## Whether the NPC was actually hit (not just shot at) within the under-fire window.
-func hit_recently() -> bool:
-	return under_fire() and _memory.recall(&"under_fire").get("hit", false)
-
-
 ## The cheap facts the controller needs between decisions (e.g. to see whether a new situation should
 ## interrupt the decision in flight), without building the whole snapshot.
 func quick_facts(character) -> Dictionary:
@@ -310,7 +305,7 @@ func debug_memory() -> Dictionary:
 ## zones. A pure read of knowledge + the visited-room memory; never perturbs it.
 func room_status(rooms: Array, self_pos: Vector2) -> Array:
 	var known := _known_room_keys()
-	var here := _room_at(self_pos, rooms)
+	var here := AgentSnapshot.room_at(self_pos, rooms)
 	var out: Array = []
 	for room in rooms:
 		var status: StringName
@@ -355,7 +350,7 @@ func observe(character, rooms: Array) -> void:
 			continue
 		var id: int = other.get_instance_id()
 		var pos: Vector2 = other.global_position
-		var room := _room_at(pos, rooms)
+		var room := AgentSnapshot.room_at(pos, rooms)
 		var item = other.current_item()
 		var f = other.get("faction")
 		var sighting := {
@@ -377,7 +372,7 @@ func observe(character, rooms: Array) -> void:
 		_hostility.classify(sighting, _memory)
 
 	# The room the NPC stands in counts as searched (superseded while it stays there).
-	var here := _room_at(self_pos, rooms)
+	var here := AgentSnapshot.room_at(self_pos, rooms)
 	if not here.is_empty():
 		_memory.remember(&"visited_room", { "key": here["key"] }, search_memory_ttl, str(here["key"]))
 
@@ -628,11 +623,3 @@ func combat_spots(character, target: Node2D, tgt_pos: Vector2, radius: float, co
 		exclude.append(target.get_rid())
 	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
 	return _tactics.combat_spots(space, character.global_position, tgt_pos, exclude, radius, count)
-
-
-## The room dict whose rect contains `p`, or empty when `p` is outside every room.
-func _room_at(p: Vector2, rooms: Array) -> Dictionary:
-	for room in rooms:
-		if (room["rect"] as Rect2).has_point(p):
-			return room
-	return {}

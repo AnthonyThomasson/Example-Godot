@@ -26,10 +26,11 @@ the domains.
   winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus
   `&"hit"`). Declares the winner once an entire faction is eliminated.
 
-- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open(defaults)` shows a
+- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ has_player, seed, defenders, invaders, ticket })` shows a
   full-screen modal (40 px margins, VBox separation 20) with: "Human player" checkbox,
   "Seed" text field (blank = random), Defenders/Invaders spinboxes, and a Start button. (The Debug switch
-  lives on the settings page.) Pressing Start emits `start_requested({ has_player, seed, defenders,
+  lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
+  muted) above the title. Pressing Start emits `start_requested({ has_player, seed, defenders,
   invaders })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to

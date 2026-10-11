@@ -17,11 +17,8 @@ signal run_requested(domain: String)
 ## The search text changed (so the host can restore it next time).
 signal filter_changed(text: String)
 
+const RESULT_HUD := preload("res://scenes/ui/test_result_hud.gd")
 const STATUS_MARKS := { "PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱", "SKIPPED": "–" }
-const STATUS_COLORS := {
-	"PASS": Color(0.45, 0.9, 0.45), "FAIL": Color(1.0, 0.4, 0.35), "TIMEOUT": Color(1.0, 0.6, 0.25),
-	"SKIPPED": Color(0.75, 0.75, 0.75),
-}
 ## Side of the ▶ run button's icon on a domain row, in pixels.
 const RUN_ICON_SIZE := 22
 
@@ -189,10 +186,10 @@ func _refresh(keep: String) -> void:
 		if t.get("requires_von", false):
 			suffix += "  [Von]"
 		item.set_text(0, "%s  %s%s" % [mark, t["name"], suffix])
-		if STATUS_COLORS.has(status):
-			item.set_custom_color(0, STATUS_COLORS[status])
+		if RESULT_HUD.STATUS_COLORS.has(status):
+			item.set_custom_color(0, RESULT_HUD.STATUS_COLORS[status])
 		elif t.get("error", "") != "":
-			item.set_custom_color(0, STATUS_COLORS["FAIL"])
+			item.set_custom_color(0, RESULT_HUD.STATUS_COLORS["FAIL"])
 		item.set_metadata(0, t)
 		if first == null:
 			first = item
@@ -225,7 +222,7 @@ static func _run_icon() -> Texture2D:
 	if _icon_cache == null:
 		var size := RUN_ICON_SIZE
 		var img := Image.create(size, size, false, Image.FORMAT_RGBA8)
-		var color: Color = STATUS_COLORS["PASS"]
+		var color: Color = RESULT_HUD.STATUS_COLORS["PASS"]
 		for y in size:
 			# The triangle's right edge narrows linearly from the full width at the middle row to a point at the ends.
 			var reach := int(size * (1.0 - absf((y + 0.5) / size - 0.5) * 2.0))

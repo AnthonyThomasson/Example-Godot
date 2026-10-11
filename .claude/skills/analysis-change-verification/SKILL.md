@@ -222,6 +222,20 @@ read the reaction back through `mcp__godot__get_debug_output` (each command echo
 Report what you drove and what the game did. Two gotchas from that skill: launch Godot from Bash
 only with the sandbox disabled, and `mcp__godot__stop_project` orphans the Von server on port 8000.
 
+## Step 6 — Show the finished change in a worktree editor
+
+Once the checks above are green, leave a live copy of the change running for the user, tagged with
+your ticket name (the Linear/branch ticket you are working on; ask if you have none):
+
+```bash
+tools/editor.sh <TICKET> --autorun        # run from the worktree being verified (Bash sandbox disabled)
+```
+
+It prints the editor pid, the command-server port and a log path. After ~10 s confirm the log
+(`$TMPDIR/editor_<TICKET>.log`) shows `[cmd] listening on 127.0.0.1:<port>` and no `SCRIPT ERROR`
+(optionally `python3 tools/gcmd.py --port <port> 'scene().name'`). The game opens on the setup menu
+with the ticket name at the top. Report the ticket, port and pid; leave the editor open.
+
 ## Output — the checklist
 
 Report findings as a checklist grouped by the sections above, most-important first. Each item is
@@ -249,6 +263,9 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 ### Load check & tests
 - [x] Headless load clean — no SCRIPT ERROR / Parse Error.
 - [x] `tools/run_tests.sh`: 6 passed, 0 failed, 2 skipped.
+
+### Worktree editor
+- [x] `tools/editor.sh ABC-123 --autorun` running (pid 4242, port 9345); setup menu shows ABC-123.
 
 **Verdict:** 3 issues to address before commit.
 ```

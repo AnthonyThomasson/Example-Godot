@@ -20,10 +20,13 @@ debug mirror (`ai/debug/vision_debug.gd`).
 All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings or
 `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`, and expose
 a typed helper. `player_controller.gd` (Character domain) is the one gameplay consumer of
-Keybinds; the only other is `command_server.gd` (dev-only), which reads the action *names* to
-inject real input when driving the game from outside. `project.godot [input]` just keeps the editor's
-Input Map panel in sync. `PAUSE` (default Space) is read only by the spectator inspector (UI domain); it
-shares Space with `INTERACT`, harmless because the spectator match has no player to interact.
+Keybinds. Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
+inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
+`command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
+outside. `Keybinds._ready` registers every action in the InputMap, so `project.godot [input]` (which lists
+only some of them) is a convenience for the editor's Input Map panel, not the source of truth. `PAUSE`
+(default Space) is read only by the spectator inspector (UI domain); it shares Space with `INTERACT`,
+harmless because the spectator match has no player to interact.
 
 Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button. Keyboard
 defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `ZOOM_IN` /
@@ -32,8 +35,7 @@ defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-c
 only by the camera; the camera keys share WASD with `MOVE_*`, harmless because the spectator match has no
 player to move. `LABELS` (settings-page order + names) and `GROUPS` must cover every action (a test
 enforces it). Runtime API: `bind(action, event)` (key or mouse button incl. wheel up/down; refuses the
-horizontal wheel and anything else), `rebind` / `rebind_mouse`
-(thin wrappers), `reset(action)` / `reset_all()`, `default_event`, `event_of`, `text_of` ("W", "Space",
+horizontal wheel and anything else), `reset(action)` / `reset_all()`, `default_event`, `event_of`, `text_of` ("W", "Space",
 "Mouse Left"; skips the layout lookup on the headless display server, which logs an error for it),
 `conflicts_of(action)` (other actions on the same input, minus the deliberately shared `SHARED` pairs —
 Interact/Pause and each camera pan key with its move key), and `overrides()` / `apply_overrides(d)` (only the bindings that differ from the
@@ -61,7 +63,8 @@ the defaults are stored, so a changed default still reaches an action the player
 ## Dev command server
 
 `command_server.gd` (a node in `main.tscn`, editor-only, cleaned up on exit) lets an external tool
-control a running game with text commands. It is **off** unless `application/debug/command_port` >
+control a running game with text commands. It is **off** unless the port — the `GODOT_CMD_PORT` env
+var (per-worktree, set by `tools/editor.sh`), else `application/debug/command_port` — is >
 0 and never exists in an exported build (`_ready()` bails when `OS.has_feature("editor")` is
 false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a curated verb
 (`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`,
@@ -134,8 +137,10 @@ wiring lives in `main.gd`; the General observers only read published contracts.
 
 - Observers (debug HUD, match HUD, camera) attach by exported node path and read only the Character
   public API/signals plus the AI controller's observer reads `current_act()` / `goal` (interface 7).
-  `player_controller.gd` and `command_server.gd` are the gameplay consumers of `Keybinds`; `main.gd`
-  (`MENU`) and `spectator_inspector.gd` (`PAUSE`) read one action each for top-level/spectator control.
+  `player_controller.gd` is the one gameplay consumer of `Keybinds`; `main.gd` and the test runner (`MENU`),
+  `spectator_inspector.gd` (`PAUSE`) and the camera (pan and zoom) read their own actions for
+  top-level/spectator control, `settings.gd` persists the bindings, and `command_server.gd` reads the
+  action names to inject input.
 - `main.gd` (the composition root) is the one caller of `Settings`: it loads the file at startup and routes
   the UI settings page's signals to `Settings.set_debug` / `rebind` / `reset` / `reset_all`, redrawing the
   page from `Settings.binding_rows()`. The UI window itself knows nothing of `Keybinds` or `Settings`.

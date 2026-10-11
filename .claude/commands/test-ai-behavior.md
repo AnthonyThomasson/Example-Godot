@@ -173,12 +173,12 @@ python3 tools/gcmd.py 'scene().get_node("Invader/GoalController").hostility_ttl'
 ```
 If it is > 0, run a round with it set to 0 and one with it set to 5 and compare whether the invader drops hostility mid-fight.
 
-**8c. Search dwell (look-around pause)** — don't re-decide the instant a room is entered
+**8c. Search coverage (look-around)** — a room is searched until it has been seen, not for a fixed time
 ```
 --invader 'scene().get_node("Invader/GoalController").pursue_hostiles = false'
---invader 'scene().get_node("Invader/GoalController").search_dwell = 5.0'
+--invader 'scene().get_node("Invader/GoalController").search_coverage_budget = 3.0'
 ```
-Expected: with no hostile known, the invader SEARCHes — it walks all the way INTO a room (its interior, not the edge), then pauses ~5 s panning its aim to look around before choosing the next room, instead of re-deciding the moment it crosses a boundary and ping-ponging between two adjacent rooms. Check `python3 tools/gcmd.py ai`: a SEARCH `move` leaf's params carry `look_around` (and no `arrive_room`), and `debug_status()` reads "reached it" while it holds through the dwell.
+Expected: with no hostile known, the invader SEARCHes — it walks all the way INTO a room (its interior, not the edge), then turns its gaze to the nearest unseen sample point (walking toward it when it is farther than `search_coverage_approach` or its line is blocked) until `search_coverage_target` of the room's points, `search_coverage_spacing` px apart, have been seen or the budget lapses; only then does it choose the next room, instead of re-deciding the moment it crosses a boundary and ping-ponging between two adjacent rooms. The 3 s budget (default 8) should cut off rooms with hard-to-see nooks sooner; also try `search_coverage_target = 0.7`, which calls a room covered with 30% of it unseen. Check `python3 tools/gcmd.py ai`: a SEARCH `move` leaf's params carry `look_around` (and no `arrive_room`), and `debug_status()` reads "reached it" while it covers the room.
 
 ### 9. Navigation through furniture
 

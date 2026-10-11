@@ -28,8 +28,8 @@ static var projectile_min_speed: float = 800.0
 ## so penetration only happens in the upper half of the speed range.
 static var penetration_min_speed: float = 1600.0
 
-## Coverage/penetration used for colliders that expose no surface (rare — walls now
-## report their own): full cover (never flown over) and high penetration.
+## Coverage/penetration used for a collider that exposes no `get_surface()`: full cover (never flown
+## over) and high penetration.
 static var wall_coverage: float = 100.0
 static var wall_penetration: float = 100.0
 

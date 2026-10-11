@@ -49,7 +49,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `sense(character, rooms, goal, activity) -> { facts, sections, sections_per_target, options }` — the
   BUILD pass (below). `activity` is the behaviour's current-activity line.
 - Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
-  `note_engaged` / `engaged_fresh` / `under_fire` / `hit_recently`; `memory_size()` and
+  `note_engaged` / `engaged_fresh` / `under_fire`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
@@ -64,9 +64,10 @@ below from that knowledge + the tactics geometry. The author reads the memory an
 only; it writes no memory and holds no policy. Everything in this section and the wording rules below
 lives in `agent_snapshot.gd`.
 
-- **facts** — named booleans the tree gates on: `threat_known`, `hostile_known`, `hostile_visible`,
-  `has_pistol`, `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`, `inside`,
-  `exposed`, `in_cover`.
+- **facts** — named booleans a `requires` or an entry rule can gate on: `threat_known`, `hostile_known`,
+  `hostile_visible`, `has_pistol`, `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`,
+  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `has_pistol`,
+  `under_fire`, `engaged` and `leads`; the rest feed the brain overlay and are there for new rules.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal`,
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`

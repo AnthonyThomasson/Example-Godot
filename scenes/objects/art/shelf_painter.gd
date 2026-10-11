@@ -6,6 +6,7 @@ extends RefCounted
 ## frames show corner uprights. Options (`art_opts`, defaulting to ObjectArtConfig.shelf_*):
 ## `contents` ("books" | "boxes" | "shoes").
 
+const Props = preload("res://scenes/objects/art/props.gd")
 const _FRAME_HEIGHT := 5    ## Heights for cast shadows: the frame stands over its contents.
 const _CONTENT_HEIGHT := 3
 
@@ -53,7 +54,7 @@ static func _books(c: PixelCanvas, well: Rect2i) -> void:
 			continue
 		var bw := mini(c.rng.randi_range(2, 4), well.end.x - x)
 		var bh := maxi(2, roundi(well.size.y * c.rng.randf_range(0.6, 0.95)))
-		var cover := _pick(c, "books")
+		var cover := Props.pick(c, "books")
 		var r := Rect2i(x, well.position.y, bw, bh)
 		c.fill(PixelCanvas.rounded(r, 0), cover, _CONTENT_HEIGHT)
 		if bw >= 3:
@@ -74,7 +75,7 @@ static func _boxes(c: PixelCanvas, well: Rect2i) -> void:
 			var rad := mini(depth / 2, 5)
 			var o := Vector2i(x + rad, well.position.y + rad + 1)
 			var tin := PixelCanvas.disc(o, rad)
-			var label := _pick(c, "books")
+			var label := Props.pick(c, "books")
 			c.fill(tin, ObjectArtConfig.prop_colors["metal"], _CONTENT_HEIGHT)
 			c.outline(tin, ObjectArtConfig.prop_colors["metal"].darkened(0.4))
 			c.outline(PixelCanvas.disc(o, maxi(1, rad - 2)), label)
@@ -97,7 +98,7 @@ static func _shoes(c: PixelCanvas, well: Rect2i) -> void:
 	var sw := maxi(3, well.size.y / 4)
 	var x := well.position.x + 1
 	while x + sw * 2 + 1 <= well.end.x:
-		var col := _pick(c, "shoes")
+		var col := Props.pick(c, "shoes")
 		var length := maxi(sw + 2, roundi(well.size.y * c.rng.randf_range(0.75, 0.95)))
 		for i in 2:
 			var r := Rect2i(x + i * (sw + 1), well.end.y - length, sw, length)
@@ -106,9 +107,3 @@ static func _shoes(c: PixelCanvas, well: Rect2i) -> void:
 			c.outline(shoe, col.darkened(0.45))
 			c.fill(PixelCanvas.ellipse(Rect2i(r.position.x + 1, r.position.y + 1, maxi(1, sw - 2), maxi(2, length * 2 / 5))), col.darkened(0.55))
 		x += sw * 2 + 3
-
-
-## A random entry of the prop palette list `name`.
-static func _pick(c: PixelCanvas, name: String) -> Color:
-	var list: Array = ObjectArtConfig.prop_colors.get(name, [Color.MAGENTA])
-	return list[c.rng.randi_range(0, list.size() - 1)]

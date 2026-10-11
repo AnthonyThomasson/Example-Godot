@@ -28,7 +28,8 @@ var _start_button: Button           ## Disabled on press, so holding the start c
 var _status: Label                  ## Status line Main shows while it holds the start (hidden when blank).
 
 
-## Build the window seeded from `defaults` (`{ has_player, seed, defenders, invaders }`) and show it.
+## Build the window seeded from `defaults` (`{ has_player, seed, defenders, invaders, ticket }`; a
+## non-blank `ticket` is shown above the title) and show it.
 ## Called by Main before the world is spawned.
 func open(defaults: Dictionary) -> void:
 	_build_ui(defaults)
@@ -59,6 +60,16 @@ func _build_ui(defaults: Dictionary) -> void:
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 20)
 	margin.add_child(box)
+
+	var ticket := str(defaults.get("ticket", "")).strip_edges()
+	if not ticket.is_empty():
+		var ticket_label := Label.new()
+		ticket_label.name = "TicketLabel"
+		ticket_label.text = ticket
+		ticket_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		ticket_label.add_theme_font_size_override("font_size", 32)
+		ticket_label.modulate = Color(1, 1, 1, 0.75)
+		box.add_child(ticket_label)
 
 	var title := Label.new()
 	title.text = "MATCH SETUP"

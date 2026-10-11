@@ -15,7 +15,7 @@ forward with a raycast and resolves every collider it crosses against that objec
 `BallisticsConfig.wall_*`). It flies until `speed < BallisticsConfig.projectile_min_speed` or it
 passes `max_distance`. Non-solid decor has no collider, so it's never raycast.
 
-Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_speed`, coverage
+Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / BallisticsConfig.projectile_speed`, coverage
 `C`, penetration `P`, `_resolve()` picks one outcome in order:
 
 1. **Fly over** — `clamp((1 − C/100) × cover_flyover_scale, 0, 1)`; no damage, excluded, flies on.

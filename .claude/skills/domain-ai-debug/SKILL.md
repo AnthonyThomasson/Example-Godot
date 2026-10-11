@@ -23,7 +23,7 @@ Files:
 ## `vision_debug.gd` (toggle `show_vision`)
 
 Draws the portions of the forward FOV cone and the 360° near-awareness bubble that have a clear line
-of sight back to the NPC. A ray fan samples the physics space each frame (same `QUERY_MASK = 1` as
+of sight back to the NPC. A ray fan samples the physics space each frame (same `QUERY_MASK = PhysicsLayers.SOLID` as
 the vision sense) and builds visibility polygons, so walls and TALL furniture cast proper shadows —
 showing only the area that would actually trigger a detection. It mirrors the sense's "look over low
 cover" rule: a ray skips furniture whose coverage is at or below the controller's `see_over_coverage`,

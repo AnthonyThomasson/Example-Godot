@@ -12,8 +12,8 @@ extends Node
 ## `command_server.gd` is, by design, the second file besides `player_controller.gd` that touches
 ## `Keybinds` — it needs the action names to inject input.
 
-## Port to listen on; 0 falls back to the `application/debug/command_port` project setting, and 0
-## there too means the server never starts.
+## Port to listen on; 0 falls back to the `GODOT_CMD_PORT` environment variable, then the
+## `application/debug/command_port` project setting, and 0 there too means the server never starts.
 @export var port: int = 0
 
 var _server: TCPServer  ## The listening socket; null when the server is off.
@@ -41,6 +41,8 @@ func _ready() -> void:
 		Keybinds.ITEM_1, Keybinds.ITEM_2, Keybinds.ITEM_3, Keybinds.ITEM_4, Keybinds.ITEM_5,
 		Keybinds.ITEM_6, Keybinds.ITEM_7, Keybinds.ITEM_8, Keybinds.ITEM_9,
 	]
+	if port <= 0:
+		port = int(OS.get_environment("GODOT_CMD_PORT"))  # per-worktree override (tools/editor.sh)
 	if port <= 0:
 		port = int(ProjectSettings.get_setting("application/debug/command_port", 0))
 	if port <= 0:

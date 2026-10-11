@@ -41,8 +41,8 @@ const ITEM_7 := "item_7"
 const ITEM_8 := "item_8"
 const ITEM_9 := "item_9"
 
-## Default key for each action, keyed by action name. Change a value here (or call
-## `rebind()` at runtime) to customize the layout — e.g. swap WASD for arrow keys.
+## Default key for each action, keyed by action name. Change a value here to change the shipped
+## layout — e.g. swap WASD for arrow keys; a player's own changes go through `bind()` and `Settings`.
 const DEFAULTS := {
 	MOVE_LEFT: KEY_A,
 	MOVE_RIGHT: KEY_D,
@@ -68,7 +68,7 @@ const DEFAULTS := {
 }
 
 ## Default mouse button for each pointer-bound action (`MouseButton` values aren't `Key`s, so they
-## live apart from DEFAULTS). Remap one at runtime with `rebind_mouse()`.
+## live apart from DEFAULTS).
 const MOUSE_DEFAULTS := {
 	FIRE: MOUSE_BUTTON_LEFT,
 	ZOOM_IN: MOUSE_BUTTON_WHEEL_UP,
@@ -161,18 +161,6 @@ func _ready() -> void:
 	# are layered on top by Main (`Settings.load_file()`), not here, so the headless test
 	# runner never reads a developer's settings file.
 	reset_all()
-
-
-## Point the given action at a single physical key, replacing any existing events.
-## `action` is one of the constants above; `keycode` is a Key value (e.g. KEY_A).
-func rebind(action: StringName, keycode: Key) -> void:
-	bind(action, _key_event(keycode))
-
-
-## Point the given action at a single mouse button, replacing any existing events.
-## Mirrors rebind() for pointer input (e.g. left-click to fire).
-func rebind_mouse(action: StringName, button: MouseButton) -> void:
-	bind(action, _mouse_event(button))
 
 
 ## Point `action` at the key or mouse button in `event`, replacing its current binding. A key is stored
@@ -336,13 +324,13 @@ func get_camera_vector() -> Vector2:
 
 
 ## True on the frame the punch key is pressed. Goes through the same rebindable
-## action as movement, so remapping `PUNCH` via `rebind()` just works.
+## action as movement, so rebinding `PUNCH` with `bind()` just works.
 func is_punch_just_pressed() -> bool:
 	return Input.is_action_just_pressed(PUNCH)
 
 
-## True on the frame the fire button (left-click) is pressed. Rebindable via
-## rebind_mouse(FIRE, ...) exactly like the keyboard actions.
+## True on the frame the fire button (left-click) is pressed. Rebindable with `bind()`
+## exactly like the keyboard actions.
 func is_fire_just_pressed() -> bool:
 	return Input.is_action_just_pressed(FIRE)
 

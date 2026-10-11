@@ -104,7 +104,6 @@ static var fixture_frame_color: Color = Color(0.72, 0.6, 0.35)
 static var prop_colors: Dictionary = {
 	"paper": Color(0.95, 0.94, 0.9),
 	"ink": Color(0.62, 0.62, 0.66),
-	"screen": Color(0.12, 0.14, 0.18),
 	"glow": Color(0.45, 0.7, 0.9),
 	"plastic_dark": Color(0.16, 0.16, 0.19),
 	"plastic_light": Color(0.82, 0.82, 0.8),

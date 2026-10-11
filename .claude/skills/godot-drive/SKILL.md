@@ -39,6 +39,9 @@ If the behaviour can be scripted, prefer a `tests/<domain>/*_test.gd` and `tools
 
 ## 1. Launch the game
 
+In a worktree, `tools/editor.sh TICKET --autorun` opens that worktree's editor, starts the game tagged with
+the ticket and prints its own command port (use `gcmd.py --port`).
+
 Prefer the MCP so output can be read back:
 
 ```

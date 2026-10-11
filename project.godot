@@ -27,6 +27,10 @@ EventBus="*res://scenes/general/event_bus.gd"
 
 project/assembly_name="Example_Godot"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/ticket_autorun/plugin.cfg")
+
 [input]
 
 move_left={

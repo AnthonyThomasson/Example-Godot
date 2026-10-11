@@ -43,7 +43,7 @@ house, the peek fallback holds instead of advancing, and melee won't chase out.
 - `update_known(known, delta) -> bool` — adopt the perception's hostiles; retarget a lost engaged
   contact to the nearest other; with none left, a leaf that needs a target ends → true (re-decide).
 - `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()`,
-  `wants_decision(character, cadence_elapsed)` (the table's last column), `apply(character, delta)`,
+  `wants_decision(character, decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
   `fallback()` (steady hold when no decision can be had).
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.

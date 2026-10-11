@@ -6,10 +6,6 @@ class_name TestSetup extends RefCounted
 ## When non-zero, every `house()` uses this seed instead of its own (the runner's `--seed=N`).
 static var seed_override := 0
 
-## Actor kinds `actor()` understands besides a PackedScene path: a scripted puppet, the human-driven
-## player, and the two AI presets.
-const ACTOR_KINDS := [&"puppet", &"player", &"defender", &"invader"]
-
 ## The world: `{ kind: "arena", rect, floor, walls, thickness }` or `{ kind: "house", seed, plan,
 ## entrance }`. Empty = an empty arena (see `resolved_world`).
 var world: Dictionary = {}
@@ -58,8 +54,9 @@ func object(id: StringName, definition: Variant, position: Vector2, opts: Dictio
 	return self
 
 
-## Place a character `id` at `position`. `kind`: one of ACTOR_KINDS or a scene path. `props` are set
-## on the character before it enters the tree (e.g. `max_health`, `start_slot`, `faction`).
+## Place a character `id` at `position`. `kind`: `puppet` (scripted), `player` (human-driven),
+## `defender` / `invader` (the AI presets) or a scene path. `props` are set on the character before it
+## enters the tree (e.g. `max_health`, `start_slot`, `faction`).
 func actor(id: StringName, kind: StringName, position: Vector2, props: Dictionary = {}) -> TestSetup:
 	actors.append({ "id": id, "kind": kind, "position": position, "props": props, "children": {} })
 	return self

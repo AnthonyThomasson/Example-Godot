@@ -115,7 +115,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"leads": not leads["options"].is_empty(),
 		"hurt": dmg >= hurt_threshold,
 		"critical": dmg >= critical_threshold,
-		"inside": not _room_at(self_pos, rooms).is_empty(),
+		"inside": not room_at(self_pos, rooms).is_empty(),
 		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
 		"in_cover": line.get("cover", "") != "",
 	}
@@ -171,7 +171,7 @@ func _analyze(ctx: Dictionary, t: Dictionary) -> Dictionary:
 
 ## Where the NPC is, whether it is free, what it holds and how hurt it is.
 func _situation_text(character, rooms: Array) -> String:
-	var room := _room_at(character.global_position, rooms)
+	var room := room_at(character.global_position, rooms)
 	var where := ("in the %s, inside the house" % _room_name(room["type"])) if not room.is_empty() else "outside the house"
 	var busy := (" You are busy: %s." % character.interaction_label()) if character.is_busy() else ""
 	return "You are %s, holding a %s.%s You are %s." % [
@@ -442,7 +442,7 @@ func _spot_option(id: String, label: String, lead: String, s: Dictionary, moving
 ## A firing spot named by its place, `dir` being its bearing from the target: "behind the sofa in the
 ## kitchen" with cover close by, else "the kitchen, north of them" / "outside, north of them".
 func _spot_place(s: Dictionary, dir: String) -> String:
-	var room := _room_at(s["point"], _rooms)
+	var room := room_at(s["point"], _rooms)
 	if s["cover"] != "":
 		return "behind the %s %s" % [s["cover"], ("in the %s" % _room_name(room["type"])) if not room.is_empty() else "outside"]
 	return "%s, %s of them" % [("the %s" % _room_name(room["type"])) if not room.is_empty() else "outside", dir]
@@ -454,7 +454,7 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 	var options: Array = []
 	var open: Array = []
 	for s in a["flanks"]:
-		var room := _room_at(s["point"], rooms)
+		var room := room_at(s["point"], rooms)
 		var place: String = ("in the %s" % _room_name(room["type"])) if not room.is_empty() else "outside the house"
 		var parts: Array = [
 			"%s — %s of them, %s" % [SIDE_WORDS[s["side"]], _compass(s["point"] - tpos), place],
@@ -478,7 +478,7 @@ func _flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 		})
 		if s["held_by"] == "" and s["crosses"] == "":
 			open.append(s)
-	var inside_open: Array = open.filter(func(s): return not _room_at(s["point"], rooms).is_empty())
+	var inside_open: Array = open.filter(func(s): return not room_at(s["point"], rooms).is_empty())
 	var shot_here: bool = a["line"]["clear"] and a["line"]["in_range"]
 	return {
 		"summary": _flank_summary(t, a["flanks"], open, rooms, shot_here),
@@ -498,7 +498,7 @@ func _flank_summary(t: Dictionary, flanks: Array, open: Array, rooms: Array, sho
 	else:
 		open.sort_custom(func(x, y): return _flank_rank(x) > _flank_rank(y))
 		var best: Dictionary = open[0]
-		var best_room := _room_at(best["point"], rooms)
+		var best_room := room_at(best["point"], rooms)
 		text = "%d free side%s; best: %s%s, %s route, %s" % [open.size(), "" if open.size() == 1 else "s",
 			SIDE_WORDS[best["side"]], (" via the %s" % _room_name(best_room["type"])) if not best_room.is_empty() else " outside",
 			_route_text(best["route_len"], best["route_exposed"]), "cover" if best["cover"] != "" else "in the open"]
@@ -694,7 +694,7 @@ func _shot_origin(ctx: Dictionary, snapped := true) -> Vector2:
 ## the house itself while outside.
 func _search_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
-	var here := _room_at(self_pos, rooms)
+	var here := room_at(self_pos, rooms)
 	var candidates: Array = []
 	var unsearched := 0
 	for room in known_rooms:
@@ -789,7 +789,7 @@ func _interaction_group(character, self_pos: Vector2, rooms: Array) -> Dictionar
 
 ## Named places to go: each known room (except this one) and the NPC's starting position.
 func _room_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary:
-	var here := _room_at(ctx["self_pos"], rooms)
+	var here := room_at(ctx["self_pos"], rooms)
 	var options: Array = []
 	for room in known_rooms:
 		if not here.is_empty() and room["key"] == here["key"]:
@@ -912,7 +912,7 @@ func _where(c: Dictionary) -> String:
 
 ## " (in the kitchen)" for a point inside a room, " (outside)" otherwise.
 func _room_suffix(p: Vector2) -> String:
-	var room := _room_at(p, _rooms)
+	var room := room_at(p, _rooms)
 	return (" (in the %s)" % _room_name(room["type"])) if not room.is_empty() else " (outside)"
 
 
@@ -960,8 +960,9 @@ func _engaged_fresh() -> bool:
 	return _memory.is_fresh(&"engaged")
 
 
-## The room dict whose rect contains `p`, or empty when `p` is outside every room.
-func _room_at(p: Vector2, rooms: Array) -> Dictionary:
+## The room dict whose rect contains `p`, or empty when `p` is outside every room. Static: the
+## perception reads rooms the same way.
+static func room_at(p: Vector2, rooms: Array) -> Dictionary:
 	for room in rooms:
 		if (room["rect"] as Rect2).has_point(p):
 			return room
@@ -970,7 +971,7 @@ func _room_at(p: Vector2, rooms: Array) -> Dictionary:
 
 ## Whether a world point lies inside the house (within any room of the decision being built).
 func _is_inside(p: Vector2) -> bool:
-	return not _room_at(p, _rooms).is_empty()
+	return not room_at(p, _rooms).is_empty()
 
 
 ## The centre of the bounding box enclosing all rooms — "the house" for an NPC that knows no room.

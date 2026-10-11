@@ -163,8 +163,8 @@ func shoot() -> void:
 	item.secondary(self)
 
 
-## Switch to inventory slot `slot`. Ignored while locked. The held item is read on demand via
-## current_item() (the debug HUD polls it), so no change signal is emitted.
+## Switch to inventory slot `slot`. Ignored while locked. Observers read the held item with
+## current_item() (the debug HUD polls it).
 func select_slot(slot: int) -> void:
 	if is_busy():
 		return

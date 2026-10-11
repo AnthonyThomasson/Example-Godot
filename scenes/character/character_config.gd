@@ -48,7 +48,7 @@ static var flesh_coverage: float = 45.0
 ## Resistance to being shot through, 0–100. Low: bullets tear through flesh.
 static var flesh_penetration: float = 15.0
 ## Base color handed to debris styling; the "flesh" material re-tints chips blood-red, so
-## this only matters to any future non-blood use of the surface color.
+## this is only the color `get_surface()` reports.
 static var flesh_color: Color = Color(0.85, 0.55, 0.5)
 ## Deepest a bullet dent may cave into the body silhouette (px). The central core keeps the
 ## deformed circle from folding, so this can be a large fraction of the body radius for

@@ -25,9 +25,6 @@ const BROWSER_SCENE := "res://scenes/testing/test_browser.tscn"
 const REPORT_PATH := "user://test_report.json"
 ## Failed/timed-out tests write their event log, final state and traces here (one JSON per test id).
 const BUNDLE_DIR := "user://test_failures"
-## Engine metas shared with the browser: the test to play, and the last status per test id.
-const META_SELECTION := "test_selection"
-const META_RESULTS := "test_results"
 ## Frame rate a Von-dependent test is paced to in real time (matches the batch run's --fixed-fps 60).
 const REALTIME_FPS := 60
 
@@ -78,13 +75,13 @@ func _ready() -> void:
 	if args.has("--run-tests"):
 		_batch = true
 		_run_batch.call_deferred(args)
-	elif Engine.has_meta(META_SELECTION):
+	elif Engine.has_meta(TestCatalog.META_SELECTION):
 		_hud = RESULT_HUD.new()
 		_hud.name = "TestResultHUD"
 		add_child(_hud)
 		_hud.rerun_requested.connect(_on_rerun)
 		_hud.back_requested.connect(_back_to_browser)
-		_run_interactive.call_deferred(String(Engine.get_meta(META_SELECTION)))
+		_run_interactive.call_deferred(String(Engine.get_meta(TestCatalog.META_SELECTION)))
 	else:
 		get_tree().change_scene_to_file.call_deferred(BROWSER_SCENE)
 
@@ -299,7 +296,7 @@ func _select_from_cli(args: PackedStringArray) -> void:
 	var filter := " ".join(words)
 	for e in TestCatalog.discover():
 		if TestCatalog.matches(e, filter):
-			Engine.set_meta(META_SELECTION, e["path"])
+			Engine.set_meta(TestCatalog.META_SELECTION, e["path"])
 			return
 	print("No test matches '%s'" % filter)
 
@@ -341,9 +338,9 @@ func _build_toggles() -> void:
 
 ## Record the verdict per test id for the browser's marks.
 func _remember(result: Dictionary) -> void:
-	var results: Dictionary = Engine.get_meta(META_RESULTS, {})
+	var results: Dictionary = Engine.get_meta(TestCatalog.META_RESULTS, {})
 	results[result["id"]] = result["status"]
-	Engine.set_meta(META_RESULTS, results)
+	Engine.set_meta(TestCatalog.META_RESULTS, results)
 
 
 # --- Batch ----------------------------------------------------------------------------------

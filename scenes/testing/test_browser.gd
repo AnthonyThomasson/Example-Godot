@@ -11,8 +11,6 @@ const TestCatalog = preload("res://scenes/testing/test_catalog.gd")
 const BROWSER_WINDOW := preload("res://scenes/ui/test_browser_window.gd")
 const RUNNER_SCENE := "res://scenes/testing/test_runner.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
-const META_SELECTION := "test_selection"
-const META_RESULTS := "test_results"
 const META_FILTER := "test_filter"
 
 var _window: CanvasLayer
@@ -34,13 +32,13 @@ func _ready() -> void:
 	window.back_requested.connect(_on_back)
 	window.run_requested.connect(_on_run)
 	window.filter_changed.connect(func(t: String): Engine.set_meta(META_FILTER, t))
-	window.open(TestCatalog.discover(), Engine.get_meta(META_RESULTS, {}), TestCatalog.matches,
-		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(META_SELECTION, "")))
+	window.open(TestCatalog.discover(), Engine.get_meta(TestCatalog.META_RESULTS, {}), TestCatalog.matches,
+		String(Engine.get_meta(META_FILTER, "")), String(Engine.get_meta(TestCatalog.META_SELECTION, "")))
 
 
 ## Play: remember the pick and open the runner.
 func _on_play(path: String) -> void:
-	Engine.set_meta(META_SELECTION, path)
+	Engine.set_meta(TestCatalog.META_SELECTION, path)
 	get_tree().change_scene_to_file(RUNNER_SCENE)
 
 
@@ -89,12 +87,12 @@ func _finish_run() -> void:
 	if not parsed is Dictionary:
 		_window.set_run_status("Test run produced no report (see %s)" % _out_dir.path_join("godot.log"))
 		return
-	var results: Dictionary = Engine.get_meta(META_RESULTS, {})
+	var results: Dictionary = Engine.get_meta(TestCatalog.META_RESULTS, {})
 	var counts := {}
 	for r in parsed["results"]:
 		results[r["id"]] = r["status"]
 		counts[r["status"]] = counts.get(r["status"], 0) + 1
-	Engine.set_meta(META_RESULTS, results)
+	Engine.set_meta(TestCatalog.META_RESULTS, results)
 	var bad: int = counts.get("FAIL", 0) + counts.get("TIMEOUT", 0)
 	var summary := "%s: %d passed, %d failed, %d timed out, %d skipped" % [_run_label, counts.get("PASS", 0),
 		counts.get("FAIL", 0), counts.get("TIMEOUT", 0), counts.get("SKIPPED", 0)]

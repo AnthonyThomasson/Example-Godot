@@ -11,6 +11,9 @@ extends RefCounted
 const ROOT := "res://tests"
 const SUFFIX := "_test.gd"
 const DEFAULT_TIMEOUT := 10.0
+## Engine metas shared by the browser and the runner: the test to play, and the last status per test id.
+const META_SELECTION := "test_selection"
+const META_RESULTS := "test_results"
 static var _WORD: RegEx = null
 ## Whether `discover()` also returns harness self-tests (`internal: true`); the runner's `--self-test`.
 static var show_internal := false

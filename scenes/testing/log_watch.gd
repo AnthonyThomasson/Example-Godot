@@ -5,7 +5,6 @@ extends RefCounted
 ## every error and warning — `push_error`/`push_warning`, script runtime errors, engine `ERROR:` /
 ## `WARNING:` output — is written to the log file (`debug/file_logging/log_path`, on by default on
 ## desktop, headless included). This tails that file from a marked offset and parses the new lines.
-## Swapping the tail for a `Logger` subclass later keeps the same `begin()` / `poll()` surface.
 
 ## Header → severity. Longest first so "SCRIPT ERROR:" isn't read as "ERROR:".
 const HEADERS := [

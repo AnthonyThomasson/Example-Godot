@@ -306,6 +306,10 @@ Two conventions hold across domains; the per-domain specifics live in each domai
 ## Running & verifying
 
 - Main scene `res://scenes/main.tscn`.
+- **Worktree editor:** `tools/editor.sh TICKET [--autorun]` opens a Godot editor on the checkout with
+  `GAME_TICKET` set (Main passes it as `ticket` to the setup window, which shows it on top; a
+  `--ticket=` user arg works too) and its own free command-server port (`GODOT_CMD_PORT`), importing first in a fresh worktree. `--autorun`
+  makes the editor plugin `addons/ticket_autorun/` press Play once it is up.
 - **Verification ladder** — use the cheapest rung that proves the change:
   1. **Loads?** `godot-debug` skill: headless load check (run `--import` first when you add a `class_name`).
   2. **Behaves?** `tools/run_tests.sh [words]` runs `tests/**/*_test.gd` headless and deterministically

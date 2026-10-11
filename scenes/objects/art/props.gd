@@ -56,8 +56,8 @@ static func _col(name: String) -> Color:
 	return ObjectArtConfig.prop_colors.get(name, Color.MAGENTA)
 
 
-## A random entry of the prop palette list `name`.
-static func _pick(c: PixelCanvas, name: String) -> Color:
+## A random entry of the prop palette list `name` (shared with the shelf and appliance painters).
+static func pick(c: PixelCanvas, name: String) -> Color:
 	var list: Array = ObjectArtConfig.prop_colors.get(name, [Color.MAGENTA])
 	return list[c.rng.randi_range(0, list.size() - 1)]
 
@@ -136,7 +136,7 @@ static func _papers(c: PixelCanvas, o: Vector2i) -> void:
 ## A closed book: a colored cover with a spine and a pale page edge.
 static func _book(c: PixelCanvas, o: Vector2i) -> void:
 	var r := _box(o, 12, 9)
-	var cover := _pick(c, "books")
+	var cover := pick(c, "books")
 	var s := _block(c, r, 0, cover)
 	c.outline(s, cover.darkened(0.45))
 	c.line(Vector2i(r.position.x + 1, r.position.y), Vector2i(r.position.x + 1, r.end.y - 1), cover.darkened(0.3))
@@ -164,7 +164,7 @@ static func _bowl(c: PixelCanvas, o: Vector2i, fruit: bool) -> void:
 		return
 	for off in [Vector2i(-2, -1), Vector2i(2, -2), Vector2i(1, 2), Vector2i(-2, 2)]:
 		var p: Vector2i = o + Vector2i(_o(off.x), _o(off.y))
-		var col := _pick(c, "fruit")
+		var col := pick(c, "fruit")
 		c.fill(PixelCanvas.disc(p, _u(2)), col, _HEIGHT)
 		c.px(p.x - 1, p.y - 1, col.lightened(0.35))
 
@@ -177,7 +177,7 @@ static func _vase(c: PixelCanvas, o: Vector2i) -> void:
 		var p := o + Vector2i((Vector2(cos(a), sin(a)) * _u(3.5)).round())
 		c.px(p.x, p.y, _col("leaf"), _HEIGHT + 1)
 		var f := o + Vector2i((Vector2(cos(a + 0.5), sin(a + 0.5)) * _u(2)).round())
-		c.fill(PixelCanvas.disc(f, maxi(1, _u(1))), _pick(c, "flowers"), _HEIGHT + 2)
+		c.fill(PixelCanvas.disc(f, maxi(1, _u(1))), pick(c, "flowers"), _HEIGHT + 2)
 
 
 ## A grained cutting board with a knife.
@@ -223,10 +223,10 @@ static func _crayons(c: PixelCanvas, o: Vector2i) -> void:
 	var sheet := _box(o, 13, 10, -3, 0)
 	c.fill(PixelCanvas.rounded(sheet, 0), _col("paper"), 2)
 	c.outline(PixelCanvas.rounded(sheet, 0), _col("paper").darkened(0.25))
-	c.line(sheet.position + Vector2i(2, 3), sheet.position + Vector2i(sheet.size.x - 3, 6), _pick(c, "flowers"))
+	c.line(sheet.position + Vector2i(2, 3), sheet.position + Vector2i(sheet.size.x - 3, 6), pick(c, "flowers"))
 	for i in 4:
 		var p := o + Vector2i(_u(5) + i * 2, -_u(3) + i)
-		c.line(p, p + Vector2i(0, _u(4)), _pick(c, "flowers"), _HEIGHT - 3)
+		c.line(p, p + Vector2i(0, _u(4)), pick(c, "flowers"), _HEIGHT - 3)
 
 
 ## A plate with an inner rim.
@@ -248,10 +248,10 @@ static func _lamp(c: PixelCanvas, o: Vector2i) -> void:
 ## A striped ball and a toy block.
 static func _toys(c: PixelCanvas, o: Vector2i) -> void:
 	var ball := o + Vector2i(-_u(3), 0)
-	c.fill(PixelCanvas.disc(ball, _u(3)), _pick(c, "flowers"), _HEIGHT)
+	c.fill(PixelCanvas.disc(ball, _u(3)), pick(c, "flowers"), _HEIGHT)
 	c.line(ball + Vector2i(-_u(2), 0), ball + Vector2i(_u(2), 0), _col("paper"), _HEIGHT)
 	var block := Rect2i(o + Vector2i(_u(2), -_u(2)), Vector2i(_u(4), _u(4)))
-	_block(c, block, 0, _pick(c, "books"))
+	_block(c, block, 0, pick(c, "books"))
 
 
 ## A phone with a lit screen.

@@ -113,7 +113,18 @@ func _ready() -> void:
 			"seed": house_seed,
 			"defenders": defender_count,
 			"invaders": invader_count,
+			"ticket": _ticket(),
 		})
+
+
+## The ticket name this run is tagged with (`GAME_TICKET` env var, else a `--ticket=<name>` user arg);
+## blank when untagged. The setup window shows it at the top.
+func _ticket() -> String:
+	var ticket := OS.get_environment("GAME_TICKET")
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--ticket="):
+			ticket = arg.trim_prefix("--ticket=")
+	return ticket.strip_edges()
 
 
 ## Apply the parameters chosen in the setup window, then build the world. `spectator_mode` is the

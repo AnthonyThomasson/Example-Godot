@@ -8,6 +8,7 @@ extends RefCounted
 ## defaulting to ObjectArtConfig.appliance_*): `panel` ("plain" | "burners" | "fridge" |
 ## "microwave" | "washer" | "dryer" | "tv").
 
+const Props = preload("res://scenes/objects/art/props.gd")
 const _BODY_HEIGHT := 4  ## Heights for cast shadows.
 const _KNOB_HEIGHT := 6
 
@@ -118,7 +119,7 @@ static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool) -> v
 		for i in 4:
 			var a := c.rng.randf() * TAU
 			var p := o + Vector2i((Vector2(cos(a), sin(a)) * c.rng.randf_range(0.0, rad - 4)).round())
-			c.fill(PixelCanvas.disc(p, maxi(1, rad / 4)), _pick(c, "books").lightened(0.15))
+			c.fill(PixelCanvas.disc(p, maxi(1, rad / 4)), Props.pick(c, "books").lightened(0.15))
 		c.glare(glass, Color(0.85, 0.92, 1.0), 2)
 	else:
 		c.fill(PixelCanvas.disc(o, rad - 2), base.darkened(0.04))
@@ -143,9 +144,3 @@ static func _tv(c: PixelCanvas, base: Color, _t: Dictionary) -> void:
 	c.line(Vector2i(bar_rect.position.x + 1, bar_rect.end.y - 1), Vector2i(bar_rect.end.x - 2, bar_rect.end.y - 1),
 			ObjectArtConfig.prop_colors["glow"])
 	c.px(c.w / 2, bar_rect.end.y, Color(0.9, 0.25, 0.2))
-
-
-## A random entry of the prop palette list `name`.
-static func _pick(c: PixelCanvas, name: String) -> Color:
-	var list: Array = ObjectArtConfig.prop_colors.get(name, [Color.MAGENTA])
-	return list[c.rng.randi_range(0, list.size() - 1)]
