@@ -33,8 +33,9 @@ const DecisionClient := preload("res://scenes/ai/decision/decision_client.gd")
 const DecisionPlanner := preload("res://scenes/ai/decision/decision_planner.gd")
 const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 
-## The behaviour to pursue, in plain language — what Von ranks every level of the decision against.
-@export_multiline var goal: String = ("Deal with hostile characters: shoot them with your pistol. " +
+## The behaviour to pursue, in plain language — what Von ranks every level of the decision against. `{gun}` stands
+## for whatever gun the NPC carries ("shoot them with your {gun}"); read it filled in through `goal_text()`.
+@export_multiline var goal: String = ("Deal with hostile characters: shoot them with your {gun}. " +
 	"Otherwise go about your business.")
 ## Pursuit primitive: when true this NPC actively hunts hostiles instead of doing chores. Once a hostile
 ## is known every decision starts at COMBAT, and IDLE (chores) is never offered — a passive interaction
@@ -69,7 +70,7 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var search_coverage_approach: float = 300.0
 ## Inset (px) from a room's walls where coverage sampling starts, so search points sit off the walls.
 @export var search_coverage_margin: float = 24.0
-## Range (px) of the pistol: shots are taken within it, and distances are banded against it for Von.
+## Range (px) of the gun: shots are taken within it, and distances are banded against it for Von.
 @export var shoot_range: float = 500.0
 ## Range (px) within which a punch lands.
 @export var punch_range: float = 48.0
@@ -81,6 +82,10 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export var cover_time: float = 1.2
 ## Minimum seconds between shots/punches while engaging.
 @export var fire_cooldown: float = 0.5
+## Rounds an automatic gun fires per trigger pull (at the gun's own fire rate); a single-shot gun fires one.
+@export var fire_burst: int = 3
+## Seconds spent stepping back when the gun's barrel is against a wall or object and cannot fire.
+@export var back_off_time: float = 0.45
 ## Seconds a chosen fire/cover position is committed to before a new one may be picked. Prevents
 ## per-frame re-selection of the nearest spot (which makes the NPC vibrate).
 @export var reposition_interval: float = 0.5
@@ -215,7 +220,7 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## Running: may the NPC sprint (spending stamina) on the way to a destination when its decision-tree
 ## node asks for it (`run`) or it is under fire.
 @export var run_enabled: bool = true
-## Reload an empty pistol on its own (holding steady, or ducked in cover) when a spare magazine is carried,
+## Reload an empty gun on its own (holding steady, or ducked in cover) when a spare magazine is carried,
 ## whatever the decision tree chose: the NPC is never left unarmed for lack of a decision.
 @export var auto_reload: bool = true
 ## Only run when the destination is farther than this (px), so short hops don't burn stamina.
@@ -364,6 +369,8 @@ func _apply_config() -> void:
 	_behavior.combat_ring_count = combat_ring_count
 	_behavior.cover_time = cover_time
 	_behavior.fire_cooldown = fire_cooldown
+	_behavior.fire_burst = fire_burst
+	_behavior.back_off_time = back_off_time
 	_behavior.reposition_interval = reposition_interval
 	_behavior.arrive_dist = arrive_dist
 	_behavior.run_enabled = run_enabled
@@ -379,6 +386,13 @@ func _apply_config() -> void:
 func _on_event(topic: StringName, data: Dictionary) -> void:
 	if topic == &"hit" or topic == &"callout":
 		_event_queue.append([topic, data])
+
+
+## Read-only: the goal as Von reads it, with `{gun}` filled in with the NPC's gun (the raw `goal` before it has acted).
+func goal_text() -> String:
+	if _perception == null or not is_instance_valid(_character):
+		return goal.replace("{gun}", "gun")
+	return _perception.fill_goal(goal, _character)
 
 
 ## Read-only: the decision path the NPC is carrying out, as ids ("combat/t_12/flank/side_left").
@@ -400,7 +414,7 @@ func debug_status() -> String:
 func debug_state() -> Dictionary:
 	var out := {
 		"npc": _npc_name(),
-		"goal": goal,
+		"goal": goal_text(),
 		"decide_in": _decide_timer,
 		"forced": _force,
 		"facts": _last_facts,

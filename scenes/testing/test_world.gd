@@ -117,6 +117,10 @@ func _build_world(world: Dictionary) -> void:
 ## Bake the nav map (after the objects, so they are carved) and add the re-baker.
 func _build_nav() -> void:
 	var region := NavBuilder.build(house, rooms, self)
+	# Every test world shares the viewport's navigation map, which a previous test has already synced. Without
+	# this, the new region is not yet in the map when its NPCs first decide, and a path query against the stale map
+	# returns the origin (a point, not a route), so the NPC walks to (0, 0). Sync now, before any actor spawns.
+	NavigationServer2D.map_force_update(get_world_2d().navigation_map)
 	_nav_debug = NAV_DEBUG.new()
 	_nav_debug.name = "NavDebug"
 	add_child(_nav_debug)

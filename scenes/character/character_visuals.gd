@@ -44,6 +44,8 @@ var _fallen_order: Array[String] = []  ## The fallen parts' keys, lowest first, 
 ## (breath, glance), and repainting an identical body is most of an idle crowd's frame cost.
 const REDRAW_POS_STEP := 0.1
 const REDRAW_ANGLE_STEP := 0.02
+## How far a held weapon's raise (0..1) must change to repaint: the gun's art steps through a few lengths.
+const REDRAW_RAISE_STEP := 0.1
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
 var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
 var redraws := 0  ## How many times the standing body has been drawn (tests read it).
@@ -89,6 +91,7 @@ func _redraw_key_of(rig) -> PackedInt32Array:
 	for angle in [pose.torso_angle, pose.head_angle, pose.hand_angles[0], pose.hand_angles[1], pose.weapon_angle]:
 		key.append(roundi(angle / REDRAW_ANGLE_STEP))
 	key.append(_character.current_slot())
+	key.append(roundi(_character.weapon_raise() / REDRAW_RAISE_STEP))  # A raised gun is drawn shorter.
 	var deformable = _character._deformable
 	if deformable:
 		key.append(deformable.impacts.size())

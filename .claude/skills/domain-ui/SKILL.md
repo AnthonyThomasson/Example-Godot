@@ -7,7 +7,7 @@ description: Deep implementation detail for the UI domain (scenes/ui/) — debug
 
 Four `CanvasLayer` nodes, all built entirely in code (no scene-side layout), all decoupled observers
 that read only published contracts — Character public API/signals, the AI controller's
-`debug_status()` / `current_act()` and `goal`, and the EventBus `&"hit"` topic. They know nothing of
+`debug_status()` / `current_act()` and `goal_text()`, and the EventBus `&"hit"` topic. They know nothing of
 the domains.
 
 ## Files
@@ -141,7 +141,7 @@ the test browser. Pressing Start also **disables the button**, because Main may 
 ## Interface recap
 
 - UI observers attach by exported node path (or node name duck-typed in `main.gd`) and read only the
-  Character public API/signals plus `AIController.current_act()` / `goal` (interface 7 in the
+  Character public API/signals plus `AIController.current_act()` / `goal_text()` (interface 7 in the
   `architecture` skill). EventBus `&"hit"` is the only cross-domain event consumed here.
 - `main.gd` calls `MatchHUD.begin(combatants)`, `SetupMenu.open(defaults)` /
   `SetupMenu.set_status(text)`, and `SeedDisplay.show_seed(seed)` — the only outward calls the UI

@@ -65,20 +65,22 @@ only; it writes no memory and holds no policy. Everything in this section and th
 lives in `agent_snapshot.gd`.
 
 - **facts** — named booleans a `requires` or an entry rule can gate on: `threat_known`, `hostile_known`,
-  `hostile_visible`, `has_pistol`, `pistol_loaded` (a pistol with rounds that is not mid-reload), `weapon_empty`,
+  `hostile_visible`, `has_gun`, `gun_loaded` (the gun it fights with, `Character.gun_slot()`, has rounds and is not mid-reload), `weapon_empty`,
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
   rounds), `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`,
-  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `pistol_loaded`, `weapon_low`, `can_reload`,
+  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `gun_loaded`, `weapon_low`, `can_reload`,
   `under_fire`, `engaged` and `leads`; the rest feed the brain overlay and are there for new rules.
-- **sections** — named state-text blocks; each tree level shows the ones it lists: `goal`,
+- **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
   (clear shot / exposed to their fire / behind cover / line blocked, plus other hostiles that can see
   you), `allies` (each ally's side of the target + their radio callouts), `flanks` (one-line digest),
-  `loadout` (the pistol in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
+  `loadout` (the gun in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
   once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
-  empty without a pistol; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
-  `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile.
+  empty without a gun; the noun is the gun's display name lower-cased, `_gun_noun` ("pistol", "assault rifle", an acronym like "SMG" kept), so a
+  pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
+  `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile. The snapshot also carries `gun` (that noun), which the planner
+  fills into `{gun}` in the tree's templates. `shoot_range` and the "in pistol range" distance band are deliberately left gun-agnostic (pinned wording).
 - **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
   `threat` (summary only), `hostiles` (bind: one per hostile, only DISTINGUISHING facts), per target
   `fire_positions` (where you stand, firing spots around the target named by place and cover — "behind

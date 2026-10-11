@@ -15,7 +15,8 @@ extends RefCounted
 ##               into the state ("You are badly wounded and being hit"), never an action label, and
 ##               no negated attributes (an encoder reads "no cover" as "cover"). The wording is
 ##               measured, not guessed: tools/von_probe.py checks it against clear-cut scenarios.
-##               Template fields: {target} (the bound target's name) and {summary} (the summary of
+##               Template fields: {target} (the bound target's name), {gun} (what the NPC calls its
+##               gun: "pistol", "assault rifle") and {summary} (the summary of
 ##               the node's `summary` option group, else its first `options` group — specifics
 ##               written by perception, kept in parentheses after the situation).
 ##   question  — the instruction Von answers when choosing AMONG this node's children/options. It names
@@ -58,14 +59,14 @@ const NODES := {
 		"bind_options": &"hostiles",
 		"bind_question": "Which hostile should you fight? Prefer the most dangerous one you can actually hit: close, armed, aiming at you or an ally.",
 		"bind_context": [&"situation", &"odds", &"awareness"],
-		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your {gun} is nearly empty or empty.",
 		"context": [&"situation", &"loadout", &"current", &"odds", &"exposure", &"contacts", &"allies", &"flanks", &"awareness"],
 		"children": [&"engage", &"flank", &"advance", &"melee", &"reload", &"retreat", &"locate"],
 	},
 	&"engage": {
 		"label": "ENGAGE",
 		"desc": "You have a clear shot at {target}, and you are not badly wounded ({summary})",
-		"requires": [&"target", &"pistol_loaded"],
+		"requires": [&"target", &"gun_loaded"],
 		"question": "Where should you fight {target} from? Prefer a clear shot with cover close by, hidden from other hostiles; wait in ambush when they are coming to you.",
 		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"fire_positions"],
@@ -74,7 +75,7 @@ const NODES := {
 	&"flank": {
 		"label": "FLANK",
 		"desc": "Your line to {target} is blocked, or they are aiming at someone else ({summary})",
-		"requires": [&"target", &"pistol_loaded"],
+		"requires": [&"target", &"gun_loaded"],
 		"question": "Which side should you flank {target} from? Prefer a free side behind or beside them, with cover and a short, hidden route.",
 		"context": [&"current", &"loadout", &"contacts", &"allies", &"flanks", &"exposure"],
 		"options": [&"flank_sides"],
@@ -101,7 +102,7 @@ const NODES := {
 	},
 	&"reload": {
 		"label": "RELOAD",
-		"desc": "Your pistol is nearly empty or empty, and you carry spare magazines",
+		"desc": "Your {gun} is nearly empty or empty, and you carry spare magazines",
 		"requires": [&"weapon_low", &"can_reload"],
 		"options": [&"reload"],
 		"primitive": &"reload",
@@ -127,7 +128,7 @@ const NODES := {
 	},
 	&"reload_quiet": {
 		"label": "RELOAD",
-		"desc": "All is quiet, your pistol is nearly empty or empty, and you carry spare magazines",
+		"desc": "All is quiet, your {gun} is nearly empty or empty, and you carry spare magazines",
 		"requires": [&"weapon_low", &"can_reload", &"!threat_known"],
 		"options": [&"reload"],
 		"primitive": &"reload",

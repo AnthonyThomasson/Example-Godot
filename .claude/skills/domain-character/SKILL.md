@@ -71,8 +71,8 @@ frame's pose.
   and the rig read.
 - `weapon_angle` is published as the character's `weapon_facing()`, which an item draws its weapon
   along.
-- `kick(hand)` (the character's `kick`, called by the pistol on firing) throws the hand back on a
-  recoil spring and twists the shoulders back on its side; the other hand feels its stance's
+- `kick(hand, strength := 1.0)` (the character's `kick`, called by a gun on firing with its `recoil`) throws the hand back on a
+  recoil spring and twists the shoulders back on its side, `strength` times a pistol's; the other hand feels its stance's
   `recoil_share` (a supporting hand recoils with the weapon hand).
 - Tuning: `CharacterConfig.pose_*` (per-part spring `freq` / `damping` / `max_lag` for head, steady
   hands, weapon, free hands, shoulders and hips; lag catch, hand pace spread, hip twist, stride,
@@ -95,9 +95,29 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 (out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
 `support` (the other hand cupping it: the pistol's two-handed hold) and `reload` (that hand dropped to the belt
-for the next magazine, named by the pistol's support hand while it reloads). A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
-and have an item name it. `CharacterConfig.muzzle_ahead` is how far past the weapon hand bullets
-leave (`muzzle_origin(hand)`).
+for the next magazine, named by a gun's support hand while it reloads). The long guns have their own pairs, sized by the gun: `smg_grip` / `smg_fore`
+(tucked in close, the other hand out on the shroud) and `rifle_grip` / `rifle_fore` (the butt against the shoulder, the grip hand
+just ahead of it, the other hand out along the handguard); both hands lie on one line along the barrel (hand 1 at +`lateral`, hand 0 at
+−`lateral`) and an arm's stretch stays within the rig's tolerance. `ready_grip` / `ready_fore` are the shared **raised** pair (below).
+A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
+and have an item name it. `Item.muzzle_ahead()` is how far past the weapon hand bullets
+leave (`muzzle_origin(hand)`); `Character._muzzle_ahead(item)` falls back to `CharacterConfig.muzzle_ahead` for an item whose `muzzle_ahead()` is negative (the base `Item`), so Items never read Character's config.
+
+## A long gun against a wall (the raise)
+
+An item whose `raises_at_contact()` is true (SMG, rifle) is judged every physics frame by `_update_weapon_raise(delta)` (after `facing` is
+set, before `pose.update`; skipped in an interaction). The barrel is a ray from beside the body centre (the weapon hand's lateral) along the
+aim, as far as the gun reaches **held normally** — the item's *un-raised* stance forward plus `muzzle_ahead()`, never the raised one, or pulling
+it up would clear the ray and drop it again. `CharacterHands.solid_distance(from, dir, max)` does the cast (it owns the physics-space query and
+`HAND_MASK`) and **ignores other characters**: a gun against a person is not against a wall, and a dead body is on no layer. It blocks when something is within
+the reach, and stays blocked until `CharacterConfig.weapon_contact_margin` of clearance, so it does not flicker at the edge. `_blocked` is
+set at once (`weapon_blocked()`: `shoot()` returns false, a gun cannot fire), while `weapon_raise()` (0..1) eases toward it at
+`CharacterConfig.weapon_raise_speed` for the art. While blocked, `_stances()` asks the item for `raised_stance(hand)` (hands drawn in to the chest), and
+`GunItem.draw_weapon` shortens the barrel by `weapon_raise()`: "pointed up" seen from above. The raise joins `_redraw_key_of` in
+`character_visuals.gd` (rounded to `REDRAW_RAISE_STEP`), or an idle body would not repaint. `select_slot`, `set_loadout` and **`shoot()` itself** re-judge it
+at once: a controller acts before the frame's own check runs (and on a character's very first frame none has run), so trusting last frame's `_blocked`
+let a long gun fired point-blank into a wall leave through it. Test: `tests/character/long_gun_wall_raise_test.gd` (incl. a shot on the first frame);
+holds: `tests/character/long_gun_hold_test.gd`.
 
 ## The rig (the standing skeleton)
 
@@ -266,15 +286,25 @@ Test: `tests/character/run_pose_test.gd`.
 
 The character carries spare magazines (`_magazines`, `Magazine` items) beside its inventory: they are never in
 `_items`, so no number key or interaction can select them. They come from the exports `spare_magazine_types`
-(`MagazineConfig.types` ids, default two `standard`) and `start_rounds` (what the starting gun is loaded with;
+(`MagazineConfig.types` ids, default two standard magazines for each gun) and `start_rounds` (what the starting gun is loaded with;
 negative = full), which tests and sandboxes set through `actor(..., props)`. `reload()` (R, or the AI's reload
 primitive) starts a timer of the held item's `reload_time()` on it if its `can_reload(self)` says a carried
-magazine would add rounds, and sets the item's `reloading` flag (the pistol's support hand eases to the `reload`
+magazine would add rounds, and sets the item's `reloading` flag (a gun's support hand eases to the `reload`
 stance while it is up). `_update_reload` runs right after the controller: it cancels the reload when the character
 is busy, running or no longer holds that item, else counts down and calls `item.finish_reload(self)`. `shoot()` is
 ignored mid-reload; switching slot or dying cancels it; magazines are lost with the body. Reads: `is_reloading()`,
-`ammo(slot)`, `ammo_capacity(slot)`, `can_reload(slot)`, `spare_magazines()`. Tests: `tests/items/reload_swaps_magazine_test.gd`,
-`tests/character/reload_blocked_test.gd`.
+`ammo(slot)`, `ammo_capacity(slot)`, `can_reload(slot)`, `spare_magazines()`, `item_name(slot)`, `is_automatic()`,
+`gun_slot()` (the gun it fights with: the held item if it takes ammo, else the lowest slot that does, else −1: how the AI finds
+its weapon without knowing which). Tests: `tests/items/reload_swaps_magazine_test.gd`, `tests/character/reload_blocked_test.gd`.
+
+**Firing.** `shoot() -> bool` runs the held item's `secondary`; it returns false when busy, running, reloading, `weapon_blocked()` or the gun
+is still cycling between rounds. `_physics_process` ticks every carried item (`Item.tick(delta)`) *before* the controller runs, so a gun's fire-rate
+cooldown is in step with the frame that pulls the trigger. A controller re-presses `shoot()` every frame while the trigger is held when
+`is_automatic()` (`player_controller.gd` reads `Keybinds.is_fire_pressed()`; the test puppet has `hold_fire(on)`).
+
+**Loadout.** `set_loadout(slots, hold_slot, spare_types)` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds)`, the carried
+magazines and the held slot (dropping any reload, re-judging the raise). Main uses it to give the player and every NPC one random gun
+(`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
 
 ## Walking into furniture
 
@@ -333,9 +363,9 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
 
 - **Character ↔ Controller** (interface 7): the character reads intent from a controller child
   (any node with `control(character, delta)`) that writes `move_input` / `aim_point` / `run_input` and calls
-  the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
+  the action API: `melee()`, `shoot() -> bool`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-  damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`
+  damage, for injury sensing), `gun_slot()`, `weapon_blocked()` and `is_automatic()`. Signals: `hit_landed(body, damage, hand)`
   (hand 0/1 = melee, −1 = shot), `died` (`is_dead`).
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
@@ -345,6 +375,6 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   `character_footsteps.gd` on each footfall, and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-  `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`, `best_magazine(gun)` / `take_magazine(gun)` /
-  `stow_magazine(m)`; and reads the item's `hand_stance(hand)` (how each hand is held), calling its
-  `drop(user, velocity)` on death.
+  `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`, `weapon_raise()`, `best_magazine(gun)` / `take_magazine(gun)` /
+  `stow_magazine(m)`; and reads the item's `hand_stance(hand)` / `raised_stance(hand)` (how each hand is held), `muzzle_ahead()`,
+  `raises_at_contact()`, `is_automatic()` and `tick(delta)`, calling its `drop(user, velocity)` on death.

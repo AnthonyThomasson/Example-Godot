@@ -95,6 +95,8 @@ func _add_splat(at: Vector2, size: float, direction: Vector2, energy: float) -> 
 	var splat := BloodSpawner.splat(host.get_parent(), at, size, direction, energy, [(host as CollisionObject2D).get_rid()] if host is CollisionObject2D else [])
 	_splats.append(splat)
 	while _splats.size() > BloodConfig.max_splats_per_body or (not _splats.is_empty() and not is_instance_valid(_splats[0])):
-		var oldest: Node = _splats.pop_front()
+		# Untyped: the loop also pops an already-freed splat (something else freed it), and assigning a freed
+		# instance to a typed `Node` is an engine error.
+		var oldest = _splats.pop_front()
 		if is_instance_valid(oldest):
 			oldest.queue_free()

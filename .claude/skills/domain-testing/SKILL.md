@@ -145,9 +145,12 @@ func run(t: TestContext) -> void:
     house/arena root before the nav bake, so they are carved.
   - Actors: `actor(id, kind, pos, props)`. Kind is `puppet` (scripted), `player` (human-driven),
     `defender`, `invader`, or a scene path. `props` are set on the character before `_ready` (for
-    example `max_health`, `start_slot`: 1 unarmed / 2 fists / 3 pistol / 4 key, `faction`, and the ammo props
-    `start_rounds` (what the pistol starts loaded with; -1 = full) and `spare_magazine_types` (e.g. `[]` for none,
-    `[&"extended"]`)). Use
+    example `max_health`, `start_slot`: 1 unarmed / 2 fists / 3 pistol / 4 key / 5 SMG / 6 assault rifle, `faction`, and the ammo props
+    `start_rounds` (what the starting gun is loaded with; -1 = full) and `spare_magazine_types` (e.g. `[]` for none,
+    `[&"extended"]`; the default is two standard magazines for each gun, so a test counting spares sets it)). Actors built here
+    keep `default_inventory()` (every item) and the weapon they ask for: only Main gives a spawn one random gun
+    (`Character.set_loadout`). To retune a gun for one test, `set_static(GunConfig, "guns", modified_copy)` (e.g. spread 0 for a
+    straight shot). Use
     `set_props(id, "GoalController", {...})` for a child's exports. NPCs get `rooms` injected, as Main
     does.
   - Behaviour: `switch(name, on)` (table below) and `set_static(ConfigClass, prop, value)`.
@@ -175,7 +178,7 @@ func run(t: TestContext) -> void:
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
     A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
-  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `stop()`, `select_slot(n)`, `punch()`, `shoot()`, `reload()`,
+  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `stop()`, `select_slot(n)`, `punch()`, `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.

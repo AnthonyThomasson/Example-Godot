@@ -497,6 +497,11 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 	return _snapshot.build(character, rooms, goal, activity, contacts(self_pos), _callouts(), knowledge)
 
 
+## The goal text as Von reads it: `{gun}` filled with what `character` calls its gun.
+func fill_goal(goal: String, character) -> String:
+	return _snapshot.fill_goal(goal, character)
+
+
 # --- House knowledge -------------------------------------------------------------------------
 
 ## Seed a familiar NPC's house knowledge once: remember every room and interactable as already-known

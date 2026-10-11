@@ -50,7 +50,7 @@ func _process(_delta: float) -> void:
 		if not is_instance_valid(c):
 			continue
 		var ctrl = entry["controller"]
-		var goal: String = str(ctrl.goal) if ctrl and "goal" in ctrl else "—"
+		var goal: String = str(ctrl.goal_text()) if ctrl and ctrl.has_method("goal_text") else "—"
 		goal_lines.append("%s: %s" % [c.name, goal])
 	_goal_label.text = "\n".join(goal_lines)
 

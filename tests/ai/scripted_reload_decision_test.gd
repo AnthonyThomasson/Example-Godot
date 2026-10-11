@@ -21,7 +21,7 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"ai.hostile_on_sight", true)
 	s.switch(&"projectile.flyover", false)
 	# The defender faces east at spawn, toward the (unarmed) stranger standing in plain sight.
-	s.actor(&"defender", &"defender", Vector2(200, 300), { "start_rounds": 2, "max_health": 400.0 })
+	s.actor(&"defender", &"defender", Vector2(200, 300), { "start_rounds": 2, "max_health": 400.0, "spare_magazine_types": [&"standard", &"standard"] })
 	s.actor(&"stranger", &"puppet", Vector2(600, 300), { "start_slot": 1, "faction": &"invader", "max_health": 400.0 })
 
 

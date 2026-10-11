@@ -199,15 +199,15 @@ func run_amount() -> float:
 	return _run
 
 
-## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side. The
-## other hand feels its share if it is steadying the weapon.
-func kick(hand: int) -> void:
-	_recoil_vel[hand] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq
+## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side, `strength`
+## times a pistol's kick. The other hand feels its share if it is steadying the weapon.
+func kick(hand: int, strength := 1.0) -> void:
+	_recoil_vel[hand] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq * strength
 	var other := 1 - hand
-	_recoil_vel[other] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq \
+	_recoil_vel[other] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq * strength \
 		* float(_stance[other]["recoil_share"])
 	var side := -1.0 if hand == 0 else 1.0
-	_torso_vel -= side * CharacterConfig.pose_recoil_twist * CharacterConfig.pose_torso_freq
+	_torso_vel -= side * CharacterConfig.pose_recoil_twist * CharacterConfig.pose_torso_freq * strength
 
 
 ## A stance's configured values by name (an unknown name is a relaxed hand).

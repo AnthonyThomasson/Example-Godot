@@ -31,6 +31,8 @@ harmless because the spectator match has no player to interact.
 Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button. Keyboard
 defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `ZOOM_IN` /
 `ZOOM_OUT` wheel up/down); `actions()` is their union and what resets, overrides and loading cover.
+`FIRE` is read two ways, both by the player controller: `is_fire_just_pressed()` (a click: one round) and `is_fire_pressed()`
+(held: an automatic gun keeps firing, `Character.is_automatic()`); no new action, so rebinding `FIRE` moves both.
 `CAMERA_LEFT/RIGHT/UP/DOWN` (default WASD, read through `get_camera_vector()`) and `ZOOM_IN/OUT` are read
 only by the camera; the camera keys share WASD with `MOVE_*`, harmless because the spectator match has no
 player to move. `LABELS` (settings-page order + names) and `GROUPS` must cover every action (a test

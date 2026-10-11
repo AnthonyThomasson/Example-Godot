@@ -272,6 +272,7 @@ func _spawn_world() -> void:
 		_spawn_defender(rooms, rng, i)
 	for i in invader_count:
 		_spawn_invader(rooms, rng, i, invader_count, front_entrance)
+	_arm_characters()
 	_configure_debug()
 	if spectator_mode:
 		_setup_spectator()
@@ -285,6 +286,29 @@ func _spawn_world() -> void:
 		add_child(toggles)
 		toggles.setup(_overlay_flags)
 		toggles.overlay_toggled.connect(_on_overlay_toggled)
+
+
+## Salt mixed into the house seed for the loadout draws, so picking guns never shifts the NPC placement
+## that the house seed already pins ("LOAD").
+const LOADOUT_SEED_SALT := 0x4C4F4144
+
+
+## Give the player (when there is one) and every NPC one random gun, carried alone with its own spare
+## magazines. Drawn from the house seed, so a pinned seed pins the loadouts too. Tests and sandboxes build
+## their own characters and never come through here, so they keep the weapon they ask for.
+func _arm_characters() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = house_seed ^ LOADOUT_SEED_SALT
+	var characters: Array = []
+	if _player and not spectator_mode:
+		characters.append(_player)
+	characters.append_array(_combatants)
+	for character in characters:
+		var slot := ItemRegistry.random_gun_slot(rng)
+		if slot < 0:
+			continue
+		character.set_loadout(ItemRegistry.loadout_for(slot), slot, ItemRegistry.spares_for(slot))
+		GameLog.say("%s is armed with the %s" % [character.name, character.item_name()])
 
 
 ## Turn the scene into a pure 2-AI spectator match: drop the human player and its player-HUD, point

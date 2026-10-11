@@ -5,7 +5,7 @@ class_name Item extends RefCounted
 ## secondary (LMB) actions do, how each hand is held, how its weapon is rendered, and what it
 ## leaves behind when its user dies (drop).
 ## The character calls into these; an Item talks back only through the small character API
-## (facing, weapon_facing(), punch(), kick(), hand_position(), muzzle_origin(), world_root(),
+## (facing, weapon_facing(), weapon_raise(), punch(), kick(), hand_position(), muzzle_origin(), world_root(),
 ## report_shot(), and for reloading best_magazine() / take_magazine() / stow_magazine()), so Items and
 ## the Character are otherwise independent.
 
@@ -29,9 +29,44 @@ func primary(_user) -> void:
 	pass
 
 
-## Secondary action (left-click). Default: nothing.
-func secondary(_user) -> void:
+## Secondary action (left-click); true when it did something (a gun: a round left the barrel). Default: nothing.
+func secondary(_user) -> bool:
+	return false
+
+
+## Advance the item's own clocks (a gun's time between rounds) by `delta` seconds. The character ticks every
+## item it carries once per physics frame, held or not. Default: nothing.
+func tick(_delta: float) -> void:
 	pass
+
+
+## Whether holding the trigger keeps repeating the secondary action (a controller re-presses it every frame)
+## instead of needing a fresh press each time. Default: no.
+func is_automatic() -> bool:
+	return false
+
+
+## The hand that holds this item's weapon (the muzzle and the recoil are that hand's). Default: the right.
+func weapon_hand() -> int:
+	return 1
+
+
+## How far past the weapon hand the muzzle is (px): bullets leave there, and a long gun reaches further.
+## Default: negative, meaning the character's own default reach.
+func muzzle_ahead() -> float:
+	return -1.0
+
+
+## Whether the weapon is too long to use against a wall: while its barrel touches a wall or object it is held
+## pointing up and cannot shoot. Default: no.
+func raises_at_contact() -> bool:
+	return false
+
+
+## How `hand` is held while the weapon is raised off a wall or object (a `CharacterConfig.stances` name).
+## Default: held as usual.
+func raised_stance(hand: int) -> StringName:
+	return hand_stance(hand)
 
 
 ## Rounds loaded right now, or -1 for an item with no ammo (the default).

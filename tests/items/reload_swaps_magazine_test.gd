@@ -50,7 +50,7 @@ func run(t: TestContext) -> void:
 	await t.seconds(0.3)
 	for i in 12:
 		shooter.shoot()
-		await t.frames(2)
+		await t.seconds(float(GunConfig.row(&"pistol")["fire_interval"]) + 0.03)  # The pistol cycles between rounds.
 	t.expect_eq(body.ammo(), 8, "twelve shots left 8 rounds")
 	gunman.reload()
 	await t.seconds(0.2)

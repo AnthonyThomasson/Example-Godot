@@ -6,8 +6,8 @@ description: The architecture map for this Godot project (Example_Godot) — the
 # Example_Godot architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
-furnished house, with two "hands" that aim at the mouse, a punch on **F**, a pistol that
-fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
+furnished house, with two "hands" that aim at the mouse, a punch on **F**, a gun (pistol, SMG or
+assault rifle) that fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
 organized into **thirteen isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
@@ -24,7 +24,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
-| **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration, damage, cover, ricochet. |
+| **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
@@ -35,8 +35,11 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
 (interface 13), the only code that knows every domain. It asks World-Gen for a house and holds the
-player; the setup window's **Tests** button sends it to the test browser instead. `project.godot` autoloads only
-`Keybinds`, `Despawner` and `EventBus` (all General).
+player; the setup window's **Tests** button sends it to the test browser instead. After the NPCs are placed it
+arms the player and every NPC with one random gun (`ItemRegistry.random_gun_slot` from an RNG seeded by the house
+seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement) through
+`Character.set_loadout`; tests and sandboxes never come through there and keep the weapon they ask for.
+`project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General).
 
 On a fresh launch Main opens the UI setup window and builds nothing until Start, then **awaits the
 AI domain's `DecisionServerLauncher.resolved(live)`** before `_spawn_world()`, so no NPC makes its
@@ -139,31 +142,45 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `Item` (`items/item.gd`): `display_name`, `reach`, `hand_stance(hand) -> StringName` (how that
    hand is held — the name of a `CharacterConfig.stances` entry: `relaxed`, `guard`, `aim`, `support`;
    the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F),
-   `secondary(user)` (LMB), `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
-   as its user dies: the pistol leaves a skidding `DroppedItem` in the world, the default leaves
+   `secondary(user) -> bool` (LMB; true = a round left the barrel), `tick(delta)` (the item's own clocks; the character ticks
+   every item it carries each physics frame), `is_automatic()` (holding the trigger keeps firing), `weapon_hand()`,
+   `muzzle_ahead()` (px past the weapon hand where bullets leave; negative = the character's `CharacterConfig.muzzle_ahead`),
+   `raises_at_contact()` / `raised_stance(hand)` (a long gun's barrel against a wall or object: held pointing up, cannot fire),
+   `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
+   as its user dies: a gun leaves a skidding `DroppedItem` in the world, the default leaves
    nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
    is which side landed up). The character
    calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id)` /
-   `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
-   `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (`CharacterConfig.muzzle_ahead`
-   past the hand), `world_root()`, `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
-   drawn weapon direction, trailing the aim; shots still use `facing`). **Ammo:** `Item` has inert hooks
+   `default_inventory()` / `inventory_for(slots)` / `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. The
+   character API an item may call: `facing`, `punch(hand)`,
+   `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
+   `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
+   `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`) and `weapon_raise()` (0..1, how far
+   a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
+   `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
+   `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their look and hold. **Ammo:** `Item` has inert hooks
    `rounds_loaded()` / `ammo_capacity()` (-1 = no ammo), `reload_time()`, `can_reload(user)`, `finish_reload(user)` and a
-   `reloading` flag the character sets. A `Magazine` (an `Item` subclass, types in `MagazineConfig`) is carried
-   by the character, never held or selectable; the pistol loads one and each shot spends a round. For a reload
-   an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. The pistol is the one
+   `reloading` flag the character sets. A `Magazine` (an `Item` subclass, types in `MagazineConfig`, each tied to one `gun` id,
+   with its own capacity and optional `reload_time`) is carried
+   by the character, never held or selectable; a gun loads one and each shot spends a round. For a reload
+   an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Guns are the one
    place Items reach into the Projectile System (`ProjectileSpawner`/`CasingSpawner`).
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. The controller writes `move_input` / `aim_point` / `run_input` (hold run: a
    faster pace that spends stamina while moving, dry = walk until it refills) and calls the
-   character's action API: `melee()` (F), `shoot()` (LMB; ignored while running or reloading), `reload()` (R: a timed swap to
+   character's action API: `melee()` (F), `shoot() -> bool` (LMB; true = a round left the barrel; ignored while running, reloading,
+   or with a long gun's barrel against a wall or object, and a gun holds back between rounds per its fire rate; a controller re-presses it
+   every frame while the trigger is held when `is_automatic()`), `reload()` (R: a timed swap to
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
    dying), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
    damage, for injury sensing), `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
-   `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `gun_slot()` (the
+   gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
+   `is_automatic()`, `set_loadout(slots, hold_slot, spare_types)` (carry only those slots, holding one, with those spare magazines: how Main
+   gives a spawn one random gun) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()` and `is_reloading()` — but only while it can SEE that character
    (aim, visible wounds and a reload in progress are things it perceives).
    `player_controller.gd` is the human one and
@@ -175,7 +192,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
-   side (kitchen)`) for those observers to show. Every NPC is the same generic goal-driven agent
+   side (kitchen)`) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
    (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
@@ -241,14 +258,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	  at a cardinal facing (the image is turned); furniture, walls, floors.
     - `PixelArt.render_turned(painter, size, color, angle, material, opts) -> Texture2D` + `PixelArt.snap_angle(angle)`
 	  — canonical art lit for a snapped angle, drawn rotated by the caller to the exact one;
-	  characters, hands, the pistol.
+	  characters, hands, the guns.
     - `PixelCanvas` — the surface a painter draws on (`static paint(canvas, base, material, opts)`):
 	  shapes (`rounded`/`ellipse`/`disc`/`bowed`), `fill`, `bevel`, `outline`, `surface`, `grain`,
 	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …
     - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
 	  turn steps, tone ramp and surface-finish tuning.
-    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb and trunk painters and Items' pistol
-    painter all render through these; Art imports nothing from other domains.
+    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb and trunk painters and Items' gun
+    painters (pistol, SMG, rifle) all render through these; Art imports nothing from other domains.
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)
     `scenes/testing/` builds a test's world and drives it through the interfaces above only:
@@ -291,6 +308,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory ─▶ Objects ─▶ Physics
 main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
+main ─▶ ItemRegistry (random_gun_slot / loadout_for / spares_for) ─▶ Character.set_loadout
 main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals only, no dependency on Settings)
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
@@ -307,14 +325,15 @@ TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-ba
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
 `Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into eight `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into nine `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
-push + punch + the character's art, pose and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
+push + punch + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
-floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass) and `MagazineConfig` (Items: magazine
-types and capacities, reload time). World-Gen's `LayoutRules` (which rooms may hold the front door or an exit,
-which room types may share a door) is a rules table in the same style, not tuning. There is no `Config`
-autoload. A ninth static holder, `PhysicsLayers`
+floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
+types, capacities and reload times) and `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
+muzzle speed, spread, recoil, magazine, whether it raises at a wall). World-Gen's `LayoutRules` (which rooms may
+hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
+tuning. There is no `Config` autoload. A tenth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
 plays for doorway sides.
 

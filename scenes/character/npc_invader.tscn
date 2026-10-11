@@ -6,7 +6,7 @@
 faction = &"invader"
 
 [node name="GoalController" parent="."]
-goal = "You are breaking into this house. Search it and shoot everyone you find with your pistol."
+goal = "You are breaking into this house. Search it and shoot everyone you find with your {gun}."
 defend_territory = false
 familiar_with_house = false
 hostile_on_sight = true

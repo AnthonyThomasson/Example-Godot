@@ -34,6 +34,11 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"projectile.flyover", false)
 	s.switch(&"physics.debris", true)
 	s.switch(&"nav.rebake", false)  # shot pieces can overlap; nav re-baking is covered by navigation/bake_and_path_stress
+	# This guards the cost of resolving shots, not the pistol's fire rate: with no interval the pistol fires on every
+	# press (automatic fire has its own guard, `automatic_fire_stress`).
+	var uncapped: Dictionary = GunConfig.guns.duplicate(true)
+	uncapped[&"pistol"]["fire_interval"] = 0.0
+	s.set_static(GunConfig, "guns", uncapped)
 	for i in SHOOTERS.size():
 		s.actor(StringName("shooter%d" % i), &"puppet", SHOOTERS[i], { "start_slot": 3, "max_health": 100000.0 })
 	var kinds := ["chair", "bookshelf", "armchair", "side_table"]

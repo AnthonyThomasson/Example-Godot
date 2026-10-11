@@ -7,7 +7,7 @@ class_name Magazine extends Item
 
 ## Which row of `MagazineConfig.types` this is.
 var type: StringName = &"standard"
-## The kind of gun it fits (`PistolItem.GUN`).
+## The kind of gun it fits (a `GunConfig` id, e.g. `PistolItem.GUN`).
 var gun: StringName = &"pistol"
 ## Rounds it holds when full.
 var capacity := 0

@@ -18,6 +18,13 @@ extends Node2D
 ## Streak length in px.
 @export var length: float = 7.0
 
+## The speed it left the muzzle at (px/s): the reference its damage and impact scale against, so a weapon's
+## damage is what it deals at full speed, head-on. The spawner sets it with `speed`.
+var muzzle_speed: float = BallisticsConfig.projectile_speed
+## Power to punch through what it hits (1 = a pistol round): it divides the speed lost to a surface and the
+## deflection, and lowers the speed it needs to get through at all.
+var penetration_power: float = 1.0
+
 ## Unit travel vector; reassigned on ricochet / penetration deflection.
 var direction := Vector2.RIGHT
 ## Body to skip in the sweep (the shooter).
@@ -89,8 +96,8 @@ func _resolve(result: Dictionary) -> void:
 	# Squareness: |travel · normal|, 1 = head-on. A degenerate normal counts as square.
 	var n: Vector2 = result.normal
 	var squareness := 1.0 if n.length() < 0.001 else absf(direction.dot(n))
-	# Incoming speed relative to muzzle speed: a fast shot hits harder.
-	var speed_factor := speed / BallisticsConfig.projectile_speed if BallisticsConfig.projectile_speed > 0.0 else 1.0
+	# Incoming speed relative to this round's own muzzle speed: a fast shot hits harder.
+	var speed_factor := speed / muzzle_speed if muzzle_speed > 0.0 else 1.0
 	# Captured before the ricochet branch reassigns `direction`; the shove follows the shot in.
 	var incoming := direction
 
@@ -117,16 +124,18 @@ func _resolve(result: Dictionary) -> void:
 		return
 
 	var dealt := damage * squareness * speed_factor
-	# 3a. Too slow to punch through: deal the impact and embed (zeroed speed frees the bullet).
-	if speed < BallisticsConfig.penetration_min_speed:
+	# 3a. Too slow to punch through (a more penetrating round needs less speed): deal the impact and embed
+	# (zeroed speed frees the bullet).
+	if speed < BallisticsConfig.penetration_min_speed / penetration_power:
 		GameLog.say("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
 		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false))
 		return
 	# 3b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
-	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness), 0.0, 1.0)
+	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness)
+		/ penetration_power, 0.0, 1.0)
 	speed *= (1.0 - loss)
-	var j := deg_to_rad(BallisticsConfig.penetrate_deflect_max_deg * penetration / 100.0)
+	var j := deg_to_rad(BallisticsConfig.penetrate_deflect_max_deg * penetration / 100.0 / penetration_power)
 	direction = direction.rotated(randf_range(-j, j))
 	rotation = direction.angle()
 	_exclude.append(rid)

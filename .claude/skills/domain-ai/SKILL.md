@@ -7,8 +7,8 @@ description: Light overview of the AI domain (scenes/ai/) — non-player brains,
 
 Non-player brains. **One** generic, data-driven controller drives every NPC (house defender and
 invader alike) — there is no per-NPC-type or per-goal code. An NPC's behaviour is pure DATA authored
-on its scene: a plain-language `goal` string plus a handful of generic primitives (hostility rules,
-pursuit, territory) and decision-tree config. A controller writes the character's intent and calls
+on its scene: a plain-language `goal` string (`{gun}` in it stands for the NPC's own gun; `goal_text()` is the filled-in text)
+plus a handful of generic primitives (hostility rules, pursuit, territory) and decision-tree config. A controller writes the character's intent and calls
 its public action API — it never reaches into character internals.
 
 The domain is split into **four isolated sub-domains** around a thin orchestrator, each a module
@@ -70,9 +70,13 @@ Spawned by Main (`defender_count` / `invader_count`, default 1 each):
 Both pursue hostiles (`pursue_hostiles`, default on): IDLE is never offered and a known hostile sends
 every decision straight to COMBAT.
 
-Both know their ammo: the snapshot's `loadout` section and the `pistol_loaded` / `weapon_low` / `can_reload` facts feed a RELOAD
-tactic in the decision tree, the `reload` primitive runs it, and the `auto_reload` export (default on) reloads an empty pistol
+Both know their ammo: the snapshot's `loadout` section and the `gun_loaded` / `weapon_low` / `can_reload` facts feed a RELOAD
+tactic in the decision tree, the `reload` primitive runs it, and the `auto_reload` export (default on) reloads an empty gun
 as a reflex. `low_ammo_fraction` sets where "nearly empty" starts.
+
+Nothing in the AI is written per weapon: it fights with `Character.gun_slot()` (whatever gun it carries — the presets hold a pistol, but the game
+spawns every NPC with one random gun) and reacts only to generic conditions the character reports. Notably, when its gun cannot fire because the
+barrel is against a wall or object (`weapon_blocked()`, a long gun), it steps back until it can; a pistol is never blocked. See `domain-ai-behavior`.
 
 ## Key idea: Von picks, perceptions inform, behaviour executes
 

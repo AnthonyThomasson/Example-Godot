@@ -16,8 +16,6 @@ extends RefCounted
 ## tree's situation descriptions are written in, so a fact in the state lights up the option it argues
 ## for. Options are places and things, never verbs — the decision tree decides what to do at them.
 
-## Inventory slot of the pistol (ItemRegistry id), tested for the `has_pistol` fact.
-const PISTOL_SLOT := 3
 ## Compass names for an 8-wind direction, indexed clockwise from east (screen +y is south).
 const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"]
 ## How each flank side of a target is named to Von.
@@ -105,17 +103,18 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var line: Dictionary = analyses[primary["id"]]["line"] if not primary.is_empty() else {}
 	var leads := _lead_group(ctx, hostiles)
 	var dmg: float = character.damage_taken()
-	# Rounds in the pistol (-1 without one): the AI shoots, reloads and plans around it.
-	var ammo: int = character.ammo(PISTOL_SLOT) if character.has_item(PISTOL_SLOT) else -1
+	# Rounds in the gun it fights with (-1 without one): the AI shoots, reloads and plans around it.
+	var gun: int = character.gun_slot()
+	var ammo: int = character.ammo(gun) if gun >= 0 else -1
 	var facts := {
 		"hostile_known": not hostiles.is_empty(),
 		"hostile_visible": hostiles.any(func(c): return c["visible"]),
 		"threat_known": not hostiles.is_empty() or _under_fire(),
-		"has_pistol": character.has_item(PISTOL_SLOT),
-		"pistol_loaded": ammo > 0 and not character.is_reloading(),
+		"has_gun": gun >= 0,
+		"gun_loaded": ammo > 0 and not character.is_reloading(),
 		"weapon_empty": ammo == 0,
-		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(PISTOL_SLOT) * low_ammo_fraction),
-		"can_reload": character.can_reload(PISTOL_SLOT),
+		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(gun) * low_ammo_fraction),
+		"can_reload": gun >= 0 and character.can_reload(gun),
 		"under_fire": _under_fire(),
 		"hit_recently": _hit_recently(),
 		"engaged": _engaged_fresh(),
@@ -127,9 +126,9 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"in_cover": line.get("cover", "") != "",
 	}
 	var sections := {
-		"goal": goal,
+		"goal": fill_goal(goal, character),
 		"situation": _situation_text(character, rooms),
-		"loadout": _loadout_text(character, ammo),
+		"loadout": _loadout_text(character, gun, ammo),
 		"current": ("Current activity: %s." % activity) if activity != "" else "",
 		"odds": _odds_text(hostiles, allies, ctx["callouts"], not leads["options"].is_empty()),
 		"contacts": _contacts_text(self_pos, known),
@@ -142,7 +141,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"per_target": per_target,
 		"threat": { "summary": _threat_summary(self_pos, hostiles) },
 		"hostiles": _hostile_group(ctx, hostiles, analyses),
-		"reload": _reload_group(character),
+		"reload": _reload_group(character, gun),
 		"retreat_positions": _retreat_group(ctx, hostiles, known_rooms, dmg),
 		"leads": leads,
 		"shooter": _shooter_group(ctx, hostiles),
@@ -151,7 +150,8 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"interactions": _interaction_group(character, self_pos, rooms),
 		"rooms": _room_group(ctx, known_rooms, rooms),
 	}
-	return { "facts": facts, "sections": sections, "sections_per_target": per_sections, "options": options }
+	return { "facts": facts, "sections": sections, "sections_per_target": per_sections, "options": options,
+		"gun": _gun_noun(character, gun) }
 
 
 ## The combat geometry around hostile `t`: its frame (front bearing), the line between the NPC and it,
@@ -187,27 +187,44 @@ func _situation_text(character, rooms: Array) -> String:
 		where, character.current_item().display_name, busy, _health_band(character.damage_taken())]
 
 
-## The pistol's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
-## reloaded; once it runs low, whether spare magazines are carried. Empty without a pistol.
-func _loadout_text(character, ammo: int) -> String:
+## The goal text with `{gun}` replaced by what `character` calls its gun ("shoot them with your {gun}" reads
+## "...your pistol" or "...your assault rifle"), so one goal serves every weapon.
+func fill_goal(goal: String, character) -> String:
+	return goal.replace("{gun}", _gun_noun(character, character.gun_slot()))
+
+
+## What the NPC calls its gun in the text Von reads: its name in lower case ("pistol", "assault rifle"; an
+## acronym like "SMG" stays as written), or "gun" with none.
+func _gun_noun(character, gun: int) -> String:
+	if gun < 0:
+		return "gun"
+	var name: String = character.item_name(gun)
+	return name if name == name.to_upper() else name.to_lower()
+
+
+## The gun's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
+## reloaded; once it runs low, whether spare magazines are carried. Empty without a gun.
+func _loadout_text(character, gun: int, ammo: int) -> String:
 	if ammo < 0:
 		return ""
+	var noun := _gun_noun(character, gun)
 	if character.is_reloading():
-		return "You are reloading your pistol."
+		return "You are reloading your %s." % noun
 	var spares := "You carry spare magazines." if character.spare_magazines() > 0 else "You are out of spare magazines."
 	if ammo == 0:
-		return "Your pistol is empty. " + spares
-	if ammo <= ceili(character.ammo_capacity(PISTOL_SLOT) * low_ammo_fraction):
-		return "Your pistol is nearly empty. " + spares
-	return "Your pistol is loaded."
+		return "Your %s is empty. %s" % [noun, spares]
+	if ammo <= ceili(character.ammo_capacity(gun) * low_ammo_fraction):
+		return "Your %s is nearly empty. %s" % [noun, spares]
+	return "Your %s is loaded." % noun
 
 
-## Reloading the pistol: one option, offered only while a carried magazine would add rounds, so the
+## Reloading the gun: one option, offered only while a carried magazine would add rounds, so the
 ## planner takes it without asking (a lone option).
-func _reload_group(character) -> Dictionary:
+func _reload_group(character, gun: int) -> Dictionary:
 	var options: Array = []
-	if character.can_reload(PISTOL_SLOT):
-		options.append({ "id": "reload", "label": "reload your pistol", "desc": "reload your pistol" })
+	if gun >= 0 and character.can_reload(gun):
+		var text := "reload your %s" % _gun_noun(character, gun)
+		options.append({ "id": "reload", "label": text, "desc": text })
 	return { "summary": "a spare magazine is carried", "options": options }
 
 
@@ -381,7 +398,7 @@ func _hostile_group(ctx: Dictionary, hostiles: Array, analyses: Dictionary) -> D
 	var self_pos: Vector2 = ctx["self_pos"]
 	for t in hostiles.slice(0, max_options_per_level):
 		var a: Dictionary = analyses[t["id"]]
-		# Only what tells the hostiles apart — common facts ("hostile", the usual pistol) blur the match.
+		# Only what tells the hostiles apart — common facts ("hostile") blur the match.
 		var parts: Array = [
 			t["name"],
 			"in sight" if t["visible"] else "last seen %s" % _recency(t["age"]),

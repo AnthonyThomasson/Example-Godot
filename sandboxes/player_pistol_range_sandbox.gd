@@ -7,7 +7,7 @@ extends GameTest
 func describe() -> Dictionary:
 	return {
 		"name": "Pistol range",
-		"description": "Player-controlled sandbox: WASD to move, mouse to aim, LMB to fire, R to reload, F to punch, Space to interact, 1–4 for items.",
+		"description": "Player-controlled sandbox: WASD to move, mouse to aim, LMB to fire, R to reload, F to punch, Space to interact, 1–6 for items (3 pistol, 5 SMG, 6 rifle).",
 		"tags": ["sandbox", "player", "pistol"],
 		"manual": true,
 	}

@@ -16,8 +16,9 @@ extends CharacterBody2D
 @export var start_slot: int = 1
 ## Rounds the starting gun is loaded with (negative = a full magazine).
 @export var start_rounds: int = -1
-## The spare magazines carried, as `MagazineConfig.types` ids (several of a kind are fine).
-@export var spare_magazine_types: Array = [&"standard", &"standard"]
+## The spare magazines carried, as `MagazineConfig.types` ids (several of a kind are fine): two for each gun.
+@export var spare_magazine_types: Array = [&"standard", &"standard", &"smg_standard", &"smg_standard",
+	&"rifle_standard", &"rifle_standard"]
 ## Allegiance tag, read by AI perception to tell allies from potential hostiles.
 @export var faction: StringName = &"player"
 ## Maximum health. Characters start at this value; configurable per character in the inspector.
@@ -60,6 +61,10 @@ var _magazines: Array = []
 ## The item being reloaded (null = not reloading) and the seconds left until it is done.
 var _reloading_item: Item
 var _reload_left := 0.0
+## The held weapon's barrel is against a wall or object (only a weapon that `raises_at_contact`): it is held
+## pointing up and cannot shoot. Set at once; `_raise` eases toward it (0 = held to the aim .. 1 = fully up).
+var _blocked := false
+var _raise := 0.0  ## How far the held weapon is raised off the aim, 0..1, easing toward `_blocked`.
 
 ## Knockback velocity from objects shoved into the character; decays each frame. Added on
 ## top of controller-driven movement.
@@ -139,6 +144,10 @@ func _physics_process(delta: float) -> void:
 			Physics.bleed_out(get_parent(), self, [get_rid()])
 		return
 
+	# Items keep their own clocks (a gun's time between rounds); tick them before the controller pulls the
+	# trigger, so a round that is due this frame can leave this frame.
+	for item: Item in _items.values():
+		item.tick(delta)
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
@@ -164,6 +173,7 @@ func _physics_process(delta: float) -> void:
 	# A parent's _physics_process runs before its children's, so the hands see this fresh
 	# facing on the same frame.
 	_hands.facing = facing
+	_update_weapon_raise(delta)
 
 	_update_stamina(run_input and move_input.length() > CharacterConfig.run_min_input, delta)
 	velocity = move_input * _move_speed() * _push_slow + _knockback
@@ -185,13 +195,20 @@ func melee() -> void:
 	item.primary(self)
 
 
-## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction,
-## running (the arms are down at the sides) or reloading.
-func shoot() -> void:
+## Shoot the held item (left-click): runs its secondary action; true when a round left the barrel. Ignored
+## while locked in an interaction, running (the arms are down at the sides), reloading, or with the weapon's
+## barrel against a wall or object (`weapon_blocked()`). A gun also holds back between rounds, per its fire rate.
+func shoot() -> bool:
 	var item := current_item()
 	if is_busy() or item == null or _running or is_reloading():
-		return
-	item.secondary(self)
+		return false
+	# Judge the barrel now rather than trusting the last frame's verdict: a controller acts before this frame's
+	# check runs, and on a character's very first frame none has run at all, so a long gun fired point-blank
+	# into a wall would leave through it.
+	_update_weapon_raise(0.0)
+	if _blocked:
+		return false
+	return item.secondary(self)
 
 
 ## Reload the held item (R): start swapping in the fullest carried magazine, which takes
@@ -215,6 +232,7 @@ func select_slot(slot: int) -> void:
 	if slot in _items and slot != _current_slot:
 		_cancel_reload()
 		_current_slot = slot
+		_update_weapon_raise(0.0)  # Judged for the new item now, so a shot in this same frame can't slip past a wall.
 
 
 ## Toggle an object interaction: start the best one in reach, or end the active one.
@@ -262,6 +280,50 @@ func stamina_fraction() -> float:
 ## True while a reload is in progress.
 func is_reloading() -> bool:
 	return _reloading_item != null
+
+
+## True while the held item keeps firing as long as the trigger is held (an automatic gun): a controller
+## re-presses `shoot()` every frame instead of once per click.
+func is_automatic() -> bool:
+	var item := current_item()
+	return item != null and item.is_automatic()
+
+
+## True while the held weapon's barrel is against a wall or object: it is held pointing up and `shoot()` does
+## nothing until the character backs off. Only a weapon that `raises_at_contact()` is ever blocked.
+func weapon_blocked() -> bool:
+	return _blocked
+
+
+## How far the held weapon is raised off the aim, 0 (held to the aim) .. 1 (fully up), easing toward the
+## blocked state. For the weapon's art.
+func weapon_raise() -> float:
+	return _raise
+
+
+## The inventory slot of the gun this character fights with: the held item when it takes ammo, else the lowest
+## slot holding something that does; -1 with none.
+func gun_slot() -> int:
+	var held := current_item()
+	if held != null and held.ammo_capacity() >= 0:
+		return _current_slot
+	var best := -1
+	for slot: int in _items:
+		if _items[slot].ammo_capacity() >= 0 and (best < 0 or slot < best):
+			best = slot
+	return best
+
+
+## Carry only the items in `slots` (see `ItemRegistry`), holding `hold_slot`, with the spare magazines named by
+## `spare_types` (`MagazineConfig.types` ids): how a character spawns with one random gun. Starts every gun
+## loaded as `start_rounds` says; a reload in progress is dropped.
+func set_loadout(slots: Array, hold_slot: int, spare_types: Array) -> void:
+	_cancel_reload()
+	_items = ItemRegistry.inventory_for(slots, start_rounds)
+	_magazines = ItemRegistry.create_magazines(spare_types)
+	_current_slot = hold_slot if hold_slot in _items else (_items.keys()[0] if not _items.is_empty() else hold_slot)
+	_raise = 0.0
+	_update_weapon_raise(0.0)
 
 
 ## Rounds loaded in the item in `slot` (the held one by default), or -1 if it has no ammo.
@@ -337,6 +399,26 @@ func _cancel_reload() -> void:
 	_reloading_item = null
 
 
+## Judge whether the held weapon's barrel touches a wall or object, and ease the raise toward it. Only a weapon
+## that `raises_at_contact()` is ever blocked. The barrel is a ray from beside the body centre along the aim, as
+## far as the weapon reaches held normally (never as raised, or pulling it up would clear it and drop it again);
+## it blocks when something solid is within that reach, and stays blocked until there is
+## `CharacterConfig.weapon_contact_margin` of clearance, so the weapon does not flicker at the edge.
+func _update_weapon_raise(delta: float) -> void:
+	var item := current_item()
+	if item == null or not item.raises_at_contact():
+		_blocked = false
+	else:
+		var hand := item.weapon_hand()
+		var stance: Dictionary = CharacterConfig.stances.get(item.hand_stance(hand), CharacterConfig.stances[&"relaxed"])
+		var reach: float = float(stance["forward"]) + _muzzle_ahead(item)
+		var lateral: float = float(stance["lateral"]) * (-1.0 if hand == 0 else 1.0)
+		var from := global_position + facing.orthogonal() * lateral
+		var margin := 0.0 if not _blocked else CharacterConfig.weapon_contact_margin
+		_blocked = _hands.solid_distance(from, facing, reach + margin + 1.0) < reach + margin
+	_raise = move_toward(_raise, 1.0 if _blocked else 0.0, CharacterConfig.weapon_raise_speed * delta)
+
+
 ## Walking speed, or run speed while running.
 func _move_speed() -> float:
 	return speed * (CharacterConfig.run_speed_mult if _running else 1.0)
@@ -380,10 +462,10 @@ func current_slot() -> int:
 	return _current_slot
 
 
-## The held item's display name, or "Unknown" with none held. For UI observers, so they
-## never need to read Item's fields directly.
-func item_name() -> String:
-	var item := current_item()
+## The display name of the item in `slot` (the held item by default), or "Unknown" with none there. For UI
+## observers and the AI's wording, so they never need to read Item's fields directly.
+func item_name(slot := -1) -> String:
+	var item := _item_in(slot)
 	return item.display_name if item else "Unknown"
 
 
@@ -404,9 +486,10 @@ func is_attacking() -> bool:
 	return _hands.is_attacking()
 
 
-## Recoil: throw `hand` back and twist the shoulders, as a fired weapon does (the item calls it).
-func kick(hand: int) -> void:
-	pose.kick(hand)
+## Recoil: throw `hand` back and twist the shoulders, as a fired weapon does (the item calls it);
+## `strength` scales it (1 = a pistol's), so a light automatic's stream of rounds does not pile up.
+func kick(hand: int, strength := 1.0) -> void:
+	pose.kick(hand, strength)
 
 
 ## The drawn direction of a held weapon: it trails the aim a little as the character turns. Visual
@@ -416,13 +499,16 @@ func weapon_facing() -> Vector2:
 
 
 ## How each hand is held (CharacterConfig.stances names), as the held item asks: arms hang with
-## nothing held. Running puts both arms down at the sides whatever is held.
+## nothing held. Running puts both arms down at the sides whatever is held; a weapon whose barrel is against
+## a wall or object is held raised, as the item says.
 func _stances() -> Array:
 	if _running:
 		return [&"run", &"run"]
 	var item: Item = current_item()
 	if item == null:
 		return [&"relaxed", &"relaxed"]
+	if _blocked:
+		return [item.raised_stance(0), item.raised_stance(1)]
 	return [item.hand_stance(0), item.hand_stance(1)]
 
 
@@ -441,9 +527,17 @@ func hand_world(hand: int) -> Vector2:
 	return global_position + _hands.hand_position(hand)
 
 
-## World muzzle point for a weapon in `hand` (CharacterConfig.muzzle_ahead past it, along the aim).
+## World muzzle point for a weapon in `hand`: the held item's `muzzle_ahead()` past it (a long gun reaches
+## further than a pistol), along the aim.
 func muzzle_origin(hand: int) -> Vector2:
-	return hand_world(hand) + facing * CharacterConfig.muzzle_ahead
+	return hand_world(hand) + facing * _muzzle_ahead(current_item())
+
+
+## How far past the weapon hand `item`'s muzzle is: its own `muzzle_ahead()`, or `CharacterConfig.muzzle_ahead`
+## for an item that gives none (or no item).
+func _muzzle_ahead(item: Item) -> float:
+	var ahead := item.muzzle_ahead() if item != null else -1.0
+	return ahead if ahead >= 0.0 else CharacterConfig.muzzle_ahead
 
 
 ## The standing skeleton as it is held right now (see character_rig.gd), for the visuals and anything

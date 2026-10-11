@@ -22,8 +22,8 @@ extends Node
 ## `end_interaction`). All tunables are set by the controller before `setup()`.
 
 const Locomotion := preload("res://scenes/ai/behavior/locomotion.gd")
-## Inventory slots of the combat items (ItemRegistry ids).
-const PISTOL_SLOT := 3
+## Inventory slot of the fists (ItemRegistry id). The gun it shoots is whatever the character fights with
+## (`Character.gun_slot()`): nothing here knows one gun from another.
 const FISTS_SLOT := 2
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
@@ -44,6 +44,10 @@ var combat_ring_radius: float = 80.0
 var combat_ring_count: int = 12
 var cover_time: float = 1.2
 var fire_cooldown: float = 0.5
+## Rounds an automatic gun fires per trigger pull (paced by the gun's own fire rate); a single-shot gun fires one.
+var fire_burst: int = 3
+## Seconds spent stepping back when the gun's barrel is against a wall or object and cannot fire.
+var back_off_time: float = 0.45
 var reposition_interval: float = 0.5
 # Locomotion config (forwarded to the Locomotion child in setup()).
 var arrive_dist: float = 10.0
@@ -51,7 +55,7 @@ var arrive_dist: float = 10.0
 var run_enabled: bool = true ## May sprint at all.
 var run_min_distance: float = 150.0 ## Only run when farther than this (px) from the destination.
 var run_start_fraction: float = 0.5 ## Stamina needed to START a run (once running it goes on until dry).
-var auto_reload: bool = true ## An empty pistol with a spare magazine is reloaded on its own while holding or ducked in cover.
+var auto_reload: bool = true ## An empty gun with a spare magazine is reloaded on its own while holding or ducked in cover.
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
 var rooms: Array = []
@@ -85,6 +89,8 @@ var _hold_ground := false         ## Combat: stay inside the house (territorial 
 var _combat_phase := "peek"       ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
 var _cover_timer := 0.0           ## Seconds left ducking behind cover before peeking again.
 var _fire_timer := 0.0            ## Seconds left before the next shot/punch may be thrown.
+var _burst_left := 0              ## Rounds still to fire in the automatic gun's current burst.
+var _back_off_timer := 0.0        ## Seconds left stepping back from whatever the gun's barrel is against.
 var _combat_dest := Vector2.ZERO  ## Committed fire/cover position the NPC is steering toward.
 var _combat_dest_timer := 0.0     ## Seconds left before a new combat position may be chosen.
 var _tactic_timer := 0.0          ## Seconds left before a fight re-asks which tactic to use.
@@ -474,7 +480,9 @@ func apply(character, delta: float) -> void:
 			_apply_reload(character)
 		_:
 			_apply_hold(character)
+	_continue_burst(character)
 	character.run_input = _should_run(character)
+	_apply_back_off(character, delta)
 	_running = character.is_running()
 	_reloading = character.is_reloading()
 
@@ -588,9 +596,10 @@ func _aim_move(character) -> void:
 
 
 ## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the
-## facing has settled on it; aims at it meanwhile. No-op without a loaded pistol (or mid-reload).
+## facing has settled on it; aims at it meanwhile. No-op without a loaded gun (or mid-reload).
 func _fire_at_will(character) -> void:
-	if not character.has_item(PISTOL_SLOT) or character.ammo(PISTOL_SLOT) == 0 or character.is_reloading():
+	var gun: int = character.gun_slot()
+	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading():
 		return
 	var target: Dictionary = {}
 	for c in _hostiles:
@@ -605,7 +614,7 @@ func _fire_at_will(character) -> void:
 		return
 	character.aim_point = pos
 	if _fire_timer <= 0.0 and absf(character.facing.angle_to(pos - character.global_position)) <= AIM_TOLERANCE:
-		_fire(character, PISTOL_SLOT)
+		_shoot(character)
 
 
 ## Engage: walk to the chosen spot (shooting on the way when a line opens), then fight from it —
@@ -629,7 +638,7 @@ func _apply_engage(character, delta: float) -> void:
 		character.move_input = Vector2.ZERO
 		if character.global_position.distance_to(_engage_pos) <= shoot_range \
 				and _perception.has_line_to(character, _engage_node, _engage_pos) and _fire_timer <= 0.0:
-			_fire(character, PISTOL_SLOT)
+			_shoot(character)
 		return
 	_apply_peek_cover(character, delta)
 
@@ -656,10 +665,13 @@ func _apply_peek_cover(character, delta: float) -> void:
 	if dist <= shoot_range and _perception.has_line_to(character, _engage_node, _engage_pos):
 		character.move_input = Vector2.ZERO
 		if _fire_timer <= 0.0:
-			_fire(character, PISTOL_SLOT)
-			_combat_phase = "cover"
-			_cover_timer = cover_time
-			_combat_dest_timer = 0.0  # Pick a cover spot immediately after shooting.
+			_shoot(character)
+			# A gun whose barrel is against something (stepping back to clear it) has not shot yet: keep
+			# peeking until it does, rather than ducking without having fired.
+			if _back_off_timer <= 0.0:
+				_combat_phase = "cover"
+				_cover_timer = cover_time
+				_combat_dest_timer = 0.0  # Pick a cover spot immediately after shooting.
 		return
 	if _combat_dest_timer <= 0.0:
 		_combat_dest = _choose_combat_dest(character, "peek")
@@ -701,27 +713,68 @@ func _apply_melee(character) -> void:
 		return
 	character.move_input = Vector2.ZERO
 	if _fire_timer <= 0.0:
-		_fire(character, FISTS_SLOT)
+		_punch(character)
 
 
-## Equip `slot` and throw one shot (pistol) or punch, refreshing the combat engagement so an active
-## fight stays committed.
-func _fire(character, slot: int) -> void:
-	if slot == PISTOL_SLOT and (character.is_running() or character.is_reloading()):
-		return  # No shooting at a run or mid-reload: keep the cooldown for when it stops.
-	if slot == PISTOL_SLOT and character.ammo(PISTOL_SLOT) == 0:
-		# Dry: a click is not a shot, so it neither commits the fight nor needs a hand free to reload;
-		# re-decide (the empty gun is in the snapshot now), at most once per cooldown.
+## Equip the character's gun and fire it, refreshing the combat engagement so an active fight stays
+## committed; true when a round left the barrel. Nothing here is specific to a gun:
+##   - at a run or mid-reload it holds fire and keeps the cooldown for when that stops;
+##   - dry, a click is not a shot, so it neither commits the fight nor needs a hand free to reload — it
+##     re-decides (the empty gun is in the snapshot now), at most once per cooldown;
+##   - with the barrel against a wall or object (`weapon_blocked()`) it cannot fire, so it steps back until
+##     it can, keeping the cooldown;
+##   - an automatic gun's pull is a burst (`fire_burst` rounds, `_continue_burst`), the rest at the gun's own rate.
+func _shoot(character) -> bool:
+	if character.is_running() or character.is_reloading():
+		return false
+	var gun: int = character.gun_slot()
+	if gun < 0:
+		return false
+	if character.ammo(gun) == 0:
 		_fire_timer = fire_cooldown
 		_resolved = true
-		return
+		return false
+	character.select_slot(gun)
+	if character.weapon_blocked():
+		_back_off_timer = back_off_time
+		return false
+	if not character.shoot():
+		return false
 	_perception.note_engaged()
 	_fire_timer = fire_cooldown
-	character.select_slot(slot)
-	if slot == PISTOL_SLOT:
-		character.shoot()
-	else:
-		character.melee()
+	_burst_left = maxi(fire_burst - 1, 0) if character.is_automatic() else 0
+	return true
+
+
+## Equip the fists and throw a punch, refreshing the combat engagement.
+func _punch(character) -> void:
+	_perception.note_engaged()
+	_fire_timer = fire_cooldown
+	character.select_slot(FISTS_SLOT)
+	character.melee()
+
+
+## Keep the trigger down for the rest of an automatic gun's burst: one more round each time the gun's own fire
+## rate allows, until the burst is spent or something stops it (a run, a reload, a swap, a wall, running dry).
+func _continue_burst(character) -> void:
+	if _burst_left <= 0:
+		return
+	if not character.is_automatic() or character.is_running() or character.is_reloading() \
+			or character.weapon_blocked() or character.ammo() <= 0:
+		_burst_left = 0
+		return
+	if character.shoot():
+		_burst_left -= 1
+
+
+## Step back from whatever the gun's barrel is against (`_shoot` set the timer): away from where it points,
+## walking, until the barrel is clear or the time is up. Applied after the primitive has steered, so it wins.
+func _apply_back_off(character, delta: float) -> void:
+	if _back_off_timer <= 0.0:
+		return
+	_back_off_timer -= delta
+	character.move_input = -character.facing
+	character.run_input = false
 
 
 ## Interact: walk to the chosen object facing it (or a known hostile, to keep eyes on them); once its
@@ -750,7 +803,7 @@ func _apply_interact(character) -> void:
 		_resolved = true
 
 
-## Hold: stand still and watch the nearest known hostile, if any. An empty pistol is reloaded meanwhile,
+## Hold: stand still and watch the nearest known hostile, if any. An empty gun is reloaded meanwhile,
 ## so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold(character) -> void:
 	character.move_input = Vector2.ZERO
@@ -770,7 +823,9 @@ func _apply_reload(character) -> void:
 		_reload_started = true
 		return
 	if not _reload_started:
-		character.select_slot(PISTOL_SLOT)
+		var gun: int = character.gun_slot()
+		if gun >= 0:
+			character.select_slot(gun)
 		character.reload()
 		if character.is_reloading():
 			_reload_started = true
@@ -781,12 +836,13 @@ func _apply_reload(character) -> void:
 	_resolved = true
 
 
-## Reflex: swap in a fresh magazine when the pistol is empty and one is carried (`auto_reload`). It
-## equips the pistol first, since a reload works on the held item.
+## Reflex: swap in a fresh magazine when the gun is empty and one is carried (`auto_reload`). It
+## equips the gun first, since a reload works on the held item.
 func _reload_if_dry(character) -> void:
-	if not auto_reload or character.is_reloading() or character.ammo(PISTOL_SLOT) != 0 or not character.can_reload(PISTOL_SLOT):
+	var gun: int = character.gun_slot()
+	if not auto_reload or gun < 0 or character.is_reloading() or character.ammo(gun) != 0 or not character.can_reload(gun):
 		return
-	character.select_slot(PISTOL_SLOT)
+	character.select_slot(gun)
 	character.reload()
 
 

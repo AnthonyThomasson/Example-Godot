@@ -349,6 +349,11 @@ func is_fire_just_pressed() -> bool:
 	return Input.is_action_just_pressed(FIRE)
 
 
+## True every frame the fire button is held down: how an automatic gun keeps firing.
+func is_fire_pressed() -> bool:
+	return Input.is_action_pressed(FIRE)
+
+
 ## True on the frame the interact key (space) is pressed. Goes through the same rebindable
 ## action path as the others.
 func is_interact_just_pressed() -> bool:

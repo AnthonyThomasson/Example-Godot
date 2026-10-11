@@ -141,11 +141,36 @@ static var stances: Dictionary = {
 	# Reloading: the supporting hand drops to the belt for the next magazine.
 	&"reload": { "forward": 1.0, "lateral": 11.5, "height": 4.4, "swing": 0.0, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.1, -0.8, -0.2) },
+	# A submachine gun: tucked in close, the grip hand back near the body and the other hand out on the shroud.
+	# Both hands lie on one line along the barrel (hand 1 at +lateral, hand 0 at -lateral), 5 px off the aim.
+	&"smg_grip": { "forward": 20.0, "lateral": 5.0, "height": 5.8, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.5, -0.1, -1.0) },
+	&"smg_fore": { "forward": 28.0, "lateral": -5.0, "height": 5.8, "swing": 0.0, "steady": true,
+		"recoil_share": 0.8, "elbow_pole": Vector3(0.4, 0.0, -1.0) },
+	# An assault rifle: the butt against the shoulder, the grip hand just ahead of it and the other hand reaching
+	# out along the handguard, both on the barrel line 6 px off the aim.
+	&"rifle_grip": { "forward": 15.0, "lateral": 6.0, "height": 5.9, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.8, -0.1, -1.0) },
+	&"rifle_fore": { "forward": 29.0, "lateral": -6.0, "height": 5.8, "swing": 0.0, "steady": true,
+		"recoil_share": 0.8, "elbow_pole": Vector3(0.4, 0.0, -1.0) },
+	# A long gun raised off a wall or object (butt still on the shoulder, barrel pointed up): both hands drawn in
+	# toward the chest, the front one higher as the barrel tips up.
+	&"ready_grip": { "forward": 8.0, "lateral": 7.0, "height": 6.4, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.8, -0.1, -1.0) },
+	&"ready_fore": { "forward": 14.0, "lateral": -7.0, "height": 6.8, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.5, 0.0, -1.0) },
 }
 ## How fast a hand eases from one stance to another (1/s).
 static var stance_ease: float = 12.0
-## How far ahead of a hand its weapon's muzzle is (px): bullets leave there.
+## How far ahead of a hand its weapon's muzzle is (px): bullets leave there. The default for an item that
+## does not say (`Item.muzzle_ahead()`); a long gun reaches further.
 static var muzzle_ahead: float = 11.0
+## How fast a long gun comes up off a wall (and back down) once its barrel touches (or leaves) it: the share of
+## the way per second (8 = about an eighth of a second).
+static var weapon_raise_speed: float = 8.0
+## Clearance (px) a raised gun needs beyond the touching distance before it comes back down, so it does not
+## flicker at the edge.
+static var weapon_contact_margin: float = 6.0
 
 # --- Ragdoll (the fall on death; character_ragdoll.gd, solved by Physics' Ragdoll; angles in degrees) ---
 static var ragdoll_belly: float = 0.4             ## Belly and back points off the spine (keep the trunk rigid).

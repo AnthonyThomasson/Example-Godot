@@ -28,7 +28,7 @@ fields are read live, so only locomotion needs the push.)
 | `engage` | `point` (anchor), `target_id`, `style` (peek_cover / ambush), `confine_inside` | Path to the anchor firing at will, then fight from it: **peek-and-cover** (peek to the nearest spot with a clear shot, fire on `fire_cooldown`, duck to cover for `cover_time`, positions committed for `reposition_interval`) or **ambush** (hold the covered spot, fire the moment a line opens). ENGAGE and FLANK use this, anchored at the chosen spot or side. | Moving: at `max_commit_time`. In position: every `tactic_interval` (timer starts on arrival) or when `engaged` lapses. |
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
-| `reload` | — | Equip the pistol, stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
+| `reload` | — | Equip the gun (`gun_slot()`), stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -42,15 +42,30 @@ the NPC is under fire, the destination is farther than `run_min_distance` (strai
 start (`run_start_fraction` of the stamina bar, or already running). The Character spends the stamina and
 walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `run_start_fraction`.
 `debug_status()` reads "running" / "running into position" while it sprints; `debug_state()` has `running`.
-A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_fire()` skips a pistol
-shot while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
+A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_shoot()` skips a shot
+while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
 Test: `tests/ai/ai_runs_to_destination_test.gd`.
 
-**Ammo.** An empty pistol cannot fire, so the behaviour never "fights" with one: `_fire_at_will` returns early when the pistol
-is empty or reloading, and `_fire()` on an empty pistol is a dry click that does not note engagement or call `shoot()`; it spends
-`fire_cooldown` and flags the task resolved, so the NPC re-decides (the snapshot now says the pistol is empty) at most once per
+**No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
+lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
+
+**Firing** (`_shoot(character) -> bool`, true = a round left the barrel; the fists are `_punch`). It holds fire at a run or mid-reload (cooldown kept);
+a dry gun is a click (below); otherwise it equips the gun and, **if `weapon_blocked()` (the barrel is against a wall or object), sets
+`_back_off_timer = back_off_time`, keeps the cooldown and returns false**, else calls `shoot()` and, only on success, notes engagement and starts
+the cooldown. `apply()` ends each tick with `_apply_back_off`: while the timer runs it overrides `move_input = -facing` (away from where the gun
+points) and clears `run_input`, so the NPC steps back until the barrel is clear, then shoots. Callers that advance state on a shot (peek-and-cover
+switching to its cover phase) wait for the back-off to finish. A pistol never reports blocked, so a chair against it changes nothing. An
+`is_automatic()` gun's trigger pull is a **burst**: `_burst_left = fire_burst − 1` more rounds, fired from `apply()` (`_continue_burst`) as the gun's own
+fire rate allows, ending early on a run, reload, wall or empty gun. Controller exports: `fire_burst` (3), `back_off_time` (0.45 s).
+Tests: `tests/ai/blocked_gun_steps_back_test.gd` (a rifle with a chair against its barrel), `pistol_fires_against_object_test.gd`.
+Not modelled: a rifleman cornered with a wall behind it can still stall (bounded by the back-off timer and re-decisions); cover logic treats walls as
+bulletproof though a rifle shoots through them.
+
+**Ammo.** An empty gun cannot fire, so the behaviour never "fights" with one: `_fire_at_will` returns early when the gun
+is empty or reloading, and `_shoot()` on an empty gun is a dry click that does not note engagement or call `shoot()`; it spends
+`fire_cooldown` and flags the task resolved, so the NPC re-decides (the snapshot now says the gun is empty) at most once per
 cooldown. `auto_reload` (controller export, default on) is a reflex in `hold` (the server-down fallback, and after a
-reload) and in the cover phase of peek-and-cover: an EMPTY pistol with a spare magazine is reloaded without a decision. A reload
+reload) and in the cover phase of peek-and-cover: an EMPTY gun with a spare magazine is reloaded without a decision. A reload
 runs only while standing (running cancels it, so the `reload` primitive never sets `run_input`). `debug_state()` / `debug_combat()`
 carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/scripted_reload_decision_test.gd`,
 `dry_pistol_fallback_test.gd`, `empty_pistol_no_spares_test.gd`.

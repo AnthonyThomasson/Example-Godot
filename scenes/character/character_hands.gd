@@ -85,6 +85,25 @@ func punch_amounts() -> Array:
 	return _punch.duplicate()
 
 
+## How far from world point `from`, along unit `dir`, the first wall or solid object lies, or `INF` when
+## nothing is within `max_len`. Other characters do not count (a gun held against a person is not held against
+## a wall), nor the body itself. A weapon's barrel asks this to know whether it touches something.
+func solid_distance(from: Vector2, dir: Vector2, max_len: float) -> float:
+	var space := get_world_2d().direct_space_state
+	var query := PhysicsRayQueryParameters2D.create(from, from + dir * max_len, HAND_MASK)
+	var skip: Array[RID] = [_character.get_rid()]
+	for _attempt in 6:
+		query.exclude = skip
+		var hit := space.intersect_ray(query)
+		if hit.is_empty():
+			return INF
+		if hit.collider is CharacterBody2D:
+			skip.append(hit.rid)
+			continue
+		return from.distance_to(hit.position)
+	return INF
+
+
 ## True while a swing is in progress (extend + retract).
 func is_attacking() -> bool:
 	return _attack_active

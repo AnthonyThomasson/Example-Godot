@@ -20,6 +20,8 @@ var _walk_target: Variant = null
 var _move_dir := Vector2.ZERO
 ## Whether the puppet holds run.
 var _run := false
+## Whether the puppet holds the trigger: an automatic gun keeps firing, a semi-auto one fires once per `shoot()`.
+var _firing := false
 ## Actions waiting for the character's next frame: Callables taking the character.
 var _pending: Array[Callable] = []
 ## Interactions started on the character's frame that reported failure (object, id) — for tests to read.
@@ -43,6 +45,8 @@ func control(character, _delta: float) -> void:
 	else:
 		character.move_input = _move_dir
 	character.run_input = _run
+	if _firing and character.is_automatic():
+		character.shoot()
 	var actions := _pending.duplicate()
 	_pending.clear()
 	for action in actions:
@@ -81,7 +85,7 @@ func has_arrived() -> bool:
 	return _walk_target == null
 
 
-## Switch to inventory slot `slot` (1 unarmed, 2 fists, 3 pistol, 4 key).
+## Switch to inventory slot `slot` (1 unarmed, 2 fists, 3 pistol, 4 key, 5 SMG, 6 assault rifle).
 func select_slot(slot: int) -> void:
 	_pending.append(func(c): c.select_slot(slot))
 
@@ -91,9 +95,15 @@ func punch() -> void:
 	_pending.append(func(c): c.melee())
 
 
-## Use the held item's secondary action (LMB: fire the pistol).
+## Use the held item's secondary action once (a click of LMB: fire a round).
 func shoot() -> void:
 	_pending.append(func(c): c.shoot())
+
+
+## Hold (or release) the trigger: while held, an automatic gun fires every frame its fire rate allows. A
+## semi-automatic gun is unaffected (it needs a `shoot()` per round).
+func hold_fire(on: bool) -> void:
+	_firing = on
 
 
 ## Reload the held item (R): swap in the fullest carried magazine.
