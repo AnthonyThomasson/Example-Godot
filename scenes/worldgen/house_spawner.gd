@@ -6,8 +6,6 @@ class_name HouseSpawner
 ## FloorFactory, the one its furnishing palette names). The house is positioned so its front
 ## entrance lands on a point. A plan may also carry `exit` openings (a back/side/garage door).
 
-const Wall = preload("res://scenes/objects/wall/wall.gd")
-
 const OPENING_CLEARANCE := 50.0  ## Kept free of furniture on each side of a doorway opening.
 const INTERIOR_MARGIN := 6.0   ## Gap between wall faces and furniture.
 
@@ -124,21 +122,7 @@ static func _mirror_x(rooms: Array, openings: Array) -> void:
 
 ## Openings (Wall.Side format) for every doorway lying on one of `rect`'s walls.
 static func _openings_for(rect: Rect2, openings: Array) -> Array:
-	var cut: Array = []
-	for opening in openings:
-		var p: Vector2 = opening["pos"]
-		var width: float = opening["width"]
-		var within_x := p.x > rect.position.x and p.x < rect.end.x
-		var within_y := p.y > rect.position.y and p.y < rect.end.y
-		if within_x and is_equal_approx(p.y, rect.position.y):
-			cut.append({ "side": Wall.Side.TOP, "offset": p.x - rect.position.x, "width": width })
-		elif within_x and is_equal_approx(p.y, rect.end.y):
-			cut.append({ "side": Wall.Side.BOTTOM, "offset": p.x - rect.position.x, "width": width })
-		elif within_y and is_equal_approx(p.x, rect.position.x):
-			cut.append({ "side": Wall.Side.LEFT, "offset": p.y - rect.position.y, "width": width })
-		elif within_y and is_equal_approx(p.x, rect.end.x):
-			cut.append({ "side": Wall.Side.RIGHT, "offset": p.y - rect.position.y, "width": width })
-	return cut
+	return WallFactory.openings_for(rect, openings)
 
 
 ## A box straddling each doorway opening that furniture must stay out of.

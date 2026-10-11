@@ -145,6 +145,9 @@ carries a `note` string is surfaced to Von.
 
 ## Tactics (`agent_tactics.gd`)
 
+The flank behaviour these queries should deliver, and the tests that assert it, are in
+`docs/flanking-behavior.md`.
+
 Pure queries over known contacts, the physics space (via the vision rays) and the nav map
 (`NavigationServer2D` closest point + path). A target's flanks are measured in its own frame (its
 last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,

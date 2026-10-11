@@ -117,6 +117,6 @@ furnisher warns "no room for required zone" and the doorway test fails.
 - **World Generation → Objects** (interface 2, the only way world-gen makes entities):
   `ObjectFactory.spawn(definition, position, parent, opts) -> Node`,
   `WallFactory.spawn(rect, thickness, openings, name, parent, style) -> Node`,
-  `FloorFactory.spawn(rect, definition, name, parent) -> Node`, and `Wall.Side` (enum used when
-  building `openings`). World-Gen's only outward code deps are `Wall.Side` + the three
+  `FloorFactory.spawn(rect, definition, name, parent) -> Node`; `HouseSpawner` cuts each room's doorways
+  with `WallFactory.openings_for(rect, openings)`. World-Gen's only outward code deps are the three
   factories — it is a leaf.

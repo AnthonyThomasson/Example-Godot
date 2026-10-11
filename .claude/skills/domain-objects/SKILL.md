@@ -118,7 +118,8 @@ add its knobs to `ObjectArtConfig`, and set `"art": "<name>"` on catalogue defin
 
 - **World Generation → Objects** (interface 2): `ObjectFactory.spawn(definition, position,
   parent, opts) -> Node`, `WallFactory.spawn(rect, thickness, openings, name, parent, style) ->
-  Node`, `FloorFactory.spawn(rect, definition, name, parent) -> Node`, `Wall.Side` enum.
+  Node`, `WallFactory.openings_for(rect, doors) -> Array` (the doorways on a rect's walls, as `openings`),
+  `FloorFactory.spawn(rect, definition, name, parent) -> Node`, `Wall.Side` enum.
 - **Objects → Art** (interface 12): its painters render through `PixelArt.render`, draw on
   `PixelCanvas`, and read `ArtConfig`.
 - Objects also implements the hittable (3), pushable (5) and interactable (8) contracts above.

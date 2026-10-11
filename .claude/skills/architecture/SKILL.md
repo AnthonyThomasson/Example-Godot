@@ -83,7 +83,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `style` is the cap's look (`art`, `color`, `art_opts`); empty = a flat gray line.
    - `FloorFactory.spawn(rect: Rect2, definition: Dictionary, name, parent) -> Node` — a room's
 	 floor (no collider), from a floor definition (`art`, `color`, `material`, `art_opts`).
-   - `Wall.Side` — enum used when building `openings`.
+   - `WallFactory.openings_for(rect: Rect2, doors: Array) -> Array` — the `{ pos, width }` doorways that lie
+	 on `rect`'s walls, as the `openings` `spawn` takes (World-Gen and the Testing domain's layouts use it).
+   - `Wall.Side` — the enum inside those `openings` (callers get them from `openings_for`).
    World-Gen owns the *catalogue*; Objects owns the *field schema* and turns a plain definition
    dict into a node. World-Gen never touches an object's fields.
 
@@ -279,7 +281,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)
     `scenes/testing/` builds a test's world and drives it through the interfaces above only:
-    WorldGen (1, incl. the catalogue lookups) or an arena from the three factories (2), `NavBuilder`
+    WorldGen (1, incl. the catalogue lookups) or an arena / hand-laid room layout from the three
+    factories (2, incl. `WallFactory.openings_for`), `NavBuilder`
     + `nav_updater.gd` (9), the character scenes plus the controller contract (7) — a puppet
     `ScriptedController` or `player_controller.gd` on `character/character_base.tscn` (the
     controller-less character) — and `EventBus` / character signals (7, 10) for its event log.
@@ -334,7 +337,7 @@ TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-ba
 ```
 
 Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
-`Wall.Side` + the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
+the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
 only on Godot's `Image`). Tuning is split into nine `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
 push + punch + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,

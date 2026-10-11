@@ -1,6 +1,6 @@
 ---
 name: domain-testing
-description: Deep implementation detail for the Testing domain (scenes/testing/ + tests/) — game tests that declare a world (arena or generated house), the actors and objects in it and which behaviours are on, run it, and assert what happened; plus the in-game test browser/runner and the headless CLI runner (tools/run_tests.sh). Use when writing or debugging a test, adding a behaviour switch, running the suite, or editing scenes/testing/. Any engine error/warning during a test fails it. Complements the `architecture` skill (interface 13).
+description: Deep implementation detail for the Testing domain (scenes/testing/ + tests/) — game tests that declare a world (arena, hand-laid room layout or generated house), the actors and objects in it and which behaviours are on, run it, and assert what happened; plus the in-game test browser/runner and the headless CLI runner (tools/run_tests.sh). Use when writing or debugging a test, adding a behaviour switch, running the suite, or editing scenes/testing/. Any engine error/warning during a test fails it. Complements the `architecture` skill (interface 13).
 ---
 
 # Testing domain (`scenes/testing/`, cases in `tests/`)
@@ -138,7 +138,10 @@ func run(t: TestContext) -> void:
   10), `requires_von`,
   `fail_on_errors` / `fail_on_warnings` (default true), `allowed_logs` (regexes).
 - **`configure(s: TestSetup)`** is data only, and the browser also calls it to list the switches.
-  - World: `arena(rect, { floor, walls, thickness })` (a walled room in the house style, with the same
+  - World: `layout(rooms, doors, { thickness })` (a hand-laid building: `rooms` = `[{ key, type, rect,
+    floor? }]`, `doors` = `[{ pos, width }]` on the walls the rooms share or on an outer edge; walls in the
+    house style, doorways open, so the nav bake and `WorldGen.get_rooms` / `get_openings` work as for a
+    house), `arena(rect, { floor, walls, thickness })` (a walled room in the house style, with the same
     `rooms` meta a house has) or `house(seed, plan := "", entrance := Vector2.ZERO)`. Default is an
     800×500 arena.
   - Objects: `object(id, catalogue_key_or_definition, pos, opts)`. Objects are placed under the
@@ -208,6 +211,49 @@ load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/f
   test covers re-baking); world-gen's first run in a process is
   slower (cold caches), so its budget covers the cold case.
 
+## Flanking tests (tag `flank`)
+
+`tests/ai/flank_*_test.gd` pin down how the AI weighs and takes the sides of a target: frame geometry, route
+safety, ally and radio claims, shot and cover wording, territory, and the walk itself. They are
+scripted-Von tests (no server); `tools/run_tests.sh flank` runs them. What they assert is written in
+`docs/flanking-behavior.md` (behaviours F, B1 to B9, C); each test header names the behaviour. A test that
+asserts a behaviour the AI does not show yet is red and tagged `gap` (`tools/run_tests.sh gap`).
+
+- **Realistic maps** (`tests/_ai/flank_maps.gd`, `const Maps := preload(...)`): `Maps.house(s)`,
+  `Maps.spine(s)` and `Maps.warehouse(s)` lay out rooms, doorways, corridors and cover with
+  `TestSetup.layout`, and expose landmark consts (doors, wall and room points). Call the map first, then
+  `Flank.rules(s)`. Flank points sit 220 px from the target and snap to the navmesh, so a room-sized map
+  gives some sides behind walls; choose positions from a `Flank.dump(brain)` of the situation.
+- **Shared helper** `tests/_ai/flank_probe.gd` (`const Flank := preload(...)`; not a test): `rules`,
+  `target`, `npc`, `ally`, `radio`, `settle`, and the reads below.
+- **Observe through the controller's public reads.** `debug_zones()` lists every flank side the snapshot
+  weighed *including those the planner then dropped*, with its `desc` and `tags` (`held`, `held_by`,
+  `crosses`, `crosses_name`, `clear_shot`, `cover`, `inside`, `route_exposed`, `ally_lane`);
+  `debug_state()["decision"]["levels"]` holds what each level offered. So "dropped because X" is `zones`
+  says X and `offered` lacks the id. `Flank.zones/offered/offered_sides/dump/level/side_of_act` wrap these;
+  `Flank.side_of` is the test's own copy of the target-frame maths (left is the target's own left, so a
+  west-facing target's left is south). With several hostiles known, `debug_zones()` mixes their sides:
+  give `Flank.zones(brain, target_pos)` the target and make the NPC fight it with `Flank.prefer_target`
+  (the nearest hostile is otherwise the first option and gets picked).
+- **Hold the NPC and settle** (`Flank.npc` + `Flank.settle`): `speed` 0 and a 0.4 s commit and tactic
+  cadence, so it re-decides from a fixed spot and `settle` waits for a finished walk. A walking test holds
+  the NPC until `settle`, then sets `brain.max_commit_time` back to 6 and `npc.speed` to 150.
+- **Set the target's frame before the first frame** (`Flank.target`): its `facing` and `aim_point` are
+  props, because a puppet's `aim_point` defaults to the origin and turns it that way until `aim_at` runs.
+  Give targets and allies a huge `max_health`; the NPCs shoot while they wait.
+- **Radio claims** are real `callout` events posted with `Flank.radio` from an ally puppet the NPC cannot
+  see (behind a wall, or far off). An ally it can see holds the side it stands on by name, without
+  "(radio)". Two or more live invaders get different `max_commit_time` / `tactic_interval` /
+  `decide_interval`, otherwise they decide on the same frame and claim the same side.
+- **Route-safety rules decide which sides exist.** A route within `route_clearance` of a hostile is dropped,
+  and in open ground the straight route to a rear point passes the target. Tests about other rules set
+  `route_clearance` low (0 for the group tests, 40 for the ally lane) so only the rule under test acts, and
+  say so in a comment.
+- **Not testable here: TTL lapse.** Memory ages in wall-clock ms (`Time.get_ticks_msec`), which a headless
+  `--fixed-fps` run outruns, so a callout or contact never lapses in test time.
+- **Flank point sampling** prefers any sampled point with a clear shot, so a "line blocked" scenario needs
+  a barrier across the whole arc (a row of shelves), not one piece.
+
 ## Errors and warnings fail the test (`log_watch.gd`)
 
 Godot 4.4 has no in-process logger hook (that arrives with `OS.add_logger` in 4.5). `LogWatch` tails
@@ -262,8 +308,9 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house or arena, objects, nav plus updater, actors (controller injected before `_ready`), then world switches. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), actors (controller injected before `_ready`), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
+| `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |
 | `test_switches.gd` | The switch table. |
 | (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test). |
@@ -282,5 +329,8 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 - A test that ends mid-wait (a failure or timeout) leaves its coroutine parked. Godot may report
   "ObjectDB instances leaked" at process exit for it. That happens after the last log poll and is
   harmless.
+- An NPC thinks on its first tick, so the world must be live before actors enter: `TestWorld.build` waits
+  two physics frames after the walls and navmesh are made (otherwise an NPC sees through room walls and
+  plans on an empty navmesh).
 - The defender preset is `hostile_on_trespass`, and an arena counts as its house. Turn
   `ai.hostile_on_trespass` off to test a reaction to something else.

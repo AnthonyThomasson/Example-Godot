@@ -43,6 +43,16 @@ func arena(rect: Rect2, opts: Dictionary = {}) -> TestSetup:
 	return self
 
 
+## A hand-laid building: `rooms` is `[{ key, type, rect, floor? }]` (world-space rects; walls run along
+## their edges, `floor` is a catalogue floor key, default "oak_planks") and `doors` is `[{ pos, width }]`,
+## each `pos` a point on a wall's centerline (on a wall two rooms share it is an interior doorway, on an
+## outer edge an entrance). Walls are the house's own, so the nav bake carves them and leaves the doorways
+## open. `opts`: `thickness` (default 12).
+func layout(room_list: Array, doors: Array = [], opts: Dictionary = {}) -> TestSetup:
+	world = { "kind": "layout", "rooms": room_list, "doors": doors, "thickness": opts.get("thickness", 12.0) }
+	return self
+
+
 ## A generated house from `seed` (pinned, never random) and an optional floorplan key; its front
 ## entrance lands at `entrance`.
 func house(house_seed: int, plan: String = "", entrance := Vector2.ZERO) -> TestSetup:

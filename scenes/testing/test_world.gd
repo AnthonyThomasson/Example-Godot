@@ -6,6 +6,7 @@ extends Node2D
 ## overrides, which outlive the scene.
 
 const ArenaBuilder = preload("res://scenes/testing/arena_builder.gd")
+const LayoutBuilder = preload("res://scenes/testing/layout_builder.gd")
 const TestSwitches = preload("res://scenes/testing/test_switches.gd")
 const ScriptedController = preload("res://scenes/testing/scripted_controller.gd")
 const PlayerController = preload("res://scenes/character/player_controller.gd")
@@ -33,7 +34,9 @@ var _nav_debug: Node2D = null
 
 
 ## Build everything `setup` declares. Statics and switches are applied before anything spawns, so
-## spawning already sees them.
+## spawning already sees them. The world (walls, objects, navmesh) is stepped through two physics
+## frames before any actor enters: the walls' colliders and the navmesh only go live on a physics step, and
+## an NPC thinking on its first tick would otherwise see through the walls and plan on an empty map.
 func build(setup: TestSetup) -> void:
 	for switch_name in setup.switches:
 		if not TestSwitches.has(switch_name):
@@ -49,6 +52,8 @@ func build(setup: TestSetup) -> void:
 	for flag in OVERLAY_REGISTRY.defaults():
 		_overlay_flags[flag] = setup.overlays.has(flag)
 	_build_nav()
+	await get_tree().physics_frame
+	await get_tree().physics_frame
 	for a in setup.actors:
 		actors[a["id"]] = _spawn_actor(a, setup.switches)
 	_apply_world_switches(setup.switches)
@@ -109,6 +114,8 @@ func _set_static(script: Script, prop: StringName, value: Variant) -> void:
 func _build_world(world: Dictionary) -> void:
 	if world["kind"] == "house":
 		house = WorldGen.generate(int(world["seed"]), String(world.get("plan", "")), world.get("entrance", Vector2.ZERO), self)
+	elif world["kind"] == "layout":
+		house = LayoutBuilder.build(world, self)
 	else:
 		house = ArenaBuilder.build(world, self)
 	rooms = WorldGen.get_rooms(house)

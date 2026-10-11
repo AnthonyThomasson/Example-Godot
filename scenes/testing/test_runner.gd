@@ -220,7 +220,9 @@ func _start(entry: Dictionary) -> void:
 	_world.child_entered_tree.connect(func(n: Node): _on_event(&"spawned", { "node": n, "name": String(n.name) }))
 	_world.child_exiting_tree.connect(func(n: Node): _on_event(&"removed", { "node": n, "name": String(n.name) }))
 	EventBus.posted.connect(_on_event)
-	_world.build(setup)
+	await _world.build(setup)
+	if not is_instance_valid(_world):
+		return
 	_ctx.bind(_world, _world.actors, _world.objects, _world.rooms)
 	for id in _world.actors:
 		_observe_actor(id, _world.actors[id])
