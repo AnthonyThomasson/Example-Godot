@@ -2,7 +2,7 @@ class_name Item extends RefCounted
 
 ## Base class for a thing the character can hold and act with. An Item is pure behaviour
 ## + a little state (e.g. which fist punches next); it owns what the primary (F) and
-## secondary (LMB) actions do, which hands are drawn, how its weapon is rendered, and what it
+## secondary (LMB) actions do, how each hand is held, how its weapon is rendered, and what it
 ## leaves behind when its user dies (drop).
 ## The character calls into these; an Item talks back only through the small character API
 ## (facing, weapon_facing(), punch(), kick(), hand_position(), muzzle_origin(), world_root(),
@@ -14,15 +14,11 @@ var display_name := "Item"
 var reach := 28.0
 
 
-## Hands to draw for this item: [] none, [1] right only, [0, 1] both.
-func visible_hands() -> Array:
-	return []
-
-
-## Hands that aim a held weapon: the character keeps them steady and quick to the aim instead of
-## swinging them with the walk. Default: none.
-func aiming_hands() -> Array:
-	return []
+## How `hand` (0 = left, 1 = right) is held while this item is out: the name of a stance in
+## CharacterConfig.stances — "relaxed" (arm hanging), "guard" (fists up), "aim" (arm out, steady,
+## holding a weapon) or "support" (cupping the aiming hand). Default: relaxed.
+func hand_stance(_hand: int) -> StringName:
+	return &"relaxed"
 
 
 ## Primary action (F). Default: nothing (unarmed).

@@ -2,49 +2,64 @@ extends RefCounted
 
 ## Character POSE (Character domain, animate layer): the living motion layered over the aim. The
 ## head, each hand, a held weapon and the shoulders each chase `facing` on their own damped spring
-## — the head first, an aiming hand next, the weapon a touch behind it, free hands each at a
-## slightly different pace, the shoulders last — so a turn ripples through the body. Walking sways
-## the shoulders and swings the free hands along a stride (an aiming hand stays steady, drifting
-## only a little sideways); the head leans into the movement and settles when it stops; standing
-## still, it breathes and glances around. A kick (recoil) throws a hand back and twists the
-## shoulders. Owned and stepped by character.gd each
-## physics frame; read by the hands (their rest pose) and the visuals (each part's angle and
-## offset). Visual only: aim, shots and punches stay on `facing`. Tuning: CharacterConfig.pose_*.
+## — the head first, a steady (aiming or supporting) hand next, the weapon a touch behind it, free
+## hands each at a slightly different pace, the shoulders last — so a turn ripples through the body.
+## The hips are planted while standing and turn to the walking direction while walking, so the feet
+## stay put under a twisting upper body and step the way the body travels. Walking sways the
+## shoulders and swings the free hands along a stride; the head leans into the movement and settles
+## when it stops; standing still, it breathes and glances around. A kick (recoil) throws a hand back
+## and twists the shoulders; a punch twists them toward the punching side and lunges the upper body.
+## Each hand eases between the stances its item asks for (CharacterConfig.stances): where it rests,
+## how high it is gripped, how its elbow bends. Owned and stepped by character.gd each physics
+## frame; read by the hands (their rest pose), the rig (the joints) and the visuals (each part's
+## angle and offset). Visual only: aim, shots and punches stay on `facing`. Tuning: CharacterConfig.pose_*.
 
-var torso_angle := 0.0           ## Shoulders' facing angle (rad, as Vector2.angle()).
+var torso_angle := 0.0           ## Shoulders' facing angle (rad, as Vector2.angle()), punch twist included.
+var torso_offset := Vector2.ZERO ## Upper body's lunge ahead of the hips (local px).
+var hip_angle := 0.0             ## Hips' and feet's facing angle (rad).
 var head_angle := 0.0            ## Head's facing angle (rad).
 var hand_angles := [0.0, 0.0]    ## Per hand: the angle of the frame its rest pose is built in (rad).
 var weapon_angle := 0.0          ## A held weapon's facing angle (rad): trails the aiming hand.
-var head_offset := Vector2.ZERO  ## Head's shift off the body center (local px).
+var head_offset := Vector2.ZERO  ## Head's shift off the body center (local px), the lunge included.
 
+var _torso_core := 0.0            ## Shoulders' spring angle, before the punch twist (rad).
 var _torso_vel := 0.0             ## Shoulders' spring velocity (rad/s).
+var _hip_vel := 0.0               ## Hips' spring velocity (rad/s).
 var _head_vel := 0.0              ## Head's spring velocity (rad/s).
 var _hand_vels := [0.0, 0.0]      ## Per-hand spring velocity (rad/s).
 var _weapon_vel := 0.0            ## Weapon's spring velocity (rad/s).
-var _aiming := [false, false]     ## Per hand: holding an aimed weapon (steady, quicker to the aim).
+var _steady := [false, false]     ## Per hand: held steady (aiming or supporting), quick to the aim.
+var _stance := [_stance_data(&"relaxed"), _stance_data(&"relaxed")]  ## Per hand: its stance, eased.
 var _lean := Vector2.ZERO         ## Head lean (local px), on a spring.
 var _lean_vel := Vector2.ZERO     ## Head lean spring velocity (px/s).
 var _recoil := [0.0, 0.0]         ## Per-hand recoil (px back from the rest pose), on a spring.
 var _recoil_vel := [0.0, 0.0]     ## Per-hand recoil spring velocity (px/s).
 var _stride := 0.0                ## Walk cycle phase (rad; one turn per stride).
 var _walk := 0.0                  ## How much the character is walking, 0..1 (smoothed speed).
-var _move_dir := Vector2.ZERO     ## Last walking direction (unit), for the head bob.
+var _move_dir := Vector2.ZERO     ## Last walking direction (unit), for the head bob and the hips.
 var _time := 0.0                  ## Seconds alive, for breathing and glances.
 var _phase := randf() * TAU       ## Per-character offset so characters don't move in lockstep.
 var _primed := false              ## False until the first update snaps every part to the aim.
 
 
 ## Advance the pose by `delta` toward `facing`, walking at `velocity` (top speed `top_speed`);
-## `aiming` lists the hands holding an aimed weapon (the held item's aiming_hands()).
-func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, aiming: Array = []) -> void:
+## `stances` names each hand's stance (the held item's hand_stance()), `punch` is each hand's
+## extension, 0 (resting) .. 1 (fully punched).
+func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, stances: Array,
+		punch: Array) -> void:
 	var aim := facing.angle()
 	if not _primed:
 		torso_angle = aim
+		_torso_core = aim
+		hip_angle = aim
 		head_angle = aim
 		hand_angles = [aim, aim]
 		weapon_angle = aim
+		_stance = [_stance_data(stances[0]), _stance_data(stances[1])]
 		_primed = true
-	_aiming = [aiming.has(0), aiming.has(1)]
+	for i in 2:
+		_stance[i] = _eased(_stance[i], _stance_data(stances[i]), delta)
+	_steady = [_stance[0]["steady"], _stance[1]["steady"]]
 	_time += delta
 	var speed := velocity.length()
 	_walk = lerpf(_walk, clampf(speed / maxf(top_speed, 1.0), 0.0, 1.0), 1.0 - exp(-8.0 * delta))
@@ -62,7 +77,7 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	_head_vel = head.y
 	for i in 2:
 		var hand: Vector2
-		if _aiming[i]:
+		if _steady[i]:
 			hand = _turn(hand_angles[i], _hand_vels[i], aim, 0.0, CharacterConfig.pose_aim_freq,
 				CharacterConfig.pose_aim_damping, CharacterConfig.pose_aim_max_lag, delta)
 		else:
@@ -76,10 +91,15 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 		CharacterConfig.pose_weapon_damping, CharacterConfig.pose_weapon_max_lag, delta)
 	weapon_angle = weapon.x
 	_weapon_vel = weapon.y
-	var torso := _turn(torso_angle, _torso_vel, aim, sway, CharacterConfig.pose_torso_freq,
+	var torso := _turn(_torso_core, _torso_vel, aim, sway, CharacterConfig.pose_torso_freq,
 		CharacterConfig.pose_torso_damping, CharacterConfig.pose_torso_max_lag, delta)
-	torso_angle = torso.x
+	_torso_core = torso.x
 	_torso_vel = torso.y
+	# A punch drives the shoulder on its side forward and the body in behind it, as the fist goes.
+	var punching := maxf(punch[0], punch[1])
+	torso_angle = wrapf(_torso_core + (punch[1] - punch[0]) * CharacterConfig.pose_punch_twist, -PI, PI)
+	torso_offset = facing * (punching * CharacterConfig.pose_punch_lunge)
+	_step_hips(delta, aim)
 
 	for i in 2:
 		_recoil_vel[i] = _accel(_recoil_vel[i], -_recoil[i], CharacterConfig.pose_recoil_freq,
@@ -94,18 +114,53 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	var breath := sin(_time * TAU / maxf(CharacterConfig.pose_breath_period, 0.1) + _phase) \
 		* CharacterConfig.pose_breath * (1.0 - _walk)
 	var bob := cos(_stride * 2.0) * CharacterConfig.pose_head_bob * _walk  # A bob per step.
-	head_offset = _lean + facing * breath + _move_dir * bob
+	head_offset = _lean + facing * breath + _move_dir * bob + torso_offset
+
+
+## The hips plant while standing and turn to the way the character walks (a backward step stays
+## facing the aim); the shoulders may twist only so far off them before the feet re-plant.
+func _step_hips(delta: float, aim: float) -> void:
+	var target := hip_angle
+	if _walk > 0.15:
+		target = _move_dir.angle()
+		if absf(angle_difference(aim, target)) > PI * 0.5:
+			target += PI  # Walking backward: the feet still face the aim.
+	var hips := _turn(hip_angle, _hip_vel, target, 0.0, CharacterConfig.pose_hip_freq,
+		CharacterConfig.pose_hip_damping, PI, delta)
+	var planted := _reel(hips.x, hips.y, aim, CharacterConfig.pose_hip_twist, delta)
+	hip_angle = planted.x
+	_hip_vel = planted.y
 
 
 ## A hand's shift off its rest pose (local px), in its own frame: a free hand swings fore and aft
-## with the walk (opposite to the other), an aiming hand only drifts a little sideways; both minus
-## any recoil.
+## with the walk (opposite to the other) as far as its stance allows, a steady hand only drifts a
+## little sideways; both minus any recoil.
 func hand_offset(hand: int) -> Vector2:
 	var along := Vector2.from_angle(hand_angles[hand])
 	var step := sin(_stride + (0.0 if hand == 0 else PI)) * _walk
-	if _aiming[hand]:
+	if _steady[hand]:
 		return along.orthogonal() * step * CharacterConfig.pose_aim_drift - along * _recoil[hand]
-	return along * (step * CharacterConfig.pose_hand_swing - _recoil[hand])
+	return along * (step * float(_stance[hand]["swing"]) - _recoil[hand])
+
+
+## How far ahead of the body center a hand rests (px), along its frame.
+func rest_forward(hand: int) -> float:
+	return _stance[hand]["forward"]
+
+
+## How far out to its own side a hand rests (px).
+func rest_lateral(hand: int) -> float:
+	return _stance[hand]["lateral"]
+
+
+## How high a hand is gripped (body radii off the floor): the arm bends to reach it.
+func grip_height(hand: int) -> float:
+	return _stance[hand]["height"]
+
+
+## Where a hand's elbow bends toward (out, forward, up).
+func elbow_pole(hand: int) -> Vector3:
+	return _stance[hand]["elbow_pole"]
 
 
 ## The walk cycle's phase (rad; one turn per stride).
@@ -118,20 +173,45 @@ func walk_amount() -> float:
 	return _walk
 
 
-## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side.
+## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side. The
+## other hand feels its share if it is steadying the weapon.
 func kick(hand: int) -> void:
 	_recoil_vel[hand] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq
+	var other := 1 - hand
+	_recoil_vel[other] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq \
+		* float(_stance[other]["recoil_share"])
 	var side := -1.0 if hand == 0 else 1.0
 	_torso_vel -= side * CharacterConfig.pose_recoil_twist * CharacterConfig.pose_torso_freq
 
 
-## One step of a part's angle chasing `aim + offset` on a damped spring. Past `max_lag` behind the
-## aim it is reeled back in quickly (CharacterConfig.pose_lag_catch) rather than snapped, so a
-## sudden flick drags it along smoothly instead of leaving it behind. Returns (angle, velocity).
+## A stance's configured values by name (an unknown name is a relaxed hand).
+static func _stance_data(name: StringName) -> Dictionary:
+	return CharacterConfig.stances.get(name, CharacterConfig.stances[&"relaxed"])
+
+
+## `now` eased toward the stance `to` (its numbers and elbow pole; `steady` switches at once).
+static func _eased(now: Dictionary, to: Dictionary, delta: float) -> Dictionary:
+	var k := 1.0 - exp(-CharacterConfig.stance_ease * delta)
+	var out := to.duplicate()
+	for key in ["forward", "lateral", "height", "swing", "recoil_share"]:
+		out[key] = lerpf(now[key], to[key], k)
+	out["elbow_pole"] = (now["elbow_pole"] as Vector3).lerp(to["elbow_pole"], k)
+	return out
+
+
+## One step of a part's angle chasing `aim + offset` on a damped spring, reeled back in when it
+## trails the aim by more than `max_lag` (see `_reel`). Returns (angle, velocity).
 static func _turn(angle: float, vel: float, aim: float, offset: float, freq: float, damping: float,
 		max_lag: float, delta: float) -> Vector2:
 	vel = _accel(vel, angle_difference(angle, aim + offset), freq, damping, delta)
 	angle += vel * delta
+	return _reel(angle, vel, aim, max_lag, delta)
+
+
+## `angle` past `max_lag` behind `aim` is reeled back in quickly (CharacterConfig.pose_lag_catch)
+## rather than snapped, so a sudden flick drags it along smoothly instead of leaving it behind.
+## Returns (angle, velocity).
+static func _reel(angle: float, vel: float, aim: float, max_lag: float, delta: float) -> Vector2:
 	var lag := angle_difference(aim, angle)
 	if absf(lag) > max_lag:
 		var excess := lag - signf(lag) * max_lag

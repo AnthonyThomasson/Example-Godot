@@ -1,7 +1,7 @@
 class_name CharacterConfig
 
 ## Tuning for a Character walking into / being shoved by world objects, being shot, its
-## pixel art, its pose and its fall on death (scenes/character/). A `class_name` holder of `static var`s — read as
+## pixel art, its body, hand stances and pose, and its fall on death (scenes/character/). A `class_name` holder of `static var`s — read as
 ## `CharacterConfig.<name>`; there is no instance and no autoload.
 ##
 ## Walking the character body into a pushable object (anything exposing `apply_impulse`
@@ -77,23 +77,54 @@ static var art_shoulder_depth: float = 0.54
 static var art_skin_color: Color = Color(0.93, 0.76, 0.6)
 static var art_hair_color: Color = Color(0.36, 0.24, 0.14)
 static var art_pack_color: Color = Color(0.3, 0.32, 0.26)
-## Default pants color (seen once a character falls).
+## Default pants color (the legs and feet, seen where they stride out from under the body).
 static var art_pants_color: Color = Color(0.22, 0.27, 0.4)
 
-# --- Ragdoll (the fall on death; character_ragdoll.gd, solved by Physics' Ragdoll) ---
+# --- Body (the skeleton the standing body is drawn from and the ragdoll falls from; character_rig.gd) ---
 # Lengths are in body radii (a 14 px radius ≈ 0.225 m, half the shoulders), so a body stands
-# ≈ 7.6 radii tall; angles are in degrees.
-static var ragdoll_hip_height: float = 3.95       ## Hip joints above the floor (legs stand a touch bent).
-static var ragdoll_shoulder_height: float = 6.3   ## Shoulder joints above the floor.
-static var ragdoll_head_height: float = 7.2       ## Head center above the floor.
-static var ragdoll_shoulder_width: float = 0.8    ## Each shoulder joint off the spine.
-static var ragdoll_hip_width: float = 0.4         ## Each hip joint off the spine.
+# ≈ 7.6 radii tall.
+static var body_hip_height: float = 3.8        ## Hip joints above the floor (legs stand a touch bent).
+static var body_shoulder_height: float = 6.3   ## Shoulder joints above the floor.
+static var body_head_height: float = 7.2       ## Head center above the floor.
+static var body_shoulder_width: float = 0.8    ## Each shoulder joint off the spine.
+static var body_hip_width: float = 0.4         ## Each hip joint off the spine.
+static var body_upper_arm: float = 1.35
+static var body_forearm: float = 1.4           ## Elbow to the center of the fist.
+static var body_thigh: float = 1.95
+static var body_shin: float = 1.85             ## Knee to ankle.
+static var body_foot: float = 1.0              ## Shoe length.
+## How far an arm may stretch before its shoulder follows the hand (fraction of its length), and the
+## furthest the shoulder joint follows a hand out of reach (body radii) — a punch's lean-in.
+static var body_arm_extension: float = 0.98
+static var body_shoulder_reach: float = 1.0
+## How far each foot swings fore and aft mid-stride at full walking speed, and how high the
+## swinging foot lifts (body radii).
+static var body_stride: float = 0.85
+static var body_foot_lift: float = 0.35
+
+# --- Stances (how a hand is held; the held item picks one per hand through Item.hand_stance) ---
+# A hand rests `forward` px ahead of the body center and `lateral` px out to its own side, in the
+# frame it chases the aim in; its grip is `height` body radii off the floor (the arm bends to reach
+# it) and its elbow bends toward `elbow_pole` (out, forward, up). `swing` is the walk's fore-and-aft
+# swing of a free hand (px); a `steady` hand follows the aim closely and only drifts sideways;
+# `recoil_share` is how much of a kick the hand feels when the other hand fires.
+static var stances: Dictionary = {
+	&"relaxed": { "forward": 2.0, "lateral": 13.0, "height": 3.7, "swing": 9.0, "steady": false,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.2, -0.8, -0.2) },
+	&"guard": { "forward": 11.5, "lateral": 7.0, "height": 6.0, "swing": 1.5, "steady": false,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.35, -0.1, -1.0) },
+	&"aim": { "forward": 27.0, "lateral": 5.0, "height": 6.0, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.3, 0.0, -1.0) },
+	&"support": { "forward": 22.0, "lateral": -1.5, "height": 5.7, "swing": 0.0, "steady": true,
+		"recoil_share": 0.7, "elbow_pole": Vector3(0.6, -0.1, -1.0) },
+}
+## How fast a hand eases from one stance to another (1/s).
+static var stance_ease: float = 12.0
+## How far ahead of a hand its weapon's muzzle is (px): bullets leave there.
+static var muzzle_ahead: float = 11.0
+
+# --- Ragdoll (the fall on death; character_ragdoll.gd, solved by Physics' Ragdoll; angles in degrees) ---
 static var ragdoll_belly: float = 0.4             ## Belly and back points off the spine (keep the trunk rigid).
-static var ragdoll_upper_arm: float = 1.35
-static var ragdoll_forearm: float = 1.4           ## Elbow to the center of the fist.
-static var ragdoll_thigh: float = 1.95
-static var ragdoll_shin: float = 1.85             ## Knee to ankle.
-static var ragdoll_foot: float = 1.0              ## Shoe length.
 ## Collision radii: the trunk's is half its depth, so it lies on its back or front with thickness.
 static var ragdoll_torso_radius: float = 0.5
 static var ragdoll_head_radius: float = 0.38
@@ -105,13 +136,13 @@ static var ragdoll_elbow_mass: float = 0.25
 static var ragdoll_hand_mass: float = 0.15
 static var ragdoll_knee_mass: float = 0.6
 static var ragdoll_ankle_mass: float = 0.35
-## Drawn thickness of the fallen body's limbs (body radii), at each joint down the chain: the neck;
+## Drawn thickness of the body's limbs (body radii), at each joint down the chain: the neck;
 ## the arm at the shoulder, elbow and wrist; the leg at the hip, knee, calf and ankle; the shoe at
 ## the heel and toe. Neighbouring segments share a joint's width, so limbs taper smoothly.
-static var ragdoll_neck_width: float = 0.42
-static var ragdoll_arm_widths: Array = [0.48, 0.36, 0.3]
-static var ragdoll_leg_widths: Array = [0.66, 0.46, 0.52, 0.32]
-static var ragdoll_shoe_widths: Array = [0.38, 0.34]
+static var body_neck_width: float = 0.42
+static var body_arm_widths: Array = [0.48, 0.36, 0.3]
+static var body_leg_widths: Array = [0.66, 0.46, 0.52, 0.32]
+static var body_shoe_widths: Array = [0.38, 0.34]
 ## The fallen trunk's shape: cross-sections along the spine, each Vector3(where along it — 0 at the
 ## hip joints, 1 at the shoulder joints —, half-width, half-depth in body radii), bottom to top. Its
 ## outline is the hull of each neighbouring pair, so it is waisted and rounded at both ends.
@@ -130,16 +161,14 @@ static var ragdoll_elbow_slack: float = 70.0
 static var ragdoll_knee_bend: Vector2 = Vector2(0.0, 150.0)
 static var ragdoll_knee_slack: float = 20.0
 ## The fall's launch: the upper body's push along the killing blow (px/s at the shoulders, fading
-## to none at the hips), the knees' forward buckle (px/s), a random jolt on every point (px/s), and
-## how far the feet stand fore and aft mid-stride at full walking speed (body radii).
+## to none at the hips), the knees' forward buckle (px/s) and a random jolt on every point (px/s).
 static var ragdoll_hit_topple: float = 60.0
 static var ragdoll_knee_buckle: float = 70.0
 static var ragdoll_jitter: float = 15.0
-static var ragdoll_stride: float = 0.5
 ## Speed (px/s) a held item is tossed off at as the hand lets go, on top of the body's momentum.
 static var ragdoll_drop_toss: float = 70.0
 ## A fallen part's floor shadow shift per px of height (matches the standing drop shadow).
-static var ragdoll_shadow_per_height: float = 0.03
+static var body_shadow_per_height: float = 0.03
 ## Draw layer of a dead body: beneath the living, above blood pools.
 static var ragdoll_z_index: int = -1
 
@@ -152,9 +181,9 @@ static var pose_lag_catch: float = 14.0
 static var pose_head_freq: float = 12.0      ## Head: turns to the aim first.
 static var pose_head_damping: float = 0.9    ## Head: barely overshoots.
 static var pose_head_max_lag: float = 0.8    ## Head: furthest behind the aim.
-static var pose_aim_freq: float = 11.0       ## Aiming hand: follows the aim closely.
-static var pose_aim_damping: float = 0.95    ## Aiming hand: settles without wobble.
-static var pose_aim_max_lag: float = 0.6     ## Aiming hand: furthest behind the aim.
+static var pose_aim_freq: float = 11.0       ## Steady hands (aiming, supporting): follow the aim closely.
+static var pose_aim_damping: float = 0.95    ## Steady hands: settle without wobble.
+static var pose_aim_max_lag: float = 0.6     ## Steady hands: furthest behind the aim.
 static var pose_weapon_freq: float = 7.0     ## Weapon: heavier than the hand holding it.
 static var pose_weapon_damping: float = 0.8  ## Weapon: swings a hair past and settles.
 static var pose_weapon_max_lag: float = 0.7  ## Weapon: furthest behind the aim.
@@ -166,14 +195,20 @@ static var pose_hand_pace_spread: float = 0.3
 static var pose_torso_freq: float = 5.5      ## Shoulders: follow last.
 static var pose_torso_damping: float = 0.75  ## Shoulders: ease past and settle.
 static var pose_torso_max_lag: float = 1.2   ## Shoulders: furthest behind the aim.
+static var pose_hip_freq: float = 9.0        ## Hips (and feet): turn to the walking direction.
+static var pose_hip_damping: float = 0.9     ## Hips: barely overshoot.
+## How far the shoulders may twist off the planted hips before the feet re-plant toward the aim (rad).
+static var pose_hip_twist: float = 0.9
 ## Distance walked per full stride (two steps), in px.
 static var pose_stride_length: float = 48.0
 ## Shoulder sway either way at full walking speed (rad).
 static var pose_walk_sway: float = 0.07
-## Free hands' swing fore and aft at full walking speed (px).
-static var pose_hand_swing: float = 1.5
-## An aiming hand's sideways drift at full walking speed (px).
+## A steady hand's sideways drift at full walking speed (px).
 static var pose_aim_drift: float = 0.5
+## A punch's body: the shoulders twist toward the punching side by this much (rad) and the upper
+## body lunges this far ahead (px) at full extension.
+static var pose_punch_twist: float = 0.5
+static var pose_punch_lunge: float = 4.0
 ## Head bob along the walk at full speed (px), twice per stride.
 static var pose_head_bob: float = 0.4
 ## Head lean into the movement at full speed (px), on a soft spring so it settles on a stop.

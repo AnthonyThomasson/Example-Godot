@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## Character RAGDOLL (Character domain, animate layer): the body falling on death. Builds a humanoid
-## on the Physics domain's Ragdoll from the live pose — a rigid trunk (chest, pelvis, belly and back,
+## on the Physics domain's Ragdoll from the rig's standing joints (character_rig.gd) — a rigid trunk (chest, pelvis, belly and back,
 ## shoulders, hips), the head, elbows, fists, knees and ankles — held by anatomical limits: swing
 ## cones at the neck, shoulders and hips, and hinges at the elbows and knees that only ever bend the
 ## natural way. It is launched with the body's momentum, a topple along the killing blow and a
@@ -9,17 +9,20 @@ extends RefCounted
 ## visuals, which draw it top-down by height. Index pairs are per hand side (0 = left, 1 = right),
 ## matching the hands. Tuning: CharacterConfig.ragdoll_*.
 
-const HEAD := 0
-const CHEST := 1
-const PELVIS := 2
-const BELLY := 3
-const SHOULDER := [4, 5]
-const HIP := [6, 7]
-const ELBOW := [8, 9]
-const HAND := [10, 11]
-const KNEE := [12, 13]
-const ANKLE := [14, 15]
-const SPINE := 16  ## The back, opposite the belly.
+const Rig = preload("res://scenes/character/character_rig.gd")
+
+# Joint indices, shared with the rig the body starts from.
+const HEAD := Rig.HEAD
+const CHEST := Rig.CHEST
+const PELVIS := Rig.PELVIS
+const BELLY := Rig.BELLY
+const SHOULDER := Rig.SHOULDER
+const HIP := Rig.HIP
+const ELBOW := Rig.ELBOW
+const HAND := Rig.HAND
+const KNEE := Rig.KNEE
+const ANKLE := Rig.ANKLE
+const SPINE := Rig.SPINE
 
 ## Directions in the trunk's frame: x toward the right shoulder, y up the spine, z out of the chest.
 const UP := Vector3(0.0, 1.0, 0.0)
@@ -32,76 +35,38 @@ var body := Ragdoll.new()
 var _frame := 0  ## The trunk's frame id in `body`.
 
 
-## Build the body standing in `character`'s live pose, moving at `momentum` (px/s) and knocked over
+## Build the body standing as the rig holds `character`, moving at `momentum` (px/s) and knocked over
 ## along `blow` (the killing hit's direction; zero for none).
 func _init(character, momentum: Vector2, blow: Vector2) -> void:
 	var r: float = character.radius
-	var pose = character.pose
-	var f2 := Vector2.from_angle(pose.torso_angle)
+	var rig = Rig.new(character)
+	var f2 := Vector2.from_angle(character.pose.torso_angle)
 	var fwd := Vector3(f2.x, f2.y, 0.0)
-	var right := Vector3(f2.orthogonal().x, f2.orthogonal().y, 0.0)  # Hand 1's side.
-	var up := Vector3(0.0, 0.0, 1.0)
-	var hip_z := CharacterConfig.ragdoll_hip_height * r
-	var shoulder_z := CharacterConfig.ragdoll_shoulder_height * r
-	var upper := CharacterConfig.ragdoll_upper_arm * r
-	var fore := CharacterConfig.ragdoll_forearm * r
-	var thigh := CharacterConfig.ragdoll_thigh * r
-	var shin := CharacterConfig.ragdoll_shin * r
+	var hip_z := CharacterConfig.body_hip_height * r
+	var shoulder_z := CharacterConfig.body_shoulder_height * r
 	var torso_r := CharacterConfig.ragdoll_torso_radius * r
 	var limb_r := CharacterConfig.ragdoll_limb_radius * r
 
-	var head := Vector3(pose.head_offset.x, pose.head_offset.y, CharacterConfig.ragdoll_head_height * r)
-	var shoulders := []
-	var hips := []
-	var elbows := []
-	var hands := []
-	var knees := []
-	var ankles := []
-	for i in 2:
-		var out := right * (-1.0 if i == 0 else 1.0)
-		var shoulder := up * shoulder_z + out * CharacterConfig.ragdoll_shoulder_width * r
-		var hip := up * hip_z + out * CharacterConfig.ragdoll_hip_width * r
-		# The fist where the hands hold it, at the height the arm reaches it with a relaxed bend.
-		var grip: Vector2 = character.hand_position(i)
-		var flat := grip - Vector2(shoulder.x, shoulder.y)
-		var reach := (upper + fore) * 0.85
-		if flat.length() > reach * 0.95:
-			flat = flat.normalized() * reach * 0.95
-		var hand := Vector3(shoulder.x + flat.x, shoulder.y + flat.y,
-			shoulder.z - sqrt(maxf(reach * reach - flat.length_squared(), 0.0)))
-		# Feet under the hips, fore and aft opposite to the arm swing mid-stride.
-		var step: float = -sin(pose.stride_phase() + (0.0 if i == 0 else PI)) * pose.walk_amount() \
-			* CharacterConfig.ragdoll_stride * r
-		var ankle := Vector3(hip.x, hip.y, limb_r) + fwd * step
-		shoulders.append(shoulder)
-		hips.append(hip)
-		hands.append(hand)
-		ankles.append(ankle)
-		elbows.append(_bend(shoulder, hand, upper, fore, -fwd + out * 0.6 - up * 0.3))
-		knees.append(_bend(hip, ankle, thigh, shin, fwd))
-
-	body.add_point(head, CharacterConfig.ragdoll_head_radius * r, CharacterConfig.ragdoll_head_mass)
-	body.add_point(up * shoulder_z, torso_r, CharacterConfig.ragdoll_torso_mass)
-	body.add_point(up * hip_z, torso_r, CharacterConfig.ragdoll_torso_mass)
+	body.add_point(rig.point(HEAD), CharacterConfig.ragdoll_head_radius * r, CharacterConfig.ragdoll_head_mass)
+	body.add_point(rig.point(CHEST), torso_r, CharacterConfig.ragdoll_torso_mass)
+	body.add_point(rig.point(PELVIS), torso_r, CharacterConfig.ragdoll_torso_mass)
 	# Belly and back sit off the spine, their radii reaching just to the trunk's surface, so the trunk
 	# lies flat on either side (rather than rocking on a keel) and can never fold through itself.
-	var belly := CharacterConfig.ragdoll_belly * r
-	var mid_z := (hip_z + shoulder_z) * 0.5
-	var skin := maxf(torso_r - belly, 0.05 * r)
-	body.add_point(up * mid_z + fwd * belly, skin, CharacterConfig.ragdoll_torso_mass)
+	var skin := maxf(torso_r - CharacterConfig.ragdoll_belly * r, 0.05 * r)
+	body.add_point(rig.point(BELLY), skin, CharacterConfig.ragdoll_torso_mass)
 	for i in 2:
-		body.add_point(shoulders[i], limb_r, CharacterConfig.ragdoll_torso_mass)
+		body.add_point(rig.point(SHOULDER[i]), limb_r, CharacterConfig.ragdoll_torso_mass)
 	for i in 2:
-		body.add_point(hips[i], torso_r * 0.8, CharacterConfig.ragdoll_torso_mass)
+		body.add_point(rig.point(HIP[i]), torso_r * 0.8, CharacterConfig.ragdoll_torso_mass)
 	for i in 2:
-		body.add_point(elbows[i], limb_r, CharacterConfig.ragdoll_elbow_mass)
+		body.add_point(rig.point(ELBOW[i]), limb_r, CharacterConfig.ragdoll_elbow_mass)
 	for i in 2:
-		body.add_point(hands[i], limb_r, CharacterConfig.ragdoll_hand_mass)
+		body.add_point(rig.point(HAND[i]), limb_r, CharacterConfig.ragdoll_hand_mass)
 	for i in 2:
-		body.add_point(knees[i], limb_r, CharacterConfig.ragdoll_knee_mass)
+		body.add_point(rig.point(KNEE[i]), limb_r, CharacterConfig.ragdoll_knee_mass)
 	for i in 2:
-		body.add_point(ankles[i], limb_r, CharacterConfig.ragdoll_ankle_mass)
-	body.add_point(up * mid_z - fwd * belly, skin, CharacterConfig.ragdoll_torso_mass)
+		body.add_point(rig.point(ANKLE[i]), limb_r, CharacterConfig.ragdoll_ankle_mass)
+	body.add_point(rig.point(SPINE), skin, CharacterConfig.ragdoll_torso_mass)
 
 	body.add_rigid([CHEST, PELVIS, BELLY, SPINE, SHOULDER[0], SHOULDER[1], HIP[0], HIP[1]])
 	body.add_bone(CHEST, HEAD)
@@ -198,15 +163,3 @@ static func _limits(deg: Dictionary, i: int) -> Dictionary:
 		"front": deg_to_rad(deg["front"]), "back": deg_to_rad(deg["back"]),
 		"right": out if i == 1 else across, "left": across if i == 1 else out,
 	}
-
-
-## Where the middle joint of a two-bone chain from `a` to `b` (bone lengths `l1`, `l2`) sits, bent
-## toward `pole`.
-static func _bend(a: Vector3, b: Vector3, l1: float, l2: float, pole: Vector3) -> Vector3:
-	var ab := b - a
-	var d := clampf(ab.length(), 0.001, l1 + l2 - 0.001)
-	var along := ab.normalized()
-	var x := (l1 * l1 - l2 * l2 + d * d) / (2.0 * d)
-	var h := sqrt(maxf(l1 * l1 - x * x, 0.0))
-	var side := (pole - along * pole.dot(along)).normalized()
-	return a + along * x + side * h

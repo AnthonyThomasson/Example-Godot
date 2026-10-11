@@ -15,7 +15,7 @@ A painter is any script with
 draws in a **canonical frame** — front toward +y, width across the front — under `canvas.light`,
 the world light already turned into that frame, so its shading lands correctly after the art is
 turned. Painters live in their own domain: Objects (`objects/art/*_painter.gd` + the `ObjectArt`
-registry), Character (`character/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`), Items
+registry), Character (`character/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`), Items
 (`items/pistol_painter.gd`). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
 
 ## PixelArt (`pixel_art.gd`) — the renderer
@@ -51,7 +51,7 @@ through snapshots).
 ## ArtConfig (`art_config.gd`)
 
 Shared tuning: `pixel_size`, `light_from`, `turn_steps`, drop shadow (`drop_shadow_per_coverage`,
-`drop_shadow_max`, `drop_shadow_alpha` — read by the object and character visuals), cast shadow,
+`drop_shadow_max` — read by the object visuals; `drop_shadow_alpha` — also by the character's shadow), cast shadow,
 the tone ramp, and the surface-finish densities. Domain-specific proportions and colors stay in
 each domain's config (`ObjectArtConfig`, `CharacterConfig.art_*`).
 

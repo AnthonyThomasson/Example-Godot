@@ -12,9 +12,9 @@ func _init() -> void:
 	reach = 28.0
 
 
-## Both hands are shown.
-func visible_hands() -> Array:
-	return [0, 1]
+## Both fists up.
+func hand_stance(_hand: int) -> StringName:
+	return &"guard"
 
 
 ## Punch with the next hand, then swap which hand is next.

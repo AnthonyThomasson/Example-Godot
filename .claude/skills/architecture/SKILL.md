@@ -130,16 +130,17 @@ interface(s) and describes how they're implemented; this list is authoritative f
    impacts, melee punches, and the walking character.
 
 6. **Items ↔ Character**
-   `Item` (`items/item.gd`): `display_name`, `reach`, `visible_hands()`, `aiming_hands()` (held
-   steady by the character's pose), `primary(user)` (F),
+   `Item` (`items/item.gd`): `display_name`, `reach`, `hand_stance(hand) -> StringName` (how that
+   hand is held — the name of a `CharacterConfig.stances` entry: `relaxed`, `guard`, `aim`, `support`;
+   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F),
    `secondary(user)` (LMB), `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
    as its user dies: the pistol leaves a skidding `DroppedItem` in the world, the default leaves
    nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
    is which side landed up). The character
    calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id)` /
    `default_inventory()`. The character API an item may call: `facing`, `punch(hand)`,
-   `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-   `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
+   `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (`CharacterConfig.muzzle_ahead`
+   past the hand), `world_root()`, `report_shot(body, dmg)`, `kick(hand)` (recoil: throws that hand back), `weapon_facing()` (the
    drawn weapon direction, trailing the aim; shots still use `facing`). The pistol is the one
    place Items reach into the Projectile System (`ProjectileSpawner`/`CasingSpawner`).
 
@@ -231,7 +232,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …
     - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
 	  turn steps, tone ramp and surface-finish tuning.
-    Objects' painters + `ObjectArt` registry, Character's body/hand painters and Items' pistol
+    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb and trunk painters and Items' pistol
     painter all render through these; Art imports nothing from other domains.
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)

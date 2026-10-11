@@ -5,8 +5,9 @@ extends CharacterBody2D
 ## controller child (any node with a `control(character, delta)` method): the controller
 ## writes `move_input` / `aim_point` and calls `melee/shoot/select_slot`. Drawing
 ## is in character_visuals.gd, the hand/punch/fist geometry in character_hands.gd, the living
-## motion of head, shoulders and hands in character_pose.gd (stepped here each physics frame), and
-## the body's fall on death in character_ragdoll.gd (stepped here once dead).
+## motion of head, shoulders, hips and hands in character_pose.gd (stepped here each physics frame),
+## the standing skeleton the limbs are drawn from in character_rig.gd, and the body's fall on death
+## in character_ragdoll.gd (stepped here once dead).
 
 ## Radius of the placeholder circle. Matches chair size (28x28 → 14 radius).
 @export var radius: float = 14.0  ## Body circle radius (px).
@@ -28,8 +29,8 @@ var is_dead: bool = false
 
 ## Unit vector from the character toward its aim point; read by the hands and visuals.
 var facing := Vector2.RIGHT
-## The body's living motion (head, shoulders and hands chasing `facing`); read by the hands and
-## visuals.
+## The body's living motion (head, shoulders, hips and hands chasing `facing`); read by the hands,
+## rig and visuals.
 var pose: CharacterPose = CharacterPose.new()
 ## The falling body once dead (null while alive): stepped here, drawn by the visuals.
 var ragdoll: CharacterRagdoll
@@ -67,6 +68,7 @@ signal hit_landed(body: Node, damage: float, hand: int)
 ## `is_busy()` / `interaction_label()`.
 const CharacterInteraction = preload("res://scenes/interaction/character_interaction.gd")
 const CharacterPose = preload("res://scenes/character/character_pose.gd")
+const CharacterRig = preload("res://scenes/character/character_rig.gd")
 const CharacterRagdoll = preload("res://scenes/character/character_ragdoll.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
@@ -124,7 +126,7 @@ func _physics_process(delta: float) -> void:
 		velocity = Vector2.ZERO
 		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
 		_hands.facing = facing
-		pose.update(delta, facing, Vector2.ZERO, speed, _aiming_hands())
+		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts())
 		return
 
 	# Aim toward the aim point. Guard the degenerate zero-length case.
@@ -140,7 +142,7 @@ func _physics_process(delta: float) -> void:
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
-	pose.update(delta, facing, get_real_velocity(), speed, _aiming_hands())
+	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts())
 
 
 # --- Controller-facing API -------------------------------------------------------------
@@ -260,10 +262,13 @@ func weapon_facing() -> Vector2:
 	return Vector2.from_angle(pose.weapon_angle)
 
 
-## The hands the held item aims a weapon with (held steady by the pose).
-func _aiming_hands() -> Array:
+## How each hand is held (CharacterConfig.stances names), as the held item asks: arms hang with
+## nothing held.
+func _stances() -> Array:
 	var item: Item = current_item()
-	return item.aiming_hands() if item else []
+	if item == null:
+		return [&"relaxed", &"relaxed"]
+	return [item.hand_stance(0), item.hand_stance(1)]
 
 
 ## Throw a punch with the given hand (the item decides which).
@@ -281,9 +286,15 @@ func hand_world(hand: int) -> Vector2:
 	return global_position + _hands.hand_position(hand)
 
 
-## World muzzle point for a weapon in `hand` (the drawn barrel tip, +clearance).
+## World muzzle point for a weapon in `hand` (CharacterConfig.muzzle_ahead past it, along the aim).
 func muzzle_origin(hand: int) -> Vector2:
-	return hand_world(hand) + facing * 22.0
+	return hand_world(hand) + facing * CharacterConfig.muzzle_ahead
+
+
+## The standing skeleton as it is held right now (see character_rig.gd), for the visuals and anything
+## that wants the arms' and legs' joints.
+func rig() -> CharacterRig:
+	return CharacterRig.new(self)
 
 
 ## The scene node transient projectiles/casings/debris spawn into (world space, not under us).

@@ -1,55 +1,56 @@
 extends Node2D
 
-## Character DRAW layer. Renders the character as top-down pixel art (painted through the Art
-## domain's PixelArt) in separate parts, each at its own angle from the character's pose: a drop
-## shadow, the shoulders, the head (with its shadow on the shoulders) shifted by the pose's lean
-## and breath, then the item's own weapon, then the fists the held item wants shown, gripping it,
-## and last the wound marks. Shots dent and darken the shoulders and any part they passed through.
-## Each part is lit for the nearest lighting step and drawn rotated to its exact angle. Reads the
-## body radius, pose, held item and wounds from the character and hand positions/size from the
-## hands sibling. Appearance only — no item-specific weapon logic lives here (that's each Item's
-## draw_weapon()).
+## Character DRAW layer. Renders the whole character as top-down pixel art (painted through the Art
+## domain's PixelArt), each part at its own angle from the character's pose and each limb from the
+## joints of its rig: a drop shadow, the legs and shoes, the arms (sleeve, then forearm), the
+## shoulders at the pose's lunge, the head (with its shadow on the shoulders) shifted by the pose's
+## lean and breath, then the item's own weapon, the fists gripping it, and last the wound marks.
+## Shots dent and darken the shoulders and any part they passed through. Each part is lit for the
+## nearest lighting step and drawn rotated to its exact angle. Reads the body radius, pose, rig, held
+## item and wounds from the character and hand positions/size from the hands sibling. Appearance
+## only — no item-specific weapon logic lives here (that's each Item's draw_weapon()). Once dead it
+## draws the fallen ragdoll instead.
 
 const BodyPainter = preload("res://scenes/character/body_painter.gd")
 const HeadPainter = preload("res://scenes/character/head_painter.gd")
 const HandPainter = preload("res://scenes/character/hand_painter.gd")
 const LimbPainter = preload("res://scenes/character/limb_painter.gd")
 const TorsoPainter = preload("res://scenes/character/torso_painter.gd")
-const Rag = preload("res://scenes/character/character_ragdoll.gd")
+const Rig = preload("res://scenes/character/character_rig.gd")  # The joint indices, shared with the ragdoll.
 
 @export var body_color: Color = Color(0.32549, 0.65098, 1.0)  ## Shirt color.
 @export var hand_color: Color = Color(0.93, 0.76, 0.6)        ## Hands: skin, or a glove color.
-@export var skin_color: Color = Color(0.93, 0.76, 0.6)        ## Face and ears.
+@export var skin_color: Color = Color(0.93, 0.76, 0.6)        ## Face, ears and forearms.
 @export var hair_color: Color = Color(0.36, 0.24, 0.14)       ## Hair, or the headwear's color.
 ## "short", "long", "buzz", "beanie" or "cap".
 @export_enum("short", "long", "buzz", "beanie", "cap") var hair_style: String = "short"
 @export var backpack: bool = false                            ## Wear a backpack.
 @export var pack_color: Color = Color(0.3, 0.32, 0.26)        ## Backpack color.
-@export var pants_color: Color = Color(0.22, 0.27, 0.4)       ## Pants (seen once fallen).
-@export var shoe_color: Color = Color(0.16, 0.13, 0.12)       ## Shoes (seen once fallen).
+@export var pants_color: Color = Color(0.22, 0.27, 0.4)       ## Pants.
+@export var shoe_color: Color = Color(0.16, 0.13, 0.12)       ## Shoes.
 
-@onready var _character := get_parent()   ## Character — body radius, pose, held item.
+@onready var _character := get_parent()   ## Character — body radius, pose, rig, held item.
 @onready var _hands := $"../Hands"        ## Sibling — hand positions / size.
 
-## Draws a fallen body's floor shadow; inside a CanvasGroup (which carries the shadow's alpha) so
-## overlapping parts don't darken twice. Built once the body falls.
+## Draws the body's floor shadow; inside a CanvasGroup (which carries the shadow's alpha) so
+## overlapping parts don't darken twice.
 var _shadow: Node2D
 var _settled_drawn := false  ## The fallen body has been drawn at rest: nothing left to redraw.
 
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_build_shadow()
 
 
 func _process(_delta: float) -> void:
 	var ragdoll = _character.ragdoll
 	if ragdoll == null:
 		queue_redraw()  # facing / items change continuously.
+		_shadow.queue_redraw()
 		return
 	if _settled_drawn:
 		return
-	if _shadow == null:
-		_build_shadow()
 	_settled_drawn = ragdoll.is_settled()
 	queue_redraw()
 	_shadow.queue_redraw()
@@ -59,49 +60,92 @@ func _draw() -> void:
 	if _character.ragdoll:
 		_draw_fallen(_character.ragdoll)
 		return
-	var r: float = _character.radius
-	var size := Vector2(r * 2.0, r * 2.0)
 	var pose = _character.pose
+	var rig = _character.rig()
+	var lunge: Vector2 = pose.torso_offset
 	var torso: float = pose.torso_angle - PI * 0.5  # Canonical art faces +y.
-	var body := PixelArt.render_turned(BodyPainter, size, body_color, PixelArt.snap_angle(torso), "fabric",
-		{ "backpack": backpack, "pack": pack_color })
+	var size := _shoulder_size()
+	var body := _shoulder_art(torso)
 	var deformable = _character._deformable
 	# Impacts are recorded relative to the shoulders (character.take_hit), so they turn with them.
 	var impacts := _turned(deformable.impacts if deformable else [], pose.torso_angle)
+	var placed := _shifted(impacts, lunge)  # The same wounds in the character's frame, for the parts.
 	var damage_total: float = deformable.damage_total if deformable else 0.0
 	var item: Item = _character.current_item()
-	var hands: Array = item.visible_hands() if item else []
 
-	_draw_shadow(body, size, impacts, torso)
+	for i in 2:
+		_draw_chain(_leg_chain(rig, i))
+	for i in 2:
+		_draw_chain(_arm_chain(rig, i))
 	# Shoulders: the art through the flesh silhouette deformed by any shots (dents + darkening).
+	draw_set_transform(lunge, 0.0, Vector2.ONE)
 	Deformation.draw_shape(self, "circle", size, body_color, CharacterConfig.flesh_crack_color,
 		impacts, damage_total, Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR,
 		body, torso, false)
-	_draw_head(pose, impacts, damage_total)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	_draw_head(pose, placed, damage_total)
 	if item:
 		item.draw_weapon(self, _character)
-	for hand in hands:
-		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, impacts, damage_total)
+	for hand in 2:
+		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, placed, damage_total)
 	# Wound marks over everything, so a hit hand shows its wound: dark-red holes and cracks that
 	# read as bloody gashes (config-driven).
-	Deformation.draw_marks(self, impacts, CharacterConfig.flesh_crack_color,
+	Deformation.draw_marks(self, placed, CharacterConfig.flesh_crack_color,
 		CharacterConfig.flesh_hole_color, CharacterConfig.flesh_scorch_color)
 
 
-## The body's drop shadow: the art's own silhouette through the deformed outline, offset away from
-## the light in world space by its height proxy (flesh `coverage`), like furniture.
-func _draw_shadow(body: Texture2D, size: Vector2, impacts: Array, angle: float) -> void:
-	var offset := minf(CharacterConfig.flesh_coverage * ArtConfig.drop_shadow_per_coverage, ArtConfig.drop_shadow_max)
-	if offset <= 0.0 or ArtConfig.drop_shadow_alpha <= 0.0:
-		return
+## The shoulders' art canvas: the body's round footprint.
+func _shoulder_size() -> Vector2:
+	var r: float = _character.radius
+	return Vector2(r * 2.0, r * 2.0)
+
+
+## The shoulders' pixel art, lit for the nearest lighting step to `angle` (the art's turn).
+func _shoulder_art(angle: float) -> Texture2D:
+	return PixelArt.render_turned(BodyPainter, _shoulder_size(), body_color, PixelArt.snap_angle(angle),
+		"fabric", { "backpack": backpack, "pack": pack_color })
+
+
+## The standing body's floor shadow, drawn into the shadow group: the shoulders' own silhouette
+## through the deformed outline, then each limb, fist and the head, every point shifted away from
+## the light by its height.
+func _draw_standing_shadow() -> void:
+	var pose = _character.pose
+	var rig = _character.rig()
+	var cast := _shadow_caster()
+	var deformable = _character._deformable
+	var impacts := _turned(deformable.impacts if deformable else [], pose.torso_angle)
+	var size := _shoulder_size()
+	var angle: float = pose.torso_angle - PI * 0.5
 	var poly := Deformation.shape_polygon("circle", size, impacts)
 	if not Deformation.is_valid_polygon(poly):
 		poly = Deformation.base_ring("circle", size)
 	var uvs := PackedVector2Array()
 	for p in poly:
 		uvs.append(p.rotated(-angle) / size + Vector2(0.5, 0.5))
-	var shift := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized() * offset
-	draw_colored_polygon(Transform2D(0.0, shift) * poly, Color(0.0, 0.0, 0.0, ArtConfig.drop_shadow_alpha), uvs, body)
+	var lift: Vector2 = cast.call(rig.point(Rig.CHEST))  # The shoulders' lunge, shifted from the light.
+	_shadow.draw_colored_polygon(Transform2D(0.0, lift) * poly, Color.BLACK, uvs, _shoulder_art(angle))
+	for i in 2:
+		for chain in [_leg_chain(rig, i), _arm_chain(rig, i)]:
+			_draw_limb_shadow(chain, cast)
+		_shadow.draw_circle(cast.call(rig.point(Rig.HAND[i])), _hands.hand_radius, Color.BLACK)
+	_shadow.draw_circle(cast.call(rig.point(Rig.HEAD)), CharacterConfig.ragdoll_head_radius * _character.radius,
+		Color.BLACK)
+
+
+## A 3D point's place on the floor shadow: its flat position shifted away from the light by its
+## height. Used as `cast.call(Vector3) -> Vector2`.
+func _shadow_caster() -> Callable:
+	var shift := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized() \
+		* CharacterConfig.body_shadow_per_height
+	return func(p: Vector3) -> Vector2: return Vector2(p.x, p.y) + shift * p.z
+
+
+## One limb chain's floor shadow: each segment's capsule through `cast`.
+func _draw_limb_shadow(chain: Dictionary, cast: Callable) -> void:
+	for seg in chain["segs"]:
+		_shadow.draw_colored_polygon(_capsule(cast.call(seg["a"]), cast.call(seg["b"]), seg["ra"], seg["rb"]),
+			Color.BLACK)
 
 
 ## The head at the pose's offset and angle, casting its shadow onto the shoulders first (the head
@@ -152,6 +196,18 @@ static func _turned(impacts: Array, angle: float) -> Array:
 	return out
 
 
+## `impacts` moved by `by`: from the shoulders' frame to the character's, once the shoulders lunge.
+static func _shifted(impacts: Array, by: Vector2) -> Array:
+	if by == Vector2.ZERO:
+		return impacts
+	var out := []
+	for impact in impacts:
+		var moved: Dictionary = impact.duplicate()
+		moved["pos"] = (impact["pos"] as Vector2) + by
+		out.append(moved)
+	return out
+
+
 ## The body `impacts` whose shot passed through a part — a circle of `radius` at `center` on the
 ## shot's path before it struck the body — re-seated where the shot entered the part, in its
 ## frame, with the dent scaled down to the part's size.
@@ -175,11 +231,12 @@ func _through(impacts: Array, center: Vector2, radius: float) -> Array:
 	return out
 
 
-# --- The fallen body ---------------------------------------------------------------------
-# Once dead the body is the ragdoll's: each part is drawn from its 3D points seen from above, the
-# lowest first, so a standing body hides its legs under the shoulders and a toppling one reveals
-# them. Limbs are tapered capsules between their joints and the trunk a loft of cross-sections, so
-# every part foreshortens and rounds off naturally as it tips toward or away from the camera.
+# --- Limbs, shadow and the fallen body --------------------------------------------------
+# Limbs are tapered capsules between 3D joints, drawn the same from the standing rig or the fallen
+# ragdoll. Once dead the body is the ragdoll's: each part is drawn from its 3D points seen from
+# above, the lowest first, so a standing body hides its legs under the shoulders and a toppling one
+# reveals them, with the trunk a loft of cross-sections, so every part foreshortens and rounds off
+# naturally as it tips toward or away from the camera.
 
 ## Points sampled around each trunk cross-section and each limb end.
 const SECTION_POINTS := 16
@@ -195,7 +252,7 @@ const WOUND_MIN_FACING := 0.3
 
 
 ## The shadow layer: a CanvasGroup behind the body carrying the shadow's alpha, around the node
-## the fallen body's shadow draws on (opaque, so overlapping parts merge into one shade).
+## the body's shadow draws on (opaque, so overlapping parts merge into one shade).
 func _build_shadow() -> void:
 	var group := CanvasGroup.new()
 	group.show_behind_parent = true
@@ -203,7 +260,16 @@ func _build_shadow() -> void:
 	add_child(group)
 	_shadow = Node2D.new()
 	group.add_child(_shadow)
-	_shadow.draw.connect(_draw_fallen_shadow)
+	_shadow.draw.connect(_draw_body_shadow)
+
+
+## The body's floor shadow, standing or fallen.
+func _draw_body_shadow() -> void:
+	var rd = _character.ragdoll
+	if rd == null:
+		_draw_standing_shadow()
+	else:
+		_draw_fallen_shadow(rd)
 
 
 ## Every part of the fallen body, lowest first.
@@ -224,19 +290,12 @@ func _draw_fallen(rd) -> void:
 
 ## The fallen body's floor shadow: each part's silhouette with every point shifted away from the
 ## light by its height, so the shadow closes in under the body as it lands.
-func _draw_fallen_shadow() -> void:
-	var rd = _character.ragdoll
-	if rd == null:
-		return
-	var shift := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized() \
-		* CharacterConfig.ragdoll_shadow_per_height
-	var cast := func(p: Vector3) -> Vector2: return Vector2(p.x, p.y) + shift * p.z
+func _draw_fallen_shadow(rd) -> void:
+	var cast := _shadow_caster()
 	for part in _fallen_parts(rd):
 		match part["kind"]:
 			"chain":
-				for seg in part["segs"]:
-					var poly := _capsule(cast.call(seg["a"]), cast.call(seg["b"]), seg["ra"], seg["rb"])
-					_shadow.draw_colored_polygon(poly, Color.BLACK)
+				_draw_limb_shadow(part, cast)
 			"hand":
 				_shadow.draw_circle(cast.call(part["at"]), _hands.hand_radius, Color.BLACK)
 			"head":
@@ -252,39 +311,55 @@ func _draw_fallen_shadow() -> void:
 func _fallen_parts(rd) -> Array:
 	var r: float = _character.radius
 	var parts := []
-	var arm: Array = CharacterConfig.ragdoll_arm_widths
-	var leg: Array = CharacterConfig.ragdoll_leg_widths
-	var shoe: Array = CharacterConfig.ragdoll_shoe_widths
 	for i in 2:
-		var shoulder: Vector3 = rd.point(Rag.SHOULDER[i])
-		var elbow: Vector3 = rd.point(Rag.ELBOW[i])
-		var hand: Vector3 = rd.point(Rag.HAND[i])
-		var hip: Vector3 = rd.point(Rag.HIP[i])
-		var knee: Vector3 = rd.point(Rag.KNEE[i])
-		var ankle: Vector3 = rd.point(Rag.ANKLE[i])
-		var calf := knee.lerp(ankle, 0.35)
-		var toes: Vector3 = rd.toes(i)
-		var foot := CharacterConfig.ragdoll_foot * r
-		var shin := CharacterConfig.ragdoll_shin * r
-		parts.append(_chain([
-			_seg(shoulder, elbow, arm[0], arm[1], CharacterConfig.ragdoll_upper_arm * r, body_color, "fabric"),
-			_seg(elbow, hand, arm[1], arm[2], CharacterConfig.ragdoll_forearm * r, skin_color, ""),
-		]))
-		parts.append(_chain([
-			_seg(hip, knee, leg[0], leg[1], CharacterConfig.ragdoll_thigh * r, pants_color, "fabric"),
-			_seg(knee, calf, leg[1], leg[2], shin * 0.35, pants_color, "fabric"),
-			_seg(calf, ankle, leg[2], leg[3], shin * 0.65, pants_color, "fabric"),
-			_seg(ankle - toes * foot * 0.25, ankle + toes * foot * 0.75, shoe[0], shoe[1], foot, shoe_color, ""),
-		]))
+		parts.append(_arm_chain(rd, i))
+		parts.append(_leg_chain(rd, i))
+		var elbow: Vector3 = rd.point(Rig.ELBOW[i])
+		var hand: Vector3 = rd.point(Rig.HAND[i])
 		parts.append({ "kind": "hand", "at": hand, "height": hand.z + 0.5, "along": hand - elbow, "side": i })
-	var head: Vector3 = rd.point(Rag.HEAD)
-	var chest: Vector3 = rd.point(Rag.CHEST)
-	var neck := CharacterConfig.ragdoll_neck_width
+	var head: Vector3 = rd.point(Rig.HEAD)
+	var chest: Vector3 = rd.point(Rig.CHEST)
+	var neck := CharacterConfig.body_neck_width
 	parts.append(_chain([_seg(chest, head, neck, neck,
-		(CharacterConfig.ragdoll_head_height - CharacterConfig.ragdoll_shoulder_height) * r, skin_color, "")]))
+		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, skin_color, "")]))
 	parts.append({ "kind": "head", "at": head, "height": head.z, "face": rd.face(), "neck": chest - head })
-	parts.append({ "kind": "trunk", "height": (chest.z + rd.point(Rag.PELVIS).z) * 0.5 })
+	parts.append({ "kind": "trunk", "height": (chest.z + rd.point(Rig.PELVIS).z) * 0.5 })
 	return parts
+
+
+## Side `i`'s arm as a limb chain from the joints of `j` (the rig or the ragdoll): the sleeve to the
+## elbow, the bare forearm to the center of the fist.
+func _arm_chain(j, i: int) -> Dictionary:
+	var r: float = _character.radius
+	var arm: Array = CharacterConfig.body_arm_widths
+	var shoulder: Vector3 = j.point(Rig.SHOULDER[i])
+	var elbow: Vector3 = j.point(Rig.ELBOW[i])
+	var hand: Vector3 = j.point(Rig.HAND[i])
+	return _chain([
+		_seg(shoulder, elbow, arm[0], arm[1], CharacterConfig.body_upper_arm * r, body_color, "fabric"),
+		_seg(elbow, hand, arm[1], arm[2], CharacterConfig.body_forearm * r, skin_color, ""),
+	])
+
+
+## Side `i`'s leg as a limb chain from the joints of `j`: the thigh, the shin in two parts (the
+## calf is wider than the ankle) and the shoe along the way the foot points.
+func _leg_chain(j, i: int) -> Dictionary:
+	var r: float = _character.radius
+	var leg: Array = CharacterConfig.body_leg_widths
+	var shoe: Array = CharacterConfig.body_shoe_widths
+	var hip: Vector3 = j.point(Rig.HIP[i])
+	var knee: Vector3 = j.point(Rig.KNEE[i])
+	var ankle: Vector3 = j.point(Rig.ANKLE[i])
+	var calf := knee.lerp(ankle, 0.35)
+	var toes: Vector3 = j.toes(i)
+	var foot := CharacterConfig.body_foot * r
+	var shin := CharacterConfig.body_shin * r
+	return _chain([
+		_seg(hip, knee, leg[0], leg[1], CharacterConfig.body_thigh * r, pants_color, "fabric"),
+		_seg(knee, calf, leg[1], leg[2], shin * 0.35, pants_color, "fabric"),
+		_seg(calf, ankle, leg[2], leg[3], shin * 0.65, pants_color, "fabric"),
+		_seg(ankle - toes * foot * 0.25, ankle + toes * foot * 0.75, shoe[0], shoe[1], foot, shoe_color, ""),
+	])
 
 
 ## One tapered limb segment from `a` to `b` (3D): its widths at each end in body radii, the true
@@ -409,8 +484,8 @@ static func _trunk_steps() -> PackedFloat32Array:
 func _trunk_outline(rd, project: Callable) -> PackedVector2Array:
 	var r: float = _character.radius
 	var basis: Basis = rd.torso()
-	var pelvis: Vector3 = rd.point(Rag.PELVIS)
-	var spine: float = (rd.point(Rag.CHEST) - pelvis).length()
+	var pelvis: Vector3 = rd.point(Rig.PELVIS)
+	var spine: float = (rd.point(Rig.CHEST) - pelvis).length()
 	var rings := []
 	for t in _trunk_steps():
 		var centre: Vector3 = pelvis + basis.y * t * spine
@@ -487,8 +562,8 @@ func _draw_trunk(rd) -> void:
 func _trunk_face(rd) -> Dictionary:
 	var r: float = _character.radius
 	var basis: Basis = rd.torso()
-	var pelvis: Vector3 = rd.point(Rag.PELVIS)
-	var spine: float = (rd.point(Rag.CHEST) - pelvis).length()
+	var pelvis: Vector3 = rd.point(Rig.PELVIS)
+	var spine: float = (rd.point(Rig.CHEST) - pelvis).length()
 	var sections: Array = CharacterConfig.ragdoll_trunk_sections
 	var bottom: float = ((sections[0] as Vector3).x - DOME_BOTTOM) * spine
 	var top: float = ((sections[sections.size() - 1] as Vector3).x + DOME_TOP) * spine
@@ -535,8 +610,8 @@ func _draw_wounds(rd) -> void:
 		return
 	var r: float = _character.radius
 	var basis: Basis = rd.torso()
-	var pelvis: Vector3 = rd.point(Rag.PELVIS)
-	var spine: float = (rd.point(Rag.CHEST) - pelvis).length()
+	var pelvis: Vector3 = rd.point(Rig.PELVIS)
+	var spine: float = (rd.point(Rig.CHEST) - pelvis).length()
 	var wounds := []
 	for impact in deformable.impacts:
 		var pos: Vector2 = impact["pos"]

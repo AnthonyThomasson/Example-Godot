@@ -5,15 +5,13 @@ extends Node2D
 ## (a shape query at the fist's raw punch position). The character sets `facing` and calls
 ## `punch(hand)`; visuals read `hand_position()` / `hand_radius`. WHICH hand punches and WHEN
 ## is decided by the held Item + the controller — this layer only animates and detects the
-## swing it is told to. The rest pose follows the character's pose (trailing the aim, swinging
-## with the walk, kicked back by recoil).
+## swing it is told to. The rest pose follows the character's pose (the stance the held item asks
+## for, trailing the aim, swinging with the walk, kicked back by recoil).
 
 ## Hand geometry (all in pixels, in the character's local space).
 @export var hand_radius: float = 4.0      ## Size of each hand circle.
-@export var hand_gap: float = -6.5        ## Gap between the body edge and a resting hand (negative: held in over the body).
-@export var hand_lateral: float = 7.0     ## How far each hand sits to its side of center.
 ## Gap between the body edge and where a punch's reach starts: a full swing lands the fist
-## `punch_gap + reach` beyond the body edge, however close the hands rest.
+## `punch_gap + reach` beyond the body edge, wherever the hand rests (its stance).
 @export var punch_gap: float = 5.5
 
 ## Emitted when the extended fist overlaps a body. `hand_index` is 0 (left) or 1 (right);
@@ -82,6 +80,11 @@ func _physics_process(delta: float) -> void:
 		_report_hits()
 
 
+## Both hands' extension, 0 (resting) .. 1 (fully punched).
+func punch_amounts() -> Array:
+	return _punch.duplicate()
+
+
 ## True while a swing is in progress (extend + retract).
 func is_attacking() -> bool:
 	return _attack_active
@@ -92,17 +95,23 @@ func hand_position(hand: int) -> Vector2:
 	return _hand_pos[hand]
 
 
+## How far a hand is thrown, 0 (resting) .. 1 (fully punched).
+func punch_amount(hand: int) -> float:
+	return _punch[hand]
+
+
 ## The hand's ideal local position, before any wall/object collision is applied: its rest pose
-## in the pose's frame for that hand (which trails and swings around the aim), then the punch extension
-## straight along `facing`.
+## in the pose's frame for that hand (its stance, which trails and swings around the aim), then the
+## punch extension straight along `facing`, far enough to land `punch_gap + reach` beyond the body edge.
 func _raw_hand_position(hand: int) -> Vector2:
-	var body_radius: float = _character.radius
 	var pose = _character.pose
 	var along := Vector2.from_angle(pose.hand_angles[hand])
 	var side := -1.0 if hand == 0 else 1.0
-	var rest := along * (body_radius + hand_radius + hand_gap) + along.orthogonal() * (hand_lateral * side)
+	var forward: float = pose.rest_forward(hand)
+	var lateral: float = pose.rest_lateral(hand)
+	var rest := along * forward + along.orthogonal() * (lateral * side)
 	rest += pose.hand_offset(hand)
-	var swing := punch_gap - hand_gap + _current_reach  # Rest pose → full extension.
+	var swing := maxf(_character.radius + hand_radius + punch_gap + _current_reach - forward, 0.0)  # Rest pose → full extension.
 	return rest + facing * (swing * _punch[hand])
 
 

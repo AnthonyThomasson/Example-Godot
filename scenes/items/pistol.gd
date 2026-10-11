@@ -26,14 +26,9 @@ func _init() -> void:
 	reach = 32.0
 
 
-## Only the weapon hand is shown.
-func visible_hands() -> Array:
-	return [WEAPON_HAND]
-
-
-## The weapon hand aims the pistol.
-func aiming_hands() -> Array:
-	return [WEAPON_HAND]
+## The weapon hand aims the pistol and the other hand cups its grip.
+func hand_stance(hand: int) -> StringName:
+	return &"aim" if hand == WEAPON_HAND else &"support"
 
 
 ## F: a melee jab with the weapon hand.

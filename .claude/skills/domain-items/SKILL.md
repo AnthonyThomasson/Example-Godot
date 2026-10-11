@@ -28,9 +28,10 @@ Write an `Item` subclass in `items/` and add a case in `ItemRegistry`. `ItemRegi
 sights, grip) through the Art domain: `PixelArt.render_turned(PistolPainter, ART_SIZE, color,
 PixelArt.snap_angle(angle), "metal")`, drawn rotated to the exact angle of the character's
 `weapon_facing()` (which trails the aim a touch as it turns) with its grip `GRIP_BACK` px behind
-the weapon hand. Its `aiming_hands()` is `[WEAPON_HAND]`, so that hand stays steady while walking. The character visuals draw the
-weapon before the hands, so the fist grips it. Firing calls `user.kick(WEAPON_HAND)`, so the hand
-(and the gun in it) recoils.
+the weapon hand. Its `hand_stance()` is `aim` for `WEAPON_HAND` (arm reaching out, steady while walking)
+and `support` for the other hand, which cups the grip: a two-handed hold. The character visuals draw the
+weapon before the fists, so they grip it. Firing calls `user.kick(WEAPON_HAND)`, so the weapon hand
+(and the gun in it) recoils, and the supporting hand with it by its stance's `recoil_share`.
 
 ## Dropping on death
 
@@ -55,9 +56,10 @@ The pistol is the one place Items reaches into the Projectile System
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Items ↔ Character** (interface 6): `Item` (`items/item.gd`) exposes `display_name`, `reach`,
-  `visible_hands()`, `aiming_hands()`, `primary(user)` (F), `secondary(user)` (LMB),
+  `hand_stance(hand)` (how that hand is held: a `CharacterConfig.stances` name — `relaxed` by default,
+  `guard` for fists, `aim` / `support` for the pistol), `primary(user)` (F), `secondary(user)` (LMB),
   `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate, opts)`.
   The character API an item may call: `facing`, `punch(hand)`, `hand_position(hand)`,
-  `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`,
-  `kick(hand)`, `weapon_facing()`.
+  `hand_world(hand)`, `muzzle_origin(hand)` (`CharacterConfig.muzzle_ahead` past the hand),
+  `world_root()`, `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`.
 - **Items → Art** (interface 12): the pistol's art via `PixelArt.render_turned` / `snap_angle`.

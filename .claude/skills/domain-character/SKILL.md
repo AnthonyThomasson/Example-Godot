@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, hands, the punch, death and the ragdoll fall, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands, punch hit detection, death / the fallen body, or the player/NPC scene wiring. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, the full standing body (arms, legs, feet on a solved skeleton), hand stances, the punch, death and the ragdoll fall, and the control/animate/draw layering. Use when editing scenes/character/ or working on character movement, facing, hands and arms, how a weapon is held, punch hit detection, the walk cycle, death / the fallen body, or the player/NPC scene wiring. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -18,52 +18,103 @@ its own child `Node2D`.
 - **Control** (`character.gd`, root body) owns state + physics: computes `facing`, moves, and
   forwards intent from its controller. Never draws.
 - **Animate** (`character_hands.gd`, a child `Node2D`) owns hand geometry, the punch tween, and
-  punch hit detection; exposes `hand_position(i)` and the `punched` signal. `character_pose.gd`
-  (a `RefCounted` the character owns as `pose`) owns the living motion of head, shoulders and
-  hands (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
-- **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the shoulders, the head (with
-  its shadow on the shoulders), then `item.draw_weapon()`, then the hands the held item wants
-  shown (on top, gripping the weapon), then the wound marks over all of it. Once dead it draws the
-  fallen body instead (below).
+  punch hit detection; exposes `hand_position(i)`, `punch_amount(i)` and the `punched` signal.
+  `character_pose.gd` (a `RefCounted` the character owns as `pose`) owns the living motion of head,
+  shoulders, hips and hands, and each hand's stance (below); `character_rig.gd` (a `RefCounted`
+  solved fresh by `character.rig()`) owns the standing skeleton, the 3D joints of the arms and legs
+  (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
+- **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the legs and shoes, the arms
+  (sleeve, then forearm), the shoulders (at the pose's lunge), the head (with its shadow on the
+  shoulders), then `item.draw_weapon()`, then both fists (on top, gripping the weapon), then the
+  wound marks over all of it. Once dead it draws the fallen body instead (below).
 
 ## Pose (the living motion)
 
 `character_pose.gd` layers motion over the aim; it is visual only (aim, shots and punches stay on
 `facing`). `character.gd` steps it with `pose.update(delta, facing, get_real_velocity(), speed,
-aiming)` (`aiming` = the held item's `aiming_hands()`) right after `move_and_slide()` (and with zero velocity while busy in an interaction; a dead
+stances, punch)` (`stances` = the held item's `hand_stance(0)` / `(1)`, `punch` = `Hands.punch_amounts()`)
+right after `move_and_slide()` (and with zero velocity while busy in an interaction; a dead
 character stops stepping it), before the Hands child's `_physics_process`, so hands build on this
 frame's pose.
 - `head_angle`, `hand_angles[hand]`, `weapon_angle`, `torso_angle` each chase `facing` on their
-  own damped angular spring — the head first, an aiming hand next, the weapon a touch behind the
+  own damped angular spring — the head first, a steady hand next, the weapon a touch behind the
   hand holding it, each free hand at its own pace (`pose_hand_pace_spread`), the shoulders last —
   so a turn ripples through the body. Past its `max_lag` a part is reeled in at `pose_lag_catch`
   rather than snapped, so a sudden flick stays continuous.
+- **Hips:** `hip_angle` (the feet's facing) is planted while standing, so the shoulders twist over
+  feet that stay put, and turns to the walking direction while walking (a backward step keeps the
+  feet facing the aim). The shoulders may twist `pose_hip_twist` off the hips before the feet
+  re-plant toward the aim.
 - A stride phase advances with distance walked: the shoulders sway, free hands swing fore/aft in
-  opposite phase while an aiming hand stays steady and only drifts sideways (`hand_offset(hand)`),
-  the head bobs per step. `head_offset` leans the head into the movement on a soft spring plus a
-  slow breath; standing still the head also glances a little off the aim. Each character gets a
-  random phase.
+  opposite phase (their stance's `swing`) while a steady hand only drifts sideways
+  (`hand_offset(hand)`), the head bobs per step, and the rig strides the feet. `head_offset` leans
+  the head into the movement on a soft spring plus a slow breath; standing still the head also
+  glances a little off the aim. Each character gets a random phase.
+- **Punch mechanics:** the fist lands about 51 px from the body centre but an arm is 38 px, so a
+  punch commits the body, following the fist's extension: `torso_angle` includes a twist toward the
+  punching side (`pose_punch_twist`; it sits on top of the spring's own angle, so wounds recorded
+  against it stay consistent) and `torso_offset` lunges the upper body along `facing`
+  (`pose_punch_lunge`; the head's `head_offset` includes it). The rig adds a capped residual shoulder
+  lean-in.
+- **Stances:** each hand eases (`stance_ease`) toward the stance its item names. `rest_forward(hand)`,
+  `rest_lateral(hand)`, `grip_height(hand)` and `elbow_pole(hand)` are the eased values the hands layer
+  and the rig read.
 - `weapon_angle` is published as the character's `weapon_facing()`, which an item draws its weapon
   along.
 - `kick(hand)` (the character's `kick`, called by the pistol on firing) throws the hand back on a
-  recoil spring and twists the shoulders back on its side.
-- Tuning: `CharacterConfig.pose_*` (per-part spring `freq` / `damping` / `max_lag` for head, aiming
-  hand, weapon, free hands and shoulders; lag catch, hand pace spread, stride, sway, hand swing, aim
-  drift, bob, lean, breath, glance, recoil).
+  recoil spring and twists the shoulders back on its side; the other hand feels its stance's
+  `recoil_share` (a supporting hand recoils with the weapon hand).
+- Tuning: `CharacterConfig.pose_*` (per-part spring `freq` / `damping` / `max_lag` for head, steady
+  hands, weapon, free hands, shoulders and hips; lag catch, hand pace spread, hip twist, stride,
+  sway, steady drift, punch twist and lunge, bob, lean, breath, glance, recoil) and
+  `CharacterConfig.stances` / `stance_ease`.
+
+## Stances (how a hand is held)
+
+`CharacterConfig.stances` is a data table: stance name → `forward` / `lateral` (px, in the hand's
+pose frame, from the body center), grip `height` (body radii, for the arm's IK), walk `swing` (px),
+`steady` (aim-style spring: follows the aim closely, only drifts), `recoil_share` and `elbow_pole`
+(out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
+(arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
+`support` (the other hand cupping it: the pistol's two-handed hold). To add a pose, add a table row
+and have an item name it. `CharacterConfig.muzzle_ahead` is how far past the weapon hand bullets
+leave (`muzzle_origin(hand)`).
+
+## The rig (the standing skeleton)
+
+`character_rig.gd` solves the body's 3D joints (local x/y plus height z) from the live pose and the
+hands, every time `character.rig()` is called (cheap; no cache). It exposes them through `point(i)`
+by index (`HEAD`, `CHEST`, `PELVIS`, `BELLY`, `SPINE` and per-side `SHOULDER`, `HIP`, `ELBOW`,
+`HAND`, `KNEE`, `ANKLE`; side 0/1 matching the hands) and each foot's direction through `toes(i)`.
+`character_ragdoll.gd` re-exports the same indices.
+- Upper body: chest and shoulders sit in the pose's twisted torso frame, shifted by `torso_offset`;
+  hips and feet in its `hip_angle` frame. Proportions are `CharacterConfig.body_*`, in body radii
+  (shoulders at `body_shoulder_height`, hips at `body_hip_height`, arms `body_upper_arm` +
+  `body_forearm` ≈ 38 px, legs `body_thigh` + `body_shin`).
+- Arms: two-bone IK (`_bend`) from each shoulder to where the hands layer holds the fist, at the
+  stance's grip height, the elbow toward the stance's pole. If the hand is out of reach
+  (`body_arm_extension` of the arm's length) its shoulder follows it, up to `body_shoulder_reach`;
+  past that the forearm stretches a little.
+- Legs: each ankle strides along the hips' forward by `body_stride`, in opposition to the arm on its
+  side, lifting `body_foot_lift` as it swings through; the knee is IK bent forward; toes follow
+  `hip_angle`.
+- The same rig is what the ragdoll starts from, so a body dies in exactly the pose it was drawn in.
+- Test: `tests/character/standing_body_rig_test.gd` (bone lengths, stances, punch landing, hips,
+  stride, death continuity).
 
 ## Death and the fall (the ragdoll)
 
 `_apply_damage(amount, direction)` (shared by `take_hit`, which passes the shot's direction, and
 `take_damage`, the punch path) calls `_die(direction)` at zero health. `_die` leaves layer 1 and
 moves to `CharacterConfig.ragdoll_z_index` (beneath the living, above blood pools), ends any
-interaction, builds `ragdoll` from the live pose with the body's momentum (walk + knockback,
+interaction, builds `ragdoll` from the rig's joints with the body's momentum (walk + knockback,
 including the killing blow's shove), lets go of the held item (`Item.drop(self, momentum + toss)`;
 a returned node removes the slot, so `current_item()` may be null on a corpse), then emits `died`.
 While dead `_physics_process` only steps the ragdoll (`step(delta, space, global_position)`); the
 pose and hands stop.
 
 `character_ragdoll.gd` builds a humanoid on the Physics domain's generic `Ragdoll` (3D points
-over the floor: local x/y + height z), its indices as consts (`HEAD`, `CHEST`, `PELVIS`, `BELLY`,
+over the floor: local x/y + height z), its indices the rig's (`HEAD`, `CHEST`, `PELVIS`, `BELLY`,
 `SPINE`, and per-side pairs `SHOULDER`, `HIP`, `ELBOW`, `HAND`, `KNEE`, `ANKLE`, side 0/1 matching the
 hands):
 - A rigid trunk (chest, pelvis, belly and back, shoulders, hips): the belly/back radii reach just
@@ -73,9 +124,9 @@ hands):
   swing cones at the neck (rest up), shoulders and hips (rest down, out/in mirrored per side), and
   one-way hinges at the elbows (bend toward the front) and knees (toward the back), so no joint
   ever bends backward. Ranges are `CharacterConfig.ragdoll_*_limits` / `_bend` / `_slack` (degrees).
-- Starts in the live pose: trunk upright turned to `pose.torso_angle`, head at `head_offset`, fists
-  where the hands hold them (elbows by two-bone IK, pointing back and out), feet under the hips
-  fore/aft by the stride (`pose.stride_phase()` / `walk_amount()`), knees a touch bent.
+- Starts exactly in the rig's pose (`character_rig.gd`): trunk upright turned to `pose.torso_angle`,
+  head at `head_offset`, fists where the hands hold them (elbows by two-bone IK), feet striding
+  under the hips, knees a touch bent.
 - Launch: every point carries the momentum, the upper body is pushed along the blow
   (`ragdoll_hit_topple`, fading to nothing at the hips; weaker and along the momentum or a random
   way with no blow), the knees buckle forward (`ragdoll_knee_buckle`) and each point gets a random
@@ -87,8 +138,8 @@ hands):
 points seen from above, sorted by height (lowest first), so a standing body hides its legs under
 the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
 - Limbs are chains of tapered capsules between the projected joints (the true silhouette of a limb
-  seen from any angle), widths per joint from `ragdoll_arm_widths` / `ragdoll_leg_widths` (hip,
-  knee, calf, ankle) / `ragdoll_shoe_widths` / `ragdoll_neck_width`, so neighbours share a joint's
+  seen from any angle), widths per joint from `body_arm_widths` / `body_leg_widths` (hip,
+  knee, calf, ankle) / `body_shoe_widths` / `body_neck_width`, so neighbours share a joint's
   width. A chain draws every segment a pixel wider in its outline tone first, then the fills, so its
   joints run together under one outline. Each fill maps a `limb_painter.gd` strip (shaded across,
   fabric for cloth) onto the capsule: sleeves (`body_color`), forearms and neck (`skin_color`),
@@ -107,7 +158,7 @@ the shoulders and a toppling one reveals them; lengths foreshorten as parts tip.
   `Deformation.draw_marks` only while that patch faces the camera — chest wounds on a body lying on
   its back, back wounds on one face down.
 - A floor shadow per part (the trunk's is its outline) with each point shifted from the light by its
-  height (`ragdoll_shadow_per_height`), drawn opaque inside a code-built `CanvasGroup` that carries
+  height (`body_shadow_per_height`), drawn opaque inside a code-built `CanvasGroup` that carries
   the alpha, so overlaps don't stack. Redrawing stops once the body has settled.
 
 **Bleeding out:** `blood_origin()` is the character's position while alive and its trunk's middle
@@ -117,30 +168,37 @@ once fallen (blood pools sample it). When the ragdoll first settles the characte
 ## Pixel art
 
 The character is top-down pixel art rendered through the Art domain (interface 12):
-- Three private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
+- Four private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
   (`body_color`) with sleeve seams, the dark neck ring and an optional backpack with straps;
   `head_painter.gd` — skin with ears and a nose toward the front under a `hair_style` (`short` /
   `long` / `buzz` / `beanie` / `cap`) in `hair_color`, on its own canvas (`radius_for(width)`,
   `canvas_for(r)`); `hand_painter.gd` — a fist with knuckles to the front and the thumb on the
-  inner side (`side`).
+  inner side (`side`); `limb_painter.gd` — the shaded strip of one arm, leg or shoe segment, which
+  the visuals map onto the limb's tapered capsule between two rig joints (the same drawing the
+  fallen body uses: `_arm_chain` / `_leg_chain` / `_draw_chain`). Standing, the sleeve and forearm
+  of each arm and the leg and shoe on each side draw under or around the shoulders (legs lowest,
+  then arms, then the shoulders at `torso_offset`).
 - `character_visuals.gd` renders each with `PixelArt.render_turned(..., snap_angle(angle), ...)` —
   lit for the nearest of `ArtConfig.turn_steps` steps — and draws it rotated to the exact angle of
   its part from the pose: the shoulders at `torso_angle`, the head at `head_angle` shifted by
   `head_offset`, each hand at its `hand_angles[hand]`. Each goes through `Deformation.draw_shape(..., texture,
   texture_angle, false)` so shots dent the art and darken it, then `Deformation.draw_marks` once
   on top in the flesh crack/hole/scorch colors. The head casts its shadow onto the shoulders (its
-  silhouette `ArtConfig.cast_shadow_px` away from the light at `cast_shadow_darken`). The drop
-  shadow is the shoulders' own silhouette, offset by `flesh_coverage × drop_shadow_per_coverage`
-  like furniture.
+  silhouette `ArtConfig.cast_shadow_px` away from the light at `cast_shadow_darken`). The floor
+  shadow (living and fallen alike) is one `CanvasGroup` of opaque shapes carrying
+  `ArtConfig.drop_shadow_alpha` — the shoulders' own deformed silhouette, each limb's capsule, the
+  fists and the head — every point shifted away from the light by `body_shadow_per_height × height`,
+  so overlaps don't darken twice. It is redrawn every frame while alive.
 - **Wounds turn with the shoulders:** `take_hit` records impacts relative to them
   (`Deformable.record(hit, pose.torso_angle)`) and the visuals turn them back to the current
   `torso_angle`, so a dent stays on the shoulder or hand that was hit. A part (hand or head) is
   dented by the shots whose path
   crossed it before they struck the body: each is re-seated where the shot entered the part, its
-  depth scaled by part size / body radius. A hand mid-punch has left its wounds behind.
+  depth scaled by part size / body radius. A hand mid-punch has left its wounds behind. Limbs are
+  not dented (shots hit the body circle). While the upper body lunges, wounds move with it.
 - Look exports on `Visuals`: `body_color`, `hand_color` (skin or glove), `skin_color`,
-  `hair_color`, `hair_style`, `backpack`, `pack_color`, and `pants_color` / `shoe_color` (seen once
-  fallen). The defender preset wears a navy cap, khaki pants and brown shoes; the invader a dark
+  `hair_color`, `hair_style`, `backpack`, `pack_color`, and `pants_color` / `shoe_color` (the legs and shoes, seen
+  where they stride out from under the body). The defender preset wears a navy cap, khaki pants and brown shoes; the invader a dark
   beanie, gloves, a backpack and dark jeans. Proportions/defaults: `CharacterConfig.art_*`.
 
 Ordering: a parent's `_physics_process` runs before its children's, so the hands see the
@@ -161,11 +219,13 @@ frame doesn't snap speed. Test: `tests/character/walk_into_furniture_speed_test.
 - **Facing:** `character.gd` points `facing` from itself to `aim_point` (the mouse, set by the
   controller) each frame. The node is never rotated, so hand math stays in local space.
 - **Hands:** two circles at a rest pose built in each hand's pose frame (`hand_angles[hand]` + its
-  perpendicular, plus `pose.hand_offset(hand)` for walk swing and recoil), the punch extending
-  straight along `facing`, collision-resolved so they rest on walls/objects. Tunable via `character_hands.gd`'s exports: `hand_radius`, `hand_gap`
-  (negative: the fists rest in against the chest), `hand_lateral`, and `punch_gap`. A punch
-  swings the fist from its rest pose to `punch_gap + reach` beyond the body edge, so the rest pose
-  doesn't change how far a punch lands.
+  perpendicular): the hand's stance (`pose.rest_forward` / `rest_lateral`, from
+  `CharacterConfig.stances`) plus `pose.hand_offset(hand)` for walk swing and recoil, the punch
+  extending straight along `facing`, collision-resolved so they rest on walls/objects (the rig's
+  arm just bends more when a wall pulls the hand in). Tunable via `character_hands.gd`'s exports:
+  `hand_radius` and `punch_gap`. A punch swings the fist from its rest pose to `punch_gap + reach`
+  beyond the body edge (`swing = radius + hand_radius + punch_gap + reach − rest_forward`), so the
+  stance doesn't change how far a punch lands.
 
 ## Punch hit detection
 
@@ -214,4 +274,4 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
   `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
   `report_shot(body, dmg)`, `kick(hand)`, `weapon_facing()`; and reads the item's
-  `aiming_hands()`, calling its `drop(user, velocity)` on death.
+  `hand_stance(hand)` (how each hand is held), calling its `drop(user, velocity)` on death.
