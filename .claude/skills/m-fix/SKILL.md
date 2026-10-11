@@ -1,6 +1,6 @@
 ---
-name: fix
-description: Fix a bug the user describes by first reproducing it as a failing game test, then fixing the code until it passes. Manual-only — run as `/fix <description of what is going wrong>`.
+name: m-fix
+description: Fix a bug the user describes by first reproducing it as a failing game test, then fixing the code until it passes. Manual-only — run as `/m-fix <description of what is going wrong>`.
 argument-hint: <description of what is going wrong>
 disable-model-invocation: true
 model: opus
@@ -56,8 +56,7 @@ rerun just that with `tools/run_tests.sh --failed`. Report unrelated failures; d
 ## 6. Wrap up
 
 If the fix changed a domain's internals or an interface, update that `domain-<name>` skill (and
-`architecture` for an interface). Don't commit unless asked; `analysis-change-verification` is the step
-before a commit.
+`architecture` for an interface). Don't commit unless asked.
 
 Report: root cause, the test added (path), the red → green result lines, files changed, and anything
 left uncovered.

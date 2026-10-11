@@ -13,6 +13,7 @@ const MOVE_LEFT := "move_left"
 const MOVE_RIGHT := "move_right"
 const MOVE_UP := "move_up"
 const MOVE_DOWN := "move_down"
+const RUN := "run"
 const PUNCH := "punch"
 const FIRE := "fire"
 const INTERACT := "interact"
@@ -48,6 +49,7 @@ const DEFAULTS := {
 	MOVE_RIGHT: KEY_D,
 	MOVE_UP: KEY_W,
 	MOVE_DOWN: KEY_S,
+	RUN: KEY_SHIFT,
 	PUNCH: KEY_F,
 	INTERACT: KEY_SPACE,
 	MENU: KEY_ESCAPE,
@@ -82,6 +84,7 @@ const LABELS := {
 	MOVE_DOWN: "Move down",
 	MOVE_LEFT: "Move left",
 	MOVE_RIGHT: "Move right",
+	RUN: "Run (hold)",
 	PUNCH: "Punch",
 	FIRE: "Fire",
 	INTERACT: "Interact",
@@ -110,6 +113,7 @@ const GROUPS := {
 	MOVE_DOWN: "Movement",
 	MOVE_LEFT: "Movement",
 	MOVE_RIGHT: "Movement",
+	RUN: "Movement",
 	PUNCH: "Combat",
 	FIRE: "Combat",
 	INTERACT: "Interaction",
@@ -316,6 +320,11 @@ func _deserialize(value: Variant) -> InputEvent:
 ## Movement direction from the four move actions, ready to multiply by speed.
 func get_move_vector() -> Vector2:
 	return Input.get_vector(MOVE_LEFT, MOVE_RIGHT, MOVE_UP, MOVE_DOWN)
+
+
+## True while the run key is held.
+func is_run_pressed() -> bool:
+	return Input.is_action_pressed(RUN)
 
 
 ## Manual camera pan direction from the four camera actions (length <= 1).

@@ -5,7 +5,7 @@ description: Audit the WHOLE codebase for accumulated rot, rather than verifying
 
 # Cleanup — whole-codebase health audit
 
-`analysis-change-verification` gates **one diff** before it is committed. This skill audits the **codebase as
+`/m-audit` gates **one diff** before it is committed. This skill audits the **codebase as
 it stands**, looking for what accumulates *between* changes: code nothing calls any more,
 mechanisms whose consumer was removed, duplication that crept in, boundaries that eroded, domains
 that outgrew one folder, and documentation that quietly stopped being true.
@@ -107,9 +107,7 @@ dispatch that no grep can follow, and each of these is a real mechanism in use:
   match HUD and command server find NPC state by probing for `current_act()` / `debug_status()` /
   `debug_state()`. The *caller* never names the method's file.
 - **`Expression` eval** — `general/command_server.gd` evaluates arbitrary GDScript from
-  `tools/gcmd.py`, so anything reachable from a `gcmd` verb is live. Check
-  `.claude/commands/test-ai-behavior.md` too: it passes `--defender`/`--invader` export overrides
-  as raw GDScript.
+  `tools/gcmd.py`, so anything reachable from a `gcmd` verb is live.
 - **Scene-wired signals and exported `NodePath`s** — the connection lives in the `.tscn`, not in
   any `.gd`.
 - **Contract methods** — `get_surface()`, `take_hit()`, `get_interactions()`, `apply_impulse()`,
@@ -170,7 +168,7 @@ Not "two lines look alike" — duplication that means one fix will have to be ma
 
 ## Step 3 — Domain isolation, repo-wide
 
-Step 1 of `analysis-change-verification` asks this of a diff; ask it of every boundary that exists. For each
+Step 1 of `/m-audit` asks this of a diff; ask it of every boundary that exists. For each
 cross-domain reference, is the connection **crucial**, and is it one of the **vital interfaces** in
 the `architecture` skill?
 
@@ -248,11 +246,7 @@ mechanism or method was removed (Step 1a/1b), the skill passages describing it m
 deleted read-only accessor still listed as a sub-domain interface, or a removed signal still in the
 Character interface recap, is the usual instance.
 
-**4. `.claude/commands/test-ai-behavior.md`** — it passes real GDScript into the game, so stale
-content actively breaks. A removed or renamed export leaves dead `--defender`/`--invader` override
-lines; a changed decision rule leaves a wrong "Expected:" note.
-
-**5. Code comments.** The rules: no history or rationale-for-change ("was X", "renamed from", "now
+**4. Code comments.** The rules: no history or rationale-for-change ("was X", "renamed from", "now
 emits", "no longer", "used to", "formerly", "previously", speculative "later / in future"); concise
 over restating the code; a `##` doc comment on every method and property (lifecycle overrides
 exempt); inline `#` only for a genuine gotcha, ordering dependency, or geometry subtlety; one `##`

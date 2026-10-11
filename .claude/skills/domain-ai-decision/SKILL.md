@@ -41,7 +41,7 @@ summary fills `{summary}`; `summary_inside` within a confined subtree), `bind` +
 state, since the options carry each candidate's details), `requires` (fact names, `!` negates; a bound
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, or one whose
-route passes a known hostile), `primitive`, `params` (defaults merged under each option's own params).
+route passes a known hostile), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it).
 A node may mix `children` and `options`. A node whose option groups end up empty (every flank side
 dropped; MELEE while the target isn't point-blank) has no leaf, so it isn't offered at all. Adding a
 mode or tactic = adding a node (+ a perception option group if it needs new places).

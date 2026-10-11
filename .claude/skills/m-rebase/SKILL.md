@@ -1,6 +1,6 @@
 ---
-name: rebase
-description: Rebase this branch onto the latest origin/main, keeping uncommitted changes, and resolve conflicts (asking when intent is unclear). Manual only — invoked as `/rebase`.
+name: m-rebase
+description: Rebase this branch onto the latest origin/main, keeping uncommitted changes, and resolve conflicts (asking when intent is unclear). Manual only — invoked as `/m-rebase`.
 disable-model-invocation: true
 ---
 

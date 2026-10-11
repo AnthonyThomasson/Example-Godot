@@ -46,6 +46,10 @@ var fire_cooldown: float = 0.5
 var reposition_interval: float = 0.5
 # Locomotion config (forwarded to the Locomotion child in setup()).
 var arrive_dist: float = 10.0
+# Running: whether the NPC may sprint on the way to a destination (see `_should_run`).
+var run_enabled: bool = true ## May sprint at all.
+var run_min_distance: float = 150.0 ## Only run when farther than this (px) from the destination.
+var run_start_fraction: float = 0.5 ## Stamina needed to START a run (once running it goes on until dry).
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
 var rooms: Array = []
@@ -72,6 +76,7 @@ var _engage_id := 0               ## Instance id of the contact being fought (0 
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
 var _engage_inside := false       ## Whether that contact was last seen inside the house.
+var _running := false             ## The character was running last tick (for the status line).
 var _hold_ground := false         ## Combat: stay inside the house (territorial vs. an outsider).
 var _combat_phase := "peek"       ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
 var _cover_timer := 0.0           ## Seconds left ducking behind cover before peeking again.
@@ -169,15 +174,15 @@ func activity_text() -> String:
 func _progress() -> String:
 	match _primitive:
 		&"move":
-			return "reached it" if _arrived else "en route"
+			return "reached it" if _arrived else ("running" if _running else "en route")
 		&"engage":
 			if not _arrived:
-				return "moving into position"
+				return "running into position" if _running else "moving into position"
 			if _params.get("style", &"peek_cover") == &"ambush":
 				return "in ambush, waiting for a shot"
 			return "in position, %s" % ("ducking behind cover" if _combat_phase == "cover" else "looking for a shot")
 		&"melee":
-			return "closing in to punch"
+			return "running in to punch" if _running else "closing in to punch"
 		&"interact":
 			return "using it" if _in_interaction else "walking to it"
 	return "waiting" if not _labels.is_empty() else ""
@@ -192,6 +197,7 @@ func debug_state() -> Dictionary:
 		"primitive": String(_primitive),
 		"params": _json_safe(_params),
 		"arrived": _arrived,
+		"running": _running,
 		"engage": str(_engage_node.name) if is_instance_valid(_engage_node) else "",
 		"engage_id": _engage_id,
 		"engage_inside": _engage_inside,
@@ -454,6 +460,35 @@ func apply(character, delta: float) -> void:
 			_apply_interact(character)
 		_:
 			_apply_hold(character)
+	character.run_input = _should_run(character)
+	_running = character.is_running()
+
+
+## Whether to sprint this tick, judged after the primitive has steered: only while travelling to a
+## destination (a move or engage approach that hasn't arrived, a melee closing in; never an ambush,
+## peek, room search, interaction or hold), when the leaf asks for it (`params.run`) or the NPC is under
+## fire, the destination is farther than `run_min_distance`, and a run can be started (stamina
+## `run_start_fraction`, or already running). The Character spends the stamina and runs dry on its own.
+func _should_run(character) -> bool:
+	if not run_enabled or character.move_input == Vector2.ZERO:
+		return false
+	var dest := _point
+	match _primitive:
+		&"move":
+			if _arrived or _look_around:
+				return false
+		&"engage":
+			if _arrived:
+				return false
+		&"melee":
+			dest = _engage_pos
+		_:
+			return false
+	if not _params.get("run", false) and not (_perception != null and _perception.under_fire()):
+		return false
+	if character.global_position.distance_to(dest) <= run_min_distance:
+		return false
+	return character.is_running() or character.stamina_fraction() >= run_start_fraction
 
 
 ## Move: walk to the destination (or into the destination room), aiming as the leaf asks, and — when
@@ -656,6 +691,8 @@ func _apply_melee(character) -> void:
 ## Equip `slot` and throw one shot (pistol) or punch, refreshing the combat engagement so an active
 ## fight stays committed.
 func _fire(character, slot: int) -> void:
+	if slot == PISTOL_SLOT and character.is_running():
+		return  # No shooting at a run: keep the cooldown for when it stops.
 	_perception.note_engaged()
 	_fire_timer = fire_cooldown
 	character.select_slot(slot)

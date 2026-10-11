@@ -40,6 +40,13 @@ var _bled_out := false
 ## Intent, written each frame by the controller.
 var move_input := Vector2.ZERO   ## Desired move direction (already 0–1 length).
 var aim_point := Vector2.ZERO    ## World point to face.
+var run_input := false           ## Wants to run; honoured only while moving with stamina left.
+
+## Stamina as a fraction of a full bar; spent while running, regained otherwise.
+var stamina := 1.0
+## Ran dry: walks until stamina refills to `CharacterConfig.run_resume_fraction`.
+var _exhausted := false
+var _running := false  ## Running this frame.
 
 ## Inventory (slot id -> Item) and the currently held slot.
 var _items := {}
@@ -126,6 +133,7 @@ func _physics_process(delta: float) -> void:
 	if _interaction.is_busy():
 		move_input = Vector2.ZERO
 		velocity = Vector2.ZERO
+		_update_stamina(false, delta)
 		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
 		_hands.facing = facing
 		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts())
@@ -139,7 +147,8 @@ func _physics_process(delta: float) -> void:
 	# facing on the same frame.
 	_hands.facing = facing
 
-	velocity = move_input * speed * _push_slow + _knockback
+	_update_stamina(run_input and move_input.length() > CharacterConfig.run_min_input, delta)
+	velocity = move_input * _move_speed() * _push_slow + _knockback
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
@@ -157,10 +166,11 @@ func melee() -> void:
 	item.primary(self)
 
 
-## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction.
+## Shoot the held item (left-click): runs its secondary action. Ignored while locked in an interaction
+## or running (the arms are down at the sides).
 func shoot() -> void:
 	var item := current_item()
-	if is_busy() or item == null:
+	if is_busy() or item == null or _running:
 		return
 	item.secondary(self)
 
@@ -204,6 +214,36 @@ func is_busy() -> bool:
 ## The active interaction's HUD label, or "" when idle.
 func interaction_label() -> String:
 	return _interaction.active_label()
+
+
+## True while moving at run speed (asked to run, moving, and not out of stamina).
+func is_running() -> bool:
+	return _running
+
+
+## Stamina left, 0..1 of a full bar.
+func stamina_fraction() -> float:
+	return stamina
+
+
+## Walking speed, or run speed while running.
+func _move_speed() -> float:
+	return speed * (CharacterConfig.run_speed_mult if _running else 1.0)
+
+
+## Settle this frame's running and spend or regain stamina. Running dry latches `_exhausted`,
+## which holds until stamina refills to `run_resume_fraction`.
+func _update_stamina(wants_run: bool, delta: float) -> void:
+	_running = wants_run and not _exhausted and stamina > 0.0
+	if _running:
+		stamina = maxf(stamina - delta / CharacterConfig.run_stamina_seconds, 0.0)
+		if stamina <= 0.0:
+			_exhausted = true
+			_running = false
+	else:
+		stamina = minf(stamina + delta * CharacterConfig.stamina_regen_per_sec, 1.0)
+		if _exhausted and stamina >= CharacterConfig.run_resume_fraction:
+			_exhausted = false
 
 
 ## A punch landed: surface it as hit_landed and post a world `&"hit"` event (like a projectile's)
@@ -265,8 +305,10 @@ func weapon_facing() -> Vector2:
 
 
 ## How each hand is held (CharacterConfig.stances names), as the held item asks: arms hang with
-## nothing held.
+## nothing held. Running puts both arms down at the sides whatever is held.
 func _stances() -> Array:
+	if _running:
+		return [&"run", &"run"]
 	var item: Item = current_item()
 	if item == null:
 		return [&"relaxed", &"relaxed"]
@@ -361,7 +403,7 @@ func _die(direction: Vector2) -> void:
 	collision_layer = 0
 	z_index = CharacterConfig.ragdoll_z_index
 	end_interaction()
-	var momentum := move_input * speed * _push_slow + _knockback
+	var momentum := move_input * _move_speed() * _push_slow + _knockback
 	ragdoll = CharacterRagdoll.new(self, momentum, direction)
 	_drop_item(momentum)
 	velocity = Vector2.ZERO
@@ -428,7 +470,7 @@ func _apply_pushes() -> float:
 		# Carry the object along rather than launch it: never drive it faster than we walk.
 		if collider.has_method("get_mass") and "linear_velocity" in collider:
 			var along: float = collider.linear_velocity.dot(dir)
-			var gap := maxf(move_input.dot(dir) * speed * CharacterConfig.push_carry_factor - along, 0.0)
+			var gap := maxf(move_input.dot(dir) * _move_speed() * CharacterConfig.push_carry_factor - along, 0.0)
 			impulse = minf(impulse, gap * collider.get_mass())
 		collider.apply_impulse(dir * impulse)
 		if collider.has_method("get_mass"):

@@ -210,6 +210,13 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 @export_group("")
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 @export var arrive_dist: float = 10.0
+## Running: may the NPC sprint (spending stamina) on the way to a destination when its decision-tree
+## node asks for it (`run`) or it is under fire.
+@export var run_enabled: bool = true
+## Only run when the destination is farther than this (px), so short hops don't burn stamina.
+@export var run_min_distance: float = 150.0
+## Stamina fraction (0..1) needed to start a run; once running it goes on until the Character runs dry.
+@export var run_start_fraction: float = 0.5
 ## NavigationAgent2D used for pathing (a sibling under the character); set in the NPC scene.
 @export var nav_agent_path: NodePath
 
@@ -353,6 +360,9 @@ func _apply_config() -> void:
 	_behavior.fire_cooldown = fire_cooldown
 	_behavior.reposition_interval = reposition_interval
 	_behavior.arrive_dist = arrive_dist
+	_behavior.run_enabled = run_enabled
+	_behavior.run_min_distance = run_min_distance
+	_behavior.run_start_fraction = run_start_fraction
 	_behavior.apply_config()
 
 

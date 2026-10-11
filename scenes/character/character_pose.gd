@@ -36,6 +36,7 @@ var _recoil := [0.0, 0.0]         ## Per-hand recoil (px back from the rest pose
 var _recoil_vel := [0.0, 0.0]     ## Per-hand recoil spring velocity (px/s).
 var _stride := 0.0                ## Walk cycle phase (rad; one turn per stride).
 var _walk := 0.0                  ## How much the character is walking, 0..1 (smoothed speed).
+var _run := 0.0                   ## How much the character is running, 0..1 (smoothed, past walking speed).
 var _move_dir := Vector2.ZERO     ## Last walking direction (unit), for the head bob and the hips.
 var _time := 0.0                  ## Seconds alive, for breathing and glances.
 var _phase := randf() * TAU       ## Per-character offset so characters don't move in lockstep.
@@ -63,7 +64,11 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	_time += delta
 	var speed := velocity.length()
 	_walk = lerpf(_walk, clampf(speed / maxf(top_speed, 1.0), 0.0, 1.0), 1.0 - exp(-8.0 * delta))
-	_stride = fmod(_stride + speed * delta / maxf(CharacterConfig.pose_stride_length, 1.0) * TAU, TAU)
+	# Past walking speed is running: how far toward a full run, smoothed like the walk.
+	var run_span := maxf(CharacterConfig.run_speed_mult - 1.0, 0.01)
+	_run = lerpf(_run, clampf((speed / maxf(top_speed, 1.0) - 1.0) / run_span, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
+	var stride_length := lerpf(CharacterConfig.pose_stride_length, CharacterConfig.pose_run_stride_length, _run)
+	_stride = fmod(_stride + speed * delta / maxf(stride_length, 1.0) * TAU, TAU)
 	if speed > 1.0:
 		_move_dir = velocity / speed
 
@@ -97,8 +102,13 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	_torso_vel = torso.y
 	# A punch drives the shoulder on its side forward and the body in behind it, as the fist goes.
 	var punching := maxf(punch[0], punch[1])
-	torso_angle = wrapf(_torso_core + (punch[1] - punch[0]) * CharacterConfig.pose_punch_twist, -PI, PI)
-	torso_offset = facing * (punching * CharacterConfig.pose_punch_lunge)
+	# A runner's shoulders rock against the legs: the one on the forward-swinging arm's side comes
+	# forward. Added over the spring, which is far too slow to follow a stride.
+	var run_twist := -sin(_stride) * CharacterConfig.pose_run_sway * _run
+	torso_angle = wrapf(_torso_core + (punch[1] - punch[0]) * CharacterConfig.pose_punch_twist + run_twist, -PI, PI)
+	# A runner leans into the run: the shoulders lead the hips along the way it travels.
+	torso_offset = facing * (punching * CharacterConfig.pose_punch_lunge) \
+		+ _move_dir * (CharacterConfig.pose_run_lean * _run)
 	_step_hips(delta, aim)
 
 	for i in 2:
@@ -115,6 +125,10 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 		* CharacterConfig.pose_breath * (1.0 - _walk)
 	var bob := cos(_stride * 2.0) * CharacterConfig.pose_head_bob * _walk  # A bob per step.
 	head_offset = _lean + facing * breath + _move_dir * bob + torso_offset
+	# The upper body shifts over the planted foot each step (foot 0 is planted while cos > 0); the head
+	# is set before this, so it stays steady over the rocking shoulders.
+	torso_offset += Vector2.from_angle(hip_angle).orthogonal() * (-cos(_stride) \
+		* CharacterConfig.pose_run_shoulder_shift * _run)
 
 
 ## The hips plant while standing and turn to the way the character walks (a backward step stays
@@ -155,12 +169,19 @@ func rest_lateral(hand: int) -> float:
 
 ## How high a hand is gripped (body radii off the floor): the arm bends to reach it.
 func grip_height(hand: int) -> float:
-	return _stance[hand]["height"]
+	# Running pumps the arms: the hand swinging forward rises toward the chest, the back one drops to the hip.
+	var step := sin(_stride + (0.0 if hand == 0 else PI))
+	return _stance[hand]["height"] + step * CharacterConfig.pose_run_hand_rise * _run
 
 
 ## Where a hand's elbow bends toward (out, forward, up).
 func elbow_pole(hand: int) -> Vector3:
-	return _stance[hand]["elbow_pole"]
+	# Running keeps the elbow tucked in by the body: it drops under the line to a hand swung forward and rides
+	# up behind a hand swung back (the bend only ever sits in the plane through the shoulder, the hand and
+	# this pole, so a fixed pole would throw the elbow out sideways at one end of the swing).
+	var pole: Vector3 = _stance[hand]["elbow_pole"]
+	pole.z -= sin(_stride + (0.0 if hand == 0 else PI)) * CharacterConfig.pose_run_elbow_lift * _run
+	return pole
 
 
 ## The walk cycle's phase (rad; one turn per stride).
@@ -171,6 +192,11 @@ func stride_phase() -> float:
 ## How much the character is walking, 0..1.
 func walk_amount() -> float:
 	return _walk
+
+
+## How much the character is running, 0 (walking or still) .. 1 (full run).
+func run_amount() -> float:
+	return _run
 
 
 ## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side. The

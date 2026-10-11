@@ -29,6 +29,19 @@ static var player_mass: float = 40.0
 ## Deceleration (px/s²) that bleeds the character's knockback velocity back to zero.
 static var push_knockback_friction: float = 1600.0
 
+# --- Running (a controller sets `run_input`; stamina is spent only while moving) ---------
+
+## Walk-speed multiplier while running.
+static var run_speed_mult: float = 1.7
+## Seconds of continuous running a full stamina bar lasts.
+static var run_stamina_seconds: float = 4.0
+## Stamina (fraction of a full bar) regained per second when not running.
+static var stamina_regen_per_sec: float = 0.2
+## After running dry the character walks until stamina refills to this fraction.
+static var run_resume_fraction: float = 0.3
+## Smallest `move_input` length that counts as moving, so holding run while standing spends nothing.
+static var run_min_input: float = 0.1
+
 ## Base central impulse a full-extension punch imparts to a pushable object, scaled by the
 ## swing's range of motion (0 point-blank .. 1 full reach). A shoved RigidBody slides
 ## ≈ impulse / (mass × PhysicsConfig.body_linear_damp) before settling.
@@ -101,6 +114,11 @@ static var body_shoulder_reach: float = 1.0
 ## swinging foot lifts (body radii).
 static var body_stride: float = 0.85
 static var body_foot_lift: float = 0.35
+## The same at a full run: a longer, higher stride.
+static var body_run_stride: float = 1.5
+static var body_run_foot_lift: float = 0.6
+## How far the hips sink at a full run (body radii): knees stay bent through the stride.
+static var body_run_hip_drop: float = 0.35
 
 # --- Stances (how a hand is held; the held item picks one per hand through Item.hand_stance) ---
 # A hand rests `forward` px ahead of the body center and `lateral` px out to its own side, in the
@@ -111,6 +129,9 @@ static var body_foot_lift: float = 0.35
 static var stances: Dictionary = {
 	&"relaxed": { "forward": 2.0, "lateral": 13.0, "height": 3.7, "swing": 9.0, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.2, -0.8, -0.2) },
+	# Running: both arms hang and pump at the sides whatever is held (a pistol is just carried in its hand).
+	&"run": { "forward": 2.0, "lateral": 10.5, "height": 4.9, "swing": 16.0, "steady": false,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.05, -0.8, 0.0) },
 	&"guard": { "forward": 11.5, "lateral": 7.0, "height": 6.0, "swing": 1.5, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.35, -0.1, -1.0) },
 	&"aim": { "forward": 27.0, "lateral": 5.0, "height": 6.0, "swing": 0.0, "steady": true,
@@ -201,8 +222,21 @@ static var pose_hip_damping: float = 0.9     ## Hips: barely overshoot.
 static var pose_hip_twist: float = 0.9
 ## Distance walked per full stride (two steps), in px.
 static var pose_stride_length: float = 48.0
+## The same at a full run. A planted foot stays put on the ground when this is 2π × the foot's swing
+## (`body_run_stride` × radius ≈ 21 px → ~130 px); shorter and the feet scurry and skate.
+static var pose_run_stride_length: float = 130.0
 ## Shoulder sway either way at full walking speed (rad).
 static var pose_walk_sway: float = 0.07
+## A full run's shoulders counter-rotate against the hips by this much either way (rad).
+static var pose_run_sway: float = 0.18
+## ...and the upper body shifts this far (px) sideways over the planted foot, once per step.
+static var pose_run_shoulder_shift: float = 1.2
+## A full run's forward lean: the shoulders (and head) lead the hips this far (px) along the way it travels.
+static var pose_run_lean: float = 2.5
+## How far the forward-swinging hand rises above, and the back one drops below, its grip height (body radii).
+static var pose_run_hand_rise: float = 0.7
+## How far a running elbow's pole swings up and down with the arm (see `elbow_pole`): down under a forward hand, up behind a back one.
+static var pose_run_elbow_lift: float = 0.5
 ## A steady hand's sideways drift at full walking speed (px).
 static var pose_aim_drift: float = 0.5
 ## A punch's body: the shoulders twist toward the punching side by this much (rad) and the upper

@@ -20,7 +20,7 @@ debug mirror (`ai/debug/vision_debug.gd`).
 All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings or
 `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`, and expose
 a typed helper. `player_controller.gd` (Character domain) is the one gameplay consumer of
-Keybinds. Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
+Keybinds (movement, `RUN` — held, default Shift — and the action keys). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
 inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
 `command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
 outside. `Keybinds._ready` registers every action in the InputMap, so `project.godot [input]` (which lists

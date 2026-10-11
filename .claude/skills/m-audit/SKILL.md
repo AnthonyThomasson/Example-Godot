@@ -1,14 +1,17 @@
 ---
-name: analysis-change-verification
-description: Verify staged changes to this Godot project before they are committed. Use this whenever changes have been staged, a piece of work is being wrapped up, or the user asks to verify / review / check / sanity-check a change before committing — even if they don't say "verify". It audits domain isolation (cross-domain coupling must be minimal and flow only through the published interfaces in the `architecture` skill; a concern whose complexity bleeds across several domains should be pulled out into its own), keeps the `architecture` skill AND each domain's `domain-<name>` skill in sync when domains, interfaces, or a domain's internals change, and enforces concise current-state comments. Produces a checklist of issues, each with a specific file:line recommendation.
+name: m-audit
+description: Audit the staged change before it is committed — domain isolation, architecture and domain skills in sync, current-state comments, load check and tests — as a checklist of file:line fixes. Manual only — invoked as `/m-audit`.
+disable-model-invocation: true
+model: claude-sonnet-5-5
 ---
 
-# Change verification
+# Audit
 
 Run this over the **staged** change, before it is committed — it is the last gate between a
 diff and a commit. The output is always a **checklist of concrete issues**, each tied to a
 `file:line` and a specific fix, so the author can act on it directly (or a clean bill of health
-when there is nothing to fix).
+when there is nothing to fix). Do not commit, merge or push, and do not fix findings unless the
+user asks.
 
 Three things make a change healthy in this project, in priority order: the domains stay
 **isolated**, the architecture skills stay **true**, and the comments describe the code **as it
@@ -22,6 +25,9 @@ dependency graph, the cross-cutting conventions), and each domain has a
 are held to the same current-state bar as code comments — see Step 3.
 
 ## Step 0 — Gather the change and the ground truth
+
+If nothing is staged (`git diff --staged --stat` is empty), say so and stop. Do not stage files
+yourself.
 
 ```bash
 git diff --staged --stat
@@ -128,22 +134,6 @@ Flag any drift you find as a checklist item (`architecture/SKILL.md:line` or
 what to change). Both files' prose must follow the current-state rule in Step 4: state what *is*,
 never what changed.
 
-**AI behaviour changes also require updating `.claude/commands/test-ai-behavior.md`.** When the
-diff touches the `ai/` domain — any change to `goal_controller.gd`, the hostility / vision /
-memory / perception helpers, the NPC preset scenes, or the decision-server launcher — check that
-the test command still covers the changed behaviour:
-
-- A new export or tuning primitive → add a scenario or override example to the relevant test
-  section (or a new section if it is a genuinely new behaviour).
-- A removed or renamed export → delete the corresponding `--defender`/`--invader` override lines
-  so the command doesn't pass dead GDScript to the game.
-- A changed decision rule (e.g. pursuit override logic, flanking anchor selection, peek-cover
-  pacing) → update the "Expected:" note in the matching scenario to reflect what the code now does.
-- A new NPC preset or a changed controller primitive → add a scenario that exercises it.
-
-Flag any test command drift the same way as skill drift: `.claude/commands/test-ai-behavior.md:line`
-→ what to change.
-
 ## Step 4 — Comments describe the code as it is now
 
 Comments in this project are a liability when they lie or waffle and an asset when they are short
@@ -243,7 +233,7 @@ Report findings as a checklist grouped by the sections above, most-important fir
 a `file:line`, the problem in a phrase, and the concrete fix. End with a one-line verdict.
 
 ```
-## Change verification
+## Audit
 
 ### Domain isolation
 - [ ] `scenes/main.gd:48` — Main couples to the NPC's child node name `"GoalController"`.

@@ -34,6 +34,17 @@ fields are read live, so only locomotion needs the push.)
 NPC's combat leaves) and a contact last seen outside, fire/cover spots are restricted to inside the
 house, the peek fallback holds instead of advancing, and melee won't chase out.
 
+**Running** is a behaviour policy, not a primitive: after the primitive steers, `_should_run()` sets
+`character.run_input` only while TRAVELLING (a `move` or `engage` not yet arrived — never a `look_around`
+search, ambush/peek, interaction or hold — or a `melee` closing in), when the leaf carries `run: true` or
+the NPC is under fire, the destination is farther than `run_min_distance` (straight line), and a run can
+start (`run_start_fraction` of the stamina bar, or already running). The Character spends the stamina and
+walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `run_start_fraction`.
+`debug_status()` reads "running" / "running into position" while it sprints; `debug_state()` has `running`.
+A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_fire()` skips a pistol
+shot while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
+Test: `tests/ai/ai_runs_to_destination_test.gd`.
+
 ## Public interface (what the orchestrator calls)
 
 - `setup(perception, nav_agent)` (build the Locomotion child), `apply_config()` (push the forwarded

@@ -9,6 +9,7 @@ extends Node
 ## used the same frame.
 func control(character, _delta: float) -> void:
 	character.move_input = Keybinds.get_move_vector()
+	character.run_input = Keybinds.is_run_pressed()
 	character.aim_point = character.get_global_mouse_position()
 
 	var selected := Keybinds.get_selected_item()

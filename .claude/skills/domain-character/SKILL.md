@@ -86,7 +86,7 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 `steady` (aim-style spring: follows the aim closely, only drifts), `recoil_share` and `elbow_pole`
 (out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
-`support` (the other hand cupping it: the pistol's two-handed hold). To add a pose, add a table row
+`support` (the other hand cupping it: the pistol's two-handed hold). A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
 and have an item name it. `CharacterConfig.muzzle_ahead` is how far past the weapon hand bullets
 leave (`muzzle_origin(hand)`).
 
@@ -222,6 +222,37 @@ Ordering: a parent's `_physics_process` runs before its children's, so the hands
 character's fresh `facing`, and the character pulls its controller's intent at the top of its own
 `_physics_process` (lag-free).
 
+## Running and stamina
+
+A controller sets `run_input` (the player: `Keybinds.RUN`, Shift; an NPC: its behaviour layer). Each frame
+`_update_stamina(wants_run, delta)` decides `_running` (asked, moving above `run_min_input`, not
+exhausted) and spends or regains `stamina` (a 0..1 bar): a full bar lasts `run_stamina_seconds`, it refills
+at `stamina_regen_per_sec`. Running dry latches `_exhausted` — the character walks, run still held, until
+the bar refills to `run_resume_fraction`. Running multiplies the walk speed by `run_speed_mult`
+(`_move_speed()`, also used for the death momentum and the push carry cap); `pose.update` still gets the
+walk `speed`, so the walk amount stays at 1 while the stride cadence rises with the speed. Being busy in
+an interaction counts as not running. `shoot()` does nothing while running (`melee()` still works).
+Reads: `is_running()`, `stamina_fraction()`. Test: `tests/character/run_speed_stamina_test.gd`.
+
+**The run's legs and arms.** `pose.run_amount()` (0..1, smoothed from the speed past walking pace) blends the rig's
+foot swing and lift from `body_stride` / `body_foot_lift` to `body_run_stride` / `body_run_foot_lift`, the stride
+length from `pose_stride_length` to `pose_run_stride_length`, and sinks the hips by `body_run_hip_drop` so the knees
+stay bent. A planted foot only stays put on the ground when the stride is 2π × the foot's swing (~130 px); shorter and
+the feet scurry and everything stride-locked wobbles at 3+ Hz. While `_running`, `_stances()` ignores the held item
+and puts both hands in the `run` stance: arms pumping at the sides, a pistol simply carried in its hand, and the
+`stance_ease` blend lifts it back to aim on stopping. `grip_height` adds `pose_run_hand_rise` so the forward-swinging
+hand rises toward the chest and the back one drops to the hip (keep the lowest ≥ ~4.1 body radii or the arm
+overstretches). An elbow's bend lies in the plane through the shoulder, the hand and the pole, so `elbow_pole` adds
+`pose_run_elbow_lift` of vertical swing with the arm (down under a forward hand, up behind a back one); a fixed pole
+would throw the elbow out sideways at one end of the swing.
+
+**The run's shoulders.** Added over the torso spring (too slow to follow a stride) and scaled by `run_amount()`: the
+shoulders counter-rotate by `pose_run_sway` (the one on the forward-swinging arm's side comes forward), lead the hips by
+`pose_run_lean` along the travel direction, and shift `pose_run_shoulder_shift` px sideways over the planted foot each
+step. All go through `torso_offset`, so the rig, wounds and fall follow. The lean is in `head_offset` (the head
+leads); the side shift is added after it, so the head stays steady over the rocking shoulders.
+Test: `tests/character/run_pose_test.gd`.
+
 ## Walking into furniture
 
 `_apply_pushes()` shoves each pushable the body slid into with `push_impulse` per *second* of contact
@@ -278,7 +309,7 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Character ↔ Controller** (interface 7): the character reads intent from a controller child
-  (any node with `control(character, delta)`) that writes `move_input` / `aim_point` and calls
+  (any node with `control(character, delta)`) that writes `move_input` / `aim_point` / `run_input` and calls
   the action API: `melee()`, `shoot()`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
   damage, for injury sensing). Signals: `hit_landed(body, damage, hand)`

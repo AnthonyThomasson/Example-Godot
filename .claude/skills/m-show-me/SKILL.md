@@ -1,14 +1,13 @@
 ---
-name: show-me
-description: Open the Godot editor on this worktree with autorun, named after the worktree, so the user can see the finished change running. Manual only — invoked as `/show-me`.
+name: m-show-me
+description: Open the Godot editor on this worktree with autorun, named after the worktree, so the user can see the finished change running. Manual only — invoked as `/m-show-me`.
 disable-model-invocation: true
 model: haiku
 ---
 
 # Show me
 
-Leave a live copy of the change running for the user, as in the verification skill's Step 6
-(`analysis-change-verification`).
+Leave a live copy of the change running for the user.
 
 1. The name is the worktree's directory name: `basename "$PWD"` from the worktree root (for
    example `fix-the-flickering-that-happens-when-a-ragdolls`).

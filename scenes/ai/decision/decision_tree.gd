@@ -39,7 +39,8 @@ extends RefCounted
 ##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold). FLANK
 ##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
 ##               `move`: it only closes the distance, then the NPC re-decides how to fight.
-##   params    — default primitive params, merged under each option's own params.
+##   params    — default primitive params, merged under each option's own params. `run: true` lets the
+##               behaviour sprint while travelling to the leaf's destination (Von never sees it).
 
 const NODES := {
 	&"root": {
@@ -79,7 +80,7 @@ const NODES := {
 		"options": [&"flank_sides"],
 		"drop_tags": [&"held", &"crosses"],
 		"primitive": &"engage",
-		"params": { "style": &"peek_cover" },
+		"params": { "style": &"peek_cover", "run": true },
 	},
 	&"advance": {
 		"label": "ADVANCE",
@@ -89,7 +90,7 @@ const NODES := {
 		"context": [&"current", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"advance_positions"],
 		"primitive": &"move",
-		"params": { "aim": &"target", "fire_at_will": true },
+		"params": { "aim": &"target", "fire_at_will": true, "run": true },
 	},
 	&"melee": {
 		"label": "MELEE",
@@ -106,7 +107,7 @@ const NODES := {
 		"context": [&"situation", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"retreat_positions"],
 		"primitive": &"move",
-		"params": { "aim": &"threat", "fire_at_will": true },
+		"params": { "aim": &"threat", "fire_at_will": true, "run": true },
 	},
 	&"locate": {
 		"label": "LOCATE",
@@ -125,7 +126,7 @@ const NODES := {
 		"context": [&"situation", &"current", &"contacts", &"allies", &"awareness"],
 		"options": [&"leads"],
 		"primitive": &"move",
-		"params": { "aim": &"travel", "fire_at_will": true },
+		"params": { "aim": &"travel", "fire_at_will": true, "run": true },
 	},
 	&"search": {
 		"label": "SEARCH",

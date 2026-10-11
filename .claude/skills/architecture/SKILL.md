@@ -15,11 +15,6 @@ interfaces), and the dependency graph. Keep changes inside a domain, and cross a
 through the interfaces listed here. **When working *inside* a domain, also load its
 `domain-<name>` skill** — that is where the deep implementation detail lives.
 
-**Before committing a change, run the `analysis-change-verification` skill**: it checks that domains stay
-isolated (cross-domain connections go only through the interfaces below), keeps this skill *and
-the domain skills* in sync when the architecture or a domain's internals change, and enforces
-concise current-state comments.
-
 ## The thirteen domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
@@ -150,10 +145,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
-   `control(character, delta)`. The controller writes `move_input` / `aim_point` and calls the
-   character's action API: `melee()` (F), `shoot()` (LMB), `select_slot(id)`, `try_interact()` /
+   `control(character, delta)`. The controller writes `move_input` / `aim_point` / `run_input` (hold run: a
+   faster pace that spends stamina while moving, dry = walk until it refills) and calls the
+   character's action API: `melee()` (F), `shoot()` (LMB; ignored while running), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   damage, for injury sensing), `is_running()` / `stamina_fraction()` and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing` and `damage_taken()` — but only while it can SEE that character
    (aim and visible wounds are things it perceives).
    `player_controller.gd` is the human one and
@@ -333,7 +329,5 @@ Two conventions hold across domains; the per-domain specifics live in each domai
      command server (`tools/gcmd.py`).
   4. **Whole-AI outcomes?** `tools/match.py` scores full defender-vs-invader matches.
   A bugfix starts with a failing test on rung 2 (`test-debug` skill).
-- Use the **`analysis-change-verification` skill** before committing (domain isolation, doc/skill sync,
-  comment hygiene, load check).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
   generation, movement/pushing, items, interactions, combat).

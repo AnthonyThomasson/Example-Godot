@@ -3,7 +3,7 @@ extends Node
 ## Testing domain: a puppet controller — a character's `control(character, delta)` child (interface 7)
 ## driven by a test instead of a human or an AI. Commands are queued here and carried out on the
 ## character's own frame, through only the published controller API (`move_input`, `aim_point`,
-## `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`).
+## `run_input`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`).
 ##
 ## Commands return at once; wait on their effect through the TestContext, e.g.
 ## `p.walk_to(spot)` then `await t.until(p.has_arrived, 3.0, "never arrived")`.
@@ -18,6 +18,8 @@ var _aim: Variant = null
 var _walk_target: Variant = null
 ## Steady move direction (used when no walk target), 0–1 length.
 var _move_dir := Vector2.ZERO
+## Whether the puppet holds run.
+var _run := false
 ## Actions waiting for the character's next frame: Callables taking the character.
 var _pending: Array[Callable] = []
 ## Interactions started on the character's frame that reported failure (object, id) — for tests to read.
@@ -40,6 +42,7 @@ func control(character, _delta: float) -> void:
 			character.move_input = to.normalized()
 	else:
 		character.move_input = _move_dir
+	character.run_input = _run
 	var actions := _pending.duplicate()
 	_pending.clear()
 	for action in actions:
@@ -60,6 +63,11 @@ func walk_to(point: Vector2) -> void:
 func walk(direction: Vector2) -> void:
 	_walk_target = null
 	_move_dir = direction.limit_length(1.0)
+
+
+## Hold (or release) run; it takes effect while the puppet moves.
+func set_run(on: bool) -> void:
+	_run = on
 
 
 ## Stop walking.

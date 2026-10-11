@@ -66,6 +66,7 @@ func _process(_delta: float) -> void:
 		"Punch Active: %s" % ("YES" if attack_active else "NO"),
 		"Interaction: %s" % (interaction if interaction != "" else "—"),
 		"Reach: %.1f" % reach,
+		"Stamina: %d%%%s" % [roundi(_character.stamina_fraction() * 100.0), " (running)" if _character.is_running() else ""],
 		"",
 		"Last Hit:",
 	]

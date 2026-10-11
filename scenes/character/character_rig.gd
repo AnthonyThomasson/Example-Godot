@@ -43,7 +43,7 @@ func _init(character) -> void:
 	var hip_fwd := Vector3(hips.x, hips.y, 0.0)
 	var hip_right := Vector3(hips.orthogonal().x, hips.orthogonal().y, 0.0)
 	var lunge := Vector3(pose.torso_offset.x, pose.torso_offset.y, 0.0)
-	var hip_z := CharacterConfig.body_hip_height * r
+	var hip_z: float = (CharacterConfig.body_hip_height - CharacterConfig.body_run_hip_drop * pose.run_amount()) * r  # A run sinks.
 	var shoulder_z := CharacterConfig.body_shoulder_height * r
 	var upper := CharacterConfig.body_upper_arm * r
 	var fore := CharacterConfig.body_forearm * r
@@ -82,8 +82,11 @@ func _init(character) -> void:
 		var hip: Vector3 = _points[PELVIS] + hip_right * out * CharacterConfig.body_hip_width * r
 		var phase: float = pose.stride_phase() + (0.0 if i == 0 else PI)
 		var walk: float = pose.walk_amount()
-		var step := -sin(phase) * walk * CharacterConfig.body_stride * r
-		var lift := maxf(-cos(phase), 0.0) * walk * CharacterConfig.body_foot_lift * r  # Off the floor mid-swing.
+		var run: float = pose.run_amount()  # A run strides wider and lifts higher.
+		var stride := lerpf(CharacterConfig.body_stride, CharacterConfig.body_run_stride, run)
+		var foot_lift := lerpf(CharacterConfig.body_foot_lift, CharacterConfig.body_run_foot_lift, run)
+		var step := -sin(phase) * walk * stride * r
+		var lift := maxf(-cos(phase), 0.0) * walk * foot_lift * r  # Off the floor mid-swing.
 		var ankle := Vector3(hip.x, hip.y, foot_z + lift) + hip_fwd * step
 		_points[HIP[i]] = hip
 		_points[ANKLE[i]] = ankle

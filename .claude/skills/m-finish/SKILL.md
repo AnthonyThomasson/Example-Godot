@@ -1,6 +1,6 @@
 ---
-name: finish
-description: Commit this worktree's work, merge it into main, push main, then close its ticket and remove the Orca workspace. Manual only — invoked as `/finish`.
+name: m-finish
+description: Commit this worktree's work, merge it into main, push main, then close its ticket and remove the Orca workspace. Manual only — invoked as `/m-finish`.
 disable-model-invocation: true
 model: haiku
 ---

@@ -153,7 +153,7 @@ func run(t: TestContext) -> void:
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
     A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
-  (straight line, no pathing), `walk(dir)`, `stop()`, `select_slot(n)`, `punch()`, `shoot()`,
+  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `stop()`, `select_slot(n)`, `punch()`, `shoot()`,
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.
