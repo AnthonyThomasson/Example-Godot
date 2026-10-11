@@ -41,6 +41,16 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
   without overlap, rotates/mirrors it, then hands each object's definition to `ObjectFactory`
   (item `facing` mapped onto the wall by `_map_dir`, the same way positions are, and passed as
   `opts.facing`). `furnish` returns the palette it picked.
+- **Walkability** (`room_furnisher.gd`): furnishing is planned before anything spawns (`_plan`), and a
+  candidate spot is accepted only if it keeps every doorway of the room reachable from the others on a
+  coarse grid (furniture grown by `FURNITURE_CLEAR`, the room edge by `WALL_CLEAR`; a doorway is the free
+  cells inside its clearance box) and leaves no dead slot — a gap against a wall or other furniture must be
+  just the padding or at least `SLOT_MAX` (a narrower slot is unwalkable and its overlapping nav-hole
+  offsets can break the navmesh bake). If a required zone still finds no spot, the layout is re-rolled up to
+  `PLAN_ATTEMPTS` times, then warns. Floorplans must give every room space for its required pieces plus the
+  door lanes (e.g. no 3-door small bedrooms). `tests/worldgen/house_doorways_connected_test.gd` bakes every
+  floorplan over many seeds and checks each room's doorways reach each other, each doorway can be passed
+  through and every doorway is reachable from outside the front entrance.
 - **Walls + floors**: `HouseSpawner` builds each room's walls in the `GeneralCatalog.WALL` style
   and, after furnishing, its floor — the `FLOORS` entry the room's palette names — over the room
   rect (to the wall centerlines, so the walls cover the seams). The floor rides on the palette
@@ -60,7 +70,9 @@ Add a `categories/<type>.gd` catalog with its recipe and use its key as a room `
 - **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
   front_entrance_world, parent) -> Node2D` seeds one RNG for the whole run (plan
   pick is its first draw), prints `House: <plan>  seed: N`, builds the house; every doorway is an
-  open archway. `WorldGen.get_rooms(house) -> Array`
+  open archway. `WorldGen.get_openings(house) -> Array`
+  returns the doorways as `{ pos, width, front, rooms }` (world space; `rooms` = the room keys it joins).
+  `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
   `rooms` metadata. `main.gd` positions the front entrance, fixes draw order, builds the nav map, and
   drops the NPC in — all via `get_rooms`; it never touches world-gen internals. Read-only catalogue

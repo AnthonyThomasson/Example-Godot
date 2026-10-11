@@ -80,7 +80,6 @@ const PLANS := {
 			{ "pos": Vector2(150, 340), "width": 100.0 },  # living <-> bedroom
 			{ "pos": Vector2(520, 340), "width": 100.0 },  # kitchen <-> bedroom_2
 			{ "pos": Vector2(700, 340), "width": 90.0 },  # kitchen <-> bathroom
-			{ "pos": Vector2(300, 510), "width": 90.0 },  # bedroom <-> bedroom_2
 			{ "pos": Vector2(600, 510), "width": 90.0 },  # bedroom_2 <-> bathroom
 		],
 	},
@@ -192,7 +191,6 @@ const PLANS := {
 			{ "pos": Vector2(300, 440), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(600, 120), "width": 100.0 },  # great <-> bedroom
 			{ "pos": Vector2(600, 340), "width": 90.0 },  # great <-> bathroom
-			{ "pos": Vector2(770, 240), "width": 90.0 },  # bedroom <-> bathroom
 		],
 	},
 

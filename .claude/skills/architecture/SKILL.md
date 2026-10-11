@@ -60,6 +60,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 the house; every doorway is an open archway.
    - `WorldGen.get_rooms(house) -> Array` — the house's rooms as `{ key, type, rect }` dicts
 	 (world-space `rect`), read from the house's `rooms` metadata.
+   - `WorldGen.get_openings(house) -> Array` — the house's doorways as `{ pos, width, front, rooms }` dicts
+	 (world-space `pos`, `rooms` = keys of the rooms it joins), read from the house's `openings` metadata.
    - Read-only catalogue lookups (used by the Testing domain to place single pieces):
 	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and

@@ -27,6 +27,14 @@ static func get_rooms(house: Node2D) -> Array:
 	return house.get_meta("rooms", [])
 
 
+## The generated house's doorways as an Array of { pos, width, front, rooms } in WORLD space
+## (`rooms` = keys of the rooms the doorway joins; the front entrance has one). Empty for a null house.
+static func get_openings(house: Node2D) -> Array:
+	if house == null:
+		return []
+	return house.get_meta("openings", [])
+
+
 ## The catalogue object definition for `key` (a plain dict for ObjectFactory.spawn), or {} if
 ## unknown. For callers outside World-Gen (the Testing domain) that place single catalogue pieces.
 static func object_definition(key: String) -> Dictionary:

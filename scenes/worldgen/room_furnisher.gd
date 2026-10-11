@@ -12,6 +12,19 @@ const PADDING := 8.0       ## Minimum gap between arrangements (and doorway-open
 const STEP := 10.0         ## Spacing of candidate offsets along a wall.
 const CENTER_TRIES := 40   ## Random spots tried for free-standing arrangements.
 
+## Walkability: a placement is rejected if it cuts a room's doorways off from each other (a doorway is the free grid cells inside its clearance box). An agent is
+## a point on a coarse grid; furniture is grown by `FURNITURE_CLEAR` (agent radius + nav hole margin +
+## slack) and the room edge by `WALL_CLEAR` (agent radius less the interior inset).
+const PLAN_ATTEMPTS := 12  ## Layouts tried before settling for one that misses a required zone.
+## A gap between furniture (or furniture and a wall) that is wider than touching but too narrow to walk
+## through is a dead slot, and the baked nav hole offsets either side of it overlap and can crash the map
+## bake; so a gap must be at most SLOT_MIN (just the padding: the holes fuse) or at least SLOT_MAX (an agent fits).
+const SLOT_MIN := 8.5
+const SLOT_MAX := 48.0
+const WALK_CELL := 10.0
+const FURNITURE_CLEAR := 22.0
+const WALL_CLEAR := 8.0
+
 
 ## `interior` and `blocked` rects are in `parent`'s coordinate space. Returns the palette picked
 ## for the room (its `wood` / `fabric` tones and `floor` key), or {} if the type has no recipe.
@@ -23,8 +36,29 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 
 	var palettes: Array = recipe["palettes"]
 	var palette: Dictionary = palettes[rng.randi_range(0, palettes.size() - 1)]
+
+	# Plan the layout before spawning anything, so a layout that leaves a required zone unplaced
+	# (walkability can make a tight room unable to fit it) is re-rolled instead of spawned.
+	var plan := {}
+	for attempt in range(PLAN_ATTEMPTS):
+		plan = _plan(recipe, interior, blocked, rng)
+		if plan["missing"].is_empty():
+			break
+	for zone_options in plan["missing"]:
+		push_warning("RoomFurnisher: no room for required zone %s in %s" % [zone_options, room_type])
+	for placement in plan["placements"]:
+		_spawn_items(placement["arrangement"], placement["spot"], palette, parent)
+	return palette
+
+
+## One attempt at the recipe's layout: `{ placements: [{ arrangement, spot }], missing: [options] }`
+## where `missing` lists the required zones that found no walkable spot.
+static func _plan(recipe: Dictionary, interior: Rect2, blocked: Array, rng: RandomNumberGenerator) -> Dictionary:
 	var occupied: Array = blocked.duplicate()
 	var used_tags := {}
+	var walk := _walk_state(interior, blocked)
+	var placements: Array = []
+	var missing: Array = []
 
 	for zone in recipe["zones"]:
 		var count_range: Vector2i = zone["count"]
@@ -37,30 +71,34 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 			var tags: Array = arrangement.get("tags", [])
 			if tags.any(func(t: String) -> bool: return used_tags.has(t)):
 				continue
-			var spot := _find_spot(arrangement, interior, occupied, rng)
+			var spot := _find_spot(arrangement, interior, occupied, rng, walk)
 			if spot.is_empty():
 				continue
 			occupied.append(spot["rect"])
+			walk["grid"] = _stamp(walk, spot["rect"])
+			walk["furniture"].append(spot["rect"])
 			for tag in tags:
 				used_tags[tag] = true
-			_spawn_items(arrangement, spot, palette, parent)
+			placements.append({ "arrangement": arrangement, "spot": spot })
 			placed += 1
 		# A required zone that couldn't place any of its (large) options falls back to a
 		# guaranteed-small arrangement, so essentials always appear even in tight rooms.
 		if placed == 0 and wanted > 0 and zone.has("fallback"):
 			var fb := ArrangementDefinitions.get_arrangement(zone["fallback"])
-			var fb_spot := _find_spot(fb, interior, occupied, rng)
+			var fb_spot := _find_spot(fb, interior, occupied, rng, walk)
 			if not fb_spot.is_empty():
 				occupied.append(fb_spot["rect"])
-				_spawn_items(fb, fb_spot, palette, parent)
+				walk["grid"] = _stamp(walk, fb_spot["rect"])
+				walk["furniture"].append(fb_spot["rect"])
+				placements.append({ "arrangement": fb, "spot": fb_spot })
 				placed = 1
 		if zone.get("required", false) and placed == 0 and wanted > 0:
-			push_warning("RoomFurnisher: no room for required zone %s in %s" % [zone["options"], room_type])
-	return palette
+			missing.append(zone["options"])
+	return { "placements": placements, "missing": missing }
 
 
 ## Returns { rect, orient, mirror } for a free spot, or {} if none fits.
-static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array, rng: RandomNumberGenerator) -> Dictionary:
+static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array, rng: RandomNumberGenerator, walk: Dictionary) -> Dictionary:
 	var fp: Vector2 = arrangement["footprint"]
 	var mirror := rng.randf() < 0.5
 
@@ -74,7 +112,7 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 			# First try dead center, then random spots.
 			var t := Vector2(0.5, 0.5) if i == 0 else Vector2(rng.randf(), rng.randf())
 			var rect := Rect2(interior.position + slack * t, size)
-			if _fits(rect, interior, occupied):
+			if _fits(rect, interior, occupied) and _keeps_walkable(rect, walk) and _leaves_no_slot(rect, walk):
 				return { "rect": rect, "orient": orient, "mirror": mirror }
 		return {}
 
@@ -85,9 +123,98 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 			continue
 		for offset in _offsets(max_offset, arrangement.get("prefer_corner", false), rng):
 			var rect := _wall_rect(orient, offset, fp, interior)
-			if _fits(rect, interior, occupied):
+			if _fits(rect, interior, occupied) and _keeps_walkable(rect, walk) and _leaves_no_slot(rect, walk):
 				return { "rect": rect, "orient": orient, "mirror": mirror }
 	return {}
+
+
+## The room's walkability grid (1 = blocked: near a wall or placed furniture) and its doorways: for each
+## clearance rect touching the interior, the free grid cells inside it.
+static func _walk_state(interior: Rect2, blocked: Array) -> Dictionary:
+	var cols := ceili(interior.size.x / WALK_CELL)
+	var rows := ceili(interior.size.y / WALK_CELL)
+	var grid := PackedByteArray()
+	grid.resize(cols * rows)
+	var walkable := interior.grow(-WALL_CLEAR)
+	for i in range(cols * rows):
+		if not walkable.has_point(_cell_center(interior, i % cols, i / cols)):
+			grid[i] = 1
+	var doors: Array = []
+	for clearance: Rect2 in blocked:
+		if not clearance.intersects(interior):
+			continue
+		var cells: Array = []
+		for i in range(cols * rows):
+			if grid[i] == 0 and clearance.has_point(_cell_center(interior, i % cols, i / cols)):
+				cells.append(i)
+		if not cells.is_empty():
+			doors.append(cells)
+	return { "interior": interior, "cols": cols, "rows": rows, "grid": grid, "doors": doors, "furniture": [] }
+
+
+static func _cell_center(interior: Rect2, col: int, row: int) -> Vector2:
+	return interior.position + Vector2(col + 0.5, row + 0.5) * WALK_CELL
+
+
+## Block the grid cells within agent reach of `rect`.
+static func _stamp(walk: Dictionary, rect: Rect2, grid: PackedByteArray = PackedByteArray()) -> PackedByteArray:
+	var interior: Rect2 = walk["interior"]
+	var cols: int = walk["cols"]
+	var rows: int = walk["rows"]
+	var target: PackedByteArray = walk["grid"] if grid.is_empty() else grid
+	var grown := rect.grow(FURNITURE_CLEAR)
+	var c0 := maxi(int((grown.position.x - interior.position.x) / WALK_CELL) - 1, 0)
+	var c1 := mini(int((grown.end.x - interior.position.x) / WALK_CELL) + 1, cols - 1)
+	var r0 := maxi(int((grown.position.y - interior.position.y) / WALK_CELL) - 1, 0)
+	var r1 := mini(int((grown.end.y - interior.position.y) / WALK_CELL) + 1, rows - 1)
+	for r in range(r0, r1 + 1):
+		for c in range(c0, c1 + 1):
+			if grown.has_point(_cell_center(interior, c, r)):
+				target[r * cols + c] = 1
+	return target
+
+
+## True if `rect` leaves no dead slot (see SLOT_MIN / SLOT_MAX) against a wall or placed furniture.
+static func _leaves_no_slot(rect: Rect2, walk: Dictionary) -> bool:
+	var interior: Rect2 = walk["interior"]
+	for d in [rect.position.x - interior.position.x, interior.end.x - rect.end.x,
+			rect.position.y - interior.position.y, interior.end.y - rect.end.y]:
+		if d > 1.0 and d < SLOT_MAX:
+			return false
+	for other: Rect2 in walk["furniture"]:
+		var gx := maxf(other.position.x - rect.end.x, rect.position.x - other.end.x)
+		var gy := maxf(other.position.y - rect.end.y, rect.position.y - other.end.y)
+		if (gy < 0.0 and gx > SLOT_MIN and gx < SLOT_MAX) or (gx < 0.0 and gy > SLOT_MIN and gy < SLOT_MAX):
+			return false
+	return true
+
+
+## True if, with `rect` added, every doorway cell is still free and reachable from the first one.
+static func _keeps_walkable(rect: Rect2, walk: Dictionary) -> bool:
+	var doors: Array = walk["doors"]
+	if doors.is_empty():
+		return true
+	var cols: int = walk["cols"]
+	var rows: int = walk["rows"]
+	var grid := _stamp(walk, rect, (walk["grid"] as PackedByteArray).duplicate())
+	var seen := PackedByteArray()
+	seen.resize(cols * rows)
+	var stack: Array = []
+	for cell: int in doors[0]:
+		if grid[cell] == 0:
+			seen[cell] = 1
+			stack.append(cell)
+	while not stack.is_empty():
+		var n: int = stack.pop_back()
+		var col := n % cols
+		var row := n / cols
+		for next in [n - 1 if col > 0 else -1, n + 1 if col < cols - 1 else -1,
+				n - cols if row > 0 else -1, n + cols if row < rows - 1 else -1]:
+			if next >= 0 and grid[next] == 0 and seen[next] == 0:
+				seen[next] = 1
+				stack.append(next)
+	# Every doorway must have a free, reached cell (the first one's own cells seed the fill).
+	return doors.all(func(cells: Array) -> bool: return cells.any(func(c: int) -> bool: return seen[c] == 1))
 
 
 ## Candidate offsets along a wall; corners first when preferred, otherwise shuffled.

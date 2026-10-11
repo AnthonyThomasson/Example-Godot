@@ -66,7 +66,24 @@ static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNu
 		})
 
 	house.set_meta("rooms", rooms_world)
+	house.set_meta("openings", _openings_world(rooms, openings, house.position))
 	return house
+
+
+## Every doorway as `{ pos, width, front, rooms }` in WORLD space; `rooms` are the keys of the
+## rooms whose wall it cuts (one for the front entrance, two for an interior door).
+static func _openings_world(rooms: Array, openings: Array, origin: Vector2) -> Array:
+	var result: Array = []
+	for opening in openings:
+		var keys: Array = []
+		for room in rooms:
+			if not _openings_for(room["rect"], [opening]).is_empty():
+				keys.append(room["key"])
+		result.append({
+			"pos": origin + (opening["pos"] as Vector2), "width": opening["width"],
+			"front": opening.get("front", false), "rooms": keys,
+		})
+	return result
 
 
 ## Author-error checks (warnings only): overlapping rooms, an opening not on a shared
