@@ -41,6 +41,8 @@ var _probe := RectangleShape2D.new()
 var _blocked: Dictionary = {}
 ## Floor-texture flow multiplier per cell, looked up once each.
 var _resist: Dictionary = {}
+## Soak progress 0..1 of each claimed cell lying on a porous surface (carpet, a rug): 0 = fresh, 1 = sunk in.
+var _soak: Dictionary = {}
 ## Frontier: Vector2i -> accumulated cost to reach it.
 var _frontier: Dictionary = {}
 ## The cell blood leaves the body at.
@@ -67,7 +69,11 @@ func done() -> bool:
 ## Sweep the front outward: `delta` seconds of a `duration`-second spread, easing out like a
 ## liquid slowing as it thins. Call once all cells are claimed.
 func advance(delta: float, duration: float) -> void:
-	_progress = minf(_progress + delta / maxf(duration, 0.001), 1.0)
+	# Blood creeps slower over porous surface, in proportion to how much of the pool lies on it.
+	var slow := 1.0
+	if not _soak.is_empty() and not cells.is_empty():
+		slow = lerpf(1.0, maxf(BloodConfig.porous_spread_slowdown, 1.0), float(_soak.size()) / cells.size())
+	_progress = minf(_progress + delta / (maxf(duration, 0.001) * slow), 1.0)
 	var eased := 1.0 - (1.0 - _progress) * (1.0 - _progress)
 	front = (_last_cost + BloodConfig.flow_soft_edge) * eased
 
@@ -77,13 +83,48 @@ func settled() -> bool:
 	return _progress >= 1.0
 
 
-## Fill level (0..1) of a cell: the flood-fill at the current front, or the dragged-out trail if more.
+## Fill level (0..1) of a cell: the flood-fill at the current front, or the dragged-out trail if more. Soaking
+## into a porous surface changes how the blood looks and how wet it is, never how much of the floor it covers.
 func fill(c: Vector2i) -> float:
-	var flood := 0.0
-	if cells.has(c):
-		var t := clampf((front - cells[c]) / maxf(BloodConfig.flow_soft_edge, 0.001), 0.0, 1.0)
-		flood = t * t * (3.0 - 2.0 * t)
-	return maxf(flood, trail.get(c, 0.0))
+	return maxf(_flood(c), trail.get(c, 0.0))
+
+
+## How wet (0..1) the blood on cell `c` still is: its fill, less what has soaked into the surface.
+func wetness(c: Vector2i) -> float:
+	return fill(c) * (1.0 - _soak[c]) if _soak.has(c) else fill(c)
+
+
+## How far (0..1) the blood on cell `c` has sunk in; 0 off a porous surface.
+func soak_level(c: Vector2i) -> float:
+	return _soak.get(c, 0.0)
+
+
+## Whether any claimed cell lies on a porous surface.
+func has_porous() -> bool:
+	return not _soak.is_empty()
+
+
+## Whether any blood on a porous surface has yet to finish sinking in.
+func soaking() -> bool:
+	for c in _soak:
+		if _soak[c] < 1.0:
+			return true
+	return false
+
+
+## Soak `delta` seconds further into every porous cell the flood has mostly reached.
+func tick(delta: float) -> void:
+	for c in _soak:
+		if _soak[c] < 1.0 and _flood(c) >= 0.5:
+			_soak[c] = minf(_soak[c] + delta / maxf(BloodConfig.soak_time, 0.001), 1.0)
+
+
+## The flood-fill level (0..1) of cell `c` at the current front, before anything soaks in.
+func _flood(c: Vector2i) -> float:
+	if not cells.has(c):
+		return 0.0
+	var t := clampf((front - cells[c]) / maxf(BloodConfig.flow_soft_edge, 0.001), 0.0, 1.0)
+	return t * t * (3.0 - 2.0 * t)
 
 
 ## Whether blood of any kind (flooded or dragged out) lies on cell `c`.
@@ -127,15 +168,24 @@ func _cell_center(c: Vector2i) -> Vector2:
 	return (Vector2(c) + Vector2(0.5, 0.5)) * _size
 
 
-## Claim up to `count` more cells, cheapest first. `origin_global` is the pool's world position.
-func step(count: int, space: PhysicsDirectSpaceState2D, origin_global: Vector2) -> void:
+## How much of the bleed-out cell budget the claimed cells have used: a cell on porous surface costs
+## `BloodConfig.porous_cell_weight`, so a pool on carpet covers less ground.
+func budget_used() -> float:
+	return cells.size() + _soak.size() * (maxf(BloodConfig.porous_cell_weight, 1.0) - 1.0)
+
+
+## Claim up to `count` more cells, cheapest first, stopping once `budget` is used (see `budget_used`).
+## `origin_global` is the pool's world position.
+func step(count: int, space: PhysicsDirectSpaceState2D, origin_global: Vector2, budget := INF) -> void:
 	for i in count:
-		if _frontier.is_empty():
+		if _frontier.is_empty() or budget_used() >= budget:
 			return
 		var c := _pop_cheapest()
 		var cost: float = _frontier[c]
 		_frontier.erase(c)
 		cells[c] = cost
+		if BloodSurface.is_porous(origin_global + _cell_center(c)):
+			_soak[c] = 0.0
 		_last_cost = maxf(_last_cost, cost)
 		for d in NEIGHBORS:
 			var n: Vector2i = c + d

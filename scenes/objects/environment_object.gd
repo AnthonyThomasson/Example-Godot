@@ -42,6 +42,7 @@ var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
 var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
 var _smear: BloodSmear  ## Drags blood out of a puddle as the piece slides through it (solid pieces only).
 var _collider_rebuild_queued := false  ## A deferred `_rebuild_collider` is already waiting.
+var _surface_id := -1  ## BloodSurface registration of a non-solid piece (a rug soaks blood up).
 
 
 func _ready() -> void:
@@ -62,7 +63,18 @@ func _ready() -> void:
 		# Non-solid decor never moves or collides: freeze it (a shapeless RigidBody2D would
 		# be invalid) and draw it beneath everything else.
 		freeze = true
-		z_index = -1
+		z_index = ObjectArtConfig.rug_z_index
+		# Never moves, so its footprint is fixed: blood that reaches it sinks in (Physics blood).
+		_surface_id = BloodSurface.register(Rect2(global_position - size / 2.0, size), _no_groove, true)
+
+
+func _exit_tree() -> void:
+	BloodSurface.unregister(_surface_id)
+
+
+## A rug has no grooves (BloodSurface callback; a porous surface never asks).
+func _no_groove(_at: Vector2, _half_width: float) -> float:
+	return 0.0
 
 
 # --- Hittable contract (read/hit by projectiles, melee, …) -----------------------------

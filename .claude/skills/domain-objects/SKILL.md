@@ -53,7 +53,7 @@ and never learns what an interaction *means*.
   `size`/`openings`; `openings` are `{ side, offset, width }`). `wall.gd` owns the wall-segment
   math (`wall_segments()`) and colliders.
 - `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
-  decor is `freeze`d (no shape) and gets `z_index = -1`. Physics components (`Knockback`,
+  decor is `freeze`d (no shape), gets `z_index = ObjectArtConfig.rug_z_index` (-3) and registers a porous `BloodSurface` rect. Physics components (`Knockback`,
   `Deformable`, `BloodSmear`) are added as child Nodes in `environment_object._ready()`.
 
 The editor shows "no shape" warnings on each `Wall` — expected; the shapes exist at runtime.
@@ -75,7 +75,9 @@ casings and rugs). `floor_visuals.gd` repeats `ObjectArt.tile(...)` across the r
 A floor registers itself with Physics' `BloodSurface` (`_ready`; unregisters on exit) with `flow_groove(world, half)`,
 which asks `FloorPainter.groove(local, opts, half)` — analytic, mirroring the painted geometry (tile/mosaic/
 slab grid lines, plank row seams, parquet borders + strips; butt joints and cracks aren't modelled) — and
-`FloorPainter.porous(opts)` (carpet), so blood follows the texture. It also registers its rect, `floor_material` and
+`FloorPainter.porous(opts)` (carpet), so blood follows the texture and soaks into carpet. A non-solid piece (a rug, mat
+or runner) registers its rect the same way as a porous surface and unregisters on exit, and draws at
+`ObjectArtConfig.rug_z_index` (-3, above floors, below blood) so a pool shows on it. It also registers its rect, `floor_material` and
 `art_opts.pattern` with the Audio domain's `SoundSurface` (interface 16) so footsteps sound like
 the floor (planks and parquet wood, ceramic tile, slate stone, concrete, carpet; no floor = outdoors).
 

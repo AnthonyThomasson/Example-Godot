@@ -77,7 +77,7 @@ func puppet(id: StringName) -> Node:
 
 ## The object placed as `id` (null if unknown or freed).
 func object(id: StringName) -> Node:
-	var n: Node = _objects.get(id)
+	var n = _objects.get(id)  # untyped: assigning a freed object to a Node variable is an engine error
 	return n if is_instance_valid(n) else null
 
 

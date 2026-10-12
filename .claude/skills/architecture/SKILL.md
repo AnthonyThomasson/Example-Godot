@@ -120,7 +120,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `set_footprint(local_polygon)`, then drags blood out of a puddle as feathered, wandering ribbons while the body slides).
 	 Both need `BloodConfig.enabled` and their own switch (`footprints_enabled` / `smear_enabled`).
    - `BloodSurface` (static registry): `register(rect, groove: Callable(world, half_width) -> 0..1, porous) -> id` /
-	 `unregister(id)` — Objects' `Floor` registers its room so a bleed-out flow runs along grout/seams
+	 `unregister(id)` — Objects' `Floor` registers its room so a bleed-out flow runs along grout/seams, and rugs register as porous
+	 (blood sinks into carpet and rugs, `is_porous(pos)`)
 	 (`resistance(pos)` is read only by Physics' `BloodFlow`; `BloodConfig.surface_flow` off ignores floors).
    - `Ragdoll` (`RefCounted`, character on death): a generic 3D point-mass body over the floor plane
 	 (x/y + height z). Built with `add_point(at, radius, mass)`, `add_bone(a, b)` / `add_rigid(indices)`,

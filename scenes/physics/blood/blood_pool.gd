@@ -10,8 +10,8 @@ const FLOW_CLAIMS_PER_FRAME := 60
 
 ## The flood-fill (the visuals draw its cells).
 var flow: BloodFlow
-## Cells the flow still has to claim, and the seconds its front takes to sweep them.
-var _flow_left := 0
+## The cell budget the flow may claim (porous cells cost more), and the seconds its front takes to sweep them.
+var _budget := 0.0
 var _flow_duration := 1.0
 
 @onready var _visuals := $BloodPoolVisuals  ## The draw layer child.
@@ -22,22 +22,26 @@ var _flow_duration := 1.0
 func seed_bleed_out(cells: int, duration: float, exclude: Array) -> void:
 	flow = BloodFlow.new(Vector2.RIGHT.rotated(randf() * TAU), exclude)
 	BloodField.add_pool(self)
-	_flow_left = cells
+	_budget = cells
 	_flow_duration = duration
 	set_physics_process(true)
 
 
 func _physics_process(delta: float) -> void:
 	# Claim the cells a batch per frame (each costs a collider query), then sweep the front.
-	if _flow_left > 0 and not flow.done():
-		var n := mini(FLOW_CLAIMS_PER_FRAME, _flow_left)
-		_flow_left -= n
-		flow.step(n, get_world_2d().direct_space_state, global_position)
+	if _claiming():
+		flow.step(FLOW_CLAIMS_PER_FRAME, get_world_2d().direct_space_state, global_position, _budget)
 	else:
 		flow.advance(delta, _flow_duration)
-		if flow.settled():
-			set_physics_process(false)
+	flow.tick(delta)
+	if not _claiming() and flow.settled() and not flow.soaking():
+		set_physics_process(false)
 	_visuals.queue_redraw()
+
+
+## Whether the flow still has cells to claim: budget left and somewhere to flow.
+func _claiming() -> bool:
+	return flow.budget_used() < _budget and not flow.done()
 
 
 ## Blood dragged out of the pool to world `pos` at `level` 0..1 (a smear): grows its outline there, drawn
