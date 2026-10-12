@@ -44,6 +44,13 @@ var see_over_coverage: float = 60.0
 func can_see(from_pos: Vector2, facing: Vector2, point: Vector2, space, exclude: Array) -> bool:
 	if not enabled:
 		return true
+	if not _in_view(from_pos, facing, point):
+		return false
+	return space == null or not _sight_blocked(space, from_pos, point, exclude)
+
+
+## The geometry half of sight: `point` is within view distance and either inside the near bubble or the forward cone.
+func _in_view(from_pos: Vector2, facing: Vector2, point: Vector2) -> bool:
 	var to := point - from_pos
 	var dist := to.length()
 	if dist > view_distance:
@@ -54,7 +61,7 @@ func can_see(from_pos: Vector2, facing: Vector2, point: Vector2, space, exclude:
 			return false
 		if absf(facing.angle_to(to)) > deg_to_rad(fov_degrees) * 0.5:
 			return false
-	return space == null or not _sight_blocked(space, from_pos, point, exclude)
+	return true
 
 
 ## Whether `node` (a Node2D) is visible — convenience wrapper over can_see using its global position.
@@ -63,10 +70,17 @@ func can_see(from_pos: Vector2, facing: Vector2, point: Vector2, space, exclude:
 func can_see_node(node: Node2D, from_pos: Vector2, facing: Vector2, space, exclude: Array) -> bool:
 	if node == null or not is_instance_valid(node):
 		return false
+	if not enabled:
+		return true
+	var point := node.global_position
+	if not _in_view(from_pos, facing, point):
+		return false  # Out of view whatever stands between: no need to build the ray's exclude list.
+	if space == null:
+		return true
 	var ex: Array = exclude.duplicate()
 	if node.has_method("get_rid"):
 		ex.append(node.get_rid())
-	return can_see(from_pos, facing, node.global_position, space, ex)
+	return not _sight_blocked(space, from_pos, point, ex)
 
 
 ## Whether the straight line `from`→`to` is broken for SIGHT. Unlike `blocked()` (physical: any solid

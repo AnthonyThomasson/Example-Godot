@@ -389,18 +389,19 @@ func observe(character, rooms: Array) -> void:
 	if not familiar_with_house:
 		var known_rooms := _known_room_keys()  # Read once: what is learned here is permanent and only grows.
 		for room in rooms:
+			if known_rooms.has(room["key"]):
+				continue  # Already learned: looking again would change nothing.
 			var rect: Rect2 = room["rect"]
 			if rect.has_point(self_pos) or _vision.can_see(self_pos, facing, rect.position + rect.size * 0.5, space, exclude):
-				if not known_rooms.has(room["key"]):
-					known_rooms[room["key"]] = true
-					_learn_room(room)
+				known_rooms[room["key"]] = true
+				_learn_room(room)
 		var known_objects := _known_object_ids()
 		for obj in _interactables:
-			if is_instance_valid(obj) and _vision.can_see_node(obj, self_pos, facing, space, exclude):
-				var id: int = obj.get_instance_id()
-				if not known_objects.has(id):
-					known_objects[id] = true
-					_learn_object(obj)
+			if not is_instance_valid(obj) or known_objects.has(obj.get_instance_id()):
+				continue
+			if _vision.can_see_node(obj, self_pos, facing, space, exclude):
+				known_objects[obj.get_instance_id()] = true
+				_learn_object(obj)
 
 
 ## Update character `id`'s movement track with a sighting at `pos` and return its smoothed velocity.
