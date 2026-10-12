@@ -241,6 +241,7 @@ func process_callout(character, data: Dictionary) -> void:
 	if cleared != "":
 		_learn_room({ "key": cleared })
 		_memory.remember(&"visited_room", { "key": cleared }, search_memory_ttl, cleared)
+		mark_cleared(cleared)
 
 
 ## Refresh the combat engagement (called by the behaviour when it fires or adopts a fight), so an
@@ -688,6 +689,24 @@ func visible_points(character, points: Array) -> Array:
 ## frame, the stack slots and pie arc on either side, and the room's corners tagged hard or soft. {} when unknown.
 func entry_geometry(character, opening_id: String, into: String) -> Dictionary:
 	return _entry.geometry(opening_id, into, character.get_world_2d().navigation_map, character.get_world_2d().direct_space_state)
+
+
+## Mark room `key` cleared: its entry was carried through to the end (or searched by sight to the end), by this NPC or
+## by an ally who radioed it. Not the same as having stood in it (`visited_room`): a room walked through unprepared is
+## visited, not cleared. It lapses after `search_memory_ttl`, like a searched room.
+func mark_cleared(key: String) -> void:
+	_memory.remember(&"cleared_room", { "key": key }, search_memory_ttl, key)
+
+
+## Whether room `key` is cleared (see `mark_cleared`).
+func is_cleared(key: String) -> bool:
+	return _memory.age_of(&"cleared_room", "key", key) <= search_memory_ttl
+
+
+## The first doorway on the walk `path` (from waypoint `from_idx`, `max_dist` px of it at most) that leads into a room that
+## is not cleared, as `{ opening, into, dist }`, or {} (see agent_entry.gd `threshold_ahead`).
+func threshold_ahead(character, path: PackedVector2Array, from_idx: int, max_dist: float) -> Dictionary:
+	return _entry.threshold_ahead(path, from_idx, character.global_position, is_cleared, max_dist)
 
 
 ## The allies' live claims on doorway `opening_id`, off the radio: `{ id, name, slot, side, step, pos, age }`,

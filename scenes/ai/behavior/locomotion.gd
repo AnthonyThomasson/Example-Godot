@@ -102,6 +102,17 @@ func debug_state() -> Dictionary:
 	}
 
 
+## The walk the nav agent is following: `{ path: PackedVector2Array, index: int }` (the waypoints and the one it is heading
+## for), or {} with no agent or no path. Read after `move_to`, so it is the walk that was just steered.
+func path_ahead() -> Dictionary:
+	if _agent == null:
+		return {}
+	var path: PackedVector2Array = _agent.get_current_navigation_path()
+	if path.size() < 2:
+		return {}
+	return { "path": path, "index": _agent.get_current_navigation_path_index() }
+
+
 ## Observation only: sample the character's progress each tick. While it is trying to move
 ## (`move_input` set) it compares displacement over `STALL_WINDOW`; a speed under `STALL_SPEED` grows
 ## `_stalled_for`. Nothing reacts to it — `debug_progress()` exposes it to the stuck overlay.

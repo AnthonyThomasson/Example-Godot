@@ -47,7 +47,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   lead; only an UNKNOWN shooter is.
 - `process_callout(character, data)` — an ally's radio `&"callout"` within `callout_range` →
   `heard_callout` (keyed per speaker, ttl `callout_ttl`). One carrying `cleared_room` (an ally cleared a room in a
-  tactical entry) also teaches the room and marks it `visited_room`, so the team does not clear it twice.
+  tactical entry) also teaches the room, marks it `visited_room` and `cleared_room`, so the team does not clear it twice.
 - `check_lead(lead_id)` — the NPC reached an investigation lead: remember it as checked
   (`checked_lead`), so it is not offered again until something newer happens there.
 - `quick_facts(character)` — cheap facts (under fire, engaged, hostile known) between decisions.
@@ -100,7 +100,7 @@ first, then, while over `capacity`, the oldest expirable. Permanent events (ttl 
 and are never volume-evicted. Writes are cheap by design (about eighteen a frame across ten NPCs): superseding is in
 place, `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every
 reader takes the clock once. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
-`hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
+`cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
 carries a `note` string is surfaced to Von.
 
 ## Tactics (`agent_tactics.gd`)
@@ -154,3 +154,13 @@ room's four corners inset `corner_inset`, each `near` (on the door's wall), `sid
 outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step), `free_slot(team,
 self_id, current)` (the lowest free slot; a tie goes to the lower instance id), `stack_side(g, team, self_pos)` and
 `slot_point(g, side, slot)` are shared with the snapshot's `entries` group. Tunables: the controller's `entry_*` exports.
+
+**Cleared rooms and the entry guard (E9).** `cleared_room` (keyed per room, ttl `search_memory_ttl`) is not `visited_room`:
+standing in a room visits it, but a room is *cleared* only by `mark_cleared(key)`: the behaviour calls it when an entry
+finishes (`entry.gd` `_finish`, own clear or an ally's) and when a search covers its room by sight, and `process_callout`
+when an ally radios `cleared_room`. `is_cleared(key)` reads it; the snapshot's `entries` group skips only cleared rooms
+(search ranking still uses `visited_room`). `threshold_ahead(character, path, from_idx, max_dist)` (a thin wrapper on
+`AgentEntry.threshold_ahead`) walks a nav path and returns the first doorway whose wall plane a step crosses, within the
+doorway's width and heading into a room that is not the one the NPC is in and is not cleared: `{ opening, into, dist }`, or
+{}. The last step is extended by `THRESHOLD_EXTEND` (30 px) so a destination that is the doorway counts. The behaviour's
+entry guard calls it every tick.

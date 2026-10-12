@@ -22,6 +22,10 @@ static var ROWS := {
 		"description": "Invaders enter rooms tactically: stack, slice the pie, cross, take the corners.",
 		"actor": { "child": "GoalController", "props": ["entry_enabled"] },
 	},
+	&"ai.entry_guard": {
+		"description": "Any walk into a room that is not cleared goes in by tactical entry (needs ai.entry).",
+		"actor": { "child": "GoalController", "props": ["entry_guard"] },
+	},
 	&"ai.pursuit": {
 		"description": "NPCs chase hostiles they have seen.",
 		"actor": { "child": "GoalController", "props": ["pursue_hostiles"] },

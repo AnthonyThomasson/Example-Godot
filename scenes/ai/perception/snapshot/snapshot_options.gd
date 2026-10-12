@@ -366,8 +366,8 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 		var into: String = e["into"]
 		var status := "unexplored"
 		if known.has(into) or known.has(StringName(into)):
-			if _memory.age_of(&"visited_room", "key", into) <= _v.search_memory_ttl:
-				continue  # Searched lately: nothing to clear.
+			if _memory.age_of(&"cleared_room", "key", into) <= _v.search_memory_ttl:
+				continue  # Cleared lately: nothing to clear.
 			status = "unsearched"
 		var g: Dictionary = _entry.geometry(e["id"], into, ctx["map"], ctx["space"])
 		if g.is_empty():

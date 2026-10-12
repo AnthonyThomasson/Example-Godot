@@ -209,6 +209,13 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var rear_security_time: float = 10.0
 ## Safety cap (s) on reaching the stack: an entrant that cannot get to its slot in this time gives up its claim.
 @export var entry_approach_time: float = 20.0
+## The entry guard (E9): any walk that would cross into a room that is not cleared goes in by tactical entry first, whatever
+## order it came from. Needs `entry_enabled`. A retreat and an NPC under fire are exempt.
+@export var entry_guard: bool = true
+## Distance (px of walking) from such a doorway at which the guard starts the entry.
+@export var entry_guard_range: float = 300.0
+## Seconds a doorway whose entry was given up (a fight, a failed start) is left alone before the guard may try it again.
+@export var entry_guard_rearm: float = 6.0
 
 @export_group("Vision")
 ## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
@@ -426,6 +433,9 @@ func _apply_config() -> void:
 	_behavior.entry_corner_dwell = entry_corner_dwell
 	_behavior.rear_security_time = rear_security_time
 	_behavior.entry_approach_time = entry_approach_time
+	_behavior.entry_guard = entry_guard
+	_behavior.entry_guard_range = entry_guard_range
+	_behavior.entry_guard_rearm = entry_guard_rearm
 	_behavior.apply_config()
 
 

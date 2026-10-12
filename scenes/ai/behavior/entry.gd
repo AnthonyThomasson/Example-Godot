@@ -506,8 +506,10 @@ func _cleared_by_team(team: Array) -> bool:
 	return team.any(func(m): return m["step"] == "clear")
 
 
-## The room is clear: the last of the team in holds the doorway as rear security; everyone else is done.
+## The room is clear (by this NPC's sight or an ally's call): it is marked cleared, so nothing walks into it unprepared
+## again (the entry guard, E9), and the last of the team in holds the doorway as rear security; everyone else is done.
 func _finish(character) -> void:
+	_perception.mark_cleared(into)
 	var last := not _through.is_empty() and _through.values().all(func(other_slot): return other_slot < slot)
 	if not last:
 		phase = "done"

@@ -16,6 +16,10 @@ extends RefCounted
 const ENTRY_POINT_DEPTH := 24.0
 ## Slots worked out per side: a fuller team queues in the last one.
 const MAX_SLOTS := 6
+## How far (px) `threshold_ahead` extends the end of a walk, so a destination in the doorway itself crosses it.
+const THRESHOLD_EXTEND := 30.0
+## How far (px) past the doorway's width a step may cross the wall plane and still count as through it.
+const THRESHOLD_SLACK := 8.0
 
 var vision: RefCounted                ## The perception's sight sense (sight rays over low cover).
 var stack_spacing: float = 34.0       ## Distance (px) between neighbouring stack slots: a body's width and a little.
@@ -61,6 +65,66 @@ func entries_from(here_key: String) -> Array:
 		out.append({ "id": opening_id(o), "into": into, "pos": o["pos"], "width": float(o.get("width", 80.0)),
 			"front": bool(o.get("front", false)) })
 	return out
+
+
+## The first doorway on a walk that leads into a room the NPC has not cleared: the polyline from `from_pos` through the
+## waypoints of `path` from `from_idx` on, as far as `max_dist` px of walking. A doorway counts when a step of the walk
+## crosses its wall plane within the doorway's width, heading into a room that is not the one the NPC is in and that
+## `is_cleared` (a Callable on the room key) says is not cleared. The walk's last step is extended by a body's length, so
+## a destination that is the doorway itself crosses it. `{ opening, into, dist }` (`dist` = px of walking to it), or {}.
+## Used by the behaviour's entry guard (E9): any walk, not only the ENTER order, goes in by the entry.
+func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2, is_cleared: Callable, max_dist: float) -> Dictionary:
+	var pts: Array = [from_pos]
+	for i in range(maxi(from_idx, 0), path.size()):
+		pts.append(path[i])
+	if pts.size() < 2:
+		return {}
+	var tail: Vector2 = (pts[-1] as Vector2) - (pts[-2] as Vector2)
+	if tail.length() > 0.001:
+		pts.append((pts[-1] as Vector2) + tail.normalized() * THRESHOLD_EXTEND)
+	var here := ""
+	for r in _rooms:
+		if (r["rect"] as Rect2).has_point(from_pos):
+			here = str(r["key"])
+	var walked := 0.0
+	for i in range(1, pts.size()):
+		var a: Vector2 = pts[i - 1]
+		var b: Vector2 = pts[i]
+		var best := {}
+		for o in _openings:
+			var pos: Vector2 = o["pos"]
+			for key in o.get("rooms", []):
+				var into := str(key)
+				if into == here or is_cleared.call(into):
+					continue
+				var room := _room_rect(into)
+				if room.size == Vector2.ZERO:
+					continue
+				var inward := _inward(room, pos)
+				var sa := (a - pos).dot(inward)
+				var sb := (b - pos).dot(inward)
+				if sa >= 0.0 or sb < 0.0:
+					continue  # Not a step from outside the wall plane to its far side.
+				var q := a + (b - a) * (-sa / (sb - sa))
+				if absf((q - pos).dot(inward.orthogonal())) > float(o.get("width", 80.0)) * 0.5 + THRESHOLD_SLACK:
+					continue
+				var d := walked + a.distance_to(q)
+				if best.is_empty() or d < best["dist"]:
+					best = { "opening": opening_id(o), "into": into, "dist": d }
+		if not best.is_empty():
+			return best if best["dist"] <= max_dist else {}
+		walked += a.distance_to(b)
+		if walked > max_dist:
+			break
+	return {}
+
+
+## The rect of room `key`, or an empty Rect2.
+func _room_rect(key: String) -> Rect2:
+	for r in _rooms:
+		if str(r["key"]) == key:
+			return r["rect"]
+	return Rect2()
 
 
 ## The geometry of going through opening `id` into room `into`, or {} when either is unknown. Built once on a

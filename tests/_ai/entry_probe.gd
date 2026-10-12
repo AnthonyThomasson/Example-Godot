@@ -11,6 +11,7 @@ const Maps := preload("res://tests/_ai/flank_maps.gd")
 ## pointing away from the room being entered) and the room behind it.
 const BACK := { "id": "door_840_190", "pos": Maps.DOOR_BACK, "width": 90.0, "out": Vector2.RIGHT, "room": Maps.HOUSE_KITCHEN, "room_key": "kitchen" }
 const FRONT := { "id": "door_0_415", "pos": Maps.DOOR_FRONT, "width": 80.0, "out": Vector2.LEFT, "room": Maps.HOUSE_HALL, "room_key": "hall" }
+const KITCHEN_LIVING := { "id": "door_480_150", "pos": Maps.DOOR_LIVING_KITCHEN, "width": 90.0, "out": Vector2.RIGHT, "room": Maps.HOUSE_LIVING, "room_key": "living_room" }
 const HALL_LIVING := { "id": "door_150_360", "pos": Maps.DOOR_HALL_LIVING, "width": 80.0, "out": Vector2.DOWN, "room": Maps.HOUSE_LIVING, "room_key": "living_room" }
 
 ## How deep (px) the funnel reaches either side of the wall plane: the strip in the doorway where an entrant is exposed.
@@ -26,6 +27,15 @@ static func rules(s: TestSetup, door: Dictionary, extra: Array = []) -> void:
 	var script: Array = [{ "pick": "enter" }, { "pick": door["id"] }, { "pick": "engage" }]
 	script.append_array(extra)
 	s.von_script(script)
+	s.switch(&"ai.hostile_on_trespass", false)
+	s.switch(&"projectile.flyover", false)
+
+
+## Scripted Von for a test of the entry guard (E9): whenever asked, the first of `picks` that is offered (ids, in order of
+## preference; never ENTER, the point is a plain order that crosses a doorway), the same shared switches as `rules`. Call
+## it after the map.
+static func guard_rules(s: TestSetup, picks: Array) -> void:
+	s.von_script(picks.map(func(p): return { "pick": p }))
 	s.switch(&"ai.hostile_on_trespass", false)
 	s.switch(&"projectile.flyover", false)
 
@@ -231,13 +241,38 @@ static func calls(t: TestContext, step := "", id: StringName = &"") -> Array:
 		return who == null or d.get("speaker") == who)
 
 
-## The sim time of the first entry callout of step `step` from actor `id`, or INF.
-static func first_call_time(t: TestContext, step: String, id: StringName) -> float:
+## The sim time of the first entry callout of step `step` from actor `id` (about doorway `opening` when given), or INF.
+static func first_call_time(t: TestContext, step: String, id: StringName, opening := "") -> float:
 	var who := t.actor(id)
 	for e in t.events:
-		if e["topic"] == &"callout" and e["data"].get("speaker") == who and String(e["data"].get("entry_step", "")) == step:
+		if e["topic"] != &"callout" or e["data"].get("speaker") != who or String(e["data"].get("entry_step", "")) != step:
+			continue
+		if opening == "" or String(e["data"].get("opening", "")) == opening:
 			return e["time"]
 	return INF
+
+
+## Whether any Von question so far was answered with an option id starting with `prefix` (a script that picks by id
+## falls back to the first option offered, so a test of a plain order checks the order was really the one chosen).
+static func asked(t: TestContext, prefix: String) -> bool:
+	for r in t.von_requests():
+		if String(r["pick"]).begins_with(prefix):
+			return true
+	return false
+
+
+## Check that actor `id` got through `door` by tactical entry (E9): it radioed `going_in` for it, no later than the first
+## time it stood in the doorway's funnel, and it did not pause in the funnel.
+static func check_entered(t: TestContext, samples: Array, id: StringName, door: Dictionary) -> void:
+	var going := first_call_time(t, "going_in", id, door["id"])
+	var funnel := first_in_funnel(samples, id, door)
+	t.check(going < INF, "%s went through %s by entry (it never radioed going_in for it)" % [id, door["id"]])
+	if going < INF and funnel < INF:
+		t.check(funnel >= going - 0.05, "%s was in the funnel of %s at %.2f s, before it radioed going_in at %.2f s" % [id, door["id"], funnel, going])
+	# Up to the moment it is through: a narrow room's corner can lie inside the funnel, and it holds that corner.
+	var through := first_call_time(t, "in", id, door["id"])
+	var crossing := samples.filter(func(sample): return sample["t"] <= through)
+	t.check(longest_pause_in_funnel(crossing, id, door) < 0.5, "%s did not pause in the funnel of %s" % [id, door["id"]])
 
 
 ## The status the brain of actor `id` gives the room with key `room_key` (`current` / `searched` / `unsearched` /

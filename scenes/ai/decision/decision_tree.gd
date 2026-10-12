@@ -116,7 +116,7 @@ const NODES := {
 		"context": [&"situation", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"retreat_positions"],
 		"primitive": &"move",
-		"params": { "aim": &"threat", "fire_at_will": true, "run": true },
+		"params": { "aim": &"threat", "fire_at_will": true, "run": true, "entry_guard": false },
 	},
 	&"locate": {
 		"label": "LOCATE",

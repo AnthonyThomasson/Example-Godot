@@ -1,7 +1,7 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E8 are enforced (issue #32, from spike #18); each has its tests
+that rule is modelled on. Behaviours E1 to E9 are enforced (E1 to E8 from issue #32, spike #18; E9 closes the gap that left); each has its tests
 in `tests/ai/entry_*_test.gd` (`tools/run_tests.sh entry`), named under the behaviour, which were written
 first as red `gap` tests following the convention of `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
@@ -111,11 +111,25 @@ Tests: `entry_solo_pies_both_sides`, `entry_solo_commits_once`, `entry_ally_join
 send it back to the start).
 
 **E8. Clear, mark, move on.** When the corners and the room's points are seen, the room is marked cleared
-(it feeds the existing *searched rooms* memory). One invader stays on the opening as rear security facing back
+(the `cleared_room` memory, which also counts as searched). One invader stays on the opening as rear security facing back
 the way it came; the others take the next opening or unsearched room. A room whose door is past is never
 passed without being searched or secured first. Why: a cleared room that is not marked is searched again; a
 doorway left unwatched is a hole in the team's rear.
 Tests: `entry_marks_room_cleared`, `entry_rear_security`.
+
+**E9. No unguarded thresholds.** A walk that would cross into a room that is not cleared goes in by tactical
+entry, whatever order sent the NPC there: a search or explore, an investigation lead, closing in on or flanking a
+hostile, the way to an object, the front entrance. And at every such doorway on the way, not only the last: sent two
+doors deep, it enters by each. Within `entry_guard_range` (300 px of walking) of the doorway the walk is paused, the
+entry runs (E1 to E8) and the walk then carries on from where the entry left the NPC. A room is cleared when an entry
+into it ran to the end, when an ally radioed it clear, or when a search covered it by sight; walking through a room does
+not clear it. Exempt: a retreat; an NPC under fire (one that began an entry gives it up and radios `abort`); and a
+crossing already under way (E4). A decision made while the entry runs, such as a fight that began, replaces the walk
+paused behind it and does not tear the entry down. Why: E8's last sentence, "a room whose door is past is never passed
+without being searched or secured first", and the plain walk through the funnel that skipping the entry is.
+Tests: `entry_guard_explore`, `entry_guard_search_room`, `entry_guard_advance`, `entry_guard_cleared_room_free`,
+`entry_guard_under_fire_exempt`, `entry_guard_retreat_exempt`; with `entry_fallback_aborts` (an entry is given up when
+Von cannot be reached) and `entry_decision_in_flight_during_cross` (a decision already in flight waits for the crossing).
 
 ## Situations
 
@@ -163,6 +177,14 @@ the stack toward the door's axis, clear of the slots.
   in the doorway is acted on once the NPC is through. The room is cleared by sight with
   `search_coverage.gd`. Posture and running stay code-owned: it stands throughout and never runs, not even
   under fire, because a running character cannot shoot (test `entry_never_runs`).
+- **The guard (E9).** `Behavior._entry_guard` (`behavior.gd`) runs after the running primitive has steered and reads the
+  walk the nav agent was just given (`Locomotion.path_ahead()`), not the order's destination, so it sees every walk: a
+  move, an engage or its repositions, the way to an object. Perception's `AgentEntry.threshold_ahead` finds the first
+  doorway on it that leads into a room that is not cleared (`cleared_room` memory, written when an entry finishes, when an
+  ally radios `cleared_room`, and when a search covers its room). The guard then stashes the order, runs an `entry`
+  primitive for that doorway (the same one ENTER runs) and puts the order back when it ends. Exempt are the nodes that
+  carry `entry_guard: false` (RETREAT) and an NPC under fire. `GoalController` exports `entry_guard`, `entry_guard_range`
+  and `entry_guard_rearm` (test switch `ai.entry_guard`). It acts only where entry does, on invaders (`entry_enabled`).
 - **The team.** Roles, readiness and progress travel on the callout radio: each step is a `callout` with
   `opening`, `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
   `cleared_room`, `rear`, `abort`), repeated every 2 s so a claim stays live. A slot is the lowest the radio
@@ -182,8 +204,9 @@ Interpretations and the game's own rules, where the sources leave a choice:
 - The room is radioed clear once the member that covered it sees the rest of the stack through; a member
   still taking its corner holds it before it accepts the call. The last of the team to go in holds the
   doorway as rear security for `rear_security_time` (E8); a lone entrant has nobody to leave behind.
-- Not enforced: passing a doorway without searching or securing the room behind it (E8's last sentence).
-  A room crossed on the way to another is marked searched as before, by standing in it.
+- A room crossed in a retreat or under fire is visited, not cleared: ENTER offers it again once the NPC is outside, and an
+  entry the guard began there and gave up is not started again for `entry_guard_rearm` s. Search ranking still goes by
+  `visited_room` (stood in it lately); the guard and ENTER go by `cleared_room`.
 
 ## Sources
 

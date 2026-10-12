@@ -258,12 +258,14 @@ functional tests of their domain.
 
 ## Tactical entry tests (tag `entry`)
 
-`tests/ai/entry_*_test.gd` pin down `docs/tactical-entry.md` (E1 to E8; each header names its behaviour): staging and
+`tests/ai/entry_*_test.gd` pin down `docs/tactical-entry.md` (E1 to E9; each header names its behaviour): staging and
 the approach, the stack's slots, the pie, the crossing, the corners, the ready barrier and the radio, the solo entry
 and a joining ally, clearing and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
 rooms so the geometry is clean), through `tests/_ai/entry_probe.gd` (`const Entry := preload(...)`): `rules(s, door)`
 (SEARCH > ENTER > that doorway, engage in a fight), `npc` (an invader that walks; `cadence` offsets its decide timer),
-`target`, the test's own doorway frame (`BACK`, `FRONT`, `HALL_LIVING` with `out`, `outward`, `lateral`, `in_funnel`,
+`target`, `guard_rules(s, picks)` (a plain order that is not ENTER: for the E9 tests, with `asked(t, prefix)` to check the
+order was really the one scripted and `check_entered(t, samples, id, door)` for "it went in by entry"), the test's own
+doorway frame (`BACK`, `FRONT`, `HALL_LIVING`, `KITCHEN_LIVING` with `out`, `outward`, `lateral`, `in_funnel`,
 `in_room`, `beside_door`, `corners`), a per-frame sampler (`watch`, then `path_of`, `pos_at`, `first_stop_in_room`,
 `funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`) and the radio (`calls(t, step, id)`, `first_call_time`;
 callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
@@ -383,6 +385,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `ai.hostile_on_attack` | Hostility toward an attacker. |
 | `ai.posture` | NPCs crouch while fighting in place (`GoalController.posture_enabled`). |
 | `ai.entry` | Tactical entry (`GoalController.entry_enabled`; on in the invader preset). |
+| `ai.entry_guard` | The entry guard (`GoalController.entry_guard`, on by default; needs `ai.entry`): any walk into an uncleared room goes in by entry. |
 | `nav.rebake` | `NavUpdater.enabled`. |
 | `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps and reloads make `sound` events and voices. |
 | `physics.blood` | `BloodConfig.enabled`. |

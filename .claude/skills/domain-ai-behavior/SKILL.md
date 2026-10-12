@@ -32,7 +32,7 @@ fields are read live, so only those modules need the push.)
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
 | `reload` | — | Equip the gun (`gun_slot()`), stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
-| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. |
+| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. The entry guard (below) also runs it, as a detour in the middle of another order. |
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -63,7 +63,7 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E8) and `tests/ai/entry_*_test.gd`. `Behavior` adopts an
+The spec and the tests are `docs/tactical-entry.md` (E1 to E9) and `tests/ai/entry_*_test.gd`. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
 `approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a
@@ -88,6 +88,23 @@ out for `rear_security_time`).
 - **The radio.** Steps are queued (`take_calls()`, via `Behavior.take_entry_calls()`) and the controller posts them;
   the latest is repeated every 2 s so the claim stays live. Choosing anything else `abandon()`s the entry (radios
   `abort`). Each phase change is a `GameLog` line (`--verbose` in tests).
+- **The entry guard (E9).** Entry is not only for an ENTER order: `Behavior._entry_guard()` runs every tick after the
+  running primitive steered (a `move` not yet arrived, an `engage` and its repositions, an `interact` walk) and reads the walk the
+  nav agent was just given (`Locomotion.path_ahead()`), not the order's destination. When the perception's `threshold_ahead()`
+  finds a doorway on that walk into a room that is not cleared, within `entry_guard_range` (300 px of walking), it starts a
+  **detour**: the order is stashed whole in `_resume`, `_primitive` becomes `entry` for that doorway (`_params` = opening +
+  room; slot and side come from the radio as usual), and when the entry ends `_finish_entry()` puts the order back and refills
+  its commit timer; the walk carries on from where the entry left the NPC, and meets the next uncleared doorway the same way.
+  The labels and path of the order stay, so the status line still says what the NPC is after, with the entry's phase as progress.
+  Exempt: `entry_guard` off, no `entry_enabled`, an NPC under fire, a leaf whose params say `entry_guard: false` (RETREAT), a
+  `move` that has arrived, and a doorway whose entry was given up less than `entry_guard_rearm` s ago (`_guard_off`, on the
+  guard's own clock). A new decision while a detour runs (`set_leaf`) replaces the paused order and leaves the entry
+  running, unless it is one the guard does not apply to (`_guards(leaf)`: not a walk, a retreat, or under fire): then the
+  detour is dropped and the entry abandoned (`abort` on the radio). Coming under fire before the crossing cancels the detour
+  the same way (`_cancel_detour`); a crossing already under way is finished. A decision that was in flight when the NPC became
+  committed to its own ENTER crossing is ignored (`set_leaf` returns) and the entry's end re-decides. `fallback()` (no decision to
+  be had) abandons any entry. Tests: `tests/ai/entry_guard_*_test.gd`, `entry_fallback_aborts`,
+  `entry_decision_in_flight_during_cross`.
 - **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides,
   hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`; the status line says the phase
   ("stacked at the door", "slicing the pie", "going in" ...).
@@ -116,7 +133,8 @@ out for `rear_security_time`).
 
 ## Locomotion (`locomotion.gd`)
 
-All movement flows through `move_to(character, dest)` on a `NavigationAgent2D`. The Navigation
+All movement flows through `move_to(character, dest)` on a `NavigationAgent2D`. `path_ahead()` returns the walk it was just given
+(`{ path, index }`, or {}), which the behaviour's entry guard reads. The Navigation
 domain bakes furniture in as navmesh holes and rings the house with a walkable outdoor strip.
 Steering always aims at `get_next_path_position()` — a navmesh waypoint, so it is wall-safe, and for
 an unreachable target it steps toward the closest reachable point. Furniture physically on the route

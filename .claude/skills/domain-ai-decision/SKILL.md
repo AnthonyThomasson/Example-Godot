@@ -46,7 +46,7 @@ state, since the options carry each candidate's details), `requires` (fact names
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
 route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
-whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it).
+whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
 A node may mix `children` and `options`. `engage` and `flank` require `gun_loaded` (an empty gun is never offered "a clear shot"); `advance`, `melee` and
 `retreat` stay available so an empty NPC can still close in, punch or fall back. The `reload` nodes require `weapon_low` +
 `can_reload` (the quiet one also `!threat_known`) and have a lone option, so the planner takes them without a Von request when

@@ -68,6 +68,10 @@ var entry_pie_dwell: float = 0.35
 var entry_corner_dwell: float = 0.6
 var rear_security_time: float = 10.0
 var entry_approach_time: float = 20.0
+# The entry guard (E9): any walk into a room that is not cleared goes in by tactical entry (see `_entry_guard`).
+var entry_guard: bool = true
+var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).
+var entry_guard_rearm: float = 6.0 ## Seconds a doorway whose entry was given up is left alone before the guard may start another.
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject; handed on to the
 ## Locomotion child, which answers the room queries.
@@ -83,6 +87,9 @@ var _coverage: RefCounted         ## Room coverage by sight for a search move; s
 var _combat: RefCounted           ## Shots, punches, bursts and the peek-and-cover cycle; see combat.gd.
 var _entry: RefCounted            ## A tactical entry through a doorway; see entry.gd.
 var _entry_pending := false       ## An ENTER leaf was adopted and its entry starts on the next tick (it needs the character).
+var _resume := {}                 ## The leaf an entry detour paused (see `_begin_detour`); {} when the entry is the NPC's own order.
+var _guard_clock := 0.0           ## Seconds the guard has been watching (sim time), for the re-arm of a given-up doorway.
+var _guard_off := {}              ## Doorway id -> `_guard_clock` before which the guard leaves it alone.
 var _hostiles: Array = []         ## Known hostile contacts this tick (nearest first), from perception.
 var _primitive: StringName = &"hold" ## The running primitive.
 var _params := {}                 ## Its params (from the leaf).
@@ -396,7 +403,34 @@ func _json_safe(d: Dictionary) -> Dictionary:
 ## Adopt the planner's leaf `{ path, labels, primitive, params }`: capture its destination (snapped
 ## onto the navmesh), its target and its object, and commit to it.
 func set_leaf(leaf: Dictionary) -> void:
-	_entry.abandon()  # A new choice ends any entry in progress (the stack is told).
+	if committed() and _resume.is_empty():
+		return  # Crossing a doorway on its own ENTER: a decision that was in flight waits (the entry ends in a re-decision).
+	var carry := {}
+	if _primitive == &"entry" and not _resume.is_empty() and (committed() or _guards(leaf)):
+		# A detour's entry carries on: the new order replaces the one paused behind it (a fight that began, the same order
+		# decided again), and the entry is not torn down at its stack or in its threshold.
+		carry = { "primitive": _primitive, "params": _params, "pending": _entry_pending }
+	else:
+		_drop_detour()
+		_entry_pending = false
+		_entry.abandon()  # A new choice ends any entry in progress (the stack is told).
+	_adopt(leaf)
+	if not carry.is_empty():
+		_stash_order()
+		_primitive = carry["primitive"]
+		_params = carry["params"]
+		_entry_pending = carry["pending"]
+
+
+## Whether the entry guard applies to `leaf`: a walk (move / engage / interact) that is not a retreat, while the NPC is not
+## under fire.
+func _guards(leaf: Dictionary) -> bool:
+	return entry_guard and leaf.get("primitive", &"hold") in [&"move", &"engage", &"interact"] \
+		and bool(leaf.get("params", {}).get("entry_guard", true)) and not _perception.under_fire()
+
+
+## Take `leaf` as the running order.
+func _adopt(leaf: Dictionary) -> void:
 	_primitive = leaf.get("primitive", &"hold")
 	_params = leaf.get("params", {})
 	_path = leaf.get("path", [])
@@ -445,6 +479,8 @@ func _engage(id: int) -> void:
 
 ## A steady stance for when no decision can be had (Von unreachable): stop and watch any known hostile.
 func fallback() -> void:
+	_drop_detour()
+	_entry.abandon()  # No decision to be had: an entry in progress is given up (the stack is told).
 	_primitive = &"hold"
 	_params = {}
 	_path = []
@@ -562,6 +598,8 @@ func apply(character, delta: float) -> void:
 			_apply_entry(character, delta)
 		_:
 			_apply_hold(character)
+	_guard_clock += delta
+	_entry_guard(character)
 	_combat.continue_burst(character)
 	character.run_input = _should_run(character)
 	_combat.apply_back_off(character, delta)
@@ -659,6 +697,9 @@ func _apply_move(character, delta: float) -> void:
 		if _coverage.step(character, delta):  # Look around until the room is covered by sight.
 			_look_around = false
 			_resolved = true
+			var covered: String = _loco.room_key_at(character.global_position)
+			if covered != "":
+				_perception.mark_cleared(covered)  # Seen all of it: cleared, as by an entry.
 		return
 	_aim_move(character)
 	if _params.get("fire_at_will", false):
@@ -733,15 +774,108 @@ func _apply_entry(character, delta: float) -> void:
 	if _entry_pending:
 		_entry_pending = false
 		if not _entry.begin(character, _params):
-			_primitive = &"hold"
-			_resolved = true
+			_finish_entry()
 			return
 	if _entry.step(character, delta):
-		_primitive = &"hold"
-		_resolved = true
+		_finish_entry()
 		return
 	if _entry.fires_at_will():
 		_fire_at_will(character)
+
+
+## The entry is over, or could not start. As the NPC's own order (ENTER) it resolves and the NPC re-decides. As a detour
+## (`_begin_detour`) it hands the walk back to the order it paused, which carries on from where the entry left the NPC; a
+## doorway whose room is still not cleared (the entry did not get to the end) is left alone for `entry_guard_rearm` s.
+func _finish_entry() -> void:
+	if _resume.is_empty():
+		_primitive = &"hold"
+		_resolved = true
+		return
+	if not _perception.is_cleared(_entry.into):
+		_guard_off[_entry.opening] = _guard_clock + entry_guard_rearm
+	_resume_order()
+
+
+## Hand the walk back to the order a detour paused.
+func _resume_order() -> void:
+	var r := _resume
+	_resume = {}
+	_primitive = r["primitive"]
+	_params = r["params"]
+	_path = r["path"]
+	_labels = r["labels"]
+	_point = r["point"]
+	_arrived = r["arrived"]
+	_look_around = r["look_around"]
+	_arrive_room = r["arrive_room"]
+	_act_armed = r["act_armed"]
+	_commit_timer = max_commit_time  # The order's cap runs from here: the entry took the time it took.
+
+
+## The entry guard (E9): a walk that is about to cross into a room that is not cleared goes in by tactical entry, whatever
+## order it came from (a search or explore, a lead, a closing-in, the way to an object, the front entrance). It reads the walk
+## the nav agent was just given rather than the leaf's destination, so a path through an intermediate room, a reposition in
+## a fight and the way to a doorway itself are all covered. Exempt: a retreat (`entry_guard: false` on its node), an NPC under
+## fire, an entry already running, and anything that is not walking.
+func _entry_guard(character) -> void:
+	if _primitive == &"entry":
+		if not _resume.is_empty() and not _entry.committed() and _perception.under_fire():
+			_cancel_detour()  # Shot at before it crossed: no time to stack. (Once crossing it finishes the crossing.)
+		return
+	if not entry_guard or _perception == null or not _perception.entry_enabled:
+		return
+	match _primitive:
+		&"move":
+			if _arrived:
+				return  # Holding at the destination, or covering the room by sight.
+		&"engage", &"interact":
+			pass
+		_:
+			return
+	if (character.move_input as Vector2).length() < 0.1 or not bool(_params.get("entry_guard", true)) or _perception.under_fire():
+		return
+	var walk: Dictionary = _loco.path_ahead()
+	if walk.is_empty():
+		return
+	var gate: Dictionary = _perception.threshold_ahead(character, walk["path"], walk["index"], entry_guard_range)
+	if gate.is_empty() or float(_guard_off.get(gate["opening"], -1.0)) > _guard_clock:
+		return
+	_begin_detour(gate)
+
+
+## Pause the running order and go through doorway `gate` (`{ opening, into }`) by tactical entry first. The order is kept
+## whole in `_resume` and comes back when the entry ends (`_finish_entry`). A new decision replaces it and lets the entry carry
+## on (`set_leaf`), unless it is one the guard does not apply to: then the detour is dropped (`_drop_detour`).
+func _begin_detour(gate: Dictionary) -> void:
+	_stash_order()
+	_primitive = &"entry"
+	_params = { "opening": gate["opening"], "into": gate["into"] }
+	_entry_pending = true
+
+
+## Give a detour's entry up (the stack is told) and carry on with the paused order, which walks straight through.
+func _cancel_detour() -> void:
+	_guard_off[str(_params.get("opening", _entry.opening))] = _guard_clock + entry_guard_rearm
+	_entry_pending = false
+	_entry.abandon()
+	_resume_order()
+
+
+## Keep the running order whole in `_resume`, to come back when the entry ends.
+func _stash_order() -> void:
+	_resume = {
+		"primitive": _primitive, "params": _params, "path": _path, "labels": _labels, "point": _point, "arrived": _arrived,
+		"look_around": _look_around, "arrive_room": _arrive_room, "act_armed": _act_armed,
+	}
+
+
+## A new decision (or no decision to be had) ends a detour: the paused order is gone, and the doorway it was stacking at
+## is left alone for `entry_guard_rearm` s so a fight that cut the entry short does not restart it every decision.
+func _drop_detour() -> void:
+	if _resume.is_empty():
+		return
+	_guard_off[str(_params.get("opening", _entry.opening))] = _guard_clock + entry_guard_rearm
+	_resume = {}
 
 
 ## Interact: walk to the chosen object facing it (or a known hostile, to keep eyes on them); once its
