@@ -193,16 +193,31 @@ static func _convex_pieces(polygon: PackedVector2Array) -> Array:
 		if _turn(polygon, tri[0], tri[1], tri[2]) * sign_ < 0.0:
 			tri = [tri[0], tri[2], tri[1]]
 		pieces.append(tri)
-	# The scan restarts after every merge, and a pair that failed to merge fails again until one of its pieces changes,
-	# so each piece carries an id and failed pairs are remembered by theirs (the same merges, in the same order).
+	# The scan restarts after every merge and takes the first pair, in piece order, that is neighbours across an edge and
+	# whose union is convex. Only neighbours can merge, so they are found through a map of who owns each directed edge
+	# (a piece's edge i -> j meets its neighbour's j -> i), and a neighbouring pair that failed is remembered by the
+	# pieces' ids (the failure holds until one of them changes). The same merges happen in the same order.
+	var count := polygon.size()
 	var ids: Array = range(pieces.size())
 	var next_id := pieces.size()
+	var owner := {}
+	for p in pieces.size():
+		_own_edges(owner, pieces[p], ids[p], count, true)
 	var failed := {}
-	var merged := true
-	while merged:
-		merged = false
+	while true:
+		var position_of := {}
+		for p in pieces.size():
+			position_of[ids[p]] = p
+		var found := false
 		for a in pieces.size():
-			for b in range(a + 1, pieces.size()):
+			var loop: Array = pieces[a]
+			var neighbours: Array = []
+			for k in loop.size():
+				var other = owner.get(int(loop[(k + 1) % loop.size()]) * count + int(loop[k]))
+				if other != null and position_of[other] > a:
+					neighbours.append(position_of[other])
+			neighbours.sort()
+			for b in neighbours:
 				var pair: int = mini(ids[a], ids[b]) * PIECE_PAIR_STRIDE + maxi(ids[a], ids[b])
 				if failed.has(pair):
 					continue
@@ -210,16 +225,31 @@ static func _convex_pieces(polygon: PackedVector2Array) -> Array:
 				if union.is_empty() or not _is_convex_loop(polygon, union, sign_):
 					failed[pair] = true
 					continue
+				_own_edges(owner, pieces[a], ids[a], count, false)
+				_own_edges(owner, pieces[b], ids[b], count, false)
 				pieces[a] = union
 				ids[a] = next_id
 				next_id += 1
+				_own_edges(owner, union, ids[a], count, true)
 				pieces.remove_at(b)
 				ids.remove_at(b)
-				merged = true
+				found = true
 				break
-			if merged:
+			if found:
 				break
+		if not found:
+			break
 	return pieces
+
+
+## Record (`add`) or forget the directed edges of piece `loop` in `owner`, keyed `from * count + to`, as piece `id`'s.
+static func _own_edges(owner: Dictionary, loop: Array, id: int, count: int, add: bool) -> void:
+	for k in loop.size():
+		var key: int = int(loop[k]) * count + int(loop[(k + 1) % loop.size()])
+		if add:
+			owner[key] = id
+		else:
+			owner.erase(key)
 
 
 ## Cross product of the turn at `b` on the way a -> b -> c (positive = counter-clockwise).
