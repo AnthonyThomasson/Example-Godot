@@ -11,11 +11,8 @@ const ROWS := 10
 const KINDS := ["chair", "side_table", "armchair", "plant"]
 const MOVING_FRAMES := 180
 const RESTING_FRAMES := 60
-# Baseline: moving avg ~4.7 / p95 ~5.5 / max ~5.8, resting avg ~4.5 ms per frame. Budgets ~4-7x.
-const MOVING_AVG_MS := 20.0
-const MOVING_P95_MS := 25.0
-const MOVING_MAX_MS := 40.0
-const RESTING_AVG_MS := 20.0
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). Before the performance work (#13): moving avg ~4.7 / p95 ~5.5 /
+# max ~5.8, resting avg ~4.5 ms per frame.
 
 
 func describe() -> Dictionary:
@@ -50,7 +47,7 @@ func run(t: TestContext) -> void:
 		piece.apply_impulse((Vector2(650, 550) - piece.global_position).normalized() * 1500.0)  # converge: a pile-up
 
 	var moving := await Perf.frame_stats(t, MOVING_FRAMES)
-	Perf.within_frames(t, "furniture pile moving", moving, MOVING_AVG_MS, MOVING_P95_MS, MOVING_MAX_MS)
+	Perf.within_frames(t, "furniture pile moving", moving, Perf.SMOOTH_AVG_MS, Perf.SMOOTH_P95_MS, Perf.SMOOTH_MAX_MS)
 
 	var travelled := 0.0
 	for i in count:
@@ -66,7 +63,7 @@ func run(t: TestContext) -> void:
 		return true
 	await t.until(all_asleep, 6.0)
 	var resting := await Perf.frame_stats(t, RESTING_FRAMES)
-	Perf.within(t, "furniture pile resting avg ms/frame", resting["avg_ms"], RESTING_AVG_MS)
+	Perf.within(t, "furniture pile resting avg ms/frame", resting["avg_ms"], Perf.SMOOTH_AVG_MS)
 	var grown := Perf.nodes() - nodes_before
 	GameLog.say("PERF furniture pile node growth %d" % grown)
 	t.check(grown <= 2, "shoving furniture neither spawns nor leaks nodes (grew by %d)" % grown)

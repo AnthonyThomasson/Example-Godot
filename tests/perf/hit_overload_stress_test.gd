@@ -8,11 +8,8 @@ const Perf := preload("res://tests/_perf/perf_probe.gd")
 
 const HITS_PER_FRAME := 4
 const FRAMES := 150
-# Baseline: avg ~17 / p95 ~30 / max ~35 ms per frame, N BloodSplat (re-measure). Time budgets ~4-5x; the pool limit is
-# a count, so it is tight.
-const AVG_MS := 80.0
-const P95_MS := 130.0
-const MAX_MS := 160.0
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). Before the performance work (#13): avg ~17 / p95 ~30 /
+# max ~35 ms per frame. The pool limit is a count, so it is tight.
 const BLOOD_SPLAT_LIMIT := 80  # BloodConfig.max_splats_per_body, plus slack for ones not yet freed
 
 
@@ -61,7 +58,7 @@ func run(t: TestContext) -> void:
 			chair.take_hit(_hit(chair.global_position, i, null))
 			victim.take_hit(_hit(victim.global_position, i, null))
 	var stats := await Perf.frame_stats(t, FRAMES, land)
-	Perf.within_frames(t, "hit overload", stats, AVG_MS, P95_MS, MAX_MS)
+	Perf.within_frames(t, "hit overload", stats, Perf.SMOOTH_AVG_MS, Perf.SMOOTH_P95_MS, Perf.SMOOTH_MAX_MS)
 
 	t.check(deformable.impacts.size() <= PhysicsConfig.deform_max_impacts,
 		"recorded dents stay capped (%d, cap %d)" % [deformable.impacts.size(), PhysicsConfig.deform_max_impacts])

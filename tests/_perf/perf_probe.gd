@@ -1,11 +1,18 @@
 extends RefCounted
 
-## Shared helper for the performance stress tests (tag `perf`). Load it with
+## Shared helper for the performance tests (domain `perf`, tests/perf/). Load it with
 ## `const Perf := preload("res://tests/_perf/perf_probe.gd")`. Not a test (no `_test.gd` suffix).
 ##
 ## Headless runs use `--fixed-fps 60`, which outruns the wall clock, so the wall time between two
-## physics frames is the real CPU cost of a frame. Budgets are wall-clock limits set well above the
-## measured baseline (see each test), so they catch large regressions, not machine jitter.
+## physics frames is the real CPU cost of a frame. Budgets are wall-clock limits: the `SMOOTH_*` standard below for
+## a frame loop, or (for one-shot work) a multiple of the baseline stated in the test.
+
+
+## The standard a running match must meet, for every frame-based stress test: the average frame fits in one 60 fps
+## frame (16.7 ms, the Performance overlay's target), the 95th percentile stays near it, and no frame takes over two.
+const SMOOTH_AVG_MS := 16.7
+const SMOOTH_P95_MS := 20.0
+const SMOOTH_MAX_MS := 33.4
 
 
 ## Wall-clock milliseconds one synchronous `work.call()` takes.

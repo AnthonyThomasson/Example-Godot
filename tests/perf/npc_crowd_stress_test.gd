@@ -9,13 +9,11 @@ const Perf := preload("res://tests/_perf/perf_probe.gd")
 const PER_SIDE := 6
 const WARMUP_S := 2.0
 const MEASURE_FRAMES := 300
-# Baseline (8 runs, 600 and 300 measured frames agree): avg 22-25 / p95 30-37 / max 64-77 ms per frame; ~850 nodes added
-# over 300 frames (the Despawner caps what firing adds). Budgets 2.4-3.5x. The window is 300 frames, not the 600 it
-# once was, because the three frame statistics do not move with a longer one; the node budget went from 3000 to 2000
-# with it, so a leak per frame is caught at least as early.
-const AVG_MS := 60.0
-const P95_MS := 80.0
-const MAX_MS := 260.0
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*: avg under one 60 fps frame, p95 near it, nothing over two).
+# Before the performance work (#13): avg 22-25 / p95 30-37 / max 64-77 ms per frame; ~850 nodes added over 300 frames (the
+# Despawner caps what firing adds). The window is 300 frames, not the 600 it once was, because the three frame
+# statistics do not move with a longer one; the node budget went from 3000 to 2000 with it, so a leak per frame is
+# caught at least as early.
 const NODE_GROWTH := 2000
 
 
@@ -48,7 +46,7 @@ func run(t: TestContext) -> void:
 	await t.seconds(WARMUP_S)
 	var nodes_before := Perf.nodes()
 	var stats := await Perf.frame_stats(t, MEASURE_FRAMES)
-	Perf.within_frames(t, "npc crowd", stats, AVG_MS, P95_MS, MAX_MS)
+	Perf.within_frames(t, "npc crowd", stats, Perf.SMOOTH_AVG_MS, Perf.SMOOTH_P95_MS, Perf.SMOOTH_MAX_MS)
 	t.check(not t.von_requests().is_empty(), "the NPCs asked for decisions (%d asks)" % t.von_requests().size())
 	var grown := Perf.nodes() - nodes_before
 	GameLog.say("PERF npc crowd node growth %d, %d decisions asked" % [grown, t.von_requests().size()])

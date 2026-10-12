@@ -223,12 +223,16 @@ The shared helper is `tests/_perf/perf_probe.gd` (`const Perf := preload(...)`; 
 - **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
   outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms
   (`Perf.time_ms`), and exact counts (`Perf.nodes()`, `Despawner.count()`, dent / blood-pool caps).
-- **Budgets** are `const`s at the top of each test, about 4x the measured baseline (stated in the comment
-  above them). `Perf.within` prints `PERF <label> <value> (budget <limit>)`, traces it, and fails the
-  check with the value. Counts are asserted tightly; times loosely, so only real regressions trip them.
-- **Re-baselining:** run `tools/run_tests.sh perf --repeat=5 --verbose`, read the `PERF` lines, set each budget to
-  about 4x the worst observed value, and update the baseline comment. A deliberate cost increase is a
-  budget change in the same commit.
+- **The standard:** every frame-based test holds the smooth-match budget, `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps frame, the
+  Performance overlay's target), `SMOOTH_P95_MS` (20) and `SMOOTH_MAX_MS` (33.4, two frames), through `Perf.within_frames`.
+  `perf/match_5v5_stress` is the whole-match case (`MatchSpawner` placement, default loadouts, nav re-baker, blood, debris, sound
+  and radio on, scripted Von). One-shot work (`Perf.time_ms`: nav re-bake, path queries, world-gen) keeps a `const` budget at
+  the top of its test, about 4x the baseline stated in the comment above it. `Perf.within` prints
+  `PERF <label> <value> (budget <limit>)`, traces it, and fails the check with the value. Counts (nodes, dents,
+  pools) are asserted tightly.
+- **Re-baselining:** run `tools/run_tests.sh --domain=perf --repeat=5 --verbose` and read the `PERF` lines. The frame standard is not
+  loosened to fit a slower game: make the game faster, or state in the test why one load is heavier than a match. Update the
+  "before" numbers in a test's comment only when its load changes.
 - **Gotchas:** a lambda captures ints by value (count into an Array); `nav.rebake` is off in tests that
   shove or shoot furniture into overlaps (re-baking overlapping holes logs a nav sync error; the nav
   test covers re-baking); world-gen's first run in a process is

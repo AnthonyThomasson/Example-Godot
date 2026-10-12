@@ -11,11 +11,9 @@ const ROWS := 4
 const IDLE_FRAMES := 60
 const FALL_FRAMES := 240
 const SETTLE_TIMEOUT := 20.0
-# Baseline: idle ~15.5 (re-measured; it was ~3.3, and fails the same on the commit before the blood rework), fall avg ~45 / p95 ~70 / max ~72 ms per frame, ~600 nodes added. Budgets ~4x.
-const IDLE_AVG_MS := 60.0
-const FALL_AVG_MS := 180.0
-const FALL_P95_MS := 270.0
-const FALL_MAX_MS := 300.0
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*), idle and while the bodies fall (the frame the 36 deaths
+# are dealt in is not measured). Before the performance work (#13): idle ~15.5 (it was ~3.3 before the 3D rig and pose),
+# fall avg ~45 / p95 ~70 / max ~72 ms per frame, ~600 nodes added.
 const NODE_GROWTH := 1500
 
 
@@ -43,7 +41,7 @@ func configure(s: TestSetup) -> void:
 func run(t: TestContext) -> void:
 	var count := COLUMNS * ROWS
 	var idle := await Perf.frame_stats(t, IDLE_FRAMES)
-	Perf.within(t, "idle crowd avg ms/frame", idle["avg_ms"], IDLE_AVG_MS)
+	Perf.within(t, "idle crowd avg ms/frame", idle["avg_ms"], Perf.SMOOTH_AVG_MS)
 
 	var nodes_before := Perf.nodes()
 	for i in count:
@@ -57,7 +55,7 @@ func run(t: TestContext) -> void:
 	t.check(t.actor(_id(0)).is_dead and t.actor(_id(count - 1)).is_dead, "the crowd is dead")
 
 	var fall := await Perf.frame_stats(t, FALL_FRAMES)
-	Perf.within_frames(t, "crowd fall", fall, FALL_AVG_MS, FALL_P95_MS, FALL_MAX_MS)
+	Perf.within_frames(t, "crowd fall", fall, Perf.SMOOTH_AVG_MS, Perf.SMOOTH_P95_MS, Perf.SMOOTH_MAX_MS)
 
 	var settled := func():
 		for i in count:

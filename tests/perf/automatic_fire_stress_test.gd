@@ -15,13 +15,10 @@ const RIFLES := [Vector2(1340, 250), Vector2(1340, 450), Vector2(1340, 650), Vec
 const TARGETS := 24
 const FIRE_FRAMES := 300
 const PISTOL_EVERY := 4  ## A pistol press every this many frames.
-# Baseline (5 runs): avg ~21-22.5 / p95 ~35-37 / max ~39-52 ms per frame. Budgets ~4x the worst. (The shooters' lanes
-# interleave and the SMGs' spread lands rounds on each other, which also guards BloodWound under a sustained stream
-# of hits. The pistols hold a standard 12-round magazine and do not reload, so they add load for the first ~50 frames
-# only; the automatic guns carry the rest.)
-const AVG_MS := 90.0
-const P95_MS := 145.0
-const MAX_MS := 210.0
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). Before the performance work (#13): avg ~21-22.5 / p95 ~35-37 /
+# max ~39-52 ms per frame. (The shooters' lanes interleave and the SMGs' spread lands rounds on each other, which also
+# guards BloodWound under a sustained stream of hits. The pistols hold a standard 12-round magazine and do not reload,
+# so they add load for the first ~50 frames only; the automatic guns carry the rest.)
 # Each tracked chip carries a visuals child, so a full Despawner (1000) is ~2000 nodes; baseline ~2200.
 const NODE_GROWTH_AFTER_DRAIN := 4000
 
@@ -91,7 +88,7 @@ func run(t: TestContext) -> void:
 	var stats := await Perf.frame_stats(t, FIRE_FRAMES, click)
 	for gun in guns:
 		gun.hold_fire(false)
-	Perf.within_frames(t, "gunfire", stats, AVG_MS, P95_MS, MAX_MS)
+	Perf.within_frames(t, "gunfire", stats, Perf.SMOOTH_AVG_MS, Perf.SMOOTH_P95_MS, Perf.SMOOTH_MAX_MS)
 
 	var seconds := float(FIRE_FRAMES) / float(Engine.physics_ticks_per_second)
 	var wanted := 0.0
