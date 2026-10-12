@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Git pre-commit hook: when the commit touches game code, run the affected game tests and abort the commit on
+# failure. Enable with tools/install_hooks.sh; bypass with `git commit --no-verify`.
+set -uo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+git diff --cached --name-only | grep -qE '^(scenes/|tests/|project\.godot$)' || exit 0
+
+out=$(tools/run_tests.sh --changed --summary --jobs=auto 2>&1)
+code=$?
+[[ $code -eq 0 ]] && exit 0
+
+{
+  echo "Game tests failed; commit aborted (tools/run_tests.sh --changed --summary --jobs=auto):"
+  echo "$out" | grep -E '^(==|FAIL|TIMEOUT|        [✗·~]|        bundle:|        shot:|Logged outside|[0-9]+ passed)'
+  echo "See the test-debug skill; bundles hold the event log and final state."
+} >&2
+exit 1

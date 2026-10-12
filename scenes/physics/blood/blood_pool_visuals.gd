@@ -12,12 +12,52 @@ uniform vec4 blood_color : source_color;
 uniform vec4 rim_color : source_color;
 uniform float opacity = 0.85;
 uniform float threshold = 0.3;
+uniform vec2 field_px = vec2(1.0);
+uniform float tuft_spread = 0.8;
+uniform float tuft_px = 2.5;
+uniform float tuft_contrast = 0.2;
+uniform float soak_opacity = 0.65;
+float hash(vec2 p) {
+	return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453);
+}
 void fragment() {
-	float v = texture(TEXTURE, UV).r;
+	vec4 t = texture(TEXTURE, UV);
+	// Carpet and rug blood soaks in tuft by tuft: the pool is cut into irregular tufts (the nearest of a jittered
+	// point per cell, fixed to the pool in world pixels), each with its own soak rate and shade of red. Only the
+	// colour changes: the blood stays opaque over its whole outline, so no fibre shows through.
+	vec2 p = UV * field_px / tuft_px;
+	vec2 base = floor(p);
+	float f1 = 9.0;
+	float f2 = 9.0;
+	vec2 tuft = base;
+	for (int j = -1; j <= 1; j++) {
+		for (int i = -1; i <= 1; i++) {
+			vec2 c = base + vec2(float(i), float(j));
+			float d = distance(p, c + vec2(hash(c), hash(c + vec2(19.7, 3.1))));
+			if (d < f1) {
+				f2 = f1;
+				f1 = d;
+				tuft = c;
+			} else if (d < f2) {
+				f2 = d;
+			}
+		}
+	}
+	float rate = hash(tuft + vec2(3.3, 8.9));
+	float shade = hash(tuft + vec2(37.1, 11.7));
+	float spread = tuft_spread * 0.7;
+	float s = clamp((t.g - rate * spread) / max(1.0 - spread, 0.001), 0.0, 1.0);
+	float v = t.r;
 	float w = max(fwidth(v) * 0.75, 0.002);
 	float a = smoothstep(threshold - w, threshold + w, v);
-	vec3 c = mix(rim_color.rgb, blood_color.rgb, smoothstep(threshold, 0.9, v));
-	COLOR = vec4(c, a * opacity);
+	vec3 fresh = mix(rim_color.rgb, blood_color.rgb, smoothstep(threshold, 0.9, v));
+	vec3 soaked = mix(blood_color.rgb * (1.0 - tuft_contrast), min(blood_color.rgb * (1.0 + 0.6 * tuft_contrast), vec3(1.0)), shade);
+	vec3 col = mix(fresh, soaked, s);
+	// A faint darker crease where two tufts meet, so the texture reads as tufts without opening a gap.
+	col *= 1.0 - 0.5 * tuft_contrast * s * (1.0 - smoothstep(0.0, 0.18, f2 - f1));
+	// Soaked blood is thinner: the pattern of the carpet or rug shows through it (never a hole).
+	a *= mix(1.0, soak_opacity * (0.9 + 0.1 * shade), s);
+	COLOR = vec4(col, a * opacity);
 }
 """
 ## Box-blur passes over the fill field, melting single frontier cells into their neighbours.
@@ -79,12 +119,22 @@ func _draw_flow() -> void:
 	for pass_i in BLUR_PASSES:
 		field = _box_blur(field, w, h)
 
+	# Red = fill, green = how far the blood has sunk in (left at cell resolution;
+	# the texture filtering smooths it, and the shader soaks it in tuft by tuft).
 	var bytes := PackedByteArray()
-	bytes.resize(w * h)
+	bytes.resize(w * h * 2)
 	for i in field.size():
-		bytes[i] = int(clampf(field[i], 0.0, 1.0) * 255.0)
-	var image := Image.create_from_data(w, h, false, Image.FORMAT_R8, bytes)
+		bytes[i * 2] = int(clampf(field[i], 0.0, 1.0) * 255.0)
+	if flow.has_porous():
+		for c in flow.cells:
+			bytes[((c.y - lo.y) * w + (c.x - lo.x)) * 2 + 1] = int(clampf(flow.soak_level(c), 0.0, 1.0) * 255.0)
+	var image := Image.create_from_data(w, h, false, Image.FORMAT_RG8, bytes)
 	var size := BloodConfig.flow_cell_size
+	_flow_material.set_shader_parameter("field_px", Vector2(w, h) * size)
+	_flow_material.set_shader_parameter("tuft_spread", BloodConfig.soak_tuft_spread)
+	_flow_material.set_shader_parameter("tuft_px", BloodConfig.soak_tuft_size)
+	_flow_material.set_shader_parameter("tuft_contrast", BloodConfig.soak_tuft_contrast)
+	_flow_material.set_shader_parameter("soak_opacity", BloodConfig.soak_opacity)
 	# Held in a member: a texture freed at the end of _draw would render white.
 	_flow_texture = ImageTexture.create_from_image(image)
 	draw_texture_rect(_flow_texture, Rect2(Vector2(lo) * size, Vector2(w, h) * size), false)

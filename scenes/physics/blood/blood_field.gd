@@ -76,7 +76,7 @@ static func wetness_at(pos: Vector2) -> float:
 			continue
 		var cell := Vector2i(((pos - pool.global_position) / BloodConfig.flow_cell_size).floor())
 		if flow.covers(cell):
-			best = maxf(best, flow.fill(cell) * _wet(p["born"], BloodConfig.pool_wet_time))
+			best = maxf(best, flow.wetness(cell) * _wet(p["born"], BloodConfig.pool_wet_time))
 	return best
 
 

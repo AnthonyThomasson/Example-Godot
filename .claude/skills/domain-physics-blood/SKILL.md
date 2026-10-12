@@ -48,9 +48,22 @@ Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and
 
 The floor steers the flow: each cell's step cost is multiplied by `BloodSurface.resistance(world_pos)` —
 surfaces (Objects' floors) register a world rect + a `groove` Callable, so blood runs cheaply along grooves
-(`groove_resist`), slowly across smooth surface (`smooth_resist`) and barely at all over porous carpet
-(`porous_resist`); outdoors = 1. Newest-registered surface wins on overlap. Master switch
-`BloodConfig.surface_flow`.
+(`groove_resist`), slowly across smooth surface (`smooth_resist`) and slowest over a porous surface
+(`porous_resist`: carpet floors and rugs); outdoors = 1. Newest-registered surface wins on overlap, except
+that any porous surface at a point counts (`BloodSurface.is_porous`), so a rug over tile is porous whichever
+registered first. Master switch `BloodConfig.surface_flow`.
+
+**Soaking.** Blood on a porous surface sinks in: once the flood has mostly reached a porous cell (>= 0.5),
+`BloodFlow.tick(delta)` (called from `BloodPool`, which keeps processing after the front settles while
+`soaking()`) takes its soak 0 -> 1 over `soak_time`. Soaking never changes `fill(c)` or the pool's outline: the blood
+still covers everything it covered, with no holes; it turns translucent (`soak_opacity`) so the carpet or rug pattern shows through it. `wetness(c)` = `fill * (1 - soak)` is what
+`BloodField.wetness_at` reads, so soaked blood leaves no prints or smears. Dragged-out trail cells are not soaked.
+**Slower, shorter and tufted:** `BloodFlow.advance` stretches the sweep by `porous_spread_slowdown` in proportion to the share of
+claimed cells on porous surface, so blood creeps over carpet; and each porous cell costs `porous_cell_weight` cells of the
+bleed-out budget (`BloodFlow.budget_used`, `step(..., budget)`), so the pool does not travel as far. The pool texture is RG8 (red = `fill(c)`, green =
+`soak_level(c)`, only written when `has_porous()`); the shader splits the pool into irregular `soak_tuft_size` px tufts
+fixed to the pool, each with its own soak rate (`soak_tuft_spread` wide) and its own shade of red (`soak_tuft_contrast`, kept subtle), plus a
+faint crease where tufts meet. Only colour and opacity change, so some tufts are still bright while others have gone dull. Tests: `blood_soaks_into_carpet`, `blood_soaks_into_rug`.
 
 ## Footprints and smears (blood that is carried)
 
@@ -92,4 +105,4 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
 ## Interface recap (authoritative in the `architecture` skill)
 
 - **Character → Physics** (interface 4): the character composes `BloodWound` (its `take_hit` calls `record`, its death `stop`) and `BloodFootprints` (fed by `character_footsteps.gd`); a dead body calls `Physics.bleed_out`, and the pool reads its `blood_origin()`.
-- **Objects → Physics**: an object composes `BloodSmear` (`set_footprint`) and its `Floor` registers `BloodSurface` rects; a bullet's `HitInfo.blood` is drawn by `Deformation.draw_marks` (Physics core).
+- **Objects → Physics**: an object composes `BloodSmear` (`set_footprint`) and its `Floor` and its non-solid pieces (rugs, porous) register `BloodSurface` rects; a bullet's `HitInfo.blood` is drawn by `Deformation.draw_marks` (Physics core).
