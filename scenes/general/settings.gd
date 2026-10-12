@@ -1,7 +1,7 @@
 class_name Settings
 
 ## General domain: the player's saved settings — the debug switch and the key bindings that differ from
-## the defaults — kept in one JSON file. A `class_name` holder of `static var`s and static functions, read
+## the defaults, and the last match-setup choices — kept in one JSON file. A `class_name` holder of `static var`s and static functions, read
 ## as `Settings.<name>`; there is no instance and no autoload.
 ##
 ## Main loads it once at startup (`load_file()`), so the headless test runner, which never loads
@@ -14,10 +14,13 @@ static var path: String = "user://settings.json"
 ## Master switch for the AI debug overlays and their in-game toggle bar. Main seeds it from its own
 ## export before `load_file()`, so a file that doesn't name it leaves that value standing.
 static var debug: bool = true
+## The match-setup window's last choices (`{ side, seed, defenders, invaders }`, plain data as the window emits
+## them), so it reopens the way it was left. Empty until something has been chosen.
+static var setup: Dictionary = {}
 
 
 ## Read the file: reset every binding to its default, then apply the saved differences, and take the
-## saved `debug`. A missing file leaves the defaults; an unreadable one warns and does the same; entries
+## saved `debug` and `setup`. A missing file leaves the defaults; an unreadable one warns and does the same; entries
 ## that aren't understood are skipped one by one.
 static func load_file() -> void:
 	Keybinds.reset_all()
@@ -30,6 +33,8 @@ static func load_file() -> void:
 	var data: Dictionary = json.data
 	if data.get("debug") is bool:
 		debug = data["debug"]
+	if data.get("setup") is Dictionary:
+		setup = data["setup"]
 	if data.get("keybinds") is Dictionary:
 		Keybinds.apply_overrides(data["keybinds"])
 
@@ -42,6 +47,7 @@ static func save() -> void:
 		return
 	file.store_string(JSON.stringify({
 		"debug": debug,
+		"setup": setup,
 		"keybinds": Keybinds.overrides(),
 	}, "  "))
 
@@ -49,6 +55,16 @@ static func save() -> void:
 ## Set the Debug switch and save.
 static func set_debug(on: bool) -> void:
 	debug = on
+	save()
+
+
+## Remember the setup window's choices (`config`, as its `start_requested` carries them; only the parameters
+## it reopens with are kept, not the start `mode`) and save.
+static func set_setup(config: Dictionary) -> void:
+	setup = {}
+	for key in ["side", "seed", "defenders", "invaders"]:
+		if config.has(key):
+			setup[key] = config[key]
 	save()
 
 

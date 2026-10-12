@@ -43,7 +43,10 @@ the domains.
   defenders: { count, weapon, magazine, spares }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
-the test browser. Pressing a start button also **disables all three**, because Main may hold the start
+the test browser. `current_config() -> Dictionary` returns the same
+  `{ side, seed, defenders, invaders }` as the window stands (empty before `open`); Main saves it through
+  `Settings.set_setup` on Start, on Tests and on Escape, and feeds `Settings.setup` back into `open`'s defaults, so the
+  window reopens as it was left. Pressing a start button also **disables all three**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
   shows "Waiting for the decision server…" there so that pause is never silent. A **Settings** button

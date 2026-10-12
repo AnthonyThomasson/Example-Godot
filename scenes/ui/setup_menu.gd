@@ -290,6 +290,20 @@ func _side_config(rows: Dictionary) -> Dictionary:
 	return config
 
 
+## The window's choices as they stand: `{ side, seed, defenders, invaders }` (the shape `start_requested`
+## carries, without `mode`). Main reads it to remember them when the window is left without starting.
+## Empty until `open` has built the controls.
+func current_config() -> Dictionary:
+	if _side_option == null:
+		return {}
+	return {
+		"side": _SIDES[_side_option.selected],
+		"seed": _seed_edit.text.strip_edges().to_int(),
+		"defenders": _side_config(_side_rows["defenders"]),
+		"invaders": _side_config(_side_rows["invaders"]),
+	}
+
+
 ## Gather the chosen parameters and hand them to Main with the `mode` of the button pressed. Main applies
 ## them, frees this window and builds the world. The start buttons are disabled on the way out: Main may
 ## hold the start open for a moment (waiting on the decision server), and a second press would build the
@@ -297,10 +311,6 @@ func _side_config(rows: Dictionary) -> Dictionary:
 func _on_start(mode: String) -> void:
 	for button in _start_buttons:
 		button.disabled = true
-	start_requested.emit({
-		"mode": mode,
-		"side": _SIDES[_side_option.selected],
-		"seed": _seed_edit.text.strip_edges().to_int(),
-		"defenders": _side_config(_side_rows["defenders"]),
-		"invaders": _side_config(_side_rows["invaders"]),
-	})
+	var config := current_config()
+	config["mode"] = mode
+	start_requested.emit(config)

@@ -51,6 +51,20 @@ func run(t: TestContext) -> void:
 	t.expect_eq(_press(t, "WatchButton").get("mode"), "watch", "Watch watches")
 	t.expect_eq(_press(t, "EndlessButton").get("mode"), "endless", "Endless goes endless")
 
+	# current_config() is what the window shows right now, and reopening with it restores the same choices.
+	var first := SetupMenu.new()
+	t.world.add_child(first)
+	first.open({ "side": "invader", "seed": 42, "defenders": { "count": 2, "weapon": "fists" },
+		"invaders": { "count": 3, "weapon": "pistol", "magazine": "extended", "spares": 1 }, "weapons": WEAPONS })
+	var kept: Dictionary = first.current_config()
+	first.queue_free()
+	t.check(not kept.has("mode"), "the remembered config carries no start mode")
+	var second := SetupMenu.new()
+	t.world.add_child(second)
+	second.open(kept.merged({ "weapons": WEAPONS }))
+	t.expect_eq(second.current_config(), kept, "reopening with a remembered config restores every choice")
+	second.queue_free()
+
 	# Without weapon choices (an older caller) the window still works and reports plain counts.
 	var bare := SetupMenu.new()
 	t.world.add_child(bare)

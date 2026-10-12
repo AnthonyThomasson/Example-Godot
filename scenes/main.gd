@@ -147,14 +147,16 @@ func _ready() -> void:
 		_setup_menu.start_requested.connect(_on_setup_chosen)
 		_setup_menu.tests_requested.connect(_open_tests)
 		_setup_menu.settings_requested.connect(_open_settings)
+		# The exports are the defaults; what the player chose last time (kept in the settings file) wins.
 		_setup_menu.open({
 			"side": str(player_side),
 			"seed": house_seed,
 			"defenders": _side_defaults(defender_count, defender_loadout),
 			"invaders": _side_defaults(invader_count, invader_loadout),
+		}.merged(Settings.setup, true).merged({
 			"weapons": LoadoutConfig.options(),
 			"ticket": _ticket(),
-		})
+		}))
 
 
 ## The name this run is tagged with: the `GAME_TICKET` env var (`tools/editor.sh` sets it to the worktree
@@ -182,6 +184,7 @@ func _side_defaults(count: int, loadout: Dictionary) -> Dictionary:
 ## "play" (a human takes `side`), "watch" (the AIs alone: the spectator contest) or "endless" (watch,
 ## then a fresh randomised match after each one ends); anything but "play" has no human player.
 func _on_setup_chosen(config: Dictionary) -> void:
+	Settings.set_setup(config)
 	var mode := str(config.get("mode", "play" if not spectator_mode else "watch"))
 	spectator_mode = mode != "play"
 	_endless = mode == "endless"
@@ -228,9 +231,20 @@ func _side_loadout(side: Variant, fallback: Dictionary) -> Dictionary:
 	return out
 
 
+## Save the setup window's choices as they stand, if it is open, so leaving it without starting (to the
+## test browser, or Escape reloading the scene) doesn't lose them.
+func _remember_setup() -> void:
+	if not is_instance_valid(_setup_menu) or _setup_menu.is_queued_for_deletion():
+		return
+	var config: Dictionary = _setup_menu.current_config()
+	if not config.is_empty():  # empty = a scripted restart that never opened the window
+		Settings.set_setup(config)
+
+
 ## The setup window's Tests button: leave for the test browser (Testing domain), which plays single
 ## game tests and returns here on Back.
 func _open_tests() -> void:
+	_remember_setup()
 	get_tree().change_scene_to_file(TEST_BROWSER)
 
 
@@ -300,6 +314,7 @@ func _unhandled_input(event: InputEvent) -> void:
 ## scripted restart may have set (so the reloaded scene shows the window again and the window's own
 ## seed choice — not a stale pin — decides the layout) and reload the scene. Also the `menu` command verb.
 func return_to_setup() -> void:
+	_remember_setup()
 	if Engine.has_meta("skip_setup"):
 		Engine.remove_meta("skip_setup")
 	if Engine.has_meta("match_seed"):

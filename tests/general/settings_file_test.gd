@@ -19,6 +19,7 @@ func describe() -> Dictionary:
 func configure(s: TestSetup) -> void:
 	s.set_static(Settings, &"path", SCRATCH)
 	s.set_static(Settings, &"debug", true)
+	s.set_static(Settings, &"setup", {})
 
 
 func run(t: TestContext) -> void:
@@ -47,6 +48,15 @@ func run(t: TestContext) -> void:
 	Settings.load_file()
 	t.expect_eq(Settings.debug, false, "a reload restores Debug")
 	t.check(_key(KEY_G).is_action(Keybinds.PUNCH), "a reload restores the rebinding")
+
+	# The setup window's choices are remembered too (the start mode is not).
+	Settings.set_setup({ "mode": "watch", "side": "invader", "seed": 7, "defenders": { "count": 3 } })
+	Settings.setup = {}
+	Settings.load_file()
+	t.expect_eq(Settings.setup.get("side"), "invader", "a reload restores the setup side")
+	t.expect_eq(int(Settings.setup.get("seed")), 7, "a reload restores the setup seed")
+	t.expect_eq(int(Settings.setup["defenders"]["count"]), 3, "a reload restores a side's choices")
+	t.check(not Settings.setup.has("mode"), "the start mode is not remembered")
 
 	# The page's rows reflect the live state.
 	var rows := Settings.binding_rows()

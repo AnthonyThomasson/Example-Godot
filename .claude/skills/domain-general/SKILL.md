@@ -49,13 +49,15 @@ defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skippe
 `settings.gd` (`class_name Settings`, a static holder like the config holders — no instance, no autoload)
 keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays) and the key-binding
 overrides in one JSON file, `Settings.path` (`user://settings.json`):
-`{ "debug": bool, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
+`{ "debug": bool, "setup": { side, seed, defenders, invaders }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
 the defaults are stored, so a changed default still reaches an action the player never touched.
 - **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`; a
   missing file keeps the defaults, an unreadable one `push_warning`s and does the same, and a file that
   doesn't name `debug` leaves it as it was.
 - **Main calls it, not `Keybinds._ready`**, once in `_ready` (after seeding `Settings.debug` from its own
   export), so the headless test runner — which never loads `main.tscn` — never reads a developer's file.
+- **`Settings.setup`** holds the match-setup window's last choices (`set_setup(config)` saves them, dropping the
+  start `mode`); Main feeds it back into the window so it reopens as it was left.
 - **Mutators save at once:** `set_debug(on)`, `rebind(action, event) -> bool`, `reset(action)`,
   `reset_all()` (leaves `debug`). `binding_rows()` reshapes the bindings into the plain dicts the settings
   page draws: `{ action, label, group, text, conflicts: [labels], changed }`.
