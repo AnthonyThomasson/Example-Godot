@@ -7,14 +7,25 @@ const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
 
 @onready var _obj := get_parent()
 var _art: Texture2D  ## The piece's pixel-art texture, or null for the flat shape + label.
+var _watching := false  ## Whether the Deformable's `changed` is connected yet.
+var _drawn_rotation := NAN  ## The global rotation the current drawing was made for (NAN = not drawn yet).
 
 func _ready() -> void:
 	if _obj.art != "":
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_art = ObjectArt.texture(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.object_material, _obj.art_opts)
 
+## Redraws only when the picture can have changed: a recorded impact (the object's `Deformable` says so) or a turn, which
+## swings the drop shadow (its offset is fixed in world space). A piece at rest, or just shoved sideways, keeps its drawing.
 func _process(_delta: float) -> void:
-	queue_redraw()
+	if not _watching:
+		var deformable = _obj._deformable  # created by the object's _ready, which runs after this node's
+		if deformable:
+			deformable.changed.connect(queue_redraw)
+			_watching = true
+	if global_rotation != _drawn_rotation:
+		_drawn_rotation = global_rotation
+		queue_redraw()
 
 func _draw() -> void:
 	var shape: String = _obj.shape_type
