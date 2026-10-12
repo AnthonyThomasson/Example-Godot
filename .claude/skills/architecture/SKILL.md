@@ -199,7 +199,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
-   side (kitchen)`) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Every NPC is the same generic goal-driven agent
+   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
    (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and

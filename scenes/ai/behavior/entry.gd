@@ -215,6 +215,45 @@ func debug() -> Dictionary:
 	}
 
 
+## The entry as world-space data for the entry debug overlays (observation only): the doorway's frame, slots, pie
+## arc and corners (with what the pie saw), this NPC's role, slot, approach and gaze, the ready-barrier timers, the
+## team off the radio, and once the room is clear the doorways on it covers. {} when no entry is running.
+func debug_view(character) -> Dictionary:
+	if phase in ["", "done"] or _geo.is_empty():
+		return {}
+	var team: Array = _perception.entry_team(opening)
+	var corners: Array = []
+	for i in (_geo["corners"] as Array).size():
+		var c: Dictionary = (_geo["corners"][i] as Dictionary).duplicate()
+		c["seen"] = _corners_seen.get(i, false)
+		corners.append(c)
+	var role := "solo" if team.is_empty() and _through.is_empty() else ("point" if _ahead(team).is_empty() else "follower")
+	var ready_left := -1.0
+	if role == "point" and _ready_at >= 0.0 and phase in ["stack", "pie"]:
+		ready_left = maxf(ready_timeout - (_time - maxf(_ready_at, _team_grew_at)), 0.0)
+	var hold_left := -1.0
+	if phase == "cover":
+		hold_left = maxf(cover_time - _clock, 0.0)
+	elif phase == "rear":
+		hold_left = maxf(rear_time - _clock, 0.0)
+	return {
+		"door": { "pos": _geo["pos"], "width": _geo["width"], "out": _geo["out"], "along": _geo["along"], "room": _geo["room"] },
+		"opening": opening, "into": into, "phase": phase, "clock": _clock, "role": role, "slot": slot, "side": side,
+		"slots": _geo["slots"], "my_slot": _stack_point(), "pie": _geo["pie"], "pie_queue": _pie_queue.duplicate(),
+		"pie_side": _pie_side, "pie_sides": pie_sides, "corners": corners, "corner": corner,
+		"waypoints": _waypoints.duplicate(), "unseen": _unseen.duplicate() if phase == "pie" else [],
+		"seen_fraction": seen_fraction, "gaze": Vector2.from_angle(_look_angle),
+		"ready_left": ready_left, "follow_left": maxf(follow_gap - (_time - _turn_at), 0.0) if _turn_at >= 0.0 and phase == "stack" else -1.0,
+		"waiting_for": team.filter(func(m): return m["step"] == "claim").map(func(m): return str(m["name"])),
+		"team": team,
+		"watch": _watch.map(func(w): return { "id": w["id"], "pos": w["pos"], "spot": w["spot"], "aim": w["aim"] }),
+		"covering": covering, "cover_spot": _cover_spot, "cover_aim": _cover_aim,
+		"sweep": _sweep.map(func(w): return w["id"]), "rear_spot": _rear_spot, "hold_left": hold_left,
+		"ready_total": ready_timeout, "follow_total": follow_gap, "hold_total": rear_time if phase == "rear" else cover_time,
+		"self_pos": character.global_position,
+	}
+
+
 # --- The tick ----------------------------------------------------------------------------------
 
 ## One tick of the entry. True once it is over (the room is clear and any rear watch is done, or it was given up),

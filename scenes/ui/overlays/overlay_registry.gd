@@ -32,6 +32,8 @@ const ENTRIES := [
 	{ "flag": "show_targets", "label": "Move & use targets", "group": "Movement", "default": false },
 	{ "flag": "show_stuck", "label": "Stuck detection", "group": "Movement", "default": false },
 	{ "flag": "show_brain", "label": "Brain (Von)", "group": "Brain", "default": false },
+	{ "flag": "show_entry", "label": "Entry plan", "group": "Entry", "default": false },
+	{ "flag": "show_entry_team", "label": "Entry team & guard", "group": "Entry", "default": false },
 	{ "flag": "show_nav_holes", "label": "Furniture holes", "group": "Map", "default": false },
 	{ "flag": "show_perf", "label": "Performance", "group": "Stats", "default": false },
 ]

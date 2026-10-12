@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3 uid="uid://d2vjx5ny4i4kv"]
+[gd_scene load_steps=19 format=3 uid="uid://d2vjx5ny4i4kv"]
 
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_character"]
 [ext_resource type="Script" path="res://scenes/ai/goal_controller.gd" id="2_controller"]
@@ -16,6 +16,8 @@
 [ext_resource type="Script" path="res://scenes/ai/debug/brain_debug.gd" id="14_brain"]
 [ext_resource type="Script" path="res://scenes/ai/debug/routes_debug.gd" id="15_routes"]
 [ext_resource type="Script" path="res://scenes/ai/debug/stuck_debug.gd" id="16_stuck"]
+[ext_resource type="Script" path="res://scenes/ai/debug/entry_debug.gd" id="17_entry"]
+[ext_resource type="Script" path="res://scenes/ai/debug/entry_team_debug.gd" id="18_entry_team"]
 
 [node name="NPC" type="CharacterBody2D"]
 script = ExtResource("1_character")
@@ -74,3 +76,9 @@ script = ExtResource("15_routes")
 
 [node name="StuckDebug" type="Node2D" parent="."]
 script = ExtResource("16_stuck")
+
+[node name="EntryDebug" type="Node2D" parent="."]
+script = ExtResource("17_entry")
+
+[node name="EntryTeamDebug" type="Node2D" parent="."]
+script = ExtResource("18_entry_team")

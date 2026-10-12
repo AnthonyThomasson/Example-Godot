@@ -521,6 +521,16 @@ func debug_entry() -> Dictionary:
 	return _behavior.debug_entry() if _behavior != null else {}
 
 
+## Read-only: the tactical entry and the entry guard as world-space data, for the entry debug overlays: `entry` (the
+## doorway's slots, pie arc and corners, this NPC's role, timers, the team off the radio, the doorways it covers; {}
+## when not entering) and `guard` (a running detour and the order it paused, the next uncleared doorway on the walk,
+## the rooms regarded as cleared). See behavior.gd `debug_entry_view`.
+func debug_entry_view() -> Dictionary:
+	if _behavior == null or _character == null:
+		return {}
+	return _behavior.debug_entry_view(_character)
+
+
 ## Read-only: the behaviour's running search-coverage state (which room sample points it has seen vs.
 ## still needs to, and the one it is looking at now), for the search debug overlay. Empty/inactive when
 ## the NPC isn't currently covering a room.

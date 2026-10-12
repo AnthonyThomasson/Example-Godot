@@ -311,6 +311,44 @@ func debug_entry() -> Dictionary:
 	return _entry.debug() if _primitive == &"entry" else {}
 
 
+## How far (px of walking) the entry debug view looks ahead along the walk for the next uncleared doorway.
+const GUARD_PREVIEW_RANGE := 2000.0
+
+
+## Read-only, for the entry debug overlays: the running entry as world-space data (entry.gd `debug_view`, under `entry`;
+## {} when none) and the entry guard's picture under `guard`: whether a detour is running and the order it paused
+## (`resume_point`, `resume_label`), the doorways it is leaving alone (`rearm`: `{ opening, left }`), its `range`, the
+## next uncleared doorway on the current walk (`ahead`: `{ opening, into, dist, pos }`, or {}), and the rects of the rooms
+## this NPC regards as cleared (`cleared_rooms`). Computed only when asked; nothing reads it back.
+func debug_entry_view(character) -> Dictionary:
+	var guard := {
+		"detour": _primitive == &"entry" and not _resume.is_empty(),
+		"resume_point": _resume.get("point", Vector2.INF),
+		"resume_label": " - ".join(_resume.get("labels", [])),
+		"rearm": [],
+		"range": entry_guard_range,
+		"ahead": {},
+		"cleared_rooms": [],
+	}
+	for id in _guard_off:
+		var left: float = float(_guard_off[id]) - _guard_clock
+		if left > 0.0:
+			guard["rearm"].append({ "opening": id, "left": left })
+	if _perception != null:
+		for r in rooms:
+			if _perception.is_cleared(str(r["key"])):
+				guard["cleared_rooms"].append(r["rect"])
+		var walk: Dictionary = _loco.path_ahead() if _primitive != &"entry" else {}
+		if not walk.is_empty():
+			var gate: Dictionary = _perception.threshold_ahead(character, walk["path"], walk["index"], GUARD_PREVIEW_RANGE)
+			if not gate.is_empty():
+				var geo: Dictionary = _perception.entry_geometry(character, gate["opening"], gate["into"])
+				if not geo.is_empty():
+					gate["pos"] = geo["pos"]
+					guard["ahead"] = gate
+	return { "entry": _entry.debug_view(character) if _primitive == &"entry" else {}, "guard": guard }
+
+
 ## Whether the NPC is committed to crossing a doorway: the controller holds every re-decision until it is through.
 func committed() -> bool:
 	return _primitive == &"entry" and _entry.committed()

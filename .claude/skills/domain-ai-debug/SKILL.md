@@ -1,6 +1,6 @@
 ---
 name: domain-ai-debug
-description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the draw-only overlays on an NPC: the four core ones plus eight behaviour overlays (contacts, hearing, combat, territory, targets, brain, routes, stuck). The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), the tactics overlay (the candidate navigation zones it weighed), and the search overlay (room-coverage points a searcher is seeing / still to see). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, the tactical-zone overlay, or the search-coverage overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/debug/) — the draw-only overlays on an NPC: the four core ones plus ten behaviour overlays (contacts, hearing, combat, territory, targets, brain, routes, stuck, and the two tactical-entry ones: entry plan, entry team & guard). The vision overlay (LoS-masked FOV cone + awareness bubble), the agent overlay (floating action label + current navigation path), the tactics overlay (the candidate navigation zones it weighed), and the search overlay (room-coverage points a searcher is seeing / still to see). Use when editing scenes/ai/debug/ or working on the NPC vision cone / awareness bubble visualization, the action-status label, the movement-path overlay, the tactical-zone overlay, or the search-coverage overlay. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Debug sub-domain (`scenes/ai/debug/`)
@@ -16,10 +16,11 @@ Files:
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
 - `zone_list.gd` — a static transform (`ZoneList.from_options`) that flattens a snapshot's option groups into the point zones the tactics overlay draws; the orchestrator's `debug_zones()` calls it (the only file here the orchestrator preloads).
 - `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
-- Eight further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
+- Ten further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
   character, runs `PROCESS_MODE_ALWAYS`, redraws only while its `show_<x>` is on, plus ring/arrow/line/
   timer-arc helpers): `contacts_debug.gd`, `hearing_debug.gd`, `combat_debug.gd`, `territory_debug.gd`,
-  `targets_debug.gd`, `brain_debug.gd`, `routes_debug.gd`, `stuck_debug.gd` (see the section below).
+  `targets_debug.gd`, `brain_debug.gd`, `routes_debug.gd`, `stuck_debug.gd`, `entry_debug.gd`, `entry_team_debug.gd`
+  (see the section below).
 
 ## `vision_debug.gd` (toggle `show_vision`)
 
@@ -111,12 +112,16 @@ Each is a child of the NPC in `npc.tscn`, found by its `show_<x>` property (regi
 | `brain_debug` (`show_brain`) | THINKING badge while Von is asked, FALLBACK badge when the last walk failed, next-decision / tactic / commit timers, force reason, true facts, per-level probability bars | `debug_brain()` |
 | `routes_debug` (`show_routes`) | navigated route to each fire/flank/advance/retreat point (green hidden / red exposed), clear-shot + cover notes, flank `held by` / `route passes` / ally lane, hostile `watch_arc` wedges | `debug_zones()` (entries carry `tags`), `known_contacts_for_display()`; route from the nav map, cached 0.5 s |
 | `stuck_debug` (`show_stuck`) | recent-position trail + a ring that reddens while the NPC is trying to move without progressing | `debug_progress()` |
+| `entry_debug` (`show_entry`) | this NPC's tactical entry: the doorway, its out-normal and the fatal funnel; stack slots in use (numbered, its own ringed; a lone entrant's far side faint); approach waypoints; the pie arc (steps done dim / to go bright, the current one ringed), the line through the doorway and the room points still unseen; corners red hard / green soft, filled once its pie saw them, its target corner ringed; its gaze; after the clear the doorways on (line + wedge, the one it covers bright, a solo sweep numbered) or the rear it holds; cleared rooms outlined; a badge (slot, role, phase, pie progress, seen %) with timer arcs for the ready wait, follow gap and hold | `debug_entry_view()` |
+| `entry_team_debug` (`show_entry_team`) | the team off the radio: each ally's claim (from where it radioed to its slot, `slot N · step`, an arrow to the doorway on it covers) and who the point is waiting for; the entry guard: the next doorway into an uncleared room on the walk and how far (cyan within `entry_guard_range`, grey beyond), a running detour (GUARD badge, dashed line to the paused order), doorways it is leaving alone | `debug_entry_view()` |
 
 The getters are read-only and added to the controller: `debug_memory()` (perception memory: gunfire,
 under-fire, callouts, engaged window, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
 state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
 and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
-reacts to a stall) and `debug_sent_callout()`. `debug_zones()` entries now also carry the option's `tags`
+reacts to a stall), `debug_sent_callout()` and `debug_entry_view()` (behaviour `debug_entry_view`: the running entry as
+world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`; the guard's
+look-ahead along the walk is computed only when asked). `debug_zones()` entries now also carry the option's `tags`
 (`inside`, `held`, `crosses`/`crosses_name`, `no_shot`, `heading`, `lane`, `hidden`, plus `clear_shot`,
 `route_exposed`, `cover`, `route_len`, `exposed_to`, `ally_lane`, `held_by` added by the snapshot's
 `_geo_tags()`; the planner reads only the booleans (`inside`, `held`, `crosses`, `no_shot`, `heading`,

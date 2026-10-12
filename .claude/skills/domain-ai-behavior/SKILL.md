@@ -116,7 +116,10 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   be had) abandons any entry. Tests: `tests/ai/entry_guard_*_test.gd`, `entry_fallback_aborts`,
   `entry_decision_in_flight_during_cross`.
 - **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides, covering, watch_doors,
-  hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`; the status line says the phase
+  hidden_corners, corner, stack_point, team, covering, watch_doors), also under `entry` in `debug_state()`;
+  `Behavior.debug_entry_view(character)` (world-space: entry.gd `debug_view` — doorway frame, slots, pie arc and queue,
+  corners with what the pie saw, role, waypoints, gaze, timers, the team off the radio, the doorways covered — plus the
+  entry guard's detour, rearm list, look-ahead and the cleared rooms) for the entry debug overlays; the status line says the phase
   ("stacked at the door", "slicing the pie", "going in" ...).
 
 ## Public interface (what the orchestrator calls)

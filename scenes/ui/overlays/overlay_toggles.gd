@@ -1,7 +1,7 @@
 extends CanvasLayer
 
 ## UI domain, in-game debug-overlay toggle bar: a collapsible panel of toggle buttons, one per overlay in
-## `overlay_registry.gd`, grouped (Perception / Combat / Movement / Brain / Map / Stats). Pressing one emits
+## `overlay_registry.gd`, grouped (Perception / Combat / Movement / Brain / Entry / Map / Stats). Pressing one emits
 ## `overlay_toggled(flag, on)`; each group's header button and the "All" button flip a whole set at once
 ## (all on unless they already are, then all off), emitting one `overlay_toggled` per flag changed. Main
 ## applies each live to the NPCs' overlay nodes (or, in the spectator match, to the inspector's
