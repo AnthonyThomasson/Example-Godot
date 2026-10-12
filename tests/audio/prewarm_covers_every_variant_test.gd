@@ -19,7 +19,7 @@ func configure(s: TestSetup) -> void:
 
 
 func run(t: TestContext) -> void:
-	var library: Array = Sound._library()
+	var library: Array = Sound.library()
 	var profiles := SoundBank.profiles()
 	var seen := {}
 	var wanted := 0

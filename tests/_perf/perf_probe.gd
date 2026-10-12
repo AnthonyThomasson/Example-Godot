@@ -15,6 +15,13 @@ const SMOOTH_P95_MS := 20.0
 const SMOOTH_MAX_MS := 33.4
 
 
+## Render every sound the way the game's background pre-warm has by the time a match is fought. Headless runs skip that
+## pre-warm, so a test that plays sound would otherwise pay each variant's first synthesis (9 to 35 ms) mid-measurement.
+static func warm_sounds() -> void:
+	for pair: Array in Sound.library():
+		SoundBank.sound(pair[0], pair[1])
+
+
 ## Wall-clock milliseconds one synchronous `work.call()` takes.
 static func time_ms(work: Callable) -> float:
 	var start := Time.get_ticks_usec()

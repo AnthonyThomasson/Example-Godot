@@ -40,7 +40,7 @@ func _ready() -> void:
 	_rng.seed = SoundConfig.rng_seed
 	EventBus.posted.connect(_on_posted)
 	if SoundConfig.prewarm and DisplayServer.get_name() != "headless":
-		_warm = _library()
+		_warm = library()
 
 
 func _process(delta: float) -> void:
@@ -202,7 +202,7 @@ func _acquire(category: StringName) -> Dictionary:
 
 ## Every `[profile, variant]` the service can play: the first variant of each profile, then the others. A variant
 ## nobody has rendered yet is synthesized when it first plays, a hitch of several frames in the middle of a fight.
-func _library() -> Array:
+func library() -> Array:
 	var profiles := SoundBank.profiles()
 	var out: Array = []
 	for profile in profiles:
