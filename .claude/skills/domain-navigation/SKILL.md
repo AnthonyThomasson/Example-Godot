@@ -25,7 +25,7 @@ through). Handling every shape (not just the primitives) is what keeps a dented 
 vanishing on a re-bake. A body's footprint is the **convex hull** of all its collider shapes: a dent's
 notches are far smaller than the agent, and baked in they leave sub-pixel navmesh edges the
 NavigationServer cannot merge ("navigation map synchronization error"). Overlapping footprints are
-then fused (`_union_outlines`) and every outline is snapped to the 1 px grid with repeated points dropped (`_on_grid`). The bake runs in the
+then fused (`_union_outlines`, which skips the polygon merge for two outlines whose bounding boxes are apart: the union would keep them as two; `tests/navigation/furniture_union_fast_path_test.gd` pins it to the every-pair merge, and it was most of a re-bake's cost) and every outline is snapped to the 1 px grid with repeated points dropped (`_on_grid`). The bake runs in the
 house's local frame and the region is offset by `house.position`, so the map lands in world space.
 `main.gd` calls it once after `WorldGen.generate`. `build` and every re-bake share one private
 `_bake_polygon` helper, so both carve furniture holes identically.

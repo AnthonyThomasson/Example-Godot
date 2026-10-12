@@ -20,7 +20,13 @@ Objects *compose* these components; Physics imports nothing outward.
   owner redraws + rebuilds its collider from the same deformed polygon. `record(hit, turn)` stores
   the impact un-turned by `turn`, for a body drawn turned beyond its node rotation (a character
   facing its aim); the owner turns the impacts back when drawing.
-- `Deformation` — the polygon math + drawing (shared by furniture and walls). `draw_shape` takes
+- `Deformation` — the polygon math + drawing (shared by furniture and walls). `shape_polygon` keeps its last 256 dented
+  silhouettes, keyed by everything they are made from (shape, size, the dents, the deformation tuning) and checked for equality:
+  each hit asks for the same one three times (collider, shadow, drawing) and every repaint of a wounded character asks again
+  (`tests/physics/shape_polygon_cache_test.gd`). `convex_shapes` cuts a silhouette into convex collider pieces (Hertel-Mehlhorn
+  over its triangulation) finding neighbouring pieces through a directed-edge map, remembering failed pairs by piece id and
+  checking only the two corners a merge joins; `tests/physics/convex_pieces_match_plain_scan_test.gd` pins it to the plain
+  every-pair, every-corner scan. `draw_shape` takes
   an optional `texture`: the deformed polygon is then drawn textured (UVs from the intact
   footprint, so dents cut into the image), tinted darker by damage, without the smooth outline;
   `texture_angle` turns the image within the unturned silhouette (a round body facing any way);

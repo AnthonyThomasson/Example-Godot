@@ -112,7 +112,9 @@ World-Gen; visual only, a cardinal direction in the local frame — the `rotated
 owns the footprint). The visuals draw a drop shadow — the art's own alpha through the deformed
 outline, offset away from the light in world space by `coverage × drop_shadow_per_coverage`
 (capped; non-solid decor casts none) — then `Deformation.draw_shape(..., texture)` so dents and
-chunks cut into the art. Walls: `WallFactory`'s `style` sets `art` / `art_color` / `art_opts` on
+chunks cut into the art. A piece repaints only when that can have changed — its `Deformable` recorded an impact or its rotation
+changed (the shadow's offset is fixed in world space) — not every frame (a house has ~90 pieces); a hit also queues one deferred
+collider rebuild however many hits land before it runs. Walls: `WallFactory`'s `style` sets `art` / `art_color` / `art_opts` on
 the wall (`art_color` is also the debris color); `wall_visuals.gd` fetches a
 `wall_tile_px × wall_thickness` tile and passes it to `Deformation.draw_wall(..., texture,
 wall_tile_px)`. To add a painter: write `<name>_painter.gd`, register it in `ObjectArt.PAINTERS`,

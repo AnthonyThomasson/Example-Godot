@@ -31,7 +31,10 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `observe(character, rooms)` — the SEE pass, every tick: one `saw_character` sighting per visible
   character (keyed, superseded while visible) carrying `pos`, a smoothed velocity track (`vel`),
   `facing`, a visible wound band, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
-  remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight.
+  remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
+  before testing sight, and reads each known set once per pass). The characters it tests are found by scanning the world
+  root once and keeping the list (`_other_characters`: rescanned only when a node with `current_item` enters or leaves the
+  tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes and used to run per NPC per frame).
 - `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),
   with `hostile`/`reason`/`visible`/`age`. `lost_hostiles()` — hostiles last seen longer ago, within
   `lead_memory_ttl` (investigation leads).
@@ -71,7 +74,8 @@ The NPC perceives characters, not "the player". The hostility rules categorize e
 
 ## Vision & knowledge
 
-`agent_vision.gd.can_see` is true within `view_distance`, AND within the `awareness_radius` bubble or
+`agent_vision.gd` reuses one `PhysicsRayQueryParameters2D` for every cast, and `can_see_node` tests the cone before building
+the ray's exclude list. `agent_vision.gd.can_see` is true within `view_distance`, AND within the `awareness_radius` bubble or
 the forward cone (`fov_degrees`), AND with a clear SIGHT line on `QUERY_MASK = 1` (walls + solid
 furniture). The sight line looks OVER low cover: it walks the ray, skipping any collider whose
 `coverage` (the Objects height proxy) is at or below `see_over_coverage` (default 60 — tables, beds,
@@ -88,7 +92,9 @@ A generic event log: `remember(topic, data, ttl, key := "")`; `is_fresh` / `reca
 live event with the same topic + key — something re-observed every tick stays one entry instead of
 flooding the log and volume-evicting every other expirable event. Cleanup on every write: age-expired
 first, then, while over `capacity`, the oldest expirable. Permanent events (ttl ≤ 0) never age out
-and are never volume-evicted. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
+and are never volume-evicted. Writes are cheap by design (about eighteen a frame across ten NPCs): superseding is in
+place, `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every
+reader takes the clock once. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
 `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
 carries a `note` string is surfaced to Von.
 
@@ -97,7 +103,8 @@ carries a `note` string is surfaced to Von.
 The flank behaviour these queries should deliver, and the tests that assert it, are in
 `docs/flanking-behavior.md`.
 
-Pure queries over known contacts, the physics space (via the vision rays) and the nav map
+Whether the NPC is hidden from a hostile where it stands is worked out once per snapshot (`ctx.covered_from`), not per candidate
+spot. Pure queries over known contacts, the physics space (via the vision rays) and the nav map
 (`NavigationServer2D` closest point + path). A target's flanks are measured in its own frame (its
 last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,
 sampled across `flank_arc`, snapped to the navmesh, preferring a clear shot. Each spot is annotated

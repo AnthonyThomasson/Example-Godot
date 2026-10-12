@@ -161,7 +161,8 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   (seen edge-on they share only a line, and the union can come apart, flashing the torso as one
   small slice for a frame as the body landed); a union still in pieces falls back to the two slices'
   convex hull. Test: `tests/character/fallen_trunk_outline_steady_test.gd`. It fills with the shirt, then the art of the side most turned to the
-  camera mapped across it (UVs from that side's projected axes): the standing `BodyPainter`
+  camera mapped across it (UVs from that side's projected axes; the art is requested at whole pixels, because the spine's
+  length flexes every frame and an exact size would paint and cache a new texture each frame): the standing `BodyPainter`
   shoulders on top, or `torso_painter.gd` (a full strip: shirt with collar and buttons down to a
   belt, pants on the hips; the back with a seam and the backpack; a flank), then a 1 px outline.
 - Wounds: each recorded impact sits on the trunk's surface around the body where it struck (its

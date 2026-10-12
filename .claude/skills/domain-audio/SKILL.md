@@ -109,7 +109,9 @@ medium impact keeps ≥ 40 % of its energy under 250 Hz; low-end weight, includi
 - With a camera present (the test runner has one), range culling is live: audio tests that are not about distance
   set `SoundConfig.category_range` to `Probe.EVERYWHERE` (`tests/_audio/sound_probe.gd`).
 - Sounds render lazily (1–12 ms each, the whole library ~0.7 s) and, with a display, are pre-rendered in the
-  background at `prewarm_budget_ms` a frame after launch; headless tests render on first use.
+  background at `prewarm_budget_ms` a frame after launch, every variant of every profile (`Sound.library()`: the first variants
+  first; the 330 sounds take ~1.6 s), because a variant first synthesized in a fight is a 9–35 ms hitch; headless tests render on first use
+  (`Perf.warm_sounds()` in `tests/_perf/perf_probe.gd` does what the pre-warm would have by the time a match is fought).
 - Headless uses the Dummy audio driver: playback is accepted and silent. Nothing here can be heard by a test.
 
 ## Adding to it

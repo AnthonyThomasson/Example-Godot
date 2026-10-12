@@ -211,32 +211,50 @@ func run(t: TestContext) -> void:
 ## Performance tests (domain `perf`, `tests/perf/`)
 
 Their own category: regression guards for speed and runaway object counts, one folder, one browser section, one
-selector. They are ordinary tests that load other domains, so they live apart from them
-(`perf/npc_crowd_stress`, `bake_and_path_stress`, `furniture_pile_stress`, `crowd_deaths_stress`,
-`hit_overload_stress`, `automatic_fire_stress` (SMGs and rifles on the trigger plus pistols clicking: one run covers the
-single-shot and the automatic path), `generate_houses_stress`). `tools/run_tests.sh --domain=perf` (or the word `perf`)
-runs just them; they stay in the default run, balanced across shards by measured cost like every test, and `--changed` adds the
-domain whenever a scene they exercise changes (`affected()` in `tools/run_tests.sh`) or `tests/_perf/` changes.
-The shared helper is `tests/_perf/perf_probe.gd` (`const Perf := preload(...)`; not a test). `audio/bank` and
-`character/standing_body_repaints_on_change` keep a budget or a count but are functional tests of their domain.
+selector. They are ordinary tests that load other domains, so they live apart from them:
+
+| Test | Load |
+|---|---|
+| `perf/match_5v5_stress` | the whole-match case: a generated house, five defenders and five invaders placed by `MatchSpawner`, default loadouts, debug overlays off as in Main, nav re-baker, blood, debris, sound and radio on, scripted Von |
+| `perf/npc_crowd_stress` | twelve scripted-Von NPCs sensing, deciding and shooting in one open furnished arena (everyone sees everyone: the decision snapshot's worst case) |
+| `perf/automatic_fire_stress` | SMGs and rifles on the trigger plus pistols clicking into furniture: one run covers the single-shot and the automatic path |
+| `perf/hit_overload_stress` | hundreds of hits on one chair and one character: deformation, debris, blood and their caps |
+| `perf/crowd_deaths_stress` | a whole 5v5 (ten characters) killed in one frame: ragdolls, blood, bleed-out |
+| `perf/furniture_pile_stress` | 120 rigid bodies shoved at once |
+| `perf/bake_and_path_stress`, `perf/generate_houses_stress` | one-shot work: nav re-bake and path queries, world-gen |
+
+`tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. They stay in the default run, balanced across shards
+by measured cost like every test, and `--changed` adds the domain whenever a scene they exercise changes (`affected()` in
+`tools/run_tests.sh`) or `tests/_perf/` changes. The shared helper is `tests/_perf/perf_probe.gd` (`const Perf :=
+preload(...)`; not a test). `audio/bank` and `character/standing_body_repaints_on_change` keep a budget or a count but are
+functional tests of their domain.
 
 - **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
   outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms
   (`Perf.time_ms`), and exact counts (`Perf.nodes()`, `Despawner.count()`, dent / blood-pool caps).
-- **The standard:** every frame-based test holds the smooth-match budget, `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps frame, the
-  Performance overlay's target), `SMOOTH_P95_MS` (20) and `SMOOTH_MAX_MS` (33.4, two frames), through `Perf.within_frames`.
-  `perf/match_5v5_stress` is the whole-match case (`MatchSpawner` placement, default loadouts, nav re-baker, blood, debris, sound
-  and radio on, scripted Von). One-shot work (`Perf.time_ms`: nav re-bake, path queries, world-gen) keeps a `const` budget at
-  the top of its test, about 4x the baseline stated in the comment above it. `Perf.within` prints
-  `PERF <label> <value> (budget <limit>)`, traces it, and fails the check with the value. Counts (nodes, dents,
-  pools) are asserted tightly.
+- **The standard:** a 5v5 match runs without frame loss, so every frame-based test holds `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps
+  frame, the Performance overlay's target), `SMOOTH_P95_MS` (20) and `SMOOTH_MAX_MS` (33.4, two frames) through
+  `Perf.within_frames`, at the scale of one match (ten characters). A test whose load is beyond a match and still has a
+  known hitch states its own looser tail in its header (`npc_crowd_stress`: the decision snapshot). One-shot work
+  (`Perf.time_ms`) keeps a `const` budget at the top of its test, about 4x the baseline stated in the comment above it.
+  `Perf.within` prints `PERF <label> <value> (budget <limit>)`, traces it, and fails the check with the value. Counts
+  (nodes, dents, pools) are asserted tightly.
 - **Re-baselining:** run `tools/run_tests.sh --domain=perf --repeat=5 --verbose` and read the `PERF` lines. The frame standard is not
   loosened to fit a slower game: make the game faster, or state in the test why one load is heavier than a match. Update the
   "before" numbers in a test's comment only when its load changes.
+- **Finding what costs:** the wall time of a frame is script time, so attribute it by timing. A throwaway `Time.get_ticks_usec`
+  accumulator wrapped around the suspect functions (never committed), dumped at the end of the measured window, ranks them
+  in minutes; switching a feature off with `set_static`/`switch` shows what it is worth. The costs found so far were not
+  where reading the code suggested: a tree scan per NPC per frame, a polygon merge per pair of footprints, a recomputed
+  silhouette per body part and a texture painted every frame.
 - **Gotchas:** a lambda captures ints by value (count into an Array); `nav.rebake` is off in tests that
   shove or shoot furniture into overlaps (re-baking overlapping holes logs a nav sync error; the nav
-  test covers re-baking); world-gen's first run in a process is
-  slower (cold caches), so its budget covers the cold case.
+  test covers re-baking), and the 5v5 test, which keeps it on, allows that log (`allowed_logs`); world-gen's first run in a
+  process is slower (cold caches), so its budget covers the cold case; headless runs skip the sound pre-warm, so a test that
+  plays sound calls `Perf.warm_sounds()` first or turns `audio.sound` off, or the first play of each variant (9 to 35 ms) lands
+  in its worst frame. A speed-up must not change what the game does: where a fast path replaces a plain algorithm, a test
+  pins its output to the plain one (`navigation/furniture_union_fast_path`, `physics/blood_splat_merge_fast_path`,
+  `physics/convex_pieces_match_plain_scan`, `physics/shape_polygon_cache`).
 
 ## Flanking tests (tag `flank`)
 
