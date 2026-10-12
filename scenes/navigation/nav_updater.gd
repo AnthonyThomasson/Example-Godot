@@ -4,11 +4,13 @@ extends Node
 ## around. The holes `NavBuilder.build` carves are a snapshot of where the furniture stood at bake
 ## time; as pieces are bulldozed off their spots those holes go stale and paths route around empty
 ## floor. This node re-bakes the map on an interval (`NavBuilder.rebake`) so the holes follow the
-## furniture's CURRENT positions and paths route around scattered objects. It only re-bakes when a
-## piece has actually moved past `move_threshold`, so an at-rest scene costs a cheap per-tick compare
-## and no bake. Bulldozing is still the behaviour BETWEEN re-bakes (and for non-solid decor, which is
-## never carved). A script-only node Main builds once after the initial bake; imports nothing from
-## other domains — it is handed plain Nodes.
+## furniture's CURRENT positions and paths route around scattered objects. The living characters are
+## holes in the STEERING region (`NavBuilder.rebake_steering`), so it follows them as they walk, appear
+## and die. It only re-bakes when a piece or a character has actually moved past `move_threshold`, so an
+## at-rest scene costs a cheap per-tick compare and no bake. The planning region only re-bakes for
+## furniture. Bulldozing is still the behaviour BETWEEN re-bakes (and
+## for non-solid decor, which is never carved). A script-only node Main builds once after the initial
+## bake; imports nothing from other domains — it is handed plain Nodes.
 
 ## Whether the periodic re-bake runs at all. Off = the map stays the static bake-time snapshot.
 @export var enabled: bool = true
@@ -28,9 +30,10 @@ var _agent_radius: float = 14.0
 ## Optional furniture-hole debug overlay (nav_debug.gd), re-snapshotted after each re-bake so it
 ## keeps matching the live navmesh. Null when no overlay is wired.
 var _nav_debug: Node = null
-## The furniture footprints (NavBuilder.furniture_holes) as of the last bake, compared each tick to
-## detect movement.
+## The furniture footprints (NavBuilder.furniture_holes) and the character footprints
+## (NavBuilder.character_holes) as of the last bake of each, compared each tick to detect movement.
 var _baseline: Array = []
+var _character_baseline: Array = []
 
 
 ## Wire the updater to the baked map and start the interval. `region` is NavBuilder.build's result,
@@ -43,6 +46,7 @@ func setup(region: NavigationRegion2D, house: Node2D, rooms: Array, nav_debug: N
 	_agent_radius = agent_radius
 	_nav_debug = nav_debug
 	_baseline = NavBuilder.furniture_holes(house)
+	_character_baseline = NavBuilder.character_holes(house.get_parent())
 	var timer := Timer.new()
 	timer.name = "RebakeTimer"
 	timer.wait_time = max(interval, 0.05)
@@ -52,22 +56,28 @@ func setup(region: NavigationRegion2D, house: Node2D, rooms: Array, nav_debug: N
 
 
 ## One interval tick: if furniture has moved since the last bake, re-carve the holes at the live
-## positions and refresh the overlay. Skips the bake entirely when nothing has moved.
+## positions in both regions; if only a character has, re-carve the steering region. Refreshes the
+## overlay after either. Skips the bake entirely when nothing has moved.
 func _on_tick() -> void:
 	if not enabled or _region == null or not is_instance_valid(_house):
 		return
-	var current := NavBuilder.furniture_holes(_house)
-	if not _moved(_baseline, current):
+	var furniture := NavBuilder.furniture_holes(_house)
+	var characters := NavBuilder.character_holes(_house.get_parent())
+	var furniture_moved := _moved(_baseline, furniture)
+	if not furniture_moved and not _moved(_character_baseline, characters):
 		return
-	NavBuilder.rebake(_region, _house, _rooms, _agent_radius)
-	_baseline = current
+	if furniture_moved:
+		NavBuilder.rebake(_region, _house, _rooms, _agent_radius)
+		_baseline = furniture
+	NavBuilder.rebake_steering(_region, _house, _rooms, _agent_radius)
+	_character_baseline = characters
 	if _nav_debug != null and is_instance_valid(_nav_debug) and _nav_debug.has_method("setup"):
 		_nav_debug.setup(_house)  # re-snapshot the overlay so it matches the re-baked holes
 
 
-## Whether the furniture layout `b` differs from `a` enough to warrant a re-bake: a different piece
+## Whether the footprints `b` differ from `a` enough to warrant a re-bake: a different piece
 ## count, or any footprint point shifted more than `move_threshold`. Both come from
-## NavBuilder.furniture_holes, so points line up one-to-one when the piece count is unchanged.
+## the same function, so points line up one-to-one when the piece count is unchanged.
 func _moved(a: Array, b: Array) -> bool:
 	if a.size() != b.size():
 		return true

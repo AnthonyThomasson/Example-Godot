@@ -30,6 +30,23 @@ house's local frame and the region is offset by `house.position`, so the map lan
 `main.gd` calls it once after `WorldGen.generate`. `build` and every re-bake share one private
 `_bake_polygon` helper, so both carve furniture holes identically.
 
+## Characters at rest are holes too (the steering map)
+
+A character that stands in the way is as much an obstacle as a chair, so `NavBuilder.character_holes(root)` returns the footprint of
+each **living character at rest** under `root` (`house.get_parent()`: the node the region lives under) as a world-space polygon: a
+`CharacterBody2D` that still has a collision layer (death clears it, so a corpse is walked over) and moves slower than `REST_SPEED`
+(10 px/s), grown by the same `OBSTACLE_MARGIN` and fed through the same union + 1 px snap as furniture. Only characters **at rest**:
+every character is inside its own hole, and a walking one's would seal or split the passage around itself (a doorway, the 110 px hall)
+and send its own path the long way round.
+
+These holes live in a **second map**, not the world's: `build` adds a child region `NavSteering` (`steering_region(region)`) on a map of
+its own (`steering_map(world_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
+The world's own map stays furniture-only, because the AI plans on it (flank/fire/retreat spots, route length and exposure, tactical
+entry slots, search coverage) and a body's hole would bend every one of those. Only a `NavigationAgent2D` walks the steering map, and
+the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it; it is baked
+with `weld=true`, which merges the vertices that share a 1 px cell (`_weld_vertices`): a hole meeting a wall leaves vertices a fraction
+of a pixel apart, and the server rejects such an edge ("navigation map synchronization error").
+
 Solid furniture is recognised by engine type alone — a non-frozen `RigidBody2D` with a
 `CollisionShape2D` (walls are `StaticBody2D`; non-solid decor freezes itself) — so Navigation stays a
 leaf that imports nothing.
@@ -45,8 +62,9 @@ so moved pieces carve at their new spots.
 
 `nav_updater.gd` (a script-only Node; `main.gd` builds it once right after the bake and hands it the
 region, house, rooms and the overlay) drives the re-bake on an interval. Each tick it recomputes
-`furniture_holes` (cheap — transforms only, no bake) and re-bakes **only** when a piece moved past
-`move_threshold` (4 px), so an at-rest scene costs just the compare. Exports: `enabled`,
+`furniture_holes` and `character_holes` (cheap — transforms only, no bake) and re-bakes **only** when a piece moved past
+`move_threshold` (4 px): furniture re-bakes both regions, a character that stopped, set off, appeared or died re-bakes the steering
+one. An at-rest scene costs just the compare. Exports: `enabled`,
 `interval` (0.75 s between checks), `move_threshold`. After a re-bake it calls the overlay's `setup`
 again so the overlay re-snapshots. **Bulldozing is still the behaviour between re-bakes** (and for
 non-solid decor, which is never carved): a piece just shoved is run over by the character's push
@@ -62,12 +80,12 @@ the agent's RVO avoidance.
 global — not per-NPC) that draws the furniture HOLES carved out of the navmesh as filled polygons +
 outlines. `main.gd` builds it once right after the bake: `nav_debug.setup(house)` snapshots the holes
 via `NavBuilder.furniture_holes(house)`, and `show_holes` toggles it (wired from the setup window's
-"Furniture holes" checkbox, whose starting state is `main.gd`'s `show_nav_holes` export — on).
+"Navigation holes" checkbox / toggle-bar button, whose starting state is `main.gd`'s `show_nav_holes` export — off).
 `furniture_holes(house) -> Array` returns each solid piece's grown footprint as a closed WORLD-space
 polygon, using the exact same selection and footprint helpers the bake feeds the obstruction baker
 (`_add_furniture_holes` calls it), so the overlay cannot drift from what was carved. `nav_updater.gd`
 calls `setup` again after each re-bake, so the overlay **re-snapshots** and follows the furniture
-to its current positions. The overlay reads nothing back and feeds nothing in.
+to its current positions. The characters' holes are drawn too, in another colour. The overlay reads nothing back and feeds nothing in.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
@@ -76,4 +94,5 @@ to its current positions. The overlay reads nothing back and feeds nothing in.
   and read `get_next_path_position()`. `NavBuilder.rebake(region, house, rooms, agent_radius)`
   re-carves the holes in place as furniture moves (driven internally by `nav_updater.gd`).
   `NavBuilder.furniture_holes(house) -> Array` is the debug read Main snapshots for the
-  `nav_debug.gd` overlay.
+  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(world_map) -> RID` (invalid when the world has none),
+  `steering_region(region)` and `rebake_steering(region, house, rooms)` are the characters-at-rest side (above).
