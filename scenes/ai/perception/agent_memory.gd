@@ -26,6 +26,9 @@ var capacity: int = 64
 
 ## The event log, oldest first. Each entry is `{ topic, data, at, ttl }` (`at` in msec, `ttl` in s).
 var _entries: Array = []
+## Milliseconds (`Time.get_ticks_msec`) before which no stored event can have outlived its ttl (a little early,
+## never late), so `_prune` can skip its scan until then. INF = nothing stored expires.
+var _earliest_expiry := INF
 
 
 ## Record that something happened: append an event under `topic` with optional `data` (which may
@@ -34,24 +37,32 @@ var _entries: Array = []
 ## key (see the class note). Evicts expired/overflow events afterward.
 func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0, key: String = "") -> void:
 	if key != "":
-		_entries = _entries.filter(func(e): return e["topic"] != topic or e["key"] != key)
+		for i in range(_entries.size() - 1, -1, -1):  # Drop the superseded events in place, order kept.
+			var old: Dictionary = _entries[i]
+			if old["topic"] == topic and old["key"] == key:
+				_entries.remove_at(i)
+	var at := Time.get_ticks_msec()
+	var life: float = ttl if ttl >= 0.0 else default_ttl
 	_entries.append({
 		"topic": topic,
 		"key": key,
 		"data": data,
-		"at": Time.get_ticks_msec(),
-		"ttl": ttl if ttl >= 0.0 else default_ttl,
+		"at": at,
+		"ttl": life,
 	})
+	if life > 0.0:
+		_earliest_expiry = minf(_earliest_expiry, at + life * 1000.0 - 1.0)
 	_prune()
 
 
 ## Seconds since the freshest live `topic` event whose data field `field` equals `value` was written
 ## (INF when none is remembered) — how long ago something was last observed.
 func age_of(topic: StringName, field: String, value: Variant) -> float:
+	var now := Time.get_ticks_msec()
 	for i in range(_entries.size() - 1, -1, -1):
 		var entry: Dictionary = _entries[i]
-		if entry["topic"] == topic and not _expired(entry) and entry["data"].get(field) == value:
-			return (Time.get_ticks_msec() - entry["at"]) / 1000.0
+		if entry["topic"] == topic and not _expired(entry, now) and entry["data"].get(field) == value:
+			return (now - entry["at"]) / 1000.0
 	return INF
 
 
@@ -62,7 +73,7 @@ func recall_aged(topic: StringName) -> Array:
 	var now := Time.get_ticks_msec()
 	for i in range(_entries.size() - 1, -1, -1):
 		var entry: Dictionary = _entries[i]
-		if entry["topic"] == topic and not _expired(entry):
+		if entry["topic"] == topic and not _expired(entry, now):
 			out.append({ "data": entry["data"], "age": (now - entry["at"]) / 1000.0 })
 	return out
 
@@ -74,17 +85,19 @@ func size() -> int:
 
 ## Whether any non-expired event of `topic` is remembered.
 func is_fresh(topic: StringName) -> bool:
+	var now := Time.get_ticks_msec()
 	for entry in _entries:
-		if entry["topic"] == topic and not _expired(entry):
+		if entry["topic"] == topic and not _expired(entry, now):
 			return true
 	return false
 
 
 ## The freshest non-expired event's `data` for `topic`, or an empty dict when none is remembered.
 func recall(topic: StringName) -> Dictionary:
+	var now := Time.get_ticks_msec()
 	for i in range(_entries.size() - 1, -1, -1):
 		var entry: Dictionary = _entries[i]
-		if entry["topic"] == topic and not _expired(entry):
+		if entry["topic"] == topic and not _expired(entry, now):
 			return entry["data"]
 	return {}
 
@@ -92,9 +105,10 @@ func recall(topic: StringName) -> Dictionary:
 ## Every non-expired event's `data` for `topic`, newest first.
 func recall_all(topic: StringName) -> Array:
 	var out: Array = []
+	var now := Time.get_ticks_msec()
 	for i in range(_entries.size() - 1, -1, -1):
 		var entry: Dictionary = _entries[i]
-		if entry["topic"] == topic and not _expired(entry):
+		if entry["topic"] == topic and not _expired(entry, now):
 			out.append(entry["data"])
 	return out
 
@@ -102,8 +116,9 @@ func recall_all(topic: StringName) -> Array:
 ## Every non-expired event (full entries), newest first — for rendering what the agent remembers.
 func fresh() -> Array:
 	var out: Array = []
+	var now := Time.get_ticks_msec()
 	for i in range(_entries.size() - 1, -1, -1):
-		if not _expired(_entries[i]):
+		if not _expired(_entries[i], now):
 			out.append(_entries[i])
 	return out
 
@@ -112,7 +127,19 @@ func fresh() -> Array:
 ## EXPIRABLE events (positive ttl). Permanent events (ttl <= 0) are long-term facts and are never
 ## volume-evicted — they persist for the agent's lifetime.
 func _prune() -> void:
-	_entries = _entries.filter(func(entry): return not _expired(entry))
+	var now := Time.get_ticks_msec()
+	if now >= _earliest_expiry:  # Otherwise nothing has outlived its ttl yet: skip the scan.
+		var live: Array = []
+		var earliest := INF
+		for entry in _entries:
+			if _expired(entry, now):
+				continue
+			live.append(entry)
+			var ttl: float = entry["ttl"]
+			if ttl > 0.0:
+				earliest = minf(earliest, entry["at"] + ttl * 1000.0 - 1.0)
+		_entries = live
+		_earliest_expiry = earliest
 	if capacity <= 0 or _entries.size() <= capacity:
 		return
 	var over: int = _entries.size() - capacity
@@ -125,9 +152,9 @@ func _prune() -> void:
 	_entries = kept
 
 
-## Whether an event has outlived its ttl (ttl <= 0 never expires on age).
-func _expired(entry: Dictionary) -> bool:
+## Whether an event has outlived its ttl at `now` (`Time.get_ticks_msec`; ttl <= 0 never expires on age).
+func _expired(entry: Dictionary, now: int) -> bool:
 	var ttl: float = entry["ttl"]
 	if ttl <= 0.0:
 		return false
-	return (Time.get_ticks_msec() - entry["at"]) / 1000.0 > ttl
+	return (now - entry["at"]) / 1000.0 > ttl
