@@ -48,6 +48,7 @@ func record(hit: HitInfo, turn: float = 0.0) -> void:
 	impacts.append({
 		"pos": local_pos, "inward": inward, "depth": depth,
 		"chunk": allow_chunks and hit.damage >= PhysicsConfig.deform_chunk_damage, "seed": randi(),
+		"blood": hit.blood,
 	})
 	if impacts.size() > max_impacts:
 		impacts.pop_front()

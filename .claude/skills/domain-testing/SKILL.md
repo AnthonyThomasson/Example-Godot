@@ -302,6 +302,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `physics.footprints` | `BloodConfig.footprints_enabled`. |
 | `physics.smear` | `BloodConfig.smear_enabled`. |
 | `physics.debris` | `PhysicsConfig.debris_enabled`. |
+| `physics.hit_particles` | `PhysicsConfig.hit_particles_enabled`. |
 | `physics.wall_collider_deform` | `PhysicsConfig.deform_update_collider`. |
 | `projectile.flyover` | `BallisticsConfig.cover_flyover_scale`, 0 when off. |
 

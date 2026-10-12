@@ -15,6 +15,17 @@ static var wall_mask: int = 1
 ## Master switch for debris: off = hits spray no chips (Physics.spawn_debris spawns nothing).
 static var debris_enabled: bool = true
 
+## Master switch for hit particles: off = hits emit no entry/exit particle bursts (HitParticles spawns nothing).
+static var hit_particles_enabled: bool = true
+## Scales every burst's particle count (1 = the style tables as written); 0 emits nothing.
+static var hit_particles_scale: float = 1.0
+## Most particles one burst may hold, however hard the hit.
+static var hit_particles_max: int = 24
+## A bloody mark's colour on an object a bullet carried blood onto (alpha is scaled by how much it carried).
+static var blood_mark_color: Color = Color(0.55, 0.04, 0.05)
+## Radius (px) of that mark.
+static var blood_mark_radius: float = 4.5
+
 # --- Impact force (a hit shoves the struck object) ---
 ## Base impulse magnitude at full speed and a head-on hit. Scaled by the hit's speed
 ## factor (speed / muzzle speed) and by the penetration multipliers below.

@@ -324,6 +324,9 @@ static func draw_marks(canvas: CanvasItem, impacts: Array, crack_color: Color, h
 	for impact in impacts:
 		var p := _impact_apex(impact)
 		var depth: float = impact["depth"]
+		var blood: float = impact.get("blood", 0.0)
+		if blood > 0.0:
+			_draw_blood_mark(canvas, p, blood, int(impact["seed"]))
 		canvas.draw_circle(p, PhysicsConfig.deform_scorch_radius + depth, scorch)
 		canvas.draw_circle(p, maxf(1.5, depth * PhysicsConfig.deform_hole_radius_scale), hole_color)
 		var rng := RandomNumberGenerator.new()
@@ -334,6 +337,21 @@ static func draw_marks(canvas: CanvasItem, impacts: Array, crack_color: Color, h
 			var length := PhysicsConfig.deform_crack_length * rng.randf_range(0.5, 1.0) * (1.0 + depth * 0.15)
 			var jitter := Vector2(cos(ang), sin(ang)).orthogonal() * rng.randf_range(-2.0, 2.0)
 			canvas.draw_line(p, p + Vector2(cos(ang), sin(ang)) * length + jitter, crack_color, PhysicsConfig.deform_crack_width)
+
+
+## Blood a bullet carried onto an object, drawn under the hole: a lumpy red blot with a few flecks around
+## it, scaled and faded by how much blood arrived (`blood` 0..1). Seeded per impact so it never shimmers.
+static func _draw_blood_mark(canvas: CanvasItem, at: Vector2, blood: float, seed_value: int) -> void:
+	var color := PhysicsConfig.blood_mark_color
+	color.a = clampf(0.45 + blood * 0.5, 0.0, 1.0)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 7
+	var radius := PhysicsConfig.blood_mark_radius * (0.6 + blood * 0.6)
+	canvas.draw_circle(at, radius, color)
+	for _i in 3 + int(blood * 4.0):
+		var ang := rng.randf_range(0.0, TAU)
+		var off := Vector2(cos(ang), sin(ang)) * radius * rng.randf_range(0.6, 1.6)
+		canvas.draw_circle(at + off, radius * rng.randf_range(0.25, 0.55), color)
 
 
 ## Closed outline around a ring of points.

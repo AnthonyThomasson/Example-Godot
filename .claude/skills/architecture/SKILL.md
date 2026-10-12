@@ -97,7 +97,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }`
    - `take_hit(hit: HitInfo) -> void`
    `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage,
-   speed_factor, penetrated, source`. The projectile decides the ballistic outcome, then hands
+   speed_factor, penetrated, source`, plus `has_exit` / `exit_position` / `exit_normal` (where a penetrating
+   bullet left the body) and `blood` (0..1, blood a bullet carries out of a character onto the next
+   surface). The projectile decides the ballistic outcome, then hands
    the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
    (interface 4), the character bleeds instead (its `BloodWound` component, interface 4). The
    projectile is the only striker that uses this; a melee punch shoves through the "pushable"

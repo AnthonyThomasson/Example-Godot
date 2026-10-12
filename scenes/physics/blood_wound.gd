@@ -36,6 +36,11 @@ func record(hit: HitInfo) -> void:
 		var size := randf_range(BloodConfig.drip_size_min, BloodConfig.drip_size_max) * BloodConfig.hit_splat_size
 		_add_splat(hit.position + dir * reach, size, dir, BloodConfig.hit_spray_energy if i > 0 else 0.4)
 
+	# A round that went right through also throws blood out the far side, along its flight.
+	if hit.has_exit:
+		var size := randf_range(BloodConfig.drip_size_min, BloodConfig.drip_size_max) * BloodConfig.hit_splat_size
+		_add_splat(hit.exit_position, size, hit.direction, BloodConfig.hit_spray_energy)
+
 	var owed := maxi(1, ceili(hit.damage * BloodConfig.drips_per_damage))
 	if _drips == 0:
 		_wait = _next_wait()

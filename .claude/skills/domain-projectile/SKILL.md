@@ -43,6 +43,14 @@ which the Audio domain voices impacts from; a fly-over posts nothing) so decoupl
 hostility) learn what was struck, where, and by whom. Console lines: `Shot flew over /
 ricocheted off / penetrated / blocked by …`.
 
+**Exit point and blood carry.** A penetrating hit also fills `HitInfo.has_exit / exit_position / exit_normal`:
+`_find_exit` casts a probe ray back from `BallisticsConfig.exit_probe_distance` ahead toward the entry, skipping other
+colliders, until it meets the penetrated collider's far face (none found = thicker than the probe, no exit). A bullet
+that penetrates a `BallisticsConfig.blood_material` (flesh) surface carries that body's blood from its exit; the next
+non-flesh surface it strikes (any outcome but fly-over) within `blood_carry_distance` px gets `HitInfo.blood`
+= `1 − distance / blood_carry_distance`, and the bullet then carries no more. Tests: `tests/physics/hit_particles_*`,
+`blood_carries_past_character`, `blood_carry_distance_limit`.
+
 ## Layering
 
 `projectile.gd` / `casing.gd` are control; `projectile_visuals.gd` / `casing_visuals.gd` draw.

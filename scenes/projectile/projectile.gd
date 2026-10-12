@@ -36,6 +36,9 @@ var _traveled := 0.0
 ## Colliders excluded from further sweeps (flown over or penetrated), so the bullet does not
 ## re-hit them. Ricochets are not added — a bounced bullet may strike the same surface again.
 var _exclude: Array[RID] = []
+## `_traveled` at the moment the bullet left a body carrying `BallisticsConfig.blood_material` (a character);
+## -1 = carrying no blood. The next non-flesh surface within `blood_carry_distance` of it gets marked.
+var _blood_from := -1.0
 
 ## Emitted for each damaging interaction with the dealt damage. A fly-over emits nothing.
 signal hit(body: Node, damage: float)
@@ -122,7 +125,7 @@ func _resolve(result: Dictionary) -> void:
 		rotation = direction.angle()
 		speed *= BallisticsConfig.bounce_speed_retention
 		GameLog.say("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
-		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false), &"ricochet", surface)
+		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false, _take_blood(surface)), &"ricochet", surface)
 		return
 
 	var dealt := damage * squareness * speed_factor
@@ -131,7 +134,7 @@ func _resolve(result: Dictionary) -> void:
 	if speed < BallisticsConfig.penetration_min_speed / penetration_power:
 		GameLog.say("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
-		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false), &"blocked", surface)
+		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false, _take_blood(surface)), &"blocked", surface)
 		return
 	# 3b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
 	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness)
@@ -142,7 +145,12 @@ func _resolve(result: Dictionary) -> void:
 	rotation = direction.angle()
 	_exclude.append(rid)
 	GameLog.say("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
-	_deal(body, _hit_info(result, incoming, speed_factor, dealt, true), &"penetrate", surface)
+	var info := _hit_info(result, incoming, speed_factor, dealt, true, _take_blood(surface))
+	_find_exit(info, result.position, rid, incoming)
+	_deal(body, info, &"penetrate", surface)
+	# Leaving a body (flesh) it carries that body's blood on from the exit.
+	if StringName(surface.get("material", "")) == BallisticsConfig.blood_material:
+		_blood_from = _traveled + (info.exit_position.distance_to(result.position) if info.has_exit else 0.0)
 
 
 ## The struck object's surface via get_surface(), or the wall-rating fallback for a collider
@@ -154,7 +162,8 @@ func _surface_for(body: Node) -> Dictionary:
 
 
 ## Build the HitInfo handed to the struck object for one damaging interaction.
-func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt: float, penetrated: bool) -> HitInfo:
+func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt: float, penetrated: bool,
+		blood: float = 0.0) -> HitInfo:
 	var info := HitInfo.new()
 	info.position = result.position
 	info.normal = result.normal
@@ -162,8 +171,46 @@ func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt
 	info.damage = dealt
 	info.speed_factor = speed_factor
 	info.penetrated = penetrated
+	info.blood = blood
 	info.source = self
 	return info
+
+
+## Blood this bullet hands to a non-flesh surface it strikes (0..1, fading with the distance since it left
+## a body) and then has no more of: the first surface takes it all. 0 if it carries none or has gone
+## `blood_carry_distance` px. Flesh never takes it (the wound has its own blood).
+func _take_blood(surface: Dictionary) -> float:
+	if _blood_from < 0.0 or StringName(surface.get("material", "")) == BallisticsConfig.blood_material:
+		return 0.0
+	var dist := _traveled - _blood_from
+	_blood_from = -1.0
+	var reach := BallisticsConfig.blood_carry_distance
+	return clampf(1.0 - dist / reach, 0.0, 1.0) if reach > 0.0 and dist <= reach else 0.0
+
+
+## Fill `info`'s exit fields for a bullet that just penetrated `rid` at `entry`: cast a ray back from
+## `exit_probe_distance` px ahead toward the entry, skipping anything else in between, until it meets the
+## penetrated collider's far face. Leaves `has_exit` false for a body thicker than the probe.
+func _find_exit(info: HitInfo, entry: Vector2, rid: RID, travel: Vector2) -> void:
+	if BallisticsConfig.exit_probe_distance <= 0.0:
+		return
+	var space := get_world_2d().direct_space_state
+	var from := entry + travel * BallisticsConfig.exit_probe_distance
+	var skip := _exclude.duplicate()
+	skip.erase(rid)
+	for _i in 4:
+		var query := PhysicsRayQueryParameters2D.create(from, entry, collision_mask)
+		query.hit_from_inside = true
+		query.exclude = skip
+		var found := space.intersect_ray(query)
+		if found.is_empty():
+			return
+		if found.rid == rid:
+			info.has_exit = true
+			info.exit_position = found.position
+			info.exit_normal = found.normal
+			return
+		skip.append(found.rid)
 
 
 ## Hand the hit to the object (if hittable), re-emit `hit`, and post a world `&"hit"` event so

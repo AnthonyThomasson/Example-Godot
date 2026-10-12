@@ -31,6 +31,21 @@ Objects *compose* these components; Physics imports nothing outward.
 - `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on
   `Despawner`.
 
+## Hit particles (entry and exit bursts)
+
+`HitParticles.spawn(position, direction, parent, surface, kind, strength)` (`hit_particles.gd`, static) bursts a one-shot
+`CPUParticles2D` (named `HitParticles`, frees itself on `finished`, `Despawner`-tracked, no gravity: top-down) styled by
+`surface.material` from its `STYLES` table (wood splinters, metal sparks, glass shards, ceramic, fabric puff, foliage,
+flesh/blood droplets, `default` plaster dust for walls). `Kind.EXIT` (the strongest burst, thrown on along the shot) is paired with a much weaker `Kind.ENTRY` when a round passes through
+(`has_exit`); a hit that stays in the object (blocked, ricochet, no exit found) gets one `Kind.IMPACT` burst back along the normal at exit strength. `Physics.spawn_debris` (what every `take_hit` already calls) fires the entry burst,
+the exit burst when `HitInfo.has_exit`, and the material chips. Tuning: `PhysicsConfig.hit_particles_enabled` (test switch
+`physics.hit_particles`), `hit_particles_scale`, `hit_particles_max`.
+
+**Blood carried onto a surface.** A hit with `HitInfo.blood > 0` also throws red droplets and `flesh` chips from the entry,
+and the object keeps a bloody mark: `Deformable.record` and the wall's segment impacts store `"blood"`, and
+`Deformation.draw_marks` draws a red blot (`PhysicsConfig.blood_mark_color` / `blood_mark_radius`) under the hole, riding
+with the object (`hit_marks()` on an `EnvironmentObject` or `Wall` returns them). A character hit with an exit also throws a splatter out the far side (`BloodWound.record`).
+
 ## Ragdoll (a generic 3D body falling to the floor)
 
 `ragdoll.gd` (`class_name Ragdoll`, `RefCounted`) knows nothing of what the body is; the owner (the

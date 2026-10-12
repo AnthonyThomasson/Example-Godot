@@ -47,13 +47,21 @@ func get_surface() -> Dictionary:
 
 ## Deform the nearest wall segment and spray debris. Walls are immovable, so no knockback.
 func take_hit(hit: HitInfo) -> void:
-	_record_segment_damage(hit.position, hit.normal, hit.damage)
+	_record_segment_damage(hit.position, hit.normal, hit.damage, hit.blood)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
+
+
+## Every hit mark on this wall's segments (dicts with `pos`, `depth`, `blood`, …).
+func hit_marks() -> Array:
+	var marks: Array = []
+	for arr: Array in _seg_impacts.values():
+		marks.append_array(arr)
+	return marks
 
 
 ## Dent the nearest wall segment (caving inward along the contact normal), redraw it, and
 ## rebuild that segment's collider to match.
-func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: float) -> void:
+func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: float, blood: float = 0.0) -> void:
 	var local_pos := to_local(world_pos)
 	var segs := wall_segments()
 	var best_i := -1
@@ -85,6 +93,7 @@ func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: f
 	arr.append({
 		"pos": local_pos, "inward": inward, "depth": depth,
 		"chunk": amount >= PhysicsConfig.deform_chunk_damage, "seed": randi(),
+		"blood": blood,
 	})
 	if arr.size() > PhysicsConfig.deform_max_impacts:
 		arr.pop_front()

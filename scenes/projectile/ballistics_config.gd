@@ -52,3 +52,14 @@ static var bounce_speed_retention: float = 0.6
 static var penetrate_loss_scale: float = 0.9
 ## Max random deflection on penetration, scaled by penetration/100. Degrees.
 static var penetrate_deflect_max_deg: float = 12.0
+
+## Exit point: after a bullet penetrates an object, how far past the entry (px) to look for the face it
+## leaves by (a probe ray cast back toward the entry). Objects thicker than this report no exit.
+static var exit_probe_distance: float = 80.0
+
+## Blood carry: a bullet that passes through a surface with this material (a character's flesh) carries its
+## blood; the first non-flesh surface it then hits within `blood_carry_distance` (px, measured from where it
+## left the body) is marked with blood.
+static var blood_material: StringName = &"flesh"
+## Most px a bullet carries blood after leaving a body; the mark fades linearly to nothing at this distance.
+static var blood_carry_distance: float = 160.0

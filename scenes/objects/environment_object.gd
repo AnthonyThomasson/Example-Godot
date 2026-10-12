@@ -72,6 +72,11 @@ func get_surface() -> Dictionary:
 	return { "coverage": coverage, "penetration": penetration, "material": object_material, "color": color }
 
 
+## The hit marks on this object (dicts with `pos`, `depth`, `blood`, …), oldest first.
+func hit_marks() -> Array:
+	return _deformable.impacts
+
+
 ## Take a hit: shove along the impact at the contact point (so an off-center hit spins the
 ## object), record the deformation, and spray debris. The striker fills in a HitInfo.
 func take_hit(hit: HitInfo) -> void:

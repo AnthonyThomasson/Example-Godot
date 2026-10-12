@@ -62,6 +62,10 @@ static var ROWS := {
 		"description": "Hits spray material chips.",
 		"static": [[PhysicsConfig, &"debris_enabled"]],
 	},
+	&"physics.hit_particles": {
+		"description": "Hits burst material particles at the entry and exit points.",
+		"static": [[PhysicsConfig, &"hit_particles_enabled"]],
+	},
 	&"projectile.flyover": {
 		"description": "Bullets may fly over partial cover (off = every shot meets what it reaches).",
 		"static": [[BallisticsConfig, &"cover_flyover_scale", 0.0]],

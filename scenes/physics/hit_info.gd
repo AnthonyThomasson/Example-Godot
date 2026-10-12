@@ -20,5 +20,15 @@ var speed_factor: float = 1.0
 ## True when the striker passed through (penetrated) rather than bounced/embedded.
 ## The impact transfers less momentum on a pass-through.
 var penetrated: bool = false
+## True when the striker passed through the object and `exit_position` / `exit_normal` say where it
+## left (a penetrating bullet); false for a ricochet, an embed or a hit with no notion of an exit.
+var has_exit: bool = false
+## World-space point the striker left the object at (valid when `has_exit`).
+var exit_position: Vector2 = Vector2.ZERO
+## World-space surface normal at the exit, pointing out of the object (valid when `has_exit`).
+var exit_normal: Vector2 = Vector2.ZERO
+## Blood the striker carries when it strikes this object, 0..1 (0 = none): a bullet that just passed through a
+## character and is still within its carry distance. The object shows it as a bloody mark.
+var blood: float = 0.0
 ## The node that caused the hit (the projectile, the character, …). May be null.
 var source: Node = null

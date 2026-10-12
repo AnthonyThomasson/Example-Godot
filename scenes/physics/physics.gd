@@ -16,17 +16,31 @@ static func impact_impulse(hit: HitInfo) -> Vector2:
 	return hit.direction * PhysicsConfig.impact_impulse * hit.speed_factor * force_scale
 
 
-## Spray material-styled chips out of a hit, added under `parent` (placed by world position,
-## so `parent` may be offset from the origin). `surface` is the struck object's
-## `get_surface()` — its `color` and `material` style the chips. Chips fly out along the
-## surface normal, or back along the shot when the normal is degenerate. Nothing while
-## PhysicsConfig.debris_enabled is off.
+## Show a hit: a particle burst at the entry point (weak, with a much stronger one at the exit when the striker passed
+## through, `hit.has_exit`; a hit that stays in the object gets one full-strength burst) plus chips knocked off the entry, all styled by the struck object's
+## `get_surface()` (`color`, `material`) and added under `parent` (placed by world position, so
+## `parent` may be offset from the origin). Entry particles and chips fly out along the surface
+## normal, or back along the shot when the normal is degenerate; the exit burst follows the shot. A
+## hit that carries blood (`hit.blood > 0`, a bullet that just left a character) also throws a few
+## red droplets and chips from the entry. Particles need PhysicsConfig.hit_particles_enabled, chips
+## PhysicsConfig.debris_enabled, and the blood bits BloodConfig.enabled.
 static func spawn_debris(parent: Node, hit: HitInfo, surface: Dictionary) -> void:
+	var spray := hit.normal if hit.normal.length() > 0.001 else -hit.direction
+	var strength := clampf(hit.speed_factor, 0.4, 1.5) * clampf(0.7 + hit.damage / 50.0, 0.7, 1.4)
+	# Through the object: a weak burst going in, the strong one coming out. Otherwise one full-strength burst.
+	var through := hit.has_exit
+	HitParticles.spawn(hit.position, spray, parent, surface, HitParticles.Kind.ENTRY if through else HitParticles.Kind.IMPACT, strength)
+	if through:
+		var out := hit.exit_normal if hit.exit_normal.length() > 0.001 else hit.direction
+		HitParticles.spawn(hit.exit_position, (out + hit.direction).normalized(), parent, surface, HitParticles.Kind.EXIT, strength)
+	if hit.blood > 0.0 and BloodConfig.enabled:
+		HitParticles.spawn(hit.position, spray, parent, { "material": "blood" }, HitParticles.Kind.IMPACT, hit.blood * 0.7)
+		if PhysicsConfig.debris_enabled:
+			DebrisSpawner.spawn(hit.position, spray, parent, PhysicsConfig.blood_mark_color, "flesh")
 	if not PhysicsConfig.debris_enabled:
 		return
 	var base_color: Color = surface.get("color", Color(0.6, 0.6, 0.6))
 	var material: String = surface.get("material", "")
-	var spray := hit.normal if hit.normal.length() > 0.001 else -hit.direction
 	DebrisSpawner.spawn(hit.position, spray, parent, base_color, material)
 
 
