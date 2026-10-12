@@ -34,6 +34,9 @@ var _nav_debug: Node = null
 ## (NavBuilder.character_holes) as of the last bake of each, compared each tick to detect movement.
 var _baseline: Array = []
 var _character_baseline: Array = []
+## Whether the planning region's re-bake is running on the server's worker thread; a furniture move meanwhile waits for
+## the first tick after the bake lands (the baseline is set from what that bake carved, so it is caught then).
+var _baking := false
 
 
 ## Wire the updater to the baked map and start the interval. `region` is NavBuilder.build's result,
@@ -55,9 +58,10 @@ func setup(region: NavigationRegion2D, house: Node2D, rooms: Array, nav_debug: N
 	add_child(timer)
 
 
-## One interval tick: if furniture has moved since the last bake, re-carve the holes at the live
-## positions in both regions; if only a character has, re-carve the steering region. Refreshes the
-## overlay after either. Skips the bake entirely when nothing has moved.
+## One interval tick: if furniture has moved since the last bake, re-carve the planning region's holes at the live
+## positions on the server's worker thread (`NavBuilder.rebake_async`; a furniture move while one is in flight waits for
+## the next tick) and the steering region's in place; if only a character has, re-carve the steering region. Refreshes
+## the overlay after either. Skips the bake entirely when nothing has moved.
 func _on_tick() -> void:
 	if not enabled or _region == null or not is_instance_valid(_house):
 		return
@@ -66,13 +70,21 @@ func _on_tick() -> void:
 	var furniture_moved := _moved(_baseline, furniture)
 	if not furniture_moved and not _moved(_character_baseline, characters):
 		return
-	if furniture_moved:
-		NavBuilder.rebake(_region, _house, _rooms, _agent_radius)
-		_baseline = furniture
+	if furniture_moved and not _baking:
+		_baking = true
+		NavBuilder.rebake_async(_region, _house, _rooms, _agent_radius, func() -> void:
+			_baking = false
+			_baseline = furniture
+			_refresh_overlay())
 	NavBuilder.rebake_steering(_region, _house, _rooms, _agent_radius)
 	_character_baseline = characters
-	if _nav_debug != null and is_instance_valid(_nav_debug) and _nav_debug.has_method("setup"):
-		_nav_debug.setup(_house)  # re-snapshot the overlay so it matches the re-baked holes
+	_refresh_overlay()
+
+
+## Re-snapshot the overlay so it matches the re-baked holes.
+func _refresh_overlay() -> void:
+	if _nav_debug != null and is_instance_valid(_nav_debug) and _nav_debug.has_method("setup") and is_instance_valid(_house):
+		_nav_debug.setup(_house)
 
 
 ## Whether the footprints `b` differ from `a` enough to warrant a re-bake: a different piece

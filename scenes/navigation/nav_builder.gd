@@ -150,6 +150,27 @@ static func _steering_map_for(planning_map: RID) -> RID:
 	return map
 
 
+## `rebake` with the bake itself on the NavigationServer's worker thread, so a frame never pays for it: the source
+## geometry is gathered on the main thread now (the walls are read from the scene tree, the furniture from its live
+## positions), the bake runs in the background, and the polygon is assigned to `region` once it is done, when `done`
+## is called. A region freed meanwhile is left alone. `done` is called even when there is nothing to bake. The planning
+## region only: the steering one is re-baked by `rebake_steering`.
+static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float = 14.0,
+		done: Callable = Callable()) -> void:
+	var job := _source_for(house, rooms, agent_radius)
+	if job.is_empty():
+		if done.is_valid():
+			done.call()
+		return
+	var nav_poly: NavigationPolygon = job["poly"]
+	NavigationServer2D.bake_from_source_geometry_data_async(nav_poly, job["source"], func() -> void:
+		_drop_slivers(nav_poly)
+		if is_instance_valid(region):
+			region.navigation_polygon = nav_poly
+		if done.is_valid():
+			done.call())
+
+
 ## Bake a NavigationPolygon for `house` over `rooms` at `agent_radius`: the house bounds minus the
 ## static wall colliders (doorways stay open) minus each solid furniture footprint (carved as a hole)
 ## and minus each of `characters` (footprints from `character_holes`; none = the planning bake). Returns
@@ -157,9 +178,24 @@ static func _steering_map_for(planning_map: RID) -> RID:
 ## Shared by the initial `build` and every `rebake`, so both carve furniture holes identically. `weld` snaps the
 ## result to the 1 px grid (`_weld_vertices`), which a bake with characters needs.
 static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float, characters: Array = [], weld := false) -> NavigationPolygon:
+	var job := _source_for(house, rooms, agent_radius, characters)
+	if job.is_empty():
+		return null
+	var nav_poly: NavigationPolygon = job["poly"]
+	NavigationServer2D.bake_from_source_geometry_data(nav_poly, job["source"])
+	if weld:
+		_weld_vertices(nav_poly, house.position)
+	_drop_slivers(nav_poly)
+	return nav_poly
+
+
+## Everything a bake needs, gathered on the main thread: the polygon to bake into (`poly`, with the agent radius set)
+## and its source geometry (`source`: the walls, the walkable footprint, the furniture holes and each of `characters`).
+## {} with no rooms. `_bake_polygon` bakes it at once; `rebake_async` hands it to the server's worker thread.
+static func _source_for(house: Node2D, rooms: Array, agent_radius: float, characters: Array = []) -> Dictionary:
 	var bounds := _bounds(rooms)
 	if bounds.size == Vector2.ZERO:
-		return null
+		return {}
 	bounds = bounds.grow(BOUNDS_PAD)
 	# parse_source_geometry_data returns the wall colliders in `house`'s LOCAL frame, so the
 	# footprint and the baked mesh live in that frame too; the region is then offset by the house's
@@ -183,11 +219,7 @@ static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float, char
 	# Furniture holes: each solid piece's footprint, so the baked mesh routes paths around it. Added
 	# after the footprint (both are outlines on the same source) and before the bake carves them in.
 	_add_furniture_holes(source, house, characters)
-	NavigationServer2D.bake_from_source_geometry_data(nav_poly, source)
-	if weld:
-		_weld_vertices(nav_poly, house.position)
-	_drop_slivers(nav_poly)
-	return nav_poly
+	return { "poly": nav_poly, "source": source }
 
 
 ## Merge the baked vertices that share a 1 px cell of the map (in world space: `origin` is the region's offset), the

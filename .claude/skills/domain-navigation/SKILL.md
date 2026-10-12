@@ -58,14 +58,21 @@ The holes a `build` carves are a snapshot of where the furniture stood at bake t
 house, rooms, agent_radius=14.0)` re-bakes `region`'s polygon **in place** (same region + world
 offset; reassigning `navigation_polygon` re-registers the mesh) with the holes re-measured at the
 furniture's **current** positions — `furniture_holes` reads each collider's live `global_transform`,
-so moved pieces carve at their new spots.
+so moved pieces carve at their new spots. `rebake_async(region, house, rooms, agent_radius, done)` does the same with the
+bake on the NavigationServer's worker thread: the source geometry (walls from the scene tree, the footprint, the furniture
+holes) is gathered on the main thread by `_source_for`, `bake_from_source_geometry_data_async` bakes it, and the polygon is
+assigned (slivers dropped) when the bake lands, then `done` runs; a region freed meanwhile is left alone. The sync `rebake`
+stays for a caller that needs the map now (`perf/bake_and_path_stress` times it); the re-baker uses the async one, so no
+frame pays for a bake (`tests/navigation/rebake_runs_off_the_main_thread_test.gd`).
 
 `nav_updater.gd` (a script-only Node; `main.gd` builds it once right after the bake and hands it the
 region, house, rooms and the overlay) drives the re-bake on an interval. Each tick it recomputes
 `furniture_holes` and `character_holes` (cheap — transforms only, no bake) and re-bakes **only** when a piece moved past
-`move_threshold` (4 px): furniture re-bakes both regions, a character that stopped, set off, appeared or died re-bakes the steering
-one. An at-rest scene costs just the compare. Exports: `enabled`,
-`interval` (0.75 s between checks), `move_threshold`. After a re-bake it calls the overlay's `setup`
+`move_threshold` (4 px): furniture re-bakes both regions (the planning one on the server's worker thread, `rebake_async`; a
+tick while that bake is still in flight (`_baking`) leaves the planning region alone, and its baseline is set from what the
+bake carved when it lands, so a move during a bake is caught by the next tick), a character that stopped, set off, appeared
+or died re-bakes the steering one in place. An at-rest scene costs just the compare. Exports: `enabled`,
+`interval` (0.75 s between checks), `move_threshold`. After a re-bake (once the planning one lands) it calls the overlay's `setup`
 again so the overlay re-snapshots. **Bulldozing is still the behaviour between re-bakes** (and for
 non-solid decor, which is never carved): a piece just shoved is run over by the character's push
 physics until the next re-bake routes paths around its new position.
