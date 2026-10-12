@@ -31,7 +31,10 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `setup()` (build the modules), `apply_config()` (push the config fields into them; re-callable each
   decision), `set_faction(f)`.
 - `observe(character, rooms)` — the SEE pass, every tick: one `saw_character` sighting per visible
-  character (keyed, superseded while visible) carrying `pos`, a smoothed velocity track (`vel`),
+  character (keyed, superseded while visible; renewed every `SIGHT_EVERY_FRAMES` (3) physics frames, offset per NPC and target,
+  for a character that stays in the view cone: the range/cone test runs every frame, so one that enters the cone is tested at once
+  and one that leaves it is dropped at once, and what the NPC holds of a character it sees is at most 3 frames old;
+  `tests/ai/sight_follows_a_moving_target_test.gd`) carrying `pos`, a smoothed velocity track (`vel`; `track_smoothing` is the share taken per physics frame, so a sighting several frames after the last takes the share they add up to),
   `facing`, a visible wound band, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
   remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
   before testing sight, and reads each known set once per pass). That look runs every `LEARN_EVERY_FRAMES` (6) physics frames,

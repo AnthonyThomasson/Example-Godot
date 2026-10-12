@@ -35,6 +35,12 @@ const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_voc
 ## a decision looks again first, so a glimpse shorter than this still counts when it is the moment of a decision.
 const LEARN_EVERY_FRAMES := 6
 
+## Physics frames between two sight tests of a character that stays inside an NPC's view cone. The range and cone test runs
+## every frame, so one that enters the cone is tested at once and one that leaves it is dropped at once; only the line of
+## sight and the sighting written from it are renewed this often, offset per NPC and target so a squad does not test on the
+## same frame. What the NPC holds of a character it sees is at most this many frames old.
+const SIGHT_EVERY_FRAMES := 3
+
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
 var contact_memory_ttl: float = 4.0
 ## Whether this NPC starts knowing the house (rooms + objects), else learns them by sight.
@@ -121,6 +127,8 @@ var _seeded := false             ## Whether the familiar-NPC house-knowledge see
 var _learn_next := 0             ## First physics frame the next look for unknown rooms and furniture may run.
 var _learned_frame := -1         ## Physics frame of the latest such look (-1 = none yet).
 var _visible_now := {}           ## Instance ids of characters visible on the latest observe() tick.
+var _visible_before := {}        ## The same one tick earlier (what a character not due for a sight test keeps).
+var _looked := {}                ## Instance ids of characters in the view cone that have had a sight test since they entered it.
 var _tracks := {}                ## Per-character movement track: id → { pos, vel, t } (last seen).
 
 
@@ -381,13 +389,26 @@ func observe(character, rooms: Array) -> void:
 
 	# Every other character (the player included): one sighting per character, superseded while it
 	# stays visible. Dead characters are skipped — corpses add no tactical information.
+	var frame := Engine.get_physics_frames()
+	var swap := _visible_before
+	_visible_before = _visible_now
+	_visible_now = swap
 	_visible_now.clear()
 	for other in _other_characters(character):
+		var id: int = other.get_instance_id()
 		if other.get("is_dead") == true:
+			_looked.erase(id)
 			continue
+		if not _vision.in_view(self_pos, facing, other.global_position):
+			_looked.erase(id)  # Out of the cone: not seen, and its next look is at once.
+			continue
+		if _looked.has(id) and (frame + get_instance_id() + id) % SIGHT_EVERY_FRAMES != 0:
+			if _visible_before.has(id):
+				_visible_now[id] = true  # Not due: still what the last look saw.
+			continue
+		_looked[id] = true
 		if not _vision.can_see_node(other, self_pos, facing, space, exclude):
 			continue
-		var id: int = other.get_instance_id()
 		var pos: Vector2 = other.global_position
 		var room := SnapshotVocab.room_at(pos, rooms)
 		var item = other.current_item()
@@ -399,7 +420,7 @@ func observe(character, rooms: Array) -> void:
 			"faction": f if f != null else &"",
 			"ally": _hostility.is_ally(f if f != null else &""),
 			"pos": pos,
-			"vel": _track(id, pos, now),
+			"vel": _track(id, pos, now, frame),
 			"facing": other.get("facing") if other.get("facing") is Vector2 else Vector2.ZERO,
 			"wound_dmg": other.damage_taken() if other.has_method("damage_taken") else 0.0,
 			"inside": not room.is_empty(),
@@ -451,18 +472,21 @@ func _learn_by_sight(character, rooms: Array) -> void:
 			_learn_object(obj)
 
 
-## Update character `id`'s movement track with a sighting at `pos` and return its smoothed velocity.
-## A sighting after a long gap restarts the track (no velocity across the gap).
-func _track(id: int, pos: Vector2, now: int) -> Vector2:
+## Update character `id`'s movement track with a sighting at `pos` (physics frame `frame`) and return its smoothed
+## velocity. A sighting after a long gap restarts the track (no velocity across the gap). `track_smoothing` is the share of a
+## new velocity taken per physics frame, so a sighting that comes several frames after the last takes the share they add up to.
+func _track(id: int, pos: Vector2, now: int, frame: int) -> Vector2:
 	var vel := Vector2.ZERO
 	var track = _tracks.get(id)
 	if track != null:
 		var dt: float = (now - track["t"]) / 1000.0
 		if dt > 0.0 and dt < 0.5:
-			vel = (track["vel"] as Vector2).lerp((pos - track["pos"]) / dt, track_smoothing)
+			var steps: int = maxi(frame - int(track["f"]), 1)
+			var share := track_smoothing if steps == 1 else 1.0 - pow(1.0 - track_smoothing, steps)
+			vel = (track["vel"] as Vector2).lerp((pos - track["pos"]) / dt, share)
 		elif dt == 0.0:
 			vel = track["vel"]
-	_tracks[id] = { "pos": pos, "vel": vel, "t": now }
+	_tracks[id] = { "pos": pos, "vel": vel, "t": now, "f": frame }
 	return vel
 
 

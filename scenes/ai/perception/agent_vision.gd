@@ -58,6 +58,12 @@ func can_see(from_pos: Vector2, facing: Vector2, point: Vector2, space, exclude:
 	return space == null or not _sight_blocked(space, from_pos, point, exclude)
 
 
+## Whether `point` is inside the geometry of sight (view distance and the near bubble or the forward cone), ignoring what
+## stands in the way; true for everything when sight is disabled. A cheap test: the cast of `can_see` is the costly half.
+func in_view(from_pos: Vector2, facing: Vector2, point: Vector2) -> bool:
+	return not enabled or _in_view(from_pos, facing, point)
+
+
 ## The geometry half of sight: `point` is within view distance and either inside the near bubble or the forward cone.
 func _in_view(from_pos: Vector2, facing: Vector2, point: Vector2) -> bool:
 	var to := point - from_pos
