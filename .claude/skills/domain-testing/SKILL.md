@@ -256,6 +256,25 @@ functional tests of their domain.
   pins its output to the plain one (`navigation/furniture_union_fast_path`, `physics/blood_splat_merge_fast_path`,
   `physics/convex_pieces_match_plain_scan`, `physics/shape_polygon_cache`).
 
+## Tactical entry tests (tag `entry`)
+
+`tests/ai/entry_*_test.gd` pin down `docs/tactical-entry.md` (E1 to E8; each header names its behaviour): staging and
+the approach, the stack's slots, the pie, the crossing, the corners, the ready barrier and the radio, the solo entry
+and a joining ally, clearing and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
+rooms so the geometry is clean), through `tests/_ai/entry_probe.gd` (`const Entry := preload(...)`): `rules(s, door)`
+(SEARCH > ENTER > that doorway, engage in a fight), `npc` (an invader that walks; `cadence` offsets its decide timer),
+`target`, the test's own doorway frame (`BACK`, `FRONT`, `HALL_LIVING` with `out`, `outward`, `lateral`, `in_funnel`,
+`in_room`, `beside_door`, `corners`), a per-frame sampler (`watch`, then `path_of`, `pos_at`, `first_stop_in_room`,
+`funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`) and the radio (`calls(t, step, id)`, `first_call_time`;
+callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
+
+- Two invaders that claim a doorway on the same frame settle their slots by instance id: the first actor declared
+  gets slot 1 on a tie.
+- From beside a door you can see the opposite door-wall corner through the gap, so what the pie leaves hidden is
+  geometry, not a rule: assert that hidden corners are on the door's wall, not that both are.
+- A defender meant to be unseen from outside has to be behind the jamb from every spot the entrant visits (stack,
+  arc, the walk there), e.g. tucked against the door's wall well along from it.
+
 ## Flanking tests (tag `flank`)
 
 `tests/ai/flank_*_test.gd` pin down how the AI weighs and takes the sides of a target: frame geometry, route
@@ -363,6 +382,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `ai.hostile_on_trespass` | Hostility toward anyone inside the house. |
 | `ai.hostile_on_attack` | Hostility toward an attacker. |
 | `ai.posture` | NPCs crouch while fighting in place (`GoalController.posture_enabled`). |
+| `ai.entry` | Tactical entry (`GoalController.entry_enabled`; on in the invader preset). |
 | `nav.rebake` | `NavUpdater.enabled`. |
 | `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps and reloads make `sound` events and voices. |
 | `physics.blood` | `BloodConfig.enabled`. |
@@ -384,7 +404,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), actors (controller injected before `_ready`, positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |

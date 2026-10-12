@@ -31,6 +31,7 @@ root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_posi
       ├─ reload_quiet [reload; no threat known, gun low + spare] → reload
       ├─ investigate [leads]               → move{aim travel, fire_at_will}
       ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
+      │    └─ enter [entries]              → entry{run}   (a doorway into a room left to search)
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
 ```
 
@@ -52,6 +53,13 @@ A node may mix `children` and `options`. `engage` and `flank` require `gun_loade
 nothing else is on offer. A node whose option groups end up empty (every flank side
 dropped; MELEE while the target isn't point-blank) has no leaf, so it isn't offered at all. Adding a
 mode or tactic = adding a node (+ a perception option group if it needs new places).
+
+**ENTER** (`enter`, a child of `search`): the doorways into rooms the NPC has not seen or not searched lately
+(`entries`, an invader's only, `entry_enabled`); the desc names the nearest ("A doorway leads into a room left to
+search (the doorway to the west — unexplored — short route)") and the question asks for "the shortest route"
+(measured: it beat "the nearest one into an unsearched or unexplored room", which let "unexplored" outweigh a
+short route). Von chooses only whether and which doorway; the stack, pie, crossing and corners are the
+behaviour's `entry` primitive (`domain-ai-behavior`), which asks Von nothing until the entry is over.
 
 **How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
 state (`criteria` in its API are classification criteria). A branch's desc therefore states the

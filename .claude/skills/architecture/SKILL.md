@@ -64,7 +64,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `main.gd` positions the front entrance, fixes draw order and builds the nav map from the rooms (interface 9); its
    `match_spawner.gd` drops each defender at a clear spot in a random room (its centre unless solid furniture or another
    combatant is within `spawn_clearance` — read off `NavBuilder.furniture_holes` — else a random clear point) and each invader
-   just outside the house (all via `get_rooms`); it never touches world-gen internals.
+   just outside the house (all via `get_rooms`), and hands every NPC the house's `get_openings` (for tactical
+   entry); it never touches world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
@@ -202,11 +203,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
    driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
    (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
-   decision-tree config. Main injects only `rooms` (and `entry_point`); the AI finds and categorizes
+   decision-tree config. Main injects only `rooms` and `openings` (and `entry_point`); the AI finds and categorizes
    the characters it perceives by sight. Von walks a data-driven DECISION TREE ranked against the
    goal — a broad mode (combat / investigate / search / idle), then a tactic (engage / flank / push /
    retreat / locate …), then a concrete option (a place, a firing spot, an object) — one `choice`
-   request per level, ending in a behaviour primitive (move / engage / melee / interact / hold) — no
+   request per level, ending in a behaviour primitive (move / engage / melee / interact / hold / reload / entry) — no
    per-goal or per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split
    across four isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai`
    overview and its `domain-ai-<name>` sub-skills.
@@ -260,9 +261,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
     - `&"sound"`: the Audio domain's `Sound` service posts one for every sound it accepts (`{ kind,
       profile, variant, position, volume_db, pitch }`), which is what tests assert on.
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
-      its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`). Allied
-      AI controllers within `callout_range` consume it (which flank an ally holds, whom it fights,
-      where to support it).
+      its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`) — and one
+      per step of a tactical entry, which adds `opening`, `slot`, `side`, `entry_step` (claim / ready /
+      going_in / in / clear / rear / abort) and `cleared_room` (`docs/tactical-entry.md`). Allied AI
+      controllers within `callout_range` consume it (which flank an ally holds, whom it fights, where to
+      support it, which stack slot is taken, when the point is through, which room is clear).
     Emitters and listeners never reference each other (like `Despawner`).
 
 11. **General → Interaction / AI: `PhysicsLayers.SOLID`**

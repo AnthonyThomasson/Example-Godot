@@ -1,6 +1,6 @@
 ---
 name: domain-ai-snapshot
-description: Deep implementation detail for the AI SNAPSHOT sub-domain (scenes/ai/perception/snapshot/ + agent_snapshot.gd) — the decision snapshot the planner walks and Von reads: the named facts, the state-text sections (situation, loadout, odds, contacts, exposure, allies, flanks, awareness), the option groups (hostiles, fire/flank/advance/melee per target, reload, retreat, leads, shooter, search, explore, interactions, rooms), the shared vocabulary and tuning (SnapshotVocab) and the measured wording rules Von needs (bands, canonical phrases, no negations). Use when editing scenes/ai/perception/snapshot/ or agent_snapshot.gd, or adding a fact, a state section, an option group, or changing what Von is told. Complements the `domain-ai-perception` overview, `domain-ai-decision` and the `architecture` skill.
+description: Deep implementation detail for the AI SNAPSHOT sub-domain (scenes/ai/perception/snapshot/ + agent_snapshot.gd) — the decision snapshot the planner walks and Von reads: the named facts, the state-text sections (situation, loadout, odds, contacts, exposure, allies, flanks, awareness), the option groups (hostiles, fire/flank/advance/melee per target, reload, retreat, leads, shooter, entries, search, explore, interactions, rooms), the shared vocabulary and tuning (SnapshotVocab) and the measured wording rules Von needs (bands, canonical phrases, no negations). Use when editing scenes/ai/perception/snapshot/ or agent_snapshot.gd, or adding a fact, a state section, an option group, or changing what Von is told. Complements the `domain-ai-perception` overview, `domain-ai-decision` and the `architecture` skill.
 ---
 
 # AI · Snapshot sub-domain (`scenes/ai/perception/agent_snapshot.gd` + `snapshot/`)
@@ -65,8 +65,12 @@ lives in `agent_snapshot.gd`.
   there passes a known hostile; described as "route passes X"), `advance_positions` (halfway / close /
   rush), `melee` (one `punch` option, only while the target is point-blank); globally
   `reload` (one option, only while `can_reload`, so the planner takes it unasked), `retreat_positions`, `shooter`, `leads`
-  (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `search_rooms`
-  (+ front entrance / approach the house while outside), `explore` (unknown rooms by direction only),
+  (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `entries` (the doorways
+  ENTER offers, `entry_enabled` only: out of the NPC's area into a room unseen — named by direction — or unsearched,
+  nearest first; the place is the NPC's free stack slot on the team's side, `params` carry `opening`, `into`, `slot`,
+  `side`; the summary is the nearest one's desc), `search_rooms` (+ front entrance / approach the house while outside;
+  with entries, the rooms they lead into and the entrance are left to ENTER), `explore` (unknown rooms by direction
+  only, minus those an entry leads into),
   `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
   Options are places and things, never verbs; `tags.inside` drives the territorial filter.
 

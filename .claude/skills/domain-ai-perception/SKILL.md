@@ -1,6 +1,6 @@
 ---
 name: domain-ai-perception
-description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows and how it is worded for Von. The sight sense, hostility rules, the generic event memory (with keyed supersede), movement tracks/facing/visible wounds, gunfire heard, allies' radio callouts, leads, searched rooms, the tactics geometry (flank sides, fire/advance/retreat spots, route length + exposure, cover) and its hand-off to the decision SNAPSHOT (the snapshot itself, its wording rules and option groups are the sub-domain `domain-ai-snapshot`). Use when editing scenes/ai/perception/ (except the snapshot) or working on vision, memory/eviction, hostility, flanking geometry, callouts, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows and how it is worded for Von. The sight sense, hostility rules, the generic event memory (with keyed supersede), movement tracks/facing/visible wounds, gunfire heard, allies' radio callouts, leads, searched rooms, the tactics geometry (flank sides, fire/advance/retreat spots, route length + exposure, cover), the doorway geometry for tactical entry (agent_entry.gd: stack slots, pie arc, hard/soft corners, the team's slot claims) and its hand-off to the decision SNAPSHOT (the snapshot itself, its wording rules and option groups are the sub-domain `domain-ai-snapshot`). Use when editing scenes/ai/perception/ (except the snapshot) or working on vision, memory/eviction, hostility, flanking geometry, entry geometry, callouts, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Perception sub-domain (`scenes/ai/perception/`)
@@ -16,6 +16,8 @@ Files:
 - `agent_hostility.gd` — the hostility rules (categorization).
 - `agent_memory.gd` — a generic, behaviour-agnostic event log.
 - `agent_tactics.gd` — combat geometry: flank sides, fire/advance/retreat spots, routes, cover.
+- `agent_entry.gd` — doorway geometry for a tactical entry (`docs/tactical-entry.md`) and the team's claims on a doorway
+  off the radio (see "Entry geometry" below).
 - `agent_snapshot.gd` + `snapshot/` — the BUILD half (`domain-ai-snapshot`): turns the gathered knowledge + the tactics geometry
   into the decision SNAPSHOT (facts / sections / option groups) and owns the measured wording Von reads. Pure transform.
 
@@ -44,7 +46,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   known hostile) is no mystery (COMBAT / that contact's last-seen lead already covers it), so it is not a
   lead; only an UNKNOWN shooter is.
 - `process_callout(character, data)` — an ally's radio `&"callout"` within `callout_range` →
-  `heard_callout` (keyed per speaker, ttl `callout_ttl`).
+  `heard_callout` (keyed per speaker, ttl `callout_ttl`). One carrying `cleared_room` (an ally cleared a room in a
+  tactical entry) also teaches the room and marks it `visited_room`, so the team does not clear it twice.
 - `check_lead(lead_id)` — the NPC reached an investigation lead: remember it as checked
   (`checked_lead`), so it is not offered again until something newer happens there.
 - `quick_facts(character)` — cheap facts (under fire, engaged, hostile known) between decisions.
@@ -53,6 +56,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
   `note_engaged` / `engaged_fresh` / `under_fire`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
+- Entry geometry for the behaviour: `entry_geometry(character, opening_id, into)` and `entry_team(opening_id)`
+  (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).
@@ -135,3 +140,17 @@ spots come from known rooms, nearby cover and allies, kept only if hidden from e
 away (rays toward a threat exclude hostile bodies). A character is never cover; a blocking object is
 named by its `object_name`, a character by its name, anything else as "wall".
 `combat_spots` (ring around the NPC: fire vs cover) also serves the behaviour's peek-and-cover.
+
+## Entry geometry (`agent_entry.gd`)
+
+The behaviour asked of it is `docs/tactical-entry.md`. Given the house's openings (Main's `WorldGen.get_openings`, handed
+in by `set_house` on each observe) and rooms, `entries_from(room_key)` lists the doorways out of the NPC's area (outer
+doors from outside, a room's doors into the next room) and `geometry(id, into, map, space)` lays one out, built once on a
+baked nav map and cached (walls do not move): `out` (unit normal away from the room, from the room edge the door lies on)
+and `along` (the wall's axis), `wall` (wall length either side), `side` (the side with more wall, 0 when even), `slots`
+(single file against the wall on each side: `wall_standoff` off it, the first a body clear of the jamb, then every
+`stack_spacing`, snapped), `pie` (`pie_steps` points `pie_radius` from the threshold, from 55° to 25° off the axis), and the
+room's four corners inset `corner_inset`, each `near` (on the door's wall), `side` and `hard` (no sight line from 24 px
+outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step), `free_slot(team,
+self_id, current)` (the lowest free slot; a tie goes to the lower instance id), `stack_side(g, team, self_pos)` and
+`slot_point(g, side, slot)` are shared with the snapshot's `entries` group. Tunables: the controller's `entry_*` exports.

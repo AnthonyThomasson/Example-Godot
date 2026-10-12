@@ -55,7 +55,8 @@ per option in the last snapshot's option groups that carries a world location (i
 interactable's current position); the spectator inspector reads `label`/`desc` to detail a clicked
 point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()`. Each is a translucent disc + outline + a dot at the exact point,
 coloured by `category` (`fire` red, `flank` orange, `advance` yellow, `retreat` blue, `lead` purple,
-`search` green, `room` teal, `interaction` white, `waypoint` magenta — `ZONE_COLORS`); each category
+`search` green, `entry` cyan (the stack slot beside a doorway ENTER offers), `room` teal, `interaction` white,
+`waypoint` magenta — `ZONE_COLORS`); each category
 is labelled once beside its first marker, so the palette reads as an in-world legend. `waypoint` covers
 the non-room go-to options the room/search groups carry (the NPC's starting post, the front entrance,
 approaching the house) — re-tagged out of `room`/`search` so these, which often sit well outside any

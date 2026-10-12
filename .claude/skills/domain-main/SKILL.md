@@ -61,7 +61,8 @@ inspector and overlays observe.
   fraction per index plus a little jitter, so several attackers start on different sides; the front entrance is injected so the controller heads
   straight for it.
 - `add_npc` instances the scene, sets its position and only THEN adds it under `world` (a body added at the world origin and moved afterwards
-  overlaps whatever stands there for a frame, and the physics launches that piece across the map), hands its controller the house `rooms` (and `entry_point`) through the `control` duck-type, and appends it to
+  overlaps whatever stands there for a frame, and the physics launches that piece across the map), hands its controller the house `rooms`, its `openings` (the spawner's field, which `main.gd` sets from
+  `WorldGen.get_openings` before spawning; for tactical entry) and `entry_point` through the `control` duck-type (`bind_npc`), and appends it to
   `combatants`; the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
 - Test: `tests/general/match_spawn_clear_test.gd` (two defenders in a room with a bed over its centre start clear and apart);
   `match_spawn_origin_test.gd` (a counter against the world origin is not launched by a spawn); `match_setup_test.gd`

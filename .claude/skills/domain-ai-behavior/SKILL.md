@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload) and the System-Two state Von lacks: engagement + retargeting, territorial confinement, posture and run policy, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, room queries, furniture bulldozing). The fighting itself is `domain-ai-combat` (combat.gd) and room search by sight is `domain-ai-coverage` (search_coverage.gd). Use when editing scenes/ai/behavior/ (behavior.gd, locomotion.gd) or working on how a chosen option becomes movement, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload / entry) and the System-Two state Von lacks: the tactical entry phase machine (entry.gd: stack, slice the pie, cross, corners, clear, rear security, over the team radio), engagement + retargeting, territorial confinement, posture and run policy, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, room queries, furniture bulldozing). The fighting itself is `domain-ai-combat` (combat.gd) and room search by sight is `domain-ai-coverage` (search_coverage.gd). Use when editing scenes/ai/behavior/ (behavior.gd, entry.gd, locomotion.gd) or working on how a chosen option becomes movement, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -15,6 +15,7 @@ Files:
 - `behavior.gd` — the primitive executor (a `Node`); owns engagement + commitment state, posture / run policy and the read-outs.
 - `combat.gd` — shots, punches, bursts, back-off, the peek-and-cover cycle (`RefCounted`; `domain-ai-combat`).
 - `search_coverage.gd` — covering a room by sight (`RefCounted`; `domain-ai-coverage`).
+- `entry.gd` — a tactical entry through a doorway, as a team member or alone (`RefCounted`; see "Tactical entry" below).
 - `locomotion.gd` — the pathing layer (a `Node` child of behaviour); owns the NavigationAgent2D and answers `room_key_at(p)` / `inside_house(p)`.
 
 The controller sets the behaviour's config fields from its exports, calls `setup(perception, nav_agent)`
@@ -31,6 +32,7 @@ fields are read live, so only those modules need the push.)
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
 | `reload` | — | Equip the gun (`gun_slot()`), stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
+| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option), `run` | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. |
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -59,6 +61,36 @@ Exports on the controller: `posture_enabled` (the `ai.posture` switch), `posture
 **Combat** — the gunnery, the peek-and-cover cycle, bursts, backing off a blocked barrel, the reload reflex, melee and the
 no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `Behavior` passes it the engaged contact and `hold_ground`.
 
+## Tactical entry (`entry.gd`)
+
+The spec and the tests are `docs/tactical-entry.md` (E1 to E8) and `tests/ai/entry_*_test.gd`. `Behavior` adopts an
+ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
+off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
+`approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a
+point past the slot and along the wall into it, so it never walks the door's axis close in), `stack` (in the slot facing
+the door; radios `ready`), `pie` (the point — the lowest slot still waiting — walks the pie arc, at each step turning its
+gaze through the door until it settles plus `entry_pie_dwell`, dropping room sample points (`SearchCoverage.sample_room`)
+and corners it sees: `seen_fraction`, hidden corners; alone it then crosses in front, far out, and slices the other
+side), `cross` (radios `going_in`; walks to its corner without stopping; `in` once past the wall plane and off the axis),
+`corner` (holds it `entry_corner_dwell` looking across the room), `clear` (`SearchCoverage.begin/step`; radios `clear`
+with `cleared_room` once the rest of the stack is in), `rear` (the last of the team in holds just inside the door facing
+out for `rear_security_time`).
+
+- **Barrier and order.** The point crosses when every other claimant has radioed past `claim`, or `entry_ready_timeout`
+  after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
+  it radioed `in`. A member still at `claim` once the one behind has waited the timeout is dropped from the order.
+- **Corners.** Point: the door-wall corner on its own side (buttonhook); alone, the door-wall corner on the side away
+  from where it ended the pie. Second: the hard corner on the other side. Later members: a spot inside off the axis.
+- **Commitment.** `committed()` is true while crossing; the controller starts no decision then (a forced one waits),
+  so a hit or a hostile seen in the doorway is fought once the NPC is through. Posture stands throughout; it may run
+  only on the approach (`travel_target()`).
+- **The radio.** Steps are queued (`take_calls()`, via `Behavior.take_entry_calls()`) and the controller posts them;
+  the latest is repeated every 2 s so the claim stays live. Choosing anything else `abandon()`s the entry (radios
+  `abort`). Each phase change is a `GameLog` line (`--verbose` in tests).
+- **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides,
+  hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`; the status line says the phase
+  ("stacked at the door", "slicing the pie", "going in" ...).
+
 ## Public interface (what the orchestrator calls)
 
 - `setup(perception, nav_agent)` (build the Locomotion, coverage and combat modules), `apply_config()` (push their tunables
@@ -69,7 +101,8 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
   contact to the nearest other; with none left, a leaf that needs a target ends → true (re-decide).
 - `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()`,
   `wants_decision(character, decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
-  `fallback()` (steady hold when no decision can be had).
+  `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
+  start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `path_label()`.
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.
 - `ongoing()` — the running choice is still in progress (en route, fighting, using an object): only

@@ -1,12 +1,10 @@
 # Tactical entry
 
-How an invader should get through an opening into a building, alone or as a team, and the real-world
-tactics that rule is modelled on. This is a **specification, not yet implemented**: today an invader walks
-the navmesh straight through the front doorway (`entrance` option in `snapshot/snapshot_options.gd`, a
-plain `move`). The tests for the behaviours below are written first, left red and tagged `gap`
-(`tools/run_tests.sh gap` lists them), following the convention of `docs/flanking-behavior.md`. The test
-names under each behaviour are the planned ones. The work is tracked in the implementation ticket that
-links this file (spike #18).
+How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
+that rule is modelled on. Behaviours E1 to E8 are enforced (issue #32, from spike #18); each has its tests
+in `tests/ai/entry_*_test.gd` (`tools/run_tests.sh entry`), named under the behaviour, which were written
+first as red `gap` tests following the convention of `docs/flanking-behavior.md`. They are scripted-Von
+tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
@@ -107,7 +105,9 @@ view, one committed entry (E4) that goes directly to the hard corner (E5, alone)
 It is slower than a team and takes more of the doorway's angle, but is never in the funnel longer than a team
 member. Why: the same principles with nobody to cover it. An ally that comes into range mid-sequence is joined
 at the next slot, not mid-crossing.
-Tests: `entry_solo_pies_both_sides`, `entry_solo_commits_once`, `entry_ally_joins_stack`.
+Tests: `entry_solo_pies_both_sides`, `entry_solo_commits_once`, `entry_ally_joins_stack`,
+`entry_solo_even_wall_goes_in` (a door with the same wall either side: crossing to the second side must not
+send it back to the start).
 
 **E8. Clear, mark, move on.** When the corners and the room's points are seen, the room is marked cleared
 (it feeds the existing *searched rooms* memory). One invader stays on the opening as rear security facing back
@@ -119,35 +119,70 @@ Tests: `entry_marks_room_cleared`, `entry_rear_security`.
 ## Situations
 
 The two common room shapes, `#` wall, `D` opening, `S` stack slots outside (1 is the point), `p` the pie
-stand-off, `H` hard corner, `c` soft corner.
+arc, `H` hard corner, `c` soft corner.
 
 ```
- Centre-fed room: two hard corners          Corner-fed room: one hard corner
+ Centre-fed room                             Corner-fed room
 
-   H ############## H                          H ############# c
-   #                #                         #               #
-   #                #                         #               #
-   #                #                         #               #
-   c#####   D   #####c                        c ####### c######
-       S3 S2 S1 p                                       D S1 p S2 S3
+   c ############## c                          c ############## c
+   #                #                          #                #
+   #                #                          #                #
+   # H            H #                          # H            H #
+   #######   D   #####                         ###  D  ###########
+              S1 S2 S3                                S1 S2 S3
+            p                                       p
 ```
 
-The stack waits on the wall side, `p` is a step toward the door, off its axis. In the corner-fed room the
-stack forms on the wall side of the door so the point's first turn is toward the near corner.
+Hard and soft are judged as the definition above says, by sight from just outside the threshold: the far
+corners are seen through the door and the two on the door's own wall are not, so both shapes have two hard
+corners (the sources count one for a corner-fed room, whose short-side corner is a step from the jamb). The
+stack forms on the side of the door with more wall to stand against (an even
+wall: the side the point comes from), single file, slot 1 nearest the door. The pie arc runs from beside
+the stack toward the door's axis, clear of the slots.
 
 ## How the rules are enforced
 
-None of this is enforced yet. The plan, in the order it is built:
+- **What the AI knows.** Main hands every NPC the house's openings (`WorldGen.get_openings`, through
+  `MatchSpawner.bind_npc`; the test world does the same). Perception's `agent_entry.gd` turns each one,
+  entered into one of the rooms it joins, into geometry: the door's outward normal and the axis along its
+  wall (taken from the room edge it lies on; the data has none), the stack slots in single file on both
+  sides, the pie arc, and the four corners of the room behind tagged hard or soft by a sight ray. Built
+  once per opening and kept, since walls do not move.
+- **What Von decides.** Whether to enter, and by which doorway. SEARCH offers a child **ENTER**
+  (`decision_tree.gd`) beside its rooms and unexplored areas; its options are the `entries` group
+  (`snapshot_options.gd`): the doorways out of the NPC's area into a room it has not seen or not searched
+  lately, nearest first ("the doorway into the kitchen — unsearched — short route"). A room a doorway leads
+  into is not also offered as a plain walk in. The wording was checked with `tools/von_probe.py`
+  (`tools/von_scenarios/search_enter_*.json`, `enter_*.json`). Only invaders enter this way
+  (`GoalController.entry_enabled`, on in `npc_invader.tscn`; test switch `ai.entry`).
+- **The choreography.** The ENTER leaf runs the `entry` primitive, a phase machine in the behaviour
+  sub-domain (`behavior/entry.gd`): approach (E1), stack (E2), pie (E3), cross (E4, E5), corner, clear
+  (E8), rear (E8). It does not ask Von again until the entry is over, so it runs with the server down.
+  While crossing, the controller holds every decision (`Behavior.committed()`); a hit or a hostile seen
+  in the doorway is acted on once the NPC is through. The room is cleared by sight with
+  `search_coverage.gd`. Posture and running stay code-owned (it stands throughout and may run only on the
+  approach).
+- **The team.** Roles, readiness and progress travel on the callout radio: each step is a `callout` with
+  `opening`, `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
+  `cleared_room`, `rear`, `abort`), repeated every 2 s so a claim stays live. A slot is the lowest the radio
+  leaves free; two members who claim the same slot on the same frame settle it by instance id (the flank
+  side claim pattern). A single invader is a team of one: nobody else claims the doorway, so there is no
+  barrier and the pie is sliced from both sides (E7).
 
-- The AI receives the openings (`WorldGen.get_openings`), turned into per-opening geometry: the inward
-  and outward normal, the threshold, the stack and pie points on either side and the corner types of the room
-  behind it (E1 to E3).
-- Von decides *whether and how* to enter (a new SEARCH-level ENTER tactic: stage, pie, enter, hold). The
-  choreography is not Von's: stack, pie, cross, corners and clear are a phase machine in the behaviour
-  sub-domain, driven by a role slot, so it works with the server down. Posture and run stay code-owned.
-- Roles and the ready barrier travel on the callout radio (new statuses for entry steps; a role and an
-  opening id in the payload), so a single invader and a team are the same code with a different number of
-  members (E2, E6, E7).
+Interpretations and the game's own rules, where the sources leave a choice:
+
+- "Ordered by arrival" (E2) is the order of claims on the radio, not of bodies at the wall.
+- The point is the lowest slot still waiting; a member that claimed a slot and never reached it is dropped
+  once the member behind it has waited `entry_ready_timeout`. The wait restarts when someone new claims a
+  slot (E6, E7).
+- The point buttonhooks to the door-wall corner on its own side; the second crosses to the hard corner on
+  the other side; a lone entrant goes to the door-wall corner on the side away from where it stands, so it
+  crosses the room's front (E5, E7). Later members take a spot inside, off the axis.
+- The room is radioed clear once the member that covered it sees the rest of the stack through; a member
+  still taking its corner holds it before it accepts the call. The last of the team to go in holds the
+  doorway as rear security for `rear_security_time` (E8); a lone entrant has nobody to leave behind.
+- Not enforced: passing a doorway without searching or securing the room behind it (E8's last sentence).
+  A room crossed on the way to another is marked searched as before, by standing in it.
 
 ## Sources
 

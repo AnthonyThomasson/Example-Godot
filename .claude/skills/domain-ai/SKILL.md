@@ -1,6 +1,6 @@
 ---
 name: domain-ai
-description: Light overview of the AI domain (scenes/ai/) — non-player brains, split into four isolated sub-domains under scenes/ai/ around a thin orchestrator. Start here to see the shape of the AI (sense → decision-tree walk → primitive, the sub-domain map, the two NPC presets, the cross-domain interfaces), then load the matching `domain-ai-<name>` skill for deep detail: `domain-ai-perception` (what the NPC knows: vision, hostility, memory, tracks, callouts, tactics geometry, the decision snapshot Von reads), `domain-ai-decision` (the decision tree, its planner walk, the Von round-trip + server), `domain-ai-behavior` (the primitives: move/engage/melee/interact/hold + pathing + commitment; its `combat.gd` is `domain-ai-combat` and `search_coverage.gd` is `domain-ai-coverage`), `domain-ai-debug` (the overlays); the decision snapshot inside perception is `domain-ai-snapshot`. Use when editing scenes/ai/ or working on NPC goals/behaviour, or to find which sub-domain owns a concern. Complements the `architecture` skill (cross-domain interfaces).
+description: Light overview of the AI domain (scenes/ai/) — non-player brains, split into four isolated sub-domains under scenes/ai/ around a thin orchestrator. Start here to see the shape of the AI (sense → decision-tree walk → primitive, the sub-domain map, the two NPC presets, the cross-domain interfaces), then load the matching `domain-ai-<name>` skill for deep detail: `domain-ai-perception` (what the NPC knows: vision, hostility, memory, tracks, callouts, tactics geometry, the decision snapshot Von reads), `domain-ai-decision` (the decision tree, its planner walk, the Von round-trip + server), `domain-ai-behavior` (the primitives: move/engage/melee/interact/hold/entry + pathing + commitment + tactical entry; its `combat.gd` is `domain-ai-combat` and `search_coverage.gd` is `domain-ai-coverage`), `domain-ai-debug` (the overlays); the decision snapshot inside perception is `domain-ai-snapshot`. Use when editing scenes/ai/ or working on NPC goals/behaviour, or to find which sub-domain owns a concern. Complements the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI domain (`scenes/ai/`) — overview
@@ -30,7 +30,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 |---|---|---|---|
 | **Perception** | `ai/perception/` | `domain-ai-perception` (+ `domain-ai-snapshot` for the snapshot: `agent_snapshot.gd`, `perception/snapshot/`) | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
-| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload) and the commitment state Von lacks; owns a locomotion layer for pathing. |
+| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck). |
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
@@ -49,7 +49,8 @@ root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spo
       │                             ├─ RETREAT → a hidden / farther spot        (move)
       │                             └─ LOCATE  → toward an unseen shooter       (move)
       ├─ INVESTIGATE → a lead (last seen, heading, gunfire, ally's call)        (move)
-      ├─ SEARCH      → a room / unexplored area / the entrance                  (move)
+      ├─ SEARCH ─┬─ ENTER → a doorway into a room left to search              (entry)
+      │          └─ a room / unexplored area / the entrance                     (move)
       └─ IDLE ─┬─ USE → an object · GO → a room · WAIT                           (interact / move / hold)
 ```
 
@@ -65,7 +66,9 @@ Spawned by Main (`defender_count` / `invader_count`, default 1 each):
 - **Invader** — `character/npc_invader.tscn`, an inherited scene overriding only data (faction
   `invader`): `hostile_on_sight`, not territorial, unfamiliar with the house (it learns rooms by
   sight and is offered unexplored areas by direction), a red body. Dropped just outside the house;
-  several start spread around the perimeter and coordinate flanks over the callout radio.
+  several start spread around the perimeter and coordinate flanks over the callout radio. It enters rooms
+  tactically (`entry_enabled`, `docs/tactical-entry.md`): stack beside the door, slice the pie, cross
+  without stopping, take the corners, clear, leave rear security — as a team over the radio, or alone.
 
 Both pursue hostiles (`pursue_hostiles`, default on): IDLE is never offered and a known hostile sends
 every decision straight to COMBAT.
@@ -94,7 +97,7 @@ The AI's external surface is all the orchestrator's:
   delta)`; it writes `move_input` / `aim_point` and calls `melee()`, `shoot()`, `select_slot(id)`,
   `interact_with(object, id)` / `end_interaction()`; reads `damage_taken()`, `faction`,
   `current_item()`, `has_item()` — and, for a character it can SEE, `facing` and `damage_taken()`.
-  Main injects only `rooms` (and `entry_point`). For observers the controller exposes
+  Main injects only `rooms` and `openings` (and `entry_point`). For observers the controller exposes
   `current_act()` (the decision path as ids), `debug_status()` (the full path as labels, every level —
   `COMBAT - Intruder - FLANK - their left side (kitchen)` — plus progress) and `debug_state() ->
   Dictionary` — the deep snapshot (every level of the last walk: the state and question Von saw, the
@@ -110,4 +113,5 @@ The AI's external surface is all the orchestrator's:
   `target_position` and reads `get_next_path_position()`; perception's tactics query the nav map
   (closest point, path) to judge routes.
 - **EventBus** (interface 10): the orchestrator consumes `&"hit"` and `&"callout"` and hands each to
-  perception; it posts `&"callout"` when it adopts a combat or investigation decision.
+  perception; it posts `&"callout"` when it adopts a combat or investigation decision, and at each step
+  of a tactical entry (the stack's slot claims, ready, going in, through, clear).
