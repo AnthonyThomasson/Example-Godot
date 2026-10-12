@@ -86,7 +86,7 @@ func _on_run(domain: String) -> void:
 ## While a run is going: show elapsed time, and fold in its report when the process ends.
 func _process(_delta: float) -> void:
 	if OS.is_process_running(_pid):
-		_window.set_run_status("Running %s tests… %d s" % [_run_label, (Time.get_ticks_msec() - _started_msec) / 1000], true)
+		_window.set_run_status("Running %s tests… %d s" % [_run_label, int((Time.get_ticks_msec() - _started_msec) / 1000.0)], true)
 		return
 	set_process(false)
 	_pid = -1

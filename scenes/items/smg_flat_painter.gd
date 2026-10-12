@@ -17,22 +17,22 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	var dark_part := base.darkened(0.25)
 	var flip: bool = opts.get("flip", false)
 	var mx := func(x: int) -> int: return c.w - 1 - x if flip else x
-	var body_w := maxi(3, c.w * 3 / 8)       # The receiver's thickness.
-	var stock_end := maxi(2, c.h * 24 / 100)
-	var body_end := maxi(stock_end + 3, c.h * 64 / 100)
-	var barrel_start := maxi(body_end, c.h * 86 / 100)
+	var body_w := maxi(3, int(c.w * 3 / 8.0))       # The receiver's thickness.
+	var stock_end := maxi(2, int(c.h * 24 / 100.0))
+	var body_end := maxi(stock_end + 3, int(c.h * 64 / 100.0))
+	var barrel_start := maxi(body_end, int(c.h * 86 / 100.0))
 	var below := body_w + 1                  # First column below the receiver (the grip side).
 
 	# The magazine: a straight slab hanging below the receiver, near its middle.
-	var mag_top := stock_end + (body_end - stock_end) / 2
+	var mag_top := stock_end + int((body_end - stock_end) / 2.0)
 	var mag := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, c.h), func(x: int, y: int) -> bool:
 		var lx: int = mx.call(x)
-		return lx >= below - 1 and lx <= below + 2 and y >= mag_top and y <= mag_top + maxi(3, c.h / 5))
+		return lx >= below - 1 and lx <= below + 2 and y >= mag_top and y <= mag_top + maxi(3, int(c.h / 5.0)))
 	c.fill(mag, dark_part, _PART_HEIGHT)
 	c.outline(mag, t.outline)
 
 	# The pistol grip: a slab raked back off the underside of the receiver.
-	var grip_len := maxi(3, c.h / 5)
+	var grip_len := maxi(3, int(c.h / 5.0))
 	var grip := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, c.h), func(x: int, y: int) -> bool:
 		var lx: int = mx.call(x)
 		if lx < below - 1 or lx > below + 1:
@@ -62,7 +62,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	c.bevel(body, 1, 1, t.light, t.dark)
 	c.outline(body, t.outline)
 	c.line(Vector2i(mx.call(2), stock_end + 1), Vector2i(mx.call(2), body_end - 1), t.highlight)
-	var port := stock_end + (body_end - stock_end) / 3
+	var port := stock_end + int((body_end - stock_end) / 3.0)
 	c.line(Vector2i(mx.call(body_w - 1), port), Vector2i(mx.call(body_w - 1), port + 2), t.outline)
 	for y in range(body_end + 1, barrel_start - 1, 2):  # Cooling slots in the shroud.
 		c.px(mx.call(3), y, t.outline)

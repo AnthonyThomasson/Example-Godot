@@ -4,6 +4,9 @@
   python3 tools/test_log_gate.py            scanner + wrapper (fake Godot) + the real engine, headless
   python3 tools/test_log_gate.py --headed   also the real engine WITH a window (batch --shots and the in-game runner)
 
+(The GDScript lint that runs first has its own tests at the end: lint_report.py on crafted logs, run_tests.sh
+aborting on a lint failure, and the real engine through tools/lint.sh.)
+
 Three layers, because the gate has three parts:
   1. tools/scan_godot_log.py on crafted logs (what counts as an error, the shutdown leak NOTE, --from offsets).
   2. tools/run_tests.sh against a fake `godot` that writes the log / report we choose, so every way a run can end
@@ -90,7 +93,15 @@ class ScannerTests(unittest.TestCase):
 
 
 FAKE_GODOT = r"""#!/usr/bin/env bash
-# Stands in for Godot: writes the engine log and runner report that $FAKE_SCENARIO describes.
+# Stands in for Godot: writes the engine log and runner report that $FAKE_SCENARIO describes; started on the
+# lint scene it prints the lint protocol with (FAKE_LINT=dirty) or without a warning instead.
+for a in "$@"; do
+  if [ "$a" = "res://tools/lint_scripts.tscn" ]; then
+    echo "LINT-PASS2"; echo "LINT> res://scenes/x.gd"
+    [ "$FAKE_LINT" = "dirty" ] && echo "ERROR: 'The local variable \"a\" is declared but never used in the block.'"
+    echo "LINT-DONE 1"; exit 0
+  fi
+done
 log=""; out=""
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -135,9 +146,11 @@ class WrapperTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_wrapper(self, scenario, *args):
-        env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, TMPDIR=str(self.tmp))
-        r = subprocess.run(["bash", str(RUN), *args], cwd=ROOT, env=env, capture_output=True, text=True)
+    def run_wrapper(self, scenario, *args, lint=None):
+        """`lint` = None skips the lint (these tests are about the log gate); "clean" / "dirty" runs it on the fake."""
+        env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, FAKE_LINT=lint or "", TMPDIR=str(self.tmp))
+        flags = list(args) + ([] if lint else ["--no-lint"])
+        r = subprocess.run(["bash", str(RUN), *flags], cwd=ROOT, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
     def test_clean_run_passes(self):
@@ -172,9 +185,90 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(self.run_wrapper("listing_error", "--list")[0], 1)
         self.assertEqual(self.run_wrapper("listing_clean", "--list")[0], 0)
 
+    def test_a_lint_warning_fails_the_run_before_any_test_starts(self):
+        code, out = self.run_wrapper("clean", lint="dirty")
+        self.assertEqual(code, 1)
+        self.assertIn("declared but never used", out)
+        self.assertIn("no tests were run", out)
+        self.assertNotIn("passed,", out)
+
+    def test_a_clean_lint_lets_the_tests_run(self):
+        code, out = self.run_wrapper("clean", lint="clean")
+        self.assertEqual(code, 0)
+        self.assertIn("passed,", out)
+
+    def test_no_lint_flag_and_listing_skip_the_lint(self):
+        self.assertEqual(self.run_wrapper("clean", "--no-lint", lint="dirty")[0], 0)
+        self.assertEqual(self.run_wrapper("listing_clean", "--list", lint="dirty")[0], 0)
+
     def test_one_failing_shard_fails_the_whole_run(self):
         self.assertEqual(self.run_wrapper("shard1_error", "--jobs=2")[0], 1)
         self.assertEqual(self.run_wrapper("clean", "--jobs=2")[0], 0)
+
+
+class LintReportTests(unittest.TestCase):
+    """tools/lint_report.py on crafted logs of the lint scene."""
+
+    def report(self, text, *flags):
+        with tempfile.NamedTemporaryFile("w", suffix=".log", delete=False) as f:
+            f.write(text)
+        try:
+            env = {k: v for k, v in os.environ.items() if k != "GODOT"}  # no engine: lines stay candidates
+            r = subprocess.run([sys.executable, "-I", str(ROOT / "tools" / "lint_report.py"), f.name, *flags],
+                               capture_output=True, text=True, env=env)
+        finally:
+            os.unlink(f.name)
+        return r.returncode, r.stdout
+
+    CLEAN = "Godot Engine\nLINT-PASS2\nLINT> res://a.gd\nLINT> res://b.gd\nLINT-DONE 2\nERROR: leaked at exit\n"
+
+    def test_clean_run_passes_and_ignores_what_the_engine_prints_at_exit(self):
+        self.assertEqual(self.report(self.CLEAN)[0], 0)
+
+    def test_quiet_prints_nothing_when_clean(self):
+        self.assertEqual(self.report(self.CLEAN, "--quiet"), (0, ""))
+
+    def test_a_warning_is_attributed_to_the_script_printed_before_it(self):
+        code, out = self.report("LINT-PASS2\nLINT> res://a.gd\nLINT> res://b.gd\n\x1b[1;31mERROR: 'Integer division, decimal part will be discarded.'\nLINT-DONE 2\n")
+        self.assertEqual(code, 1)
+        self.assertIn("res://b.gd  (1)", out)
+        self.assertNotIn("res://a.gd", out)
+
+    def test_a_parse_error_fails(self):
+        code, out = self.report("LINT-PASS2\nLINT> res://a.gd\nSCRIPT ERROR: Parse Error: broken\nLINT-DONE 1\n")
+        self.assertEqual(code, 1)
+        self.assertIn("broken", out)
+
+    def test_a_lint_that_never_finished_fails(self):
+        self.assertEqual(self.report("LINT-PASS2\nLINT> res://a.gd\n")[0], 1)
+
+
+@unittest.skipUnless(godot_binary(), "no Godot binary (set GODOT=/path/to/Godot)")
+class LintEngineTests(unittest.TestCase):
+    """The real engine: the project lints clean, and a script with warnings is caught with its exact lines."""
+
+    PROBE = ROOT / "tests" / "_harness" / "zz_lint_probe.gd"
+
+    def lint(self, *args):
+        env = dict(os.environ, GODOT=godot_binary())
+        r = subprocess.run(["bash", str(ROOT / "tools" / "lint.sh"), *args], cwd=ROOT, env=env, capture_output=True, text=True, timeout=300)
+        return r.returncode, r.stdout + r.stderr
+
+    def test_the_project_is_clean(self):
+        code, out = self.lint()
+        self.assertEqual(code, 0, out)
+
+    def test_warnings_are_found_per_file_with_the_division_pinpointed(self):
+        self.PROBE.write_text("extends RefCounted\n\n\nfunc f(wrap: bool) -> int:\n\tvar unused := 1\n\treturn 5 / 2\n")
+        try:
+            code, out = self.lint("tests/_harness/zz_lint_probe.gd")
+        finally:
+            self.PROBE.unlink()
+        self.assertEqual(code, 1, out)
+        self.assertIn("res://tests/_harness/zz_lint_probe.gd  (4)", out)
+        self.assertIn("declared but never used", out)
+        self.assertIn("same name as a built-in function", out)
+        self.assertIn("[line:col 6:11]", out)
 
 
 @unittest.skipUnless(godot_binary(), "no Godot binary (set GODOT=/path/to/Godot)")

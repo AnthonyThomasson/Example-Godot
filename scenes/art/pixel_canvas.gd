@@ -253,7 +253,7 @@ static func tones(base: Color) -> Dictionary:
 
 ## `r` with its corners rounded to `radius` (0 = a plain rect).
 static func rounded(r: Rect2i, radius: int) -> Shape:
-	var rad := clampi(radius, 0, mini(r.size.x, r.size.y) / 2)
+	var rad := clampi(radius, 0, int(mini(r.size.x, r.size.y) / 2.0))
 	var x0 := PackedInt32Array()
 	var x1 := PackedInt32Array()
 	var y0 := PackedInt32Array()
@@ -326,7 +326,7 @@ static func bowed(r: Rect2i, radius: int, bow: int) -> Shape:
 static func _in_rounded(r: Rect2i, radius: int, x: int, y: int) -> bool:
 	if x < r.position.x or y < r.position.y or x >= r.end.x or y >= r.end.y:
 		return false
-	var rad := mini(radius, mini(r.size.x, r.size.y) / 2)
+	var rad := mini(radius, int(mini(r.size.x, r.size.y) / 2.0))
 	if rad <= 0:
 		return true
 	var dx := x - clampi(x, r.position.x + rad, r.end.x - 1 - rad)
@@ -544,13 +544,13 @@ func _line_inside(s: Shape, a: Vector2i, b: Vector2i, c: Color) -> void:
 
 ## Texture a freshly filled shape (still in `base`) by its material: wood grain, brushed metal,
 ## stone flecks, glaze or glass glare, fabric weave or a faint plastic grain. `along_x` runs grain
-## and brushing along x; `wrap` makes them wrap at the image edges (seamless tiles).
-func surface(s: Shape, material: String, base: Color, along_x: bool = true, wrap: bool = false) -> void:
+## and brushing along x; `wraps` makes them wrap at the image edges (seamless tiles).
+func surface(s: Shape, material: String, base: Color, along_x: bool = true, wraps: bool = false) -> void:
 	match material:
 		"wood":
-			grain(s, along_x, ArtConfig.wood_grain_density, base.darkened(0.12), base.lightened(0.07), wrap)
+			grain(s, along_x, ArtConfig.wood_grain_density, base.darkened(0.12), base.lightened(0.07), wraps)
 		"metal":
-			grain(s, along_x, ArtConfig.metal_brush_density, base.lightened(0.07), base.darkened(0.05), wrap)
+			grain(s, along_x, ArtConfig.metal_brush_density, base.lightened(0.07), base.darkened(0.05), wraps)
 		"stone":
 			speckle(s.bounds, base, ArtConfig.stone_fleck_density, 0.16)
 			speckle(s.bounds, base, ArtConfig.stone_fleck_density * 0.5, 0.3)
@@ -585,9 +585,9 @@ static func _same(stored: Color, col: Color) -> bool:
 
 
 ## Wood grain over the drawn pixels of shape `s`: long, gently wandering streaks running along x
-## (or y), each a dark line with the odd pale fleck beside it. `wrap` continues a streak past the
+## (or y), each a dark line with the odd pale fleck beside it. `wraps` continues a streak past the
 ## far end back at the near end, so a tile repeats seamlessly.
-func grain(s: Shape, along_x: bool, density: float, dark: Color, pale: Color, wrap: bool = false) -> void:
+func grain(s: Shape, along_x: bool, density: float, dark: Color, pale: Color, wraps: bool = false) -> void:
 	var r := s.bounds
 	var length := r.size.x if along_x else r.size.y
 	var across := r.size.y if along_x else r.size.x
@@ -597,12 +597,12 @@ func grain(s: Shape, along_x: bool, density: float, dark: Color, pale: Color, wr
 	var streaks := maxi(1, roundi(r.get_area() * density))
 	for _s in streaks:
 		var a := rng.randi_range(0, across - 1)
-		var run := rng.randi_range(maxi(2, length * 4 / 10), maxi(2, length))
-		var start := rng.randi_range(0, length - 1) if wrap else rng.randi_range(0, maxi(0, length - run))
+		var run := rng.randi_range(maxi(2, int(length * 4 / 10.0)), maxi(2, length))
+		var start := rng.randi_range(0, length - 1) if wraps else rng.randi_range(0, maxi(0, length - run))
 		for i in run:
 			if rng.randf() < 0.05:
 				a = clampi(a + (1 if rng.randf() < 0.5 else -1), 0, across - 1)
-			var along := (start + i) % length if wrap else start + i
+			var along := (start + i) % length if wraps else start + i
 			var p := _grain_point(r, along_x, along, a)
 			if s.has(p.x, p.y) and _drawn(p):
 				img.set_pixel(p.x, p.y, dark)

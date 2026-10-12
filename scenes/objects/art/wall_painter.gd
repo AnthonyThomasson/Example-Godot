@@ -26,13 +26,13 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 
 ## Running-bond brick courses across the thickness, each brick a slightly different tone.
 static func _brick(c: PixelCanvas, base: Color, t: Dictionary) -> void:
-	var courses := maxi(2, c.h / 8)
-	var brick := c.w / 2
+	var courses := maxi(2, int(c.h / 8.0))
+	var brick := int(c.w / 2.0)
 	var mortar := base.lightened(0.35)
 	for row in courses:
-		var y0 := 2 + row * (c.h - 4) / courses
-		var y1 := 2 + (row + 1) * (c.h - 4) / courses
-		var offset := (brick / 2) * (row % 2)
+		var y0 := 2 + int(row * (c.h - 4) / float(courses))
+		var y1 := 2 + int((row + 1) * (c.h - 4) / float(courses))
+		var offset := (int(brick / 2.0)) * (row % 2)
 		for b in 3:
 			var x0 := b * brick - offset
 			var shift := c.rng.randf_range(-0.08, 0.08)

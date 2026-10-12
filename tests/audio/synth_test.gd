@@ -22,7 +22,7 @@ func configure(s: TestSetup) -> void:
 ## Sign changes in the first `seconds` of `stream` (a sine of f Hz has 2f of them a second).
 func _crossings(stream: AudioStreamWAV, seconds: float) -> int:
 	var data := stream.data
-	var n := mini(int(seconds * stream.mix_rate), data.size() / 2)
+	var n := mini(int(seconds * stream.mix_rate), int(data.size() / 2.0))
 	var crossings := 0
 	var last := 0
 	for i in n:
@@ -38,7 +38,7 @@ func _crossings(stream: AudioStreamWAV, seconds: float) -> int:
 func _peak_between(stream: AudioStreamWAV, from: float, to: float) -> float:
 	var data := stream.data
 	var peak := 0
-	for i in range(int(from * stream.mix_rate), mini(int(to * stream.mix_rate), data.size() / 2)):
+	for i in range(int(from * stream.mix_rate), mini(int(to * stream.mix_rate), int(data.size() / 2.0))):
 		peak = maxi(peak, absi(data.decode_s16(i * 2)))
 	return peak / 32768.0
 
@@ -73,7 +73,7 @@ func run(t: TestContext) -> void:
 	var glide := SoundSynth.render({ "length": 0.4, "layers": [{ "type": "tone", "freq": 2000.0, "freq_end": 200.0, "sweep": 0.05, "decay": 3.0 }] }, 1)
 	var early := _crossings(glide, 0.03)
 	t.check(early > 40, "the glide starts high (%d crossings in 30 ms)" % early)
-	t.check(_crossings(glide, 0.4) - _crossings(glide, 0.37) < early / 2, "and ends low")
+	t.check(_crossings(glide, 0.4) - _crossings(glide, 0.37) < int(early / 2.0), "and ends low")
 
 	# A delayed layer is silent until its time.
 	var late := SoundSynth.render({ "length": 0.3, "layers": [{ "type": "noise", "delay": 0.1, "decay": 0.05 }] }, 1)
@@ -97,7 +97,7 @@ func run(t: TestContext) -> void:
 
 func _energy(stream: AudioStreamWAV) -> float:
 	var sum := 0.0
-	for i in stream.data.size() / 2:
+	for i in int(stream.data.size() / 2.0):
 		var v := stream.data.decode_s16(i * 2) / 32768.0
 		sum += v * v
 	return sum

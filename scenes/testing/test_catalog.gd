@@ -135,13 +135,13 @@ static func shard(entries: Array, spec: String) -> Array:
 	var parts := spec.split("/")
 	var count := maxi(1, int(parts[1])) if parts.size() == 2 else 1
 	var index := clampi(int(parts[0]), 0, count - 1)
-	var load: Array = []
-	load.resize(count)
-	load.fill(0.0)
+	var loads: Array = []
+	loads.resize(count)
+	loads.fill(0.0)
 	var rest: Array = []
 	for e in entries:
 		if e["requires_von"]:
-			load[0] += float(e.get("timeout", 1.0))
+			loads[0] += float(e.get("timeout", 1.0))
 		else:
 			rest.append(e)
 	var order := rest.duplicate()
@@ -153,9 +153,9 @@ static func shard(entries: Array, spec: String) -> Array:
 	for e in order:
 		var lightest := 0
 		for k in count:
-			if load[k] < load[lightest]:
+			if loads[k] < loads[lightest]:
 				lightest = k
-		load[lightest] += float(e.get("timeout", 1.0))
+		loads[lightest] += float(e.get("timeout", 1.0))
 		if lightest == index:
 			mine.append(e)
 	var out: Array = []

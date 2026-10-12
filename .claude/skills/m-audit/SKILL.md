@@ -200,6 +200,17 @@ A change that doesn't parse fails everything above by default. Run the `godot-de
 headless load check (run `--import` first if the change added a `class_name` or new file). Report
 a clean load, or the exact `SCRIPT ERROR` / `Parse Error` lines.
 
+Then run the GDScript lint, `tools/lint.sh` (Bash sandbox disabled, a few seconds; `tools/run_tests.sh` runs it first
+anyway). It lists every warning the editor's Debugger > Errors tab would: unused variable or parameter, integer division,
+a name that shadows a member or a built-in, a redundant `await`. Report each as a `file:line` finding. **Never silence a
+warning to make it pass: fix the code.** `@warning_ignore`, `@warning_ignore_start`, an underscore prefix that hides a
+parameter which should be removed or used, and a lowered warning level in `project.godot` are all last resorts. Accept one
+only when no code change can remove the warning, and then only on the one statement, with a comment saying why it cannot
+be fixed. Flag every `@warning_ignore*` the staged diff adds (`git diff --staged | grep -n 'warning_ignore'`) and every
+`[debug]` / `gdscript/warnings` line it adds to `project.godot` as a finding unless it meets that bar. When renaming to
+clear a shadowing warning, grep the function for the old name: a stale reference silently binds to the member it used to
+shadow (`name`, `visible`, `material`) and no lint or parse error follows.
+
 Then run the game tests (Bash sandbox disabled; AI changes are covered without a server by the scripted-Von
 tests, and `--include-von` adds the live-server ones): `tools/run_tests.sh --changed --summary` runs the touched
 domains plus the domains that compose them (and the self-tests for `scenes/testing/` or the Von stub); a change
@@ -258,6 +269,8 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 
 ### Load check & tests
 - [x] Headless load clean — no SCRIPT ERROR / Parse Error.
+- [ ] `scenes/ai/foo.gd:57` — `@warning_ignore("integer_division")` added to pass the lint. Fix: compute it as `int(a / 2.0)`.
+- [x] `tools/lint.sh`: no warnings, and no `@warning_ignore` added.
 - [x] `tools/run_tests.sh`: 6 passed, 0 failed, 2 skipped.
 
 ### Worktree editor

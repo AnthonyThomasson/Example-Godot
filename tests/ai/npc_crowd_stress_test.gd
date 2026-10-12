@@ -35,7 +35,7 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"nav.rebake", false)  # fighting shoves furniture into overlaps; re-baking is covered by navigation/bake_and_path_stress
 	var kinds := ["bookshelf", "armchair", "side_table", "chair", "plant"]
 	for i in 20:
-		s.object(StringName("deco%d" % i), kinds[i % kinds.size()], Vector2(300 + (i % 5) * 250, 250 + (i / 5) * 160))
+		s.object(StringName("deco%d" % i), kinds[i % kinds.size()], Vector2(300 + (i % 5) * 250, 250 + (int(i / 5.0)) * 160))
 	for i in PER_SIDE:
 		s.actor(StringName("defender%d" % i), &"defender", Vector2(120 + i * 40, 120 + i * 130))
 		s.actor(StringName("invader%d" % i), &"invader", Vector2(1480 - i * 40, 120 + i * 130))

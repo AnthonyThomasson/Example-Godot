@@ -35,7 +35,7 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 1300, 1100))
 	s.switch(&"nav.rebake", false)  # shoved pieces overlap; re-baking holes that overlap logs a nav sync error
 	for i in COLUMNS * ROWS:
-		var at := Vector2(120 + (i % COLUMNS) * 90, 120 + (i / COLUMNS) * 90)
+		var at := Vector2(120 + (i % COLUMNS) * 90, 120 + (int(i / float(COLUMNS))) * 90)
 		s.object(_id(i), KINDS[i % KINDS.size()], at)
 
 

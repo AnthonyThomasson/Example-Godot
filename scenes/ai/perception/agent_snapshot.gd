@@ -135,7 +135,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"shooter": _options.shooter_group(ctx, hostiles),
 		"search_rooms": _options.search_group(ctx, known_rooms, rooms),
 		"explore": _options.explore_group(ctx, rooms),
-		"interactions": _options.interaction_group(character, self_pos, rooms),
+		"interactions": _options.interaction_group(character, self_pos),
 		"rooms": _options.room_group(ctx, known_rooms, rooms),
 	}
 	return { "facts": facts, "sections": sections, "sections_per_target": per_sections, "options": options,

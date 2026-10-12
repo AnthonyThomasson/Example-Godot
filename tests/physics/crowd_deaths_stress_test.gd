@@ -36,7 +36,7 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 1000, 600))
 	s.switch(&"physics.blood", true)
 	for i in COLUMNS * ROWS:
-		var at := Vector2(80 + (i % COLUMNS) * 100, 80 + (i / COLUMNS) * 130)
+		var at := Vector2(80 + (i % COLUMNS) * 100, 80 + (int(i / float(COLUMNS))) * 130)
 		s.actor(_id(i), &"puppet", at, { "max_health": 1.0 })
 
 

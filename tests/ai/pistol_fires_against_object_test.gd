@@ -29,11 +29,11 @@ func configure(s: TestSetup) -> void:
 func run(t: TestContext) -> void:
 	var defender := t.actor(&"defender")
 	var intruder := t.actor(&"intruder")
-	var backed_off := false
+	var backed_off := [false]  # an Array, because a lambda cannot reassign a captured local
 	var fired := await t.until(func():
 		if defender.weapon_blocked() or defender.move_input.dot(defender.facing) < -0.5:
-			backed_off = true
+			backed_off[0] = true
 		return intruder.health < intruder.max_health, 14.0)
 	t.check(fired, "the defender's pistol shoots the intruder from against the chair (%.0f / %.0f)" % [intruder.health, intruder.max_health])
-	t.check(not backed_off, "and it never reports a blocked gun or steps back")
+	t.check(not backed_off[0], "and it never reports a blocked gun or steps back")
 	t.check(defender.weapon_raise() == 0.0, "the pistol is never raised")

@@ -36,22 +36,22 @@ func run(t: TestContext) -> void:
 	var layer := BloodDecals.find(t.world)
 	if not t.require(layer != null, "the walker left prints"):
 		return
-	var prints: Array = layer.items().filter(func(m): return m["kind"] == "print")
-	t.check(prints.size() >= 5, "a trail of prints (%d)" % prints.size())
-	t.check(prints.size() <= 30, "the trail ends instead of running forever (%d)" % prints.size())
+	var trail: Array = layer.items().filter(func(m): return m["kind"] == "print")
+	t.check(trail.size() >= 5, "a trail of prints (%d)" % trail.size())
+	t.check(trail.size() <= 30, "the trail ends instead of running forever (%d)" % trail.size())
 
-	var first_x: float = prints[0]["poly"][0].x
+	var first_x: float = trail[0]["poly"][0].x
 	t.check(first_x > SPLAT_AT.x - SPLAT_SIZE * 3.0, "no prints before the splatter (first at x=%.0f)" % first_x)
 	# Past the splatter and its satellites no foot can pick blood up again, so each only ever fades.
-	var clear: Array = prints.filter(func(m): return m["poly"][0].x > SPLAT_AT.x + SPLAT_SIZE * 4.0)
+	var clear: Array = trail.filter(func(m): return m["poly"][0].x > SPLAT_AT.x + SPLAT_SIZE * 4.0)
 	var tapering := clear.size() >= 4
 	for i in range(2, clear.size()):  # two back = the same foot
 		if clear[i]["alpha"] > clear[i - 2]["alpha"] + 0.001:
 			tapering = false
 	t.check(tapering, "each foot's prints only ever fade along the clean floor (%d prints)" % clear.size())
-	t.check(prints[prints.size() - 1]["alpha"] < prints[0]["alpha"], "the last print is fainter than the first")
+	t.check(trail[trail.size() - 1]["alpha"] < trail[0]["alpha"], "the last print is fainter than the first")
 
-	var centres: Array = prints.map(func(m): return _centre(m["poly"]))
+	var centres: Array = trail.map(func(m): return _centre(m["poly"]))
 	var mean_y := 0.0
 	for c in centres:
 		mean_y += c.y

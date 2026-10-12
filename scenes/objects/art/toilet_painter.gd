@@ -17,10 +17,10 @@ static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Diction
 	c.fill(bowl, base, _BOWL_HEIGHT)
 	c.bevel(bowl, 1, 2, t.highlight, t.dark)
 	c.outline(bowl, t.shadow)
-	var water := PixelCanvas.ellipse(bowl_rect.grow(-maxi(2, c.w / 10)))
+	var water := PixelCanvas.ellipse(bowl_rect.grow(-maxi(2, int(c.w / 10.0))))
 	c.fill(water, ObjectArtConfig.bath_water_color, 1)
 	c.bevel(water, 1, 1, ObjectArtConfig.bath_water_color.darkened(0.25), ObjectArtConfig.bath_water_color.lightened(0.2))
-	c.fill(PixelCanvas.ellipse(bowl_rect.grow(-maxi(4, c.w / 5))), ObjectArtConfig.bath_water_color.darkened(0.12))
+	c.fill(PixelCanvas.ellipse(bowl_rect.grow(-maxi(4, int(c.w / 5.0)))), ObjectArtConfig.bath_water_color.darkened(0.12))
 	c.glare(water, Color(0.95, 0.98, 1.0), 1)
 
 	var tank_rect := Rect2i(roundi(c.w * 0.2), roundi(c.h * 0.06), roundi(c.w * 0.6), roundi(c.h * 0.24))

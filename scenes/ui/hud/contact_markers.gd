@@ -34,11 +34,11 @@ func _draw() -> void:
 	for c in _contacts:
 		var world_pos: Vector2 = c["pos"]
 		var hostile: bool = c["hostile"]
-		var visible: bool = c["visible"]
+		var seen: bool = c["visible"]
 		var base := COLOR_HOSTILE if hostile else COLOR_NEUTRAL
-		base.a = ALPHA_VISIBLE if visible else ALPHA_STALE
+		base.a = ALPHA_VISIBLE if seen else ALPHA_STALE
 		draw_arc(world_pos, RING_RADIUS, 0.0, TAU, 24, base, 2.5)
-		var label: String = c["name"] + (" ●" if visible else " ?")
+		var label: String = c["name"] + (" ●" if seen else " ?")
 		var str_w: float = font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE).x
 		var label_pos := world_pos + Vector2(-str_w * 0.5, -RING_RADIUS - 5.0)
 		draw_string_outline(font, label_pos, label, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, 5, Color(0, 0, 0, 0.95))

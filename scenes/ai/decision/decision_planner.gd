@@ -352,9 +352,9 @@ func _allowed(options: Array, confine: bool, drop: Array = []) -> Array:
 func _requires_ok(names: Array) -> bool:
 	var facts: Dictionary = _snap.get("facts", {})
 	for n in names:
-		var name := String(n)
-		var negate := name.begins_with("!")
-		var key := name.trim_prefix("!")
+		var fact := String(n)
+		var negate := fact.begins_with("!")
+		var key := fact.trim_prefix("!")
 		var value: bool = _binding.has(key) or bool(facts.get(key, false))
 		if value == negate:
 			return false
@@ -363,13 +363,13 @@ func _requires_ok(names: Array) -> bool:
 
 ## An option group from the snapshot: the bound target's own group of that name first, else the global
 ## one. Each group is { summary, options: [{ id, label, desc, params, tags }] }.
-func _group(name) -> Dictionary:
+func _group(group_name) -> Dictionary:
 	var options: Dictionary = _snap.get("options", {})
 	if _binding.has("target_id"):
 		var per: Dictionary = options.get("per_target", {}).get(_binding["target_id"], {})
-		if per.has(String(name)):
-			return per[String(name)]
-	return options.get(String(name), {})
+		if per.has(String(group_name)):
+			return per[String(group_name)]
+	return options.get(String(group_name), {})
 
 
 # --- What Von reads --------------------------------------------------------------------------
@@ -396,8 +396,8 @@ func _fill(template: String, id: StringName) -> String:
 func _state_text(node: Dictionary, bind_level: bool) -> String:
 	var lines: Array = []
 	var context: Array = node.get("bind_context", node.get("context", [])) if bind_level else node.get("context", [])
-	for name in [&"goal"] + context:
-		var text := _section(String(name))
+	for section_name in [&"goal"] + context:
+		var text := _section(String(section_name))
 		if text != "":
 			lines.append(text)
 	if not _steps.is_empty():
@@ -406,12 +406,12 @@ func _state_text(node: Dictionary, bind_level: bool) -> String:
 
 
 ## A state section: the bound target's version when it has one, else the global one.
-func _section(name: String) -> String:
+func _section(section_name: String) -> String:
 	if _binding.has("target_id"):
 		var per: Dictionary = _snap.get("sections_per_target", {}).get(_binding["target_id"], {})
-		if per.has(name):
-			return per[name]
-	return _snap.get("sections", {}).get(name, "")
+		if per.has(section_name):
+			return per[section_name]
+	return _snap.get("sections", {}).get(section_name, "")
 
 
 ## Mark the offered option that continues the last adopted plan, so Von can keep a plan rather than

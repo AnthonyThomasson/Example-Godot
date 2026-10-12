@@ -48,7 +48,7 @@ static func _books(c: PixelCanvas, well: Rect2i) -> void:
 			x += c.rng.randi_range(1, 3)
 			continue
 		if roll < 0.12 and well.end.x - x > 8:
-			var o := Vector2i(x + 3, well.position.y + mini(4, well.size.y / 3))
+			var o := Vector2i(x + 3, well.position.y + mini(4, int(well.size.y / 3.0)))
 			c.fill(PixelCanvas.disc(o, 2), ObjectArtConfig.prop_colors["glaze"], _CONTENT_HEIGHT + 1)
 			x += 7
 			continue
@@ -72,7 +72,7 @@ static func _boxes(c: PixelCanvas, well: Rect2i) -> void:
 	while x < well.end.x - 4:
 		var depth := maxi(4, roundi(well.size.y * c.rng.randf_range(0.6, 0.95)))
 		if c.rng.randf() < 0.3:
-			var rad := mini(depth / 2, 5)
+			var rad := mini(int(depth / 2.0), 5)
 			var o := Vector2i(x + rad, well.position.y + rad + 1)
 			var tin := PixelCanvas.disc(o, rad)
 			var label := Props.pick(c, "books")
@@ -87,15 +87,15 @@ static func _boxes(c: PixelCanvas, well: Rect2i) -> void:
 		var box := PixelCanvas.rounded(r, 0)
 		c.fill(box, tone, _CONTENT_HEIGHT)
 		c.bevel(box, 1, 1, tone.lightened(0.12), tone.darkened(0.25))
-		c.line(Vector2i(r.position.x + 1, r.position.y + r.size.y / 2), Vector2i(r.end.x - 2, r.position.y + r.size.y / 2), tone.darkened(0.3))
-		var tape := r.position.x + r.size.x / 2
+		c.line(Vector2i(r.position.x + 1, r.position.y + int(r.size.y / 2.0)), Vector2i(r.end.x - 2, r.position.y + int(r.size.y / 2.0)), tone.darkened(0.3))
+		var tape := r.position.x + int(r.size.x / 2.0)
 		c.line(Vector2i(tape, r.position.y + 1), Vector2i(tape, r.end.y - 2), tone.lightened(0.25))
 		x += bw + 1
 
 
 ## Pairs of shoes, toes toward the front: two soles with a dark opening near the heel.
 static func _shoes(c: PixelCanvas, well: Rect2i) -> void:
-	var sw := maxi(3, well.size.y / 4)
+	var sw := maxi(3, int(well.size.y / 4.0))
 	var x := well.position.x + 1
 	while x + sw * 2 + 1 <= well.end.x:
 		var col := Props.pick(c, "shoes")
@@ -105,5 +105,5 @@ static func _shoes(c: PixelCanvas, well: Rect2i) -> void:
 			var shoe := PixelCanvas.ellipse(r)
 			c.fill(shoe, col, _CONTENT_HEIGHT)
 			c.outline(shoe, col.darkened(0.45))
-			c.fill(PixelCanvas.ellipse(Rect2i(r.position.x + 1, r.position.y + 1, maxi(1, sw - 2), maxi(2, length * 2 / 5))), col.darkened(0.55))
+			c.fill(PixelCanvas.ellipse(Rect2i(r.position.x + 1, r.position.y + 1, maxi(1, sw - 2), maxi(2, int(length * 2 / 5.0)))), col.darkened(0.55))
 		x += sw * 2 + 3

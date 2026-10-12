@@ -7,6 +7,7 @@ extends GameTest
 ## uses for it: a view centred somewhere, at some zoom.
 
 const Probe := preload("res://tests/_audio/sound_probe.gd")
+const SoundService := preload("res://scenes/audio/sound.gd")  # for its static range function; the autoload is an instance
 
 
 func describe() -> Dictionary:
@@ -100,13 +101,13 @@ func run(t: TestContext) -> void:
 	# --- Range: the pure function the service asks.
 	var centre := Vector2(1000, 1000)
 	SoundConfig.category_range = { &"footstep": 900.0, &"shot": 2400.0 }
-	t.check(Sound.reach_from(&"footstep", centre + Vector2(800, 0), centre, 1.0) > 0.0, "a step 800 px away is heard at zoom 1")
-	t.expect_eq(Sound.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 1.0), 0.0, "one 1000 px away is not")
-	t.check(Sound.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 0.5) > 0.0, "but is once the camera has zoomed out to 0.5")
-	t.expect_eq(Sound.reach_from(&"footstep", centre + Vector2(500, 0), centre, 2.0), 0.0, "and one 500 px away is lost zoomed in to 2")
-	t.check(Sound.reach_from(&"shot", centre + Vector2(2300, 0), centre, 1.0) > 0.0, "a shot carries much farther than a step")
+	t.check(SoundService.reach_from(&"footstep", centre + Vector2(800, 0), centre, 1.0) > 0.0, "a step 800 px away is heard at zoom 1")
+	t.expect_eq(SoundService.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 1.0), 0.0, "one 1000 px away is not")
+	t.check(SoundService.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 0.5) > 0.0, "but is once the camera has zoomed out to 0.5")
+	t.expect_eq(SoundService.reach_from(&"footstep", centre + Vector2(500, 0), centre, 2.0), 0.0, "and one 500 px away is lost zoomed in to 2")
+	t.check(SoundService.reach_from(&"shot", centre + Vector2(2300, 0), centre, 1.0) > 0.0, "a shot carries much farther than a step")
 	SoundConfig.range_follows_zoom = false
-	t.check(Sound.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 0.5) == 0.0, "with zoom-following off the range is fixed")
+	t.check(SoundService.reach_from(&"footstep", centre + Vector2(1000, 0), centre, 0.5) == 0.0, "with zoom-following off the range is fixed")
 	SoundConfig.range_follows_zoom = true
 	# (the statics changed here are restored by the harness, like any set_static)
 

@@ -302,12 +302,12 @@ func stamina_fraction() -> float:
 ## posture every frame. Refused (false) while dead, locked in an interaction, or within
 ## `CharacterConfig.posture_change_time` of the last change. A crouch is slower, a smaller target and cannot
 ## run.
-func set_posture(posture: StringName) -> bool:
-	if posture == _posture:
+func set_posture(wanted: StringName) -> bool:
+	if wanted == _posture:
 		return true
-	if is_dead or is_busy() or _posture_cooldown > 0.0 or not CharacterConfig.postures.has(posture):
+	if is_dead or is_busy() or _posture_cooldown > 0.0 or not CharacterConfig.postures.has(wanted):
 		return false
-	_posture = posture
+	_posture = wanted
 	_posture_cooldown = CharacterConfig.posture_change_time
 	return true
 
@@ -426,7 +426,7 @@ func spare_magazines() -> int:
 
 ## The carried magazine for `gun` holding the most rounds (null with none); it stays carried.
 func best_magazine(gun: StringName) -> Magazine:
-	var best: Magazine
+	var best: Magazine = null
 	for mag: Magazine in _magazines:
 		if mag.gun == gun and (best == null or mag.rounds > best.rounds):
 			best = mag
@@ -558,12 +558,12 @@ func _update_stamina(wants_run: bool, delta: float) -> void:
 func _on_punched(hand: int, body: Node, damage: float) -> void:
 	hit_landed.emit(body, damage, hand)
 	var pos: Vector2 = body.global_position if body is Node2D else global_position
-	var material := ""
+	var surface_material := ""
 	if body.has_method("get_surface"):
-		material = String(body.get_surface().get("material", ""))
+		surface_material = String(body.get_surface().get("material", ""))
 	EventBus.post(&"hit", {
 		"position": pos, "victim": body, "source": self, "attacker": self,
-		"direction": facing, "damage": damage, "outcome": &"punch", "material": material,
+		"direction": facing, "damage": damage, "outcome": &"punch", "material": surface_material,
 	})
 
 

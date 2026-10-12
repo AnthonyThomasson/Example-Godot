@@ -142,10 +142,9 @@ func flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 		if s["held_by"] == "" and s["crosses"] == "" and s["clear_shot"] and not s["heading_toward"] and s["ally_lane"] == "":
 			open.append(s)
 	var inside_open: Array = open.filter(func(s): return not SnapshotVocab.room_at(s["point"], rooms).is_empty())
-	var shot_here: bool = a["line"]["clear"] and a["line"]["in_range"]
 	return {
-		"summary": _flank_summary(t, a["flanks"], open, rooms, shot_here),
-		"summary_inside": _flank_summary(t, a["flanks"], inside_open, rooms, shot_here),
+		"summary": _flank_summary(a["flanks"], open, rooms),
+		"summary_inside": _flank_summary(a["flanks"], inside_open, rooms),
 		"options": options,
 	}
 
@@ -375,7 +374,7 @@ func explore_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 
 ## The object interactions the NPC knows of: one option per DISTINCT action label, pointing at the
 ## nearest known object offering it (item-gated). Not capped — Von ranks them against the goal.
-func interaction_group(character, self_pos: Vector2, rooms: Array) -> Dictionary:
+func interaction_group(character, self_pos: Vector2) -> Dictionary:
 	var known_objs: Dictionary = know["known_object_ids"]
 	var nearest := {}  # action label -> nearest known object + its spec (+ squared distance).
 	for obj in know["interactables"]:
@@ -452,8 +451,8 @@ func _spot_place(s: Dictionary, dir: String) -> String:
 
 
 ## The FLANK branch summary over the `open` sides: how many, the best at a glance (Von still makes
-## the pick), and whether the NPC already has a shot without moving.
-func _flank_summary(t: Dictionary, flanks: Array, open: Array, rooms: Array, shot_here: bool) -> String:
+## the pick).
+func _flank_summary(flanks: Array, open: Array, rooms: Array) -> String:
 	if flanks.is_empty():
 		return ""
 	var text := ""
@@ -485,12 +484,12 @@ func _retreat_summary(options: Array, dmg: float) -> String:
 
 
 ## The world point to investigate when under fire from an unseen shooter: `investigate_distance` px
-## from the NPC toward where the shots came from, snapped onto the navmesh unless `snapped` is false
+## from the NPC toward where the shots came from, snapped onto the navmesh unless `snap_to_navmesh` is false
 ## (the retreat group wants the raw direction as a threat position, not a reachable spot).
-func _shot_origin(ctx: Dictionary, snapped := true) -> Vector2:
+func _shot_origin(ctx: Dictionary, snap_to_navmesh := true) -> Vector2:
 	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
 	var p: Vector2 = (ctx["self_pos"] as Vector2) + from.normalized() * _v.investigate_distance
-	return _tactics.snap(ctx["map"], p) if snapped else p
+	return _tactics.snap(ctx["map"], p) if snap_to_navmesh else p
 
 
 ## The navigated route length (px) from the NPC to `p`.

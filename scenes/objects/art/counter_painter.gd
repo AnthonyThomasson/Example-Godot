@@ -47,7 +47,7 @@ static func _basin(c: PixelCanvas, base: Color, t: Dictionary, splash: int, deep
 	var margin_x := maxi(3, roundi(c.w * 0.16))
 	var top := splash + maxi(3, roundi(c.h * 0.12))
 	var r := Rect2i(margin_x, top, c.w - margin_x * 2, maxi(4, c.h - top - maxi(3, roundi(c.h * 0.1))))
-	var radius := mini(6, mini(r.size.x, r.size.y) / 3)
+	var radius := mini(6, int(mini(r.size.x, r.size.y) / 3.0))
 	var bowl := PixelCanvas.rounded(r, radius)
 	var floor_col := base.darkened(0.16 if deep else 0.08)
 	c.fill(bowl, floor_col, 1)
@@ -58,7 +58,7 @@ static func _basin(c: PixelCanvas, base: Color, t: Dictionary, splash: int, deep
 	var drain := PixelCanvas.disc(centre, 2)
 	c.fill(drain, metal.darkened(0.3))
 	c.px(centre.x, centre.y, metal.darkened(0.7))
-	var tap_x := r.position.x + r.size.x / 2
+	var tap_x := r.position.x + int(r.size.x / 2.0)
 	c.fill(PixelCanvas.rounded(Rect2i(tap_x - 1, maxi(0, splash - 1), 2, top - splash + 4), 0), metal, _TAP_HEIGHT)
 	c.px(tap_x - 1, maxi(0, splash - 1), metal.lightened(0.4))
 	for dx in [-5, 5]:

@@ -14,10 +14,10 @@ const _SHROUD_HEIGHT := 4
 ## Paint an SMG onto `c` in `base` metal, muzzle toward +y.
 static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var cx := c.w / 2
-	var stock_end := maxi(2, c.h * 24 / 100)
-	var body_end := maxi(stock_end + 3, c.h * 62 / 100)
-	var barrel_start := maxi(body_end, c.h * 86 / 100)
+	var cx := int(c.w / 2.0)
+	var stock_end := maxi(2, int(c.h * 24 / 100.0))
+	var body_end := maxi(stock_end + 3, int(c.h * 62 / 100.0))
+	var barrel_start := maxi(body_end, int(c.h * 86 / 100.0))
 
 	# The stock: a slim frame at the back, darker than the metal.
 	var stock := PixelCanvas.rounded(Rect2i(1, 0, maxi(c.w - 2, 2), stock_end + 1), 1)
@@ -33,7 +33,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictiona
 	c.bevel(body, 1, 1, t.light, t.dark)
 	c.outline(body, t.outline)
 	c.line(Vector2i(cx, body_rect.position.y + 2), Vector2i(cx, body_end - 1), t.highlight)
-	var port_y := body_rect.position.y + body_rect.size.y / 3
+	var port_y := body_rect.position.y + int(body_rect.size.y / 3.0)
 	c.line(Vector2i(cx + 1, port_y), Vector2i(cx + 1, port_y + 2), t.outline)
 	c.px(cx - 1, body_rect.position.y + 1, t.outline)  # Charging handle.
 

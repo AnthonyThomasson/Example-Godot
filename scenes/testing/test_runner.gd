@@ -119,7 +119,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var now := Time.get_ticks_usec()
 	if _realtime and _last_frame_usec > 0:
-		var wait := 1000000 / REALTIME_FPS - (now - _last_frame_usec)
+		var wait := int(1000000 / float(REALTIME_FPS)) - (now - _last_frame_usec)
 		if wait > 0:
 			OS.delay_usec(wait)
 			now = Time.get_ticks_usec()
@@ -236,7 +236,7 @@ func _start(entry: Dictionary) -> void:
 
 ## Run the test coroutine; returning normally ends the test (verdict decided in `conclude`).
 func _drive(test: GameTest, ctx: TestContext) -> void:
-	await test.run(ctx)
+	await Callable(test, &"run").call(ctx)  # GameTest.run is not a coroutine itself; the tests that override it are.
 	ctx.finish("")
 
 
@@ -568,10 +568,10 @@ func _failed_ids(path: String) -> Array:
 
 
 ## The value of a `--name=value` argument, or `fallback`.
-func _option(args: PackedStringArray, name: String, fallback: String) -> String:
+func _option(args: PackedStringArray, option_name: String, fallback: String) -> String:
 	for a in args:
-		if a.begins_with(name + "="):
-			return a.substr(name.length() + 1)
+		if a.begins_with(option_name + "="):
+			return a.substr(option_name.length() + 1)
 	return fallback
 
 
@@ -599,10 +599,10 @@ func _print_result(r: Dictionary) -> void:
 			var a: Dictionary = r["snapshot"]["actors"][id]
 			print("        · %s at %s  health %s%s%s" % [id, a.get("position", ""), a.get("health", "?"),
 				"  DEAD" if a.get("is_dead", false) else "", "  act " + a["act"] if a.has("act") else ""])
-		for name in r["traces"]:
-			var series: Array = r["traces"][name]
+		for trace_name in r["traces"]:
+			var series: Array = r["traces"][trace_name]
 			var values := series.map(func(p): return p[1])
-			print("        ~ %s: min %s  max %s  last %s  (%d samples)" % [name, values.min(), values.max(), values.back(), series.size()])
+			print("        ~ %s: min %s  max %s  last %s  (%d samples)" % [trace_name, values.min(), values.max(), values.back(), series.size()])
 		print("        bundle: %s" % _write_bundle(r))
 		for shot in r.get("shots", []):
 			print("        shot:   %s" % shot)

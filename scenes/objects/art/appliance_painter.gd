@@ -47,15 +47,15 @@ static func _burners(c: PixelCanvas, t: Dictionary) -> void:
 	var metal := ObjectArtConfig.appliance_metal_color
 	for i in 4:
 		var kx := roundi((i + 0.5) * c.w / 4.0)
-		c.fill(PixelCanvas.disc(Vector2i(kx, c.h - strip / 2 - 1), maxi(1, strip / 3)), metal, _KNOB_HEIGHT)
+		c.fill(PixelCanvas.disc(Vector2i(kx, c.h - int(strip / 2.0) - 1), maxi(1, int(strip / 3.0))), metal, _KNOB_HEIGHT)
 	var area := Rect2i(3, 3, c.w - 6, c.h - strip - 6)
-	var rad := maxi(3, mini(area.size.x, area.size.y) / 4 - 1)
+	var rad := maxi(3, int(mini(area.size.x, area.size.y) / 4.0) - 1)
 	for gy in 2:
 		for gx in 2:
 			var o := area.position + Vector2i(roundi((gx + 0.5) * area.size.x / 2.0), roundi((gy + 0.5) * area.size.y / 2.0))
 			var ring := PixelCanvas.disc(o, rad)
 			c.outline(ring, metal.darkened(0.2))
-			c.fill(PixelCanvas.disc(o, maxi(1, rad / 3)), metal.darkened(0.45))
+			c.fill(PixelCanvas.disc(o, maxi(1, int(rad / 3.0))), metal.darkened(0.45))
 			c.line(o - Vector2i(rad, 0), o + Vector2i(rad, 0), metal.darkened(0.3), _BODY_HEIGHT + 1)
 			c.line(o - Vector2i(0, rad), o + Vector2i(0, rad), metal.darkened(0.3), _BODY_HEIGHT + 1)
 
@@ -70,9 +70,9 @@ static func _fridge(c: PixelCanvas, t: Dictionary) -> void:
 			x += 4
 	var lip := maxi(3, roundi(c.h * 0.08))
 	c.paint_over(Rect2i(2, c.h - lip - 1, c.w - 4, lip), t.dark)
-	c.line(Vector2i(c.w / 2, c.h - lip - 1), Vector2i(c.w / 2, c.h - 2), t.outline)
+	c.line(Vector2i(int(c.w / 2.0), c.h - lip - 1), Vector2i(int(c.w / 2.0), c.h - 2), t.outline)
 	var metal := ObjectArtConfig.appliance_metal_color
-	for x in [c.w / 2 - 3, c.w / 2 + 2]:
+	for x in [int(c.w / 2.0) - 3, int(c.w / 2.0) + 2]:
 		c.fill(PixelCanvas.rounded(Rect2i(x, c.h - lip - 3, 1, lip + 3), 0), metal, _KNOB_HEIGHT)
 
 
@@ -102,14 +102,14 @@ static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool) -> v
 	var panel_h := maxi(4, roundi(c.h * 0.16))
 	c.paint_over(Rect2i(2, 2, c.w - 4, panel_h), t.dark)
 	var metal := ObjectArtConfig.appliance_metal_color
-	var dial := Vector2i(c.w - 4 - panel_h / 2, 2 + panel_h / 2)
-	c.fill(PixelCanvas.disc(dial, maxi(1, panel_h / 2 - 1)), metal, _KNOB_HEIGHT)
+	var dial := Vector2i(c.w - 4 - int(panel_h / 2.0), 2 + int(panel_h / 2.0))
+	c.fill(PixelCanvas.disc(dial, maxi(1, int(panel_h / 2.0) - 1)), metal, _KNOB_HEIGHT)
 	c.px(dial.x, dial.y - 1, t.outline)
-	c.line(Vector2i(c.w / 2 - 3, 2 + panel_h / 2), Vector2i(c.w / 2 + 3, 2 + panel_h / 2), ObjectArtConfig.prop_colors["glow"])
+	c.line(Vector2i(int(c.w / 2.0) - 3, 2 + int(panel_h / 2.0)), Vector2i(int(c.w / 2.0) + 3, 2 + int(panel_h / 2.0)), ObjectArtConfig.prop_colors["glow"])
 	for i in 3:
-		c.px(5 + i * 3, 2 + panel_h / 2, t.light)
-	var o := Vector2i(c.w / 2, panel_h + 2 + (c.h - panel_h - 2) / 2)
-	var rad := maxi(3, mini(c.w, c.h - panel_h) * 3 / 10)
+		c.px(5 + i * 3, 2 + int(panel_h / 2.0), t.light)
+	var o := Vector2i(int(c.w / 2.0), panel_h + 2 + int((c.h - panel_h - 2) / 2.0))
+	var rad := maxi(3, int(mini(c.w, c.h - panel_h) * 3 / 10.0))
 	var ring := PixelCanvas.disc(o, rad)
 	c.fill(ring, t.light)
 	c.outline(ring, t.shadow)
@@ -119,7 +119,7 @@ static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool) -> v
 		for i in 4:
 			var a := c.rng.randf() * TAU
 			var p := o + Vector2i((Vector2(cos(a), sin(a)) * c.rng.randf_range(0.0, rad - 4)).round())
-			c.fill(PixelCanvas.disc(p, maxi(1, rad / 4)), Props.pick(c, "books").lightened(0.15))
+			c.fill(PixelCanvas.disc(p, maxi(1, int(rad / 4.0))), Props.pick(c, "books").lightened(0.15))
 		c.glare(glass, Color(0.85, 0.92, 1.0), 2)
 	else:
 		c.fill(PixelCanvas.disc(o, rad - 2), base.darkened(0.04))
@@ -143,4 +143,4 @@ static func _tv(c: PixelCanvas, base: Color, _t: Dictionary) -> void:
 	c.bevel(bar, 1, 1, base.lightened(0.3), base.darkened(0.2))
 	c.line(Vector2i(bar_rect.position.x + 1, bar_rect.end.y - 1), Vector2i(bar_rect.end.x - 2, bar_rect.end.y - 1),
 			ObjectArtConfig.prop_colors["glow"])
-	c.px(c.w / 2, bar_rect.end.y, Color(0.9, 0.25, 0.2))
+	c.px(int(c.w / 2.0), bar_rect.end.y, Color(0.9, 0.25, 0.2))

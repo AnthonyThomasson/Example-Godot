@@ -26,7 +26,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	c.fill(field, base)
 	c.surface(field, "fabric", base)
 	c.outline(PixelCanvas.rounded(field_rect.grow(1), 0), base.lightened(0.3))
-	var mid := border / 2
+	var mid := int(border / 2.0)
 	var stitch := base.lightened(0.15)
 	for x in range(body_rect.position.x + mid, body_rect.end.x - mid, 3):
 		c.px(x, body_rect.position.y + mid, stitch)
@@ -35,7 +35,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 		c.px(body_rect.position.x + mid, y, stitch)
 		c.px(body_rect.end.x - 1 - mid, y, stitch)
 	if pattern == "stripes":
-		var band := maxi(3, field_rect.size.y / 8 if along_x else field_rect.size.x / 8)
+		var band := maxi(3, int(field_rect.size.y / 8.0) if along_x else int(field_rect.size.x / 8.0))
 		var i := 0
 		for a in range(0, field_rect.size.y if along_x else field_rect.size.x, band):
 			if i % 2 == 1:
@@ -85,7 +85,7 @@ static func _fringe(c: PixelCanvas, body: Rect2i, length: int, along_x: bool) ->
 
 ## A plush bath mat: rounded, densely tufted in two tones, with a darker rim.
 static func _plush(c: PixelCanvas, base: Color) -> void:
-	var mat := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), mini(6, mini(c.w, c.h) / 3))
+	var mat := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), mini(6, int(mini(c.w, c.h) / 3.0)))
 	c.fill(mat, base)
 	var r := Rect2i(0, 0, c.w, c.h)
 	c.speckle(r, base, 0.45, 0.08)

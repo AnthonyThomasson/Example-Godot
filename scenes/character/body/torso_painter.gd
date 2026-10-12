@@ -21,7 +21,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	var pants: Color = opts.get("pants", CharacterConfig.art_pants_color)
 	var t := PixelCanvas.tones(base)
 	var pt := PixelCanvas.tones(pants)
-	var cx := c.w / 2
+	var cx := int(c.w / 2.0)
 	var waist := roundi(c.h * _WAIST)
 	var hips := PixelCanvas.rounded(Rect2i(0, waist, c.w, c.h - waist), 0)
 	c.fill(hips, pants, _PANTS_HEIGHT)
@@ -52,13 +52,13 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 ## A backpack on the back: a padded body with a flap and buckle, straps running up over the shoulders.
 static func _backpack(c: PixelCanvas, cx: int, waist: int, col: Color) -> void:
 	var pt := PixelCanvas.tones(col)
-	var r := Rect2i(cx - c.w / 4, 3, c.w / 2, mini(roundi(c.h * 0.45), waist - 4))
+	var r := Rect2i(cx - int(c.w / 4.0), 3, int(c.w / 2.0), mini(roundi(c.h * 0.45), waist - 4))
 	var pack := PixelCanvas.rounded(r, 2)
 	c.fill(pack, col, _PACK_HEIGHT)
 	c.surface(pack, "fabric", col)
 	c.bevel(pack, 1, 1, pt.light, pt.dark)
 	c.outline(pack, pt.outline)
-	var flap := r.position.y + r.size.y / 3
+	var flap := r.position.y + int(r.size.y / 3.0)
 	c.line(Vector2i(r.position.x + 1, flap), Vector2i(r.end.x - 2, flap), pt.dark)
 	c.px(cx, flap + 1, Color(0.75, 0.7, 0.5), _PACK_HEIGHT)
 	for x in [r.position.x + 1, r.end.x - 2]:

@@ -52,10 +52,10 @@ static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerat
 	var l := normalize(loadout)
 	var gun: StringName = l["weapon"]
 	if gun == RANDOM:
-		var slot := ItemRegistry.random_gun_slot(rng)
-		if slot < 0:
+		var random_slot := ItemRegistry.random_gun_slot(rng)
+		if random_slot < 0:
 			return &""
-		gun = GunConfig.gun_in_slot(slot)
+		gun = GunConfig.gun_in_slot(random_slot)
 	var slot := int(GunConfig.row(gun)["slot"])
 	var magazine: StringName = l["magazine"]
 	var spare_types: Array

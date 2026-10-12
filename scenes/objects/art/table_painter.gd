@@ -57,7 +57,7 @@ static func _planks(c: PixelCanvas, base: Color, t: Dictionary, opts: Dictionary
 				tone.darkened(0.12), tone.lightened(0.06))
 		if c.rng.randf() < ArtConfig.wood_knot_chance and b - a >= 4 and length >= 12:
 			var k_along := c.rng.randi_range(5, length - 6)
-			var k_across := (a + b) / 2
+			var k_across := int((a + b) / 2.0)
 			var kp := Vector2i(k_along, k_across) if along_x else Vector2i(k_across, k_along)
 			c.knot(kp.x, kp.y, tone.darkened(0.4), tone.darkened(0.2))
 		if i > 0:
@@ -85,7 +85,7 @@ static func _seam(c: PixelCanvas, along_x: bool, across: int, from: int, to: int
 ## edge nearest the light sits in shadow, the far edge catches light).
 static func _inset(c: PixelCanvas, radius: int, base: Color, t: Dictionary, opts: Dictionary) -> void:
 	var margin: int = opts.get("inset_margin", ObjectArtConfig.table_inset_margin)
-	margin = mini(margin, mini(c.w, c.h) / 4)
+	margin = mini(margin, int(mini(c.w, c.h) / 4.0))
 	var inner_rect := Rect2i(0, 0, c.w, c.h).grow(-margin)
 	if inner_rect.size.x < 4 or inner_rect.size.y < 4:
 		return
@@ -104,8 +104,8 @@ static func _runner(c: PixelCanvas) -> void:
 	var length := c.w if along_x else c.h
 	var span := c.h if along_x else c.w
 	var width := maxi(5, roundi(span * float(ObjectArtConfig.table_runner_width)))
-	var a := (span - width) / 2
-	var mid := a + width / 2
+	var a := int((span - width) / 2.0)
+	var mid := a + int(width / 2.0)
 	var col := ObjectArtConfig.table_runner_color
 	var rt := PixelCanvas.tones(col)
 	var r := Rect2i(1, a, length - 2, width) if along_x else Rect2i(a, 1, width, length - 2)
@@ -118,9 +118,9 @@ static func _runner(c: PixelCanvas) -> void:
 			for s in [a + 2, a + width - 3]:
 				_dot(c, along_x, i, s, rt.light if i % 2 == 0 else col)
 		# Diamonds: |offset from the motif centre along| + |offset across| == radius.
-		var motif := maxi(2, width / 2 - 3)
+		var motif := maxi(2, int(width / 2.0) - 3)
 		var period := motif * 2 + 2
-		var along_off := absi((i + period / 2) % period - period / 2)
+		var along_off := absi((i + int(period / 2.0)) % period - int(period / 2.0))
 		if i > 3 and i < length - 4 and along_off <= motif:
 			for s in [mid - (motif - along_off), mid + (motif - along_off)]:
 				_dot(c, along_x, i, s, rt.shadow)

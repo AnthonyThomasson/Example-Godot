@@ -396,13 +396,13 @@ func observe(character, rooms: Array) -> void:
 ## A sighting after a long gap restarts the track (no velocity across the gap).
 func _track(id: int, pos: Vector2, now: int) -> Vector2:
 	var vel := Vector2.ZERO
-	var tr = _tracks.get(id)
-	if tr != null:
-		var dt: float = (now - tr["t"]) / 1000.0
+	var track = _tracks.get(id)
+	if track != null:
+		var dt: float = (now - track["t"]) / 1000.0
 		if dt > 0.0 and dt < 0.5:
-			vel = (tr["vel"] as Vector2).lerp((pos - tr["pos"]) / dt, track_smoothing)
+			vel = (track["vel"] as Vector2).lerp((pos - track["pos"]) / dt, track_smoothing)
 		elif dt == 0.0:
-			vel = tr["vel"]
+			vel = track["vel"]
 	_tracks[id] = { "pos": pos, "vel": vel, "t": now }
 	return vel
 

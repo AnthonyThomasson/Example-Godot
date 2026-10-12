@@ -26,7 +26,7 @@ static func profiles(events: Array) -> Array:
 static func samples(profile: StringName, variant: int = 0) -> PackedFloat32Array:
 	var data: PackedByteArray = SoundBank.sound(profile, variant)["stream"].data
 	var out := PackedFloat32Array()
-	out.resize(data.size() / 2)
+	out.resize(int(data.size() / 2.0))
 	for i in out.size():
 		out[i] = data.decode_s16(i * 2) / 32768.0
 	return out

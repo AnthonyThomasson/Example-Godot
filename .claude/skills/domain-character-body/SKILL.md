@@ -180,7 +180,7 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   stays centred over its feet, and the neck pitches on, `body_crouch_neck_pitch`), narrows the hips and feet (`body_crouch_hip_width` /
   `body_crouch_foot_gap`), stands the feet ahead of the pelvis so the knees lead (`body_crouch_foot_ahead`), staggers the weapon hand's foot back
   (`body_crouch_stagger`) and shortens the stride (`body_crouch_stride`). The rig also answers `torso()` and `face()`, so a body folded past
-  `FOLD_DRAW` is drawn by `_draw_lying`: `_draw_fallen(rig, false)` (a lofted trunk showing its back, the limbs by height), then the weapon and
+  `FOLD_DRAW` is drawn by `_draw_lying`: `_draw_fallen(rig, false, weapon)` (a lofted trunk showing its back, the limbs by height), then the weapon and
   fists on top, with its shadow from `_draw_fallen_shadow`.
   **Arms:** the shoulders sprite and head are drawn at the rig's `CHEST` / `HEAD` xy (`shoulder_centre()` / `head_centre()` on the visuals), so a
   crouch's forward lean carries them with the sleeves. `posture_hand_ahead()` (`body_crouch_hand_ahead` x `posture_folded()`) is added to every

@@ -299,7 +299,7 @@ func debug_combat(character) -> Dictionary:
 		"fire_at_will": bool(_params.get("fire_at_will", false)),
 		"reloading": _reloading,
 		"requested_point": _params["point"] if _params.has("point") else null,
-		"point": _point if _params.has("point") else null,
+		"point": (_point as Variant) if _params.has("point") else null,
 		"arrived": _arrived,
 		"arrive_room": _arrive_room,
 		"object_pos": obj_pos,

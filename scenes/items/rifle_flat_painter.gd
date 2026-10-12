@@ -17,15 +17,15 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	var dark_part := base.darkened(0.25)
 	var flip: bool = opts.get("flip", false)
 	var mx := func(x: int) -> int: return c.w - 1 - x if flip else x
-	var body_w := maxi(3, c.w * 3 / 8)       # The receiver's thickness.
-	var stock_end := maxi(4, c.h * 26 / 100)
-	var body_end := maxi(stock_end + 4, c.h * 54 / 100)
-	var guard_end := maxi(body_end + 3, c.h * 82 / 100)
+	var body_w := maxi(3, int(c.w * 3 / 8.0))       # The receiver's thickness.
+	var stock_end := maxi(4, int(c.h * 26 / 100.0))
+	var body_end := maxi(stock_end + 4, int(c.h * 54 / 100.0))
+	var guard_end := maxi(body_end + 3, int(c.h * 82 / 100.0))
 	var below := body_w + 1                  # First column below the receiver (the grip side).
 
 	# The magazine: a slab curving forward as it hangs below the receiver.
-	var mag_top := stock_end + (body_end - stock_end) / 2
-	var mag_len := maxi(4, c.h / 5)
+	var mag_top := stock_end + int((body_end - stock_end) / 2.0)
+	var mag_len := maxi(4, int(c.h / 5.0))
 	var mag := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, c.h), func(x: int, y: int) -> bool:
 		var lx: int = mx.call(x)
 		var drop := lx - below
@@ -37,7 +37,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	c.outline(mag, t.outline)
 
 	# The pistol grip: a slab raked back off the underside of the receiver.
-	var grip_len := maxi(3, c.h / 8)
+	var grip_len := maxi(3, int(c.h / 8.0))
 	var grip := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, c.h), func(x: int, y: int) -> bool:
 		var lx: int = mx.call(x)
 		if lx < below - 1 or lx > below + 1:
@@ -72,7 +72,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	c.bevel(body, 1, 1, t.light, t.dark)
 	c.outline(body, t.outline)
 	c.line(Vector2i(mx.call(2), stock_end + 1), Vector2i(mx.call(2), guard_end - 1), t.highlight)
-	var port := stock_end + (body_end - stock_end) / 3
+	var port := stock_end + int((body_end - stock_end) / 3.0)
 	c.line(Vector2i(mx.call(body_w - 1), port), Vector2i(mx.call(body_w - 1), port + 2), t.outline)
 	for y in range(body_end + 2, guard_end - 1, 3):  # Handguard vent slots.
 		c.px(mx.call(body_w - 1), y, t.outline)

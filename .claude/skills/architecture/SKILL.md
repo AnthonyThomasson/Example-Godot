@@ -393,12 +393,15 @@ Two conventions hold across domains; the per-domain specifics live in each domai
   makes the editor plugin `addons/ticket_autorun/` press Play once it is up.
 - **Verification ladder** — use the cheapest rung that proves the change:
   1. **Loads?** `godot-debug` skill: headless load check (run `--import` first when you add a `class_name`).
+     **Clean?** `tools/lint.sh [paths]` (a few seconds) prints every GDScript analyzer warning of the editor's
+     Debugger > Errors tab (unused variable, integer division, shadowed names ...) per file; it runs first in
+     every `run_tests.sh` and fails the run before a test starts. Fix the code; silence a warning only as a last resort.
   2. **Behaves?** `tools/run_tests.sh [words]` runs `tests/**/*_test.gd` headless and deterministically
-     (exit 1 on any failure, or any engine error/warning logged during a test). Useful flags: `--list`,
+     (exit 1 on a lint warning, a failure, or any engine error/warning logged during a test). Useful flags: `--list`,
      `--changed` (the domains your uncommitted changes can break, in one run), `--id=<id>` / `--domain=a,b`
      (exact selection), `--failed` (rerun last run's failures), `--jobs=auto` (parallel shards),
      `--fail-fast`, `--summary` (failures + totals only), `--repeat=N` (flaky check), `--seed=N`,
-     `--json`, `--include-von` / `--require-von`. A failure prints actor state and a `bundle:` JSON path.
+     `--no-lint`, `--json`, `--include-von` / `--require-von`. A failure prints actor state and a `bundle:` JSON path.
      Writing tests: `domain-testing` skill; debugging one: `test-debug` skill. In the game, the setup
      window's **Tests** button opens the browser to play one.
   3. **Exploratory / not yet scriptable?** `godot-drive` skill: drive the live game through the dev

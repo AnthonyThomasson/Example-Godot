@@ -65,7 +65,7 @@ func set_flag(flag: String, on: bool) -> void:
 
 
 ## A label on this layer that never swallows a click meant for an NPC. The caller anchors/positions it.
-func _make_label(align: int, size: int) -> Label:
+func _make_label(align: HorizontalAlignment, size: int) -> Label:
 	var label := Label.new()
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	label.horizontal_alignment = align

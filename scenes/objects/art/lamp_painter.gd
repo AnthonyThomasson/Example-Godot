@@ -10,8 +10,8 @@ const _SHADE_HEIGHT := 8  ## Cast-shadow height of the shade.
 ## Paint a lamp onto `c` with a `base` shade.
 static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var o := Vector2i(c.w / 2, c.h / 2)
-	var radius := mini(c.w, c.h) / 2 - 1
+	var o := Vector2i(int(c.w / 2.0), int(c.h / 2.0))
+	var radius := int(mini(c.w, c.h) / 2.0) - 1
 	var shade := PixelCanvas.disc(o, radius)
 	c.fill(shade, base, _SHADE_HEIGHT)
 	var inner := maxi(2, roundi(radius * 0.45))

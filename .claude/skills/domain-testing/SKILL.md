@@ -11,6 +11,13 @@ and controller contract, EventBus and character signals) and never reaches into 
 
 ## Running tests
 
+- **Lint first:** every `tools/run_tests.sh` run starts with `tools/lint.sh` (about 5 s; skipped for `--list`,
+  `--self-test`, `--play` and with `--no-lint`). It loads every project script with the engine's debugger on, the only
+  way a headless run reports GDScript analyzer warnings (unused variable or parameter, integer division, a name that
+  shadows a member or built-in, a redundant `await` ...), and prints them per file; any warning ends the run with exit 1
+  before a test starts. The engine names no line, so the report gives candidate lines, and the exact `line:col` of each
+  integer division (it recompiles the script once per `/`). Run `tools/lint.sh scenes/x.gd` for one script. Fix the
+  code: `@warning_ignore` or a lowered level in `project.godot` is a last resort (see `m-audit`).
 - **CLI:** `tools/run_tests.sh [filter words] [--include-von]` runs
   `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. A fresh checkout
   (no `.godot/` class cache) is imported first, since without it every script fails to parse. It prints one
@@ -292,7 +299,9 @@ the engine log file (`debug/file_logging/log_path`) from an offset marked at run
   `run_tests.sh` around a fake Godot for every way a run can end, and the real engine through the probe
   `tests/_harness/log_gate_probe_test.gd` (set `GAME_TEST_PROBE=error|warning`) in batch and in-game;
   `log_watch_offsets_test.gd` covers the read positions. Run it after editing `log_watch.gd`, `test_runner.gd`,
-  `run_tests.sh` or `scan_godot_log.py`.
+  `run_tests.sh` or `scan_godot_log.py`. The same file tests the lint: `lint_report.py` on crafted logs,
+  `run_tests.sh` stopping on a lint failure, and the real engine through `tools/lint.sh` (the project is clean; a probe
+  script's warnings are found). Run it after editing `tools/lint*` too.
 
 ## Behaviour switches (`test_switches.gd`)
 

@@ -33,14 +33,14 @@ static func _mirror(c: PixelCanvas, glass: Color) -> void:
 
 ## A chrome bar on two brackets with towels folded over it.
 static func _towels(c: PixelCanvas, metal: Color) -> void:
-	var cy := c.h / 2
+	var cy := int(c.h / 2.0)
 	c.fill(PixelCanvas.rounded(Rect2i(1, cy - 1, c.w - 2, 2), 0), metal, _BAR_HEIGHT)
 	c.line(Vector2i(1, cy - 1), Vector2i(c.w - 2, cy - 1), metal.lightened(0.3))
 	for x in [2, c.w - 3]:
 		c.fill(PixelCanvas.disc(Vector2i(x, cy), 2), metal.darkened(0.2), _BAR_HEIGHT)
 	var list: Array = ObjectArtConfig.prop_colors["towels"]
-	var n := clampi(c.w / 18, 1, 3)
-	var tw := (c.w - 10) / n - 2
+	var n := clampi(int(c.w / 18.0), 1, 3)
+	var tw := int((c.w - 10) / float(n)) - 2
 	for i in n:
 		var col: Color = list[c.rng.randi_range(0, list.size() - 1)]
 		var r := Rect2i(5 + i * (tw + 2), 1, tw, c.h - 2)

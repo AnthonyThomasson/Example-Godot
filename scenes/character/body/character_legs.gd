@@ -70,10 +70,9 @@ func _anything_near(space: PhysicsDirectSpaceState2D, character) -> bool:
 
 ## Side `i`'s resting ankle (local x/y), or null when neither it nor the knee meets anything.
 func _rest_leg(space: PhysicsDirectSpaceState2D, character, rig, i: int, delta: float) -> Variant:
-	var hip: Vector3 = rig.point(Rig.HIP[i])
 	var wanted: Vector3 = rig.point(Rig.ANKLE[i])
-	var ankle := Vector2(wanted.x, wanted.y)
-	var rested := _sweep(space, character, ankle)
+	var ankle_at := Vector2(wanted.x, wanted.y)
+	var rested := _sweep(space, character, ankle_at)
 	var knee_wanted := Vector2.ZERO
 	var knee_rested := Vector2.ZERO
 	for _try in KNEE_TRIES:
@@ -86,8 +85,8 @@ func _rest_leg(space: PhysicsDirectSpaceState2D, character, rig, i: int, delta: 
 		# The knee would pass through something: step the foot back by how far it overshot, then rest it again.
 		rested = _sweep(space, character, rested + overshoot)
 	_press(space, character, 2 + i, knee_wanted, knee_rested, delta)
-	_press(space, character, i, ankle, rested, delta)
-	if rested.distance_to(ankle) <= REST_EPS and knee_rested.distance_to(knee_wanted) <= REST_EPS:
+	_press(space, character, i, ankle_at, rested, delta)
+	if rested.distance_to(ankle_at) <= REST_EPS and knee_rested.distance_to(knee_wanted) <= REST_EPS:
 		return null
 	return rested
 

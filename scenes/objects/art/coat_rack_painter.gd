@@ -11,8 +11,8 @@ const _POST_HEIGHT := 9
 
 ## Paint a coat rack onto `c` with a `base` wooden post.
 static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Dictionary) -> void:
-	var o := Vector2i(c.w / 2, c.h / 2)
-	var radius := mini(c.w, c.h) / 2 - 1
+	var o := Vector2i(int(c.w / 2.0), int(c.h / 2.0))
+	var radius := int(mini(c.w, c.h) / 2.0) - 1
 	var spin := c.rng.randf() * TAU
 	for i in 3:
 		var a := spin + TAU * i / 3.0

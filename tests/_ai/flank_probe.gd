@@ -109,9 +109,9 @@ static func zones(brain: Node, around := Vector2.INF) -> Dictionary:
 ## Make the NPCs fight `target_id` (an actor id) whenever they are asked which hostile to fight, so the
 ## options read are that target's flanks. Each hostile is an option named `t_<instance id>`.
 static func prefer_target(t: TestContext, target_id: StringName) -> void:
-	var rules: Array = DecisionStub.rules.duplicate()
-	rules.push_front({ "pick": "t_%d" % t.actor(target_id).get_instance_id(), "question": "Which hostile" })
-	DecisionStub.rules = rules
+	var ordered: Array = DecisionStub.rules.duplicate()
+	ordered.push_front({ "pick": "t_%d" % t.actor(target_id).get_instance_id(), "question": "Which hostile" })
+	DecisionStub.rules = ordered
 
 
 ## Which side of a target at `tpos` facing `facing` (unit vector) the point `p` lies on — the test's own

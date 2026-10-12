@@ -16,4 +16,4 @@ static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictiona
 	c.fill(strip, base, _LIMB_HEIGHT)
 	if material != "":
 		c.surface(strip, material, base)
-	c.bevel(strip, 1, maxi(1, c.w / 4), t.light, t.dark)
+	c.bevel(strip, 1, maxi(1, int(c.w / 4.0)), t.light, t.dark)

@@ -36,7 +36,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	if count <= 0:
 		count = 2 if c.w >= 100 else 1
 	var gap := 3
-	var pw := (mattress_rect.size.x - 6 - gap * (count - 1)) / count
+	var pw := int((mattress_rect.size.x - 6 - gap * (count - 1)) / float(count))
 	for i in count:
 		_pillow(c, Rect2i(mattress_rect.position.x + 3 + i * (pw + gap), head_h + 2, pw, pillow_h), sheet.lightened(0.04))
 
@@ -70,8 +70,8 @@ static func _pillow(c: PixelCanvas, r: Rect2i, col: Color) -> void:
 	c.fill(PixelCanvas.rounded(r.grow(-3), 3), col.lightened(0.05))
 	c.bevel(pillow, 1, 2, pt.light, pt.dark)
 	c.outline(pillow, col.darkened(0.25))
-	var cy := r.position.y + r.size.y / 2
-	c.line(Vector2i(r.position.x + r.size.x / 3, cy), Vector2i(r.end.x - r.size.x / 3, cy + 1), pt.dark)
+	var cy := r.position.y + int(r.size.y / 2.0)
+	c.line(Vector2i(r.position.x + int(r.size.x / 3.0), cy), Vector2i(r.end.x - int(r.size.x / 3.0), cy + 1), pt.dark)
 
 
 ## Duvet surface pattern: quilting stitches on a grid, scattered stars, or broad stripes.
@@ -88,11 +88,11 @@ static func _pattern(c: PixelCanvas, r: Rect2i, base: Color, pattern: String) ->
 					c.px(x, y, stitch)
 		"stars":
 			var star := ObjectArtConfig.bed_star_color
-			for _i in maxi(3, r.get_area() / 260):
+			for _i in maxi(3, int(r.get_area() / 260.0)):
 				var p := r.position + Vector2i(c.rng.randi_range(3, r.size.x - 4), c.rng.randi_range(6, r.size.y - 4))
 				for d in [Vector2i.ZERO, Vector2i.LEFT, Vector2i.RIGHT, Vector2i.UP, Vector2i.DOWN]:
 					c.px(p.x + d.x, p.y + d.y, star if d == Vector2i.ZERO else star.darkened(0.15))
 		"stripes":
-			var band := maxi(4, ObjectArtConfig.bed_quilt_px / 2)
+			var band := maxi(4, int(ObjectArtConfig.bed_quilt_px / 2.0))
 			for y in range(r.position.y, r.end.y, band * 2):
 				c.paint_over(Rect2i(r.position.x, y, r.size.x, band), base.lightened(0.1))

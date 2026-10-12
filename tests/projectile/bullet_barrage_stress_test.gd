@@ -44,7 +44,7 @@ func configure(s: TestSetup) -> void:
 	var kinds := ["chair", "bookshelf", "armchair", "side_table"]
 	for i in TARGETS:
 		s.object(StringName("target%d" % i), kinds[i % kinds.size()],
-			Vector2(450 + (i % 6) * 100, 200 + (i / 6) * 200))
+			Vector2(450 + (i % 6) * 100, 200 + (int(i / 6.0)) * 200))
 
 
 func run(t: TestContext) -> void:
@@ -63,7 +63,7 @@ func run(t: TestContext) -> void:
 	var stats := await Perf.frame_stats(t, FIRE_FRAMES, fire)
 	Perf.within_frames(t, "barrage", stats, AVG_MS, P95_MS, MAX_MS)
 
-	t.check(t.events_of(&"hit").size() > FIRE_FRAMES / FIRE_EVERY, "the barrage actually landed hits (%d)" % t.events_of(&"hit").size())
+	t.check(t.events_of(&"hit").size() > int(FIRE_FRAMES / float(FIRE_EVERY)), "the barrage actually landed hits (%d)" % t.events_of(&"hit").size())
 	t.check(Despawner.count() <= Despawner.max_scene_objects, "the Despawner cap holds (%d tracked)" % Despawner.count())
 
 	await t.seconds(8.0)  # let projectiles, casings and chips drain

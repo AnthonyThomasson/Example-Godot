@@ -193,7 +193,7 @@ func _draw_lying(rig) -> void:
 		if item:
 			item.draw_weapon(self, _character)
 			draw_order.append(&"weapon")
-	_draw_fallen(rig, false, false, weapon)
+	_draw_fallen(rig, false, weapon)
 	for hand in 2:
 		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, [], 0.0)
 	draw_order.append(&"hands")
@@ -389,10 +389,9 @@ func _draw_body_shadow() -> void:
 const STACK_BAND := 3.0
 
 
-## Every part of the fallen body, lowest first. A living body bent over draws its own fists (`with_hands`
-## off), over the weapon, and its head (`with_head` off) over both; `before_trunk` draws the weapon just
-## under the trunk.
-func _draw_fallen(rd, with_hands := true, with_head := true, before_trunk := Callable()) -> void:
+## Every part of the fallen body, lowest first. A living body bent over draws its own head (`with_head`
+## off) over the weapon and the hands; `before_trunk` draws the weapon just under the trunk.
+func _draw_fallen(rd, with_head := true, before_trunk := Callable()) -> void:
 	for part in _stack(_fallen_parts(rd)):
 		match part["kind"]:
 			"chain":
@@ -522,10 +521,10 @@ func _leg_chain(j, i: int) -> Dictionary:
 ## One tapered limb segment from `a` to `b` (3D): its widths at each end in body radii, the true
 ## `length` (px) its art is painted at, its color and material.
 func _seg(a: Vector3, b: Vector3, width_a: float, width_b: float, length: float, color: Color,
-		material: String) -> Dictionary:
+		finish: String) -> Dictionary:
 	var r: float = _character.radius
 	return { "a": a, "b": b, "ra": width_a * r * 0.5, "rb": width_b * r * 0.5, "length": length,
-		"color": color, "material": material }
+		"color": color, "material": finish }
 
 
 ## A limb chain: its segments, sorted as one part by their mean height.

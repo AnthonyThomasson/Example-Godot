@@ -14,10 +14,10 @@ const _RAIL_HEIGHT := 5
 ## Paint a chair onto `c` in `base` wood, front toward +y.
 static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var back_d := clampi(roundi(c.h * float(opts.get("back_depth", ObjectArtConfig.chair_back_depth))), 3, c.h / 2)
+	var back_d := clampi(roundi(c.h * float(opts.get("back_depth", ObjectArtConfig.chair_back_depth))), 3, int(c.h / 2.0))
 	var rail_th := maxi(2, roundi(back_d * 0.55))
 	var bow := maxi(1, roundi(back_d * 0.3))
-	var inset := maxi(1, c.w / 14)
+	var inset := maxi(1, int(c.w / 14.0))
 
 	# Spindles run from under the rail down beneath the seat's back edge.
 	var slats: int = opts.get("slats", ObjectArtConfig.chair_slats)

@@ -26,8 +26,8 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 200, 200))
 
 
-func _house(seed: int, t: TestContext) -> void:
-	var house := WorldGen.generate(seed, "", Vector2.ZERO, t.world)
+func _house(house_seed: int, t: TestContext) -> void:
+	var house := WorldGen.generate(house_seed, "", Vector2.ZERO, t.world)
 	house.free()
 
 

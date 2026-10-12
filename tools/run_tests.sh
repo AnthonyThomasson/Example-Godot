@@ -37,6 +37,9 @@
 #   --repeat=5      run each match 5 times; names FLAKY / FAILING tests
 #   --seed=42       pin every house() test to seed 42
 #   --strict-exit   also fail on Godot's own end-of-process leak report (reported as a NOTE by default)
+#   --no-lint       skip the GDScript lint that runs first (tools/lint.sh, ~5 s: unused variables, integer
+#                   division, shadowed names ... the warnings of the editor's Debugger > Errors tab). Any warning
+#                   fails the run before a single test starts. Not run for --list, --self-test or --play.
 # Every run ends with a `Slowest:` line (wall-clock ms per test).
 # A failed test prints its final actor state and a `bundle:` path to a JSON with its event log,
 # state and traces. Each invocation gets its own engine log, report and bundles in a fresh temp dir
@@ -64,6 +67,7 @@ HEADLESS=--headless
 STRICT=
 JOBS=1
 CHANGED=0
+LINT=1
 args=()
 for a in "$@"; do
   case "$a" in
@@ -71,6 +75,7 @@ for a in "$@"; do
     --strict-exit) STRICT=--strict-exit ;;
     --jobs=*) JOBS="${a#--jobs=}" ;;
     --changed) CHANGED=1 ;;
+    --no-lint) LINT=0 ;;
     --failed)
       [[ -f "$LAST" ]] || { echo "No previous run of this checkout to take failures from." >&2; exit 2; }
       args+=("--failed=$LAST") ;;
@@ -180,6 +185,14 @@ affected() {
     *) echo all ;;  # anything unknown is treated as risky
   esac
 }
+
+# The lint comes first: it takes seconds, and a script the analyzer complains about is not worth a test run.
+for x in ${args[@]+"${args[@]}"}; do
+  case "$x" in --list|--self-test|--play) LINT=0 ;; esac
+done
+if [[ $LINT -eq 1 ]]; then
+  lint_out=$("$(dirname "$0")/lint.sh" 2>&1) || { echo "$lint_out"; echo "GDScript lint failed: no tests were run (--no-lint skips it)." >&2; exit 1; }
+fi
 
 if [[ $CHANGED -eq 1 ]]; then
   files=$( { git diff --name-only HEAD; git ls-files --others --exclude-standard; } | sort -u )

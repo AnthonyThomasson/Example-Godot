@@ -31,7 +31,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Diction
 	c.glare(body, base.lightened(0.3), 3)
 
 	var glass := ObjectArtConfig.car_glass_color
-	var cx := c.w / 2
+	var cx := int(c.w / 2.0)
 	for side in [-1, 1]:
 		var crease_x: int = cx + side * roundi(body_rect.size.x * 0.22)
 		c.line(Vector2i(crease_x, roundi(c.h * 0.7)), Vector2i(crease_x, c.h - 8), t.dark)

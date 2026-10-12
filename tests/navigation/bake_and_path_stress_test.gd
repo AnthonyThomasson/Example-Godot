@@ -49,4 +49,4 @@ func run(t: TestContext) -> void:
 			if not path.is_empty():
 				found[0] += 1)
 	Perf.within(t, "nav %d path queries total ms" % QUERIES, query_ms, QUERY_BUDGET_MS)
-	t.check(found[0] > QUERIES / 2, "most room-to-room paths are found (%d of %d)" % [found[0], QUERIES])
+	t.check(found[0] > int(QUERIES / 2.0), "most room-to-room paths are found (%d of %d)" % [found[0], QUERIES])

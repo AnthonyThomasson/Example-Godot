@@ -12,8 +12,8 @@ const _THUMB_HEIGHT := 5
 ## Paint a fist onto `c` in `base` (skin or glove).
 static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var o := Vector2i(c.w / 2, c.h / 2)
-	var r := maxi(2, mini(c.w, c.h) / 2 - 1)
+	var o := Vector2i(int(c.w / 2.0), int(c.h / 2.0))
+	var r := maxi(2, int(mini(c.w, c.h) / 2.0) - 1)
 	var fist := PixelCanvas.disc(o, r)
 	c.fill(fist, base, _FIST_HEIGHT)
 	c.bevel(fist, 1, 2, t.light, t.dark)
@@ -24,7 +24,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 		c.px(x + 1, ky + 1, t.dark)
 	c.outline(fist, t.outline)
 	var side := int(opts.get("side", 1))
-	var thumb := PixelCanvas.disc(o + Vector2i(-side * (r - 2), 0), maxi(1, r / 2 - 1))
+	var thumb := PixelCanvas.disc(o + Vector2i(-side * (r - 2), 0), maxi(1, int(r / 2.0) - 1))
 	c.fill(thumb, base.lightened(0.04), _THUMB_HEIGHT)
 	c.outline(thumb, t.dark)
 	c.cast_shadows()

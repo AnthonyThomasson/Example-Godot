@@ -15,10 +15,10 @@ const _BARREL_HEIGHT := 3
 ## Paint a rifle onto `c` in `base` metal, muzzle toward +y.
 static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var cx := c.w / 2
-	var stock_end := maxi(3, c.h * 26 / 100)
-	var body_end := maxi(stock_end + 3, c.h * 50 / 100)
-	var guard_end := maxi(body_end + 3, c.h * 80 / 100)
+	var cx := int(c.w / 2.0)
+	var stock_end := maxi(3, int(c.h * 26 / 100.0))
+	var body_end := maxi(stock_end + 3, int(c.h * 50 / 100.0))
+	var guard_end := maxi(body_end + 3, int(c.h * 80 / 100.0))
 
 	# The stock: a polymer wedge, narrower toward the receiver, with a darker butt plate.
 	var stock := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, stock_end + 1), func(x: int, y: int) -> bool:
@@ -39,7 +39,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictiona
 	c.bevel(body, 1, 1, t.light, t.dark)
 	c.outline(body, t.outline)
 	c.line(Vector2i(cx, body_rect.position.y + 2), Vector2i(cx, body_end - 1), t.highlight)
-	var port_y := body_rect.position.y + body_rect.size.y / 3
+	var port_y := body_rect.position.y + int(body_rect.size.y / 3.0)
 	c.line(Vector2i(cx + 2, port_y), Vector2i(cx + 2, port_y + 3), t.outline)
 	c.px(cx - 2, body_rect.position.y + 1, t.outline)  # Charging handle.
 	c.px(cx - 2, body_rect.position.y + 2, t.outline)

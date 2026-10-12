@@ -49,6 +49,9 @@ tools/load_check.sh              # headless
 tools/load_check.sh --windowed   # with a window (rendering warnings count too)
 ```
 
+For GDScript warnings (unused variable, integer division, shadowed names; headless runs never print them) run
+`tools/lint.sh` as well; `tools/run_tests.sh` does so first.
+
 A failure prints entries like `✗ script error: Parse Error: Expected expression … (res://scenes/character/character.gd:42)` and the
 log path. To check a single script instead: `"$GODOT" --headless --path . --check-only --script scenes/character/character.gd`.
 

@@ -48,7 +48,7 @@ func configure(s: TestSetup) -> void:
 	var kinds := ["chair", "bookshelf", "armchair", "side_table"]
 	for i in TARGETS:
 		s.object(StringName("target%d" % i), kinds[i % kinds.size()],
-			Vector2(450 + (i % 6) * 100, 150 + (i / 6) * 200))
+			Vector2(450 + (i % 6) * 100, 150 + (int(i / 6.0)) * 200))
 
 
 func run(t: TestContext) -> void:

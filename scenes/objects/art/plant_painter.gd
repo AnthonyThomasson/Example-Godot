@@ -11,8 +11,8 @@ const _LEAF_HEIGHT := 7
 
 ## Paint a plant onto `c` with `base` foliage.
 static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictionary) -> void:
-	var o := Vector2i(c.w / 2, c.h / 2)
-	var radius := mini(c.w, c.h) / 2 - 1
+	var o := Vector2i(int(c.w / 2.0), int(c.h / 2.0))
+	var radius := int(mini(c.w, c.h) / 2.0) - 1
 	var pot_col := ObjectArtConfig.plant_pot_color
 	var pt := PixelCanvas.tones(pot_col)
 	var pot := PixelCanvas.disc(o, roundi(radius * 0.72))

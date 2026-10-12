@@ -201,7 +201,7 @@ static func _walk_state(interior: Rect2, blocked: Array) -> Dictionary:
 	grid.resize(cols * rows)
 	var walkable := interior.grow(-WALL_CLEAR)
 	for i in range(cols * rows):
-		if not walkable.has_point(_cell_center(interior, i % cols, i / cols)):
+		if not walkable.has_point(_cell_center(interior, i % cols, int(i / float(cols)))):
 			grid[i] = 1
 	var doors: Array = []
 	for clearance: Rect2 in blocked:
@@ -209,7 +209,7 @@ static func _walk_state(interior: Rect2, blocked: Array) -> Dictionary:
 			continue
 		var cells: Array = []
 		for i in range(cols * rows):
-			if grid[i] == 0 and clearance.has_point(_cell_center(interior, i % cols, i / cols)):
+			if grid[i] == 0 and clearance.has_point(_cell_center(interior, i % cols, int(i / float(cols)))):
 				cells.append(i)
 		if not cells.is_empty():
 			doors.append(cells)
@@ -272,7 +272,7 @@ static func _keeps_walkable(rect: Rect2, walk: Dictionary) -> bool:
 	while not stack.is_empty():
 		var n: int = stack.pop_back()
 		var col := n % cols
-		var row := n / cols
+		var row := int(n / float(cols))
 		for next in [n - 1 if col > 0 else -1, n + 1 if col < cols - 1 else -1,
 				n - cols if row > 0 else -1, n + cols if row < rows - 1 else -1]:
 			if next >= 0 and grid[next] == 0 and seen[next] == 0:

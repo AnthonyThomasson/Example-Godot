@@ -15,7 +15,7 @@ const _BODY_HEIGHT := 4  ## Cast-shadow height of the carcass (props stand above
 ## Paint a cabinet onto `c` in `base` with a `material` finish, front toward +y.
 static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
-	var lip := clampi(roundi(c.h * float(opts.get("front_depth", ObjectArtConfig.cabinet_front_depth))), 2, c.h / 3)
+	var lip := clampi(roundi(c.h * float(opts.get("front_depth", ObjectArtConfig.cabinet_front_depth))), 2, int(c.h / 3.0))
 	var body := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), 2)
 	var top_rect := Rect2i(0, 0, c.w, c.h - lip)
 	var top := PixelCanvas.rounded(top_rect, 2)
@@ -51,7 +51,7 @@ static func _front(c: PixelCanvas, strip: Rect2i, kind: String, count: int, labe
 	if kind == "none" or strip.size.y < 2:
 		return
 	var n := maxi(1, count)
-	var mid_y := strip.position.y + strip.size.y / 2
+	var mid_y := strip.position.y + int(strip.size.y / 2.0)
 	var seams: Array[int] = []
 	for i in range(1, n):
 		var x := roundi(float(i) * c.w / n)
@@ -67,12 +67,12 @@ static func _front(c: PixelCanvas, strip: Rect2i, kind: String, count: int, labe
 		"drawers":
 			for i in n:
 				var cx := roundi((i + 0.5) * c.w / n)
-				var half := clampi(c.w / n / 6, 1, 4)
+				var half := clampi(int(int(c.w / float(n)) / 6.0), 1, 4)
 				c.line(Vector2i(cx - half, mid_y), Vector2i(cx + half, mid_y), handle, _BODY_HEIGHT + 1)
 				if labels and strip.size.y >= 4:
 					c.line(Vector2i(cx - 1, mid_y - 2), Vector2i(cx + 1, mid_y - 2), Color(0.92, 0.9, 0.84))
 		"lid":
-			c.fill(PixelCanvas.rounded(Rect2i(c.w / 2 - 2, strip.position.y, 4, mini(3, strip.size.y)), 0), handle, _BODY_HEIGHT + 1)
+			c.fill(PixelCanvas.rounded(Rect2i(int(c.w / 2.0) - 2, strip.position.y, 4, mini(3, strip.size.y)), 0), handle, _BODY_HEIGHT + 1)
 
 
 ## A short vertical handle bar at column `x` of the front strip.
@@ -87,10 +87,10 @@ static func _glass_top(c: PixelCanvas, top_rect: Rect2i, t: Dictionary) -> void:
 		return
 	var glass := PixelCanvas.rounded(pane, 1)
 	c.fill(glass, ObjectArtConfig.cabinet_glass_color)
-	var r := mini(pane.size.y / 2 - 1, 6)
+	var r := mini(int(pane.size.y / 2.0) - 1, 6)
 	var x := pane.position.x + r + 1
 	while x + r < pane.end.x:
-		Props.draw(c, "plate", Vector2i(x, pane.position.y + pane.size.y / 2))
+		Props.draw(c, "plate", Vector2i(x, pane.position.y + int(pane.size.y / 2.0)))
 		x += r * 2 + 3
 	c.glare(glass, ObjectArtConfig.cabinet_glass_color.lightened(0.5), 2)
 	c.outline(glass, t.shadow)

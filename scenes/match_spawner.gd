@@ -103,12 +103,12 @@ func npc_name(base: String, index: int) -> String:
 	return base if index == 0 else "%s %d" % [base, index + 1]
 
 
-## Instance an NPC scene named `npc_name` at `pos`, hand its controller the house's rooms and optional
+## Instance an NPC scene named `node_name` at `pos`, hand its controller the house's rooms and optional
 ## entry point, and record it as a combatant (for the spectator camera + match HUD). It joins the `World`
 ## node; `_arm_characters` gives it its weapon afterwards.
-func add_npc(scene: PackedScene, npc_name: String, pos: Vector2, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
+func add_npc(scene: PackedScene, node_name: String, pos: Vector2, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
 	var npc := scene.instantiate()
-	npc.name = npc_name
+	npc.name = node_name
 	world.add_child(npc)
 	npc.global_position = pos
 	bind_npc(npc, rooms, entry_point)

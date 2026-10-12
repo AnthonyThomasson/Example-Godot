@@ -320,7 +320,9 @@ it in the game with the `godot-drive` skill and confirm the affected behaviour s
 gotchas from that skill: launch Godot from Bash only with the sandbox disabled, and a hard kill
 orphans the Von decision server on port 8000 (`pkill -f "von serve"`). Re-run
 `python3 -I tools/audit_scan.py all` and confirm the findings you fixed are gone and no new edge
-appeared in `deps`.
+appeared in `deps`. Run `tools/lint.sh` too (`run_tests.sh` does first): a removal can leave an unused variable or
+parameter behind. Fix such a warning in the code; silencing it (`@warning_ignore`, an underscore prefix on a parameter that
+should go, a lowered level in `project.godot`) is a last resort, as in `m-audit`.
 
 ## Output — the checklist
 

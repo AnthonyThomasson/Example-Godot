@@ -44,9 +44,9 @@ through snapshots).
   shaded; swap for a recess), `bevel_relative` / `outline_relative` (shade what's drawn — shapes
   in several colors), `outline`, `glare`, `cast_shadows()` (a taller part shades lower pixels on
   its far side from the light, via the height layer), `tones(base)` (outline … highlight ramp).
-- **Surface finishes:** `surface(shape, material, base, along_x, wrap)` — wood grain, brushed
+- **Surface finishes:** `surface(shape, material, base, along_x, wraps)` — wood grain, brushed
   metal, stone flecks, ceramic/glass glare, fabric weave, plastic grain — plus `speckle` (sampled;
-  matches 8-bit pixels with a tolerance), `grain`/`knot` (`wrap` for seamless tiles).
+  matches 8-bit pixels with a tolerance), `grain`/`knot` (`wraps` for seamless tiles).
 
 ## ArtConfig (`art_config.gd`)
 

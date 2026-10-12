@@ -18,11 +18,11 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	var grip_color := base.darkened(0.2)
 	var flip: bool = opts.get("flip", false)
 	var mx := func(x: int) -> int: return c.w - 1 - x if flip else x
-	var slide_w := maxi(3, c.w * 2 / 5)
+	var slide_w := maxi(3, int(c.w * 2 / 5.0))
 	var bottom := slide_w + 1  # First column below the slide (the grip side).
 
 	# The grip: a slab hanging off the slide's rear, raked back toward −y.
-	var grip_len := c.h * 2 / 5
+	var grip_len := int(c.h * 2 / 5.0)
 	var grip := PixelCanvas.Shape.new(Rect2i(0, 0, c.w, c.h), func(x: int, y: int) -> bool:
 		var lx: int = mx.call(x)
 		if lx < bottom - 1 or lx >= c.w:
@@ -52,7 +52,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	c.bevel(slide, 1, 1, t.light, t.dark)
 	c.outline(slide, t.outline)
 	c.line(Vector2i(mx.call(2), 2), Vector2i(mx.call(2), c.h - 3), t.highlight)
-	var port := c.h * 2 / 5
+	var port := int(c.h * 2 / 5.0)
 	c.line(Vector2i(mx.call(slide_w - 1), port), Vector2i(mx.call(slide_w - 1), port + 2), t.outline)
 	c.px(mx.call(0), 1, t.outline, _SLIDE_HEIGHT)          # Rear sight.
 	c.px(mx.call(0), c.h - 2, t.outline, _SLIDE_HEIGHT)    # Front sight.

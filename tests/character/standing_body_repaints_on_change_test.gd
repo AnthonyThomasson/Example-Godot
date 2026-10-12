@@ -46,7 +46,7 @@ func run(t: TestContext) -> void:
 
 	var idle := await _repaints_over_window(t, &"still")
 	t.trace("still repaints", idle)
-	t.check(idle < WINDOW / 2, "a body standing still repainted %d of %d frames" % [idle, WINDOW])
+	t.check(idle < int(WINDOW / 2.0), "a body standing still repainted %d of %d frames" % [idle, WINDOW])
 
 	var wound_before := _redraws(t, &"still")
 	var hit := HitInfo.new()
@@ -74,4 +74,4 @@ func run(t: TestContext) -> void:
 	await t.seconds(1.5)
 	var settled := await _repaints_over_window(t, &"walker")
 	t.trace("stopped repaints", settled)
-	t.check(settled < WINDOW / 2, "a body that stopped walking repainted %d of %d frames" % [settled, WINDOW])
+	t.check(settled < int(WINDOW / 2.0), "a body that stopped walking repainted %d of %d frames" % [settled, WINDOW])

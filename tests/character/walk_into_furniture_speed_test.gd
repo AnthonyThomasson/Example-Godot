@@ -85,4 +85,4 @@ func run(t: TestContext) -> void:
 
 ## Middle of case `i`'s cell in the 4×2 grid.
 func _centre(i: int) -> Vector2:
-	return Vector2((i % 4 + 0.5) * CELL, (i / 4 + 0.5) * CELL)
+	return Vector2((i % 4 + 0.5) * CELL, (int(i / 4.0) + 0.5) * CELL)

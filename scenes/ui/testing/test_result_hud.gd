@@ -104,8 +104,8 @@ func show_queue(index: int, total: int) -> void:
 
 
 ## Whether Next may skip the pause (a queued test's verdict is up).
-func set_next_ready(ready: bool) -> void:
-	_next.disabled = not ready
+func set_next_ready(is_ready: bool) -> void:
+	_next.disabled = not is_ready
 
 
 ## The queue finished: show its `summary` and drop Next.
