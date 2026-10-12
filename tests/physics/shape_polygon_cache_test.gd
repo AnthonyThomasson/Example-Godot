@@ -47,13 +47,13 @@ func run(t: TestContext) -> void:
 				wrong += 1
 	t.check(wrong == 0, "%d of %d answers differ from a fresh computation" % [wrong, checked])
 
-	var size := Vector2(40.0, 40.0)
-	var impacts := _impacts(rng, size, 6)
-	var before := Deformation.shape_polygon("circle", size, impacts)
-	impacts.append(_impacts(rng, size, 1)[0])
-	t.check(Deformation.shape_polygon("circle", size, impacts) == Deformation._shape_polygon("circle", size, impacts), "one more dent is not answered with the old polygon")
-	t.check(Deformation.shape_polygon("circle", size, impacts) != before, "and it is a different polygon")
+	var dented_size := Vector2(40.0, 40.0)
+	var dents := _impacts(rng, dented_size, 6)
+	var before := Deformation.shape_polygon("circle", dented_size, dents)
+	dents.append(_impacts(rng, dented_size, 1)[0])
+	t.check(Deformation.shape_polygon("circle", dented_size, dents) == Deformation._shape_polygon("circle", dented_size, dents), "one more dent is not answered with the old polygon")
+	t.check(Deformation.shape_polygon("circle", dented_size, dents) != before, "and it is a different polygon")
 	var other_size := Vector2(60.0, 60.0)
-	t.check(Deformation.shape_polygon("circle", other_size, impacts) == Deformation._shape_polygon("circle", other_size, impacts), "another size is computed afresh")
+	t.check(Deformation.shape_polygon("circle", other_size, dents) == Deformation._shape_polygon("circle", other_size, dents), "another size is computed afresh")
 	PhysicsConfig.deform_radius = 12.0
-	t.check(Deformation.shape_polygon("circle", size, impacts) == Deformation._shape_polygon("circle", size, impacts), "retuned deformation is computed afresh")
+	t.check(Deformation.shape_polygon("circle", dented_size, dents) == Deformation._shape_polygon("circle", dented_size, dents), "retuned deformation is computed afresh")
