@@ -86,10 +86,12 @@ func _drip() -> void:
 	_add_splat(land, size, velocity, energy)
 
 
+## Seconds until the next drip falls, drawn from the configured interval.
 func _next_wait() -> float:
 	return randf_range(BloodConfig.drip_interval_min, BloodConfig.drip_interval_max)
 
 
+## A random offset, up to `BloodConfig.drip_jitter` px, that scatters where a drip lands.
 func _jitter() -> Vector2:
 	return Vector2.from_angle(randf() * TAU) * randf() * BloodConfig.drip_jitter
 

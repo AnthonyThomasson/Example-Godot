@@ -119,6 +119,7 @@ func _on_bulk_pressed(flags: Array) -> void:
 			b.button_pressed = on  # emits toggled → overlay_toggled
 
 
+## Every overlay flag in the registry, in display order.
 func _all_flags() -> Array:
 	var flags: Array = []
 	for e in Registry.ENTRIES:
@@ -126,6 +127,7 @@ func _all_flags() -> Array:
 	return flags
 
 
+## How many of `flags` have their button pressed.
 func _count_on(flags: Array) -> int:
 	var n := 0
 	for flag in flags:

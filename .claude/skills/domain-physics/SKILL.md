@@ -1,6 +1,6 @@
 ---
 name: domain-physics
-description: Deep implementation detail for the Physics System domain (scenes/physics/) — physical reactions: forces, knockback, deformation, debris, blood pooling, and the generic 3D ragdoll solver. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, Ragdoll (joint limits, floor/wall contact, sleeping), or PhysicsConfig/BloodConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Physics System domain (scenes/physics/, with its blood system in scenes/physics/blood/) — physical reactions: forces, knockback, deformation, debris, blood pooling, and the generic 3D ragdoll solver. Use when editing scenes/physics/ or working on HitInfo, Knockback, Deformable/Deformation, debris, blood, Ragdoll (joint limits, floor/wall contact, sleeping), or PhysicsConfig/BloodConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Physics System domain
@@ -75,6 +75,11 @@ plus z = height; gravity pulls to z = 0.
 - Reading: `point(i)`, `point_count()`, `frame_basis(f)`.
 
 ## Blood (self-contained, separate from debris/deformation)
+
+Everything blood lives in **`scenes/physics/blood/`** (`blood_config, blood_field, blood_decals, blood_splat, blood_pool,
+blood_pool_visuals, blood_flow, blood_smear, blood_footprints, blood_wound, blood_spawner, blood_surface`). The rest of
+the domain (hit packet, knockback, deformation, debris, hit particles, ragdoll) reaches it only through `Physics.spawn_debris`
+/ `Physics.bleed_out`; every other domain meets it through the classes in interface 4, all resolved by `class_name`.
 
 Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and a dead body's **bleed-out**.
 

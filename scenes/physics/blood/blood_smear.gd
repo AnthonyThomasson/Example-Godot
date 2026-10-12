@@ -61,16 +61,6 @@ func set_footprint(polygon: PackedVector2Array) -> void:
 		y += _spacing
 
 
-## Blood on finger `i`, 0..1 (tests).
-func finger_load(i: int) -> float:
-	return _fingers[i]["soak"]
-
-
-## Number of fingers laid across the footprint.
-func finger_count() -> int:
-	return _fingers.size()
-
-
 func _physics_process(_delta: float) -> void:
 	var body := get_parent() as RigidBody2D
 	if body == null or _fingers.is_empty() or not (BloodConfig.enabled and BloodConfig.smear_enabled):

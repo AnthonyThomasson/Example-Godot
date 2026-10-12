@@ -171,6 +171,7 @@ func head_centre() -> Vector2:
 	return _rig_xy(_character.rig(), Rig.HEAD)
 
 
+## The floor-plane (x, y) of rig `joint`, dropping its height.
 static func _rig_xy(rig, joint: int) -> Vector2:
 	var p: Vector3 = rig.point(joint)
 	return Vector2(p.x, p.y)

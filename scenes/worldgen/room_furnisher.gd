@@ -216,6 +216,7 @@ static func _walk_state(interior: Rect2, blocked: Array) -> Dictionary:
 	return { "interior": interior, "cols": cols, "rows": rows, "grid": grid, "doors": doors, "furniture": [] }
 
 
+## The centre of walk-grid cell (`col`, `row`) in world space.
 static func _cell_center(interior: Rect2, col: int, row: int) -> Vector2:
 	return interior.position + Vector2(col + 0.5, row + 0.5) * WALK_CELL
 

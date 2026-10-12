@@ -8,7 +8,7 @@ extends GameTest
 ## and drops one with no area; `setup` runs every outline through it. The helper is checked on a
 ## self-crossing polygon (deterministic); a sweep of random splats checks the whole build.
 
-const BloodSplat = preload("res://scenes/physics/blood_splat.gd")
+const BloodSplat = preload("res://scenes/physics/blood/blood_splat.gd")
 
 const SPLATS := 6000
 const SEED := 20240611

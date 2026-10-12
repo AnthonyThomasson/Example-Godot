@@ -322,14 +322,9 @@ func posture() -> StringName:
 	return _posture
 
 
+## Whether the body is crouching.
 func is_crouching() -> bool:
 	return _posture == &"crouch"
-
-
-## The coverage (0..100, a height on the same scale as an object's) `posture` presents to a bullet; a controller
-## compares it with a piece of cover's to judge which postures that cover hides. Unknown postures read as standing.
-func posture_coverage(posture: StringName) -> float:
-	return float(CharacterConfig.postures.get(posture, CharacterConfig.postures[&"stand"])["coverage"])
 
 
 ## Where side `i`'s ankle rests (local x/y px) against a wall or piece of furniture its leg has met, or null when
@@ -530,6 +525,7 @@ func _ease_posture(delta: float) -> void:
 	_posture_height = _eased_to(_posture_height, float(CharacterConfig.postures[_posture]["height"]), k)
 
 
+## `now` moved a fraction `k` of the way to `target`, snapped onto it once within a hair of it.
 static func _eased_to(now: float, target: float, k: float) -> float:
 	var next := lerpf(now, target, k)
 	return target if absf(next - target) < 0.002 else next

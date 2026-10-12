@@ -36,11 +36,6 @@ func step(foot: int, at: Vector2, direction: Vector2, length: float, width: floa
 	_load[foot] = maxf(soak, 0.0)
 
 
-## Blood currently on `foot`, 0..1.
-func foot_load(foot: int) -> float:
-	return _load.get(foot, 0.0)
-
-
 ## The sole outline in world space: heel at the back, arch on the `inner` side, ball, rounded toe.
 ## `soak` (the foot's load) thins the arch and roughens the edge; `speed` and `soak` slip it forward.
 func _sole(at: Vector2, direction: Vector2, length: float, width: float, inner: float, soak: float, speed: float) -> PackedVector2Array:

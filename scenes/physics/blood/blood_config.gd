@@ -1,6 +1,6 @@
 class_name BloodConfig
 
-## Tuning for the blood system (scenes/physics/blood_*.gd). A `class_name` holder of `static var`s —
+## Tuning for the blood system (scenes/physics/blood/). A `class_name` holder of `static var`s —
 ## read as `BloodConfig.<name>`; there is no instance and no autoload.
 ##
 ## Blood is its own physical reaction, kept separate from the debris and deformation knobs in

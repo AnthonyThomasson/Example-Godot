@@ -1,5 +1,8 @@
 class_name CasingSpawner
 
+## Projectile System: the one place a spent casing is built and registered with the Despawner. Guns call
+## `spawn` when a round leaves the barrel; the casing (casing.gd) owns its toss and posts the `&"casing"` event.
+
 const Casing = preload("res://scenes/projectile/casing.gd")
 const CasingVisuals = preload("res://scenes/projectile/casing_visuals.gd")
 

@@ -1,5 +1,8 @@
 class_name DebrisSpawner
 
+## Physics System: throws a spray of chips (debris.gd) off a struck object. `Physics.spawn_debris` calls
+## `spawn` with the hit's position and the surface's material; `PhysicsConfig.debris_enabled` is its master switch.
+
 const Debris = preload("res://scenes/physics/debris.gd")
 const DebrisVisuals = preload("res://scenes/physics/debris_visuals.gd")
 

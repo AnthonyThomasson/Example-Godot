@@ -1,8 +1,11 @@
 class_name BloodSpawner
 
-const BloodPool = preload("res://scenes/physics/blood_pool.gd")
-const BloodPoolVisuals = preload("res://scenes/physics/blood_pool_visuals.gd")
-const BloodSplat = preload("res://scenes/physics/blood_splat.gd")
+## Physics System: builds blood in the world — one splatter (BloodSplat) per call to `splat`, and a dead
+## body's flowing pool (BloodPool) per call to `bleed`. `BloodWound` and `Physics` call it.
+
+const BloodPool = preload("res://scenes/physics/blood/blood_pool.gd")
+const BloodPoolVisuals = preload("res://scenes/physics/blood/blood_pool_visuals.gd")
+const BloodSplat = preload("res://scenes/physics/blood/blood_splat.gd")
 
 
 ## Add one splatter (BloodSplat) of core radius `size` at world `position` under `parent`, thrown toward

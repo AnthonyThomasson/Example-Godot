@@ -1,5 +1,8 @@
 class_name ProjectileSpawner
 
+## Projectile System: the one place a bullet is built. Guns (Items) call `spawn`; the bullet (projectile.gd)
+## owns its flight and the ballistic outcome of everything it strikes.
+
 const Projectile = preload("res://scenes/projectile/projectile.gd")
 const ProjectileVisuals = preload("res://scenes/projectile/projectile_visuals.gd")
 
