@@ -186,11 +186,13 @@ func secondary(user) -> bool:
 	magazine.rounds -= 1
 	_cooldown += fire_interval()
 	var hand := weapon_hand()
-	var direction: Vector2 = user.facing
+	var muzzle: Vector2 = user.muzzle_origin(hand)
+	# Zeroed: the round crosses the aim line `zero_range` ahead of the body, so a gun held off the line (the
+	# butt on the right shoulder) still shoots where the character points.
+	var direction: Vector2 = (user.global_position + user.facing * GunConfig.zero_range - muzzle).normalized()
 	var spread := deg_to_rad(float(stat("spread_deg", 0.0)))
 	if spread > 0.0:
 		direction = direction.rotated(randf_range(-spread, spread))
-	var muzzle: Vector2 = user.muzzle_origin(hand)
 	var power := round_power()
 	var proj := ProjectileSpawner.spawn(muzzle, direction, user.world_root(), user, damage(),
 		float(stat("muzzle_speed", -1.0)), power, gun)

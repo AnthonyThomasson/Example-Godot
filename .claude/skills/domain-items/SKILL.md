@@ -54,9 +54,11 @@ A subclass supplies only its look and its hold: the gun id (`GUN`, also the `Mag
 `art_size()` / `flat_size()`, `grip_back()` (px the butt sits behind the weapon hand), and the stance names (`grip_stance()` /
 `fore_stance()`, and `raised_grip_stance()` / `raised_fore_stance()`). `muzzle_ahead()` = `art_size().y − grip_back()` (the pistol's is 11), which `Character.muzzle_origin` uses, so a long gun's muzzle is further out.
 
-- **Pistol** (`pistol.gd`): 5×13 art, held at arm's length (`aim`) with the other hand cupping the grip (`support`).
-- **SMG** (`smg.gd`): 6×22 art, `GRIP_BACK` 7; tucked in close (`smg_grip` / `smg_fore`), the other hand out on the shroud.
-- **Rifle** (`rifle.gd`): 7×36 art, `GRIP_BACK` 13; shouldered, butt at the body (`rifle_grip` at the grip, `rifle_fore` out along the
+- **Pistol** (`pistol.gd`): 5×13 art, held at arm's length (`aim`) with the other fist beside it on the grip (`support`: same forward point, both hands together).
+- **SMG** (`smg.gd`): 6×28 art, `GRIP_BACK` 10; shouldered (butt on the right shoulder; `smg_grip` / `smg_fore`), the other hand out on the shroud.
+- **Zeroing:** `GunItem.secondary` aims the round from the muzzle at the point `GunConfig.zero_range` (300 px) ahead on the aim line, not parallel to `facing`, so a
+  shouldered gun (muzzle 9 px off the line) still hits where the character points; the spread is applied around that direction.
+- **Rifle** (`rifle.gd`): 7×36 art, `GRIP_BACK` 13; shouldered, butt on the right shoulder (`rifle_grip` at the grip, `rifle_fore` out along the
   handguard), both hands on the barrel's line.
 
 ## Raised against a wall (`raises_at_contact`)
@@ -103,7 +105,7 @@ A gun's `draw_weapon` draws its painter (`pistol_painter.gd`, `smg_painter.gd`, 
 `weapon_facing()` (which trails the aim a touch as it turns) with its butt `grip_back()` px behind the weapon hand. Painters draw in the
 canonical frame — muzzle toward +y, butt at y = 0 — and scale their parts from `c.w` / `c.h`, so the same painter renders the shortened raised
 barrel. The weapon hand's stance is steady (arm reaching out, steady while walking) and the other hand's holds the gun forward: a two-handed hold.
-The character visuals draw the weapon before the fists, so they grip it. Firing calls `user.kick(WEAPON_HAND, recoil)`, so the weapon hand
+The character visuals draw the weapon under the torso and before the fists, so its butt tucks behind the shoulder and the fists grip it. The weapon hand is hand 0 (the character's right as drawn). Firing calls `user.kick(WEAPON_HAND, recoil)`, so the weapon hand
 (and the gun in it) recoils, and the supporting hand with it by its stance's `recoil_share`.
 
 ## Dropping on death

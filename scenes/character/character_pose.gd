@@ -199,7 +199,7 @@ func run_amount() -> float:
 	return _run
 
 
-## Recoil: throw `hand` (0 = left, 1 = right) back and twist the shoulders back on its side, `strength`
+## Recoil: throw `hand` (0 = right as drawn, 1 = left) back and twist the shoulders back on its side, `strength`
 ## times a pistol's kick. The other hand feels its share if it is steadying the weapon.
 func kick(hand: int, strength := 1.0) -> void:
 	_recoil_vel[hand] += CharacterConfig.pose_recoil * CharacterConfig.pose_recoil_freq * strength

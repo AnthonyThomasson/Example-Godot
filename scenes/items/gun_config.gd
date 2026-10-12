@@ -19,6 +19,10 @@ class_name GunConfig
 ##   spare_magazines   how many of that type a character who carries it also carries spare.
 ##   raises_at_contact the barrel is too long to fire at a wall: it points up and cannot shoot while it touches
 ##                     a wall or object (the pistol is short enough to fire point-blank).
+## How far ahead (px) of the body, on the aim line, every gun is zeroed: a round leaves the muzzle (a shouldered
+## gun's is several px off the line) angled to cross the aim line there, so shots land where the character points
+## at a normal range instead of running parallel to it.
+static var zero_range: float = 300.0
 static var guns: Dictionary = {
 	&"pistol": {
 		"name": "Pistol", "slot": 3, "damage": 15.0, "fire_interval": 0.10, "automatic": false,

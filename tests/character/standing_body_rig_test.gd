@@ -58,11 +58,11 @@ func _check_stances(t: TestContext) -> void:
 		var guard_shoulder: float = t.actor(&"boxer").rig().point(Rig.SHOULDER[i]).z
 		t.check(raised > guard_shoulder - arm * 0.3, "a fist is held up near the shoulder (side %d, %.0f px below)" % [i, guard_shoulder - raised])
 	var gunner = t.actor(&"gunner")
-	var aiming: Vector2 = gunner.hand_position(1)
-	var cupping: Vector2 = gunner.hand_position(0)
+	var aiming: Vector2 = gunner.hand_position(0)
+	var cupping: Vector2 = gunner.hand_position(1)
 	t.check(aiming.dot(gunner.facing) > 20.0, "the pistol hand reaches out in front (%.1f px ahead)" % aiming.dot(gunner.facing))
 	t.check(aiming.distance_to(cupping) < 12.0, "the other hand cups it (%.1f px apart)" % aiming.distance_to(cupping))
-	var muzzle: Vector2 = gunner.muzzle_origin(1) - gunner.hand_world(1)
+	var muzzle: Vector2 = gunner.muzzle_origin(0) - gunner.hand_world(0)
 	t.expect_near(muzzle.length(), CharacterConfig.muzzle_ahead, 0.01, "the muzzle sits muzzle_ahead past the weapon hand")
 
 

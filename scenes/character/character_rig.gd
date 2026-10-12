@@ -16,7 +16,7 @@ extends RefCounted
 ##   together, the feet standing a little ahead of the pelvis so the knees lead.
 ## - Each ankle rests where the legs layer (character_legs.gd) stopped it against a wall or piece of furniture.
 ## Joints are read by index (the constants below, shared with the ragdoll) through `point(i)`, and
-## each foot's direction through `toes(i)`. Index pairs are per hand side (0 = left, 1 = right). A rig also
+## each foot's direction through `toes(i)`. Index pairs are per hand side (0 = the character's right as drawn, 1 = the left). A rig also
 ## answers `torso()` and `face()`, so a crouched body is drawn like a fallen one.
 ## Tuning: CharacterConfig.body_*, CharacterConfig.stances, CharacterConfig.postures.
 
@@ -49,7 +49,7 @@ func _init(character, with_legs := true) -> void:
 	var up := Vector3(0.0, 0.0, 1.0)
 	var torso := Vector2.from_angle(pose.torso_angle)
 	var fwd := Vector3(torso.x, torso.y, 0.0)
-	var right := Vector3(torso.orthogonal().x, torso.orthogonal().y, 0.0)  # Hand 1's side.
+	var right := Vector3(torso.orthogonal().x, torso.orthogonal().y, 0.0)  # Hand 1's side (the character's left as drawn: Godot's orthogonal() turns counter-clockwise).
 	var hips := Vector2.from_angle(pose.hip_angle)
 	var hip_fwd := Vector3(hips.x, hips.y, 0.0)
 	var hip_right := Vector3(hips.orthogonal().x, hips.orthogonal().y, 0.0)
@@ -80,7 +80,7 @@ func _init(character, with_legs := true) -> void:
 	var foot_half := CharacterConfig.body_hip_width * r * lerpf(1.0, CharacterConfig.body_crouch_foot_gap, folded)
 	var foot_fwd := CharacterConfig.body_crouch_foot_ahead * r * folded - lean * 0.5
 	var item: Item = character.current_item()
-	var weapon_hand: int = item.weapon_hand() if item != null else 1
+	var weapon_hand: int = item.weapon_hand() if item != null else 0
 
 	_points.resize(17)
 	_face = Vector3(cos(pose.head_angle), sin(pose.head_angle), 0.0)

@@ -4,7 +4,7 @@ extends GameTest
 ## carried in its hand rather than aimed), and the pistol cannot be fired until the run stops.
 
 const Rig = preload("res://scenes/character/character_rig.gd")
-const WEAPON_HAND := 1
+const WEAPON_HAND := 0
 
 
 func describe() -> Dictionary:

@@ -24,9 +24,10 @@ its own child `Node2D`.
   solved fresh by `character.rig()`) owns the standing skeleton, the 3D joints of the arms and legs
   (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
 - **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the legs and shoes, the arms
-  (sleeve, then forearm), the shoulders (at the pose's lunge), the head (with its shadow on the
-  shoulders), then `item.draw_weapon()`, then both fists (on top, gripping the weapon), then the
-  wound marks over all of it. Once dead it draws the fallen body instead (below).
+  (sleeve, then forearm), then `item.draw_weapon()` (under the torso, so a long gun's butt is tucked behind the shoulder), the shoulders (at the pose's lunge), then both fists (gripping the weapon), then the
+  head last (it is the highest part, so it covers the gun and fists; its shadow falls on the shoulders), then the
+  wound marks over all of it. A crouch (`_draw_lying`) keeps the same order: the head leaves the fallen-body stack and is drawn after the fists.
+  `draw_order` records what the last living draw painted (`weapon`, `torso`, `hands`, `head`) for `tests/character/head_over_gun_test.gd`. Once dead it draws the fallen body instead (below).
   **A standing body is repainted only when its drawing changes.** Each frame `_process` solves the rig once
   (shared by the body's and the shadow's draw) and rounds its inputs to a key: every joint and foot, the
   shoulder / head / fist / weapon angles, the held slot, and the wound count and damage. The key is rounded
@@ -100,10 +101,10 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 `steady` (aim-style spring: follows the aim closely, only drifts), `recoil_share` and `elbow_pole`
 (out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
-`support` (the other hand cupping it: the pistol's two-handed hold) and `reload` (that hand dropped to the belt
+`support` (the other hand on the grip beside the aim hand: both fists at the same forward point, 2 px either side of the aim line, so they grip the pistol together) and `reload` (that hand dropped to the belt
 for the next magazine, named by a gun's support hand while it reloads). The long guns have their own pairs, sized by the gun: `smg_grip` / `smg_fore`
-(tucked in close, the other hand out on the shroud) and `rifle_grip` / `rifle_fore` (the butt against the shoulder, the grip hand
-just ahead of it, the other hand out along the handguard); both hands lie on one line along the barrel (hand 1 at +`lateral`, hand 0 at
+and `rifle_grip` / `rifle_fore` (the butt on the right shoulder, 9 px to the character's right of the aim line and just ahead of the shoulder joint, the grip hand
+just ahead of it, the other hand out along the handguard); both hands lie on one line along the barrel (hand 0 at +`lateral`, hand 1 at
 −`lateral`) and an arm's stretch stays within the rig's tolerance. `ready_grip` / `ready_fore` are the shared **raised** pair (below).
 A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row
 and have an item name it. `Item.muzzle_ahead()` is how far past the weapon hand bullets

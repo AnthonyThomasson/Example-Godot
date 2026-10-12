@@ -109,7 +109,7 @@ func is_attacking() -> bool:
 	return _attack_active
 
 
-## Local-space center of a hand (0 = left, 1 = right): the collision-resolved position.
+## Local-space center of a hand (0 = the character's right as drawn, 1 = the left): the collision-resolved position.
 func hand_position(hand: int) -> Vector2:
 	return _hand_pos[hand]
 

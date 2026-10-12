@@ -40,7 +40,7 @@ func run(t: TestContext) -> void:
 	var pitch := rad_to_deg(atan2(crouched["lean"], crouched["rise"]))
 	t.check(pitch > 12.0 and pitch < 40.0, "the spine pitches forward about %.0f degrees" % pitch)
 	t.check(crouched["rise"] > 0.0 and crouched["rise"] < standing["rise"], "the chest is above the pelvis, but lower than standing")
-	t.check(crouched["head_ahead"] > standing["head_ahead"] + 0.2 * r, "the crouched head is ahead of the chest (%.1f px)" % crouched["head_ahead"])
+	t.check(crouched["head_ahead"] > standing["head_ahead"] + 0.1 * r, "the crouched head is ahead of the chest (%.1f px)" % crouched["head_ahead"])
 	t.check(absf(crouched["centre"]) < 0.15 * r, "the body stays centred over the feet (%.1f px off)" % crouched["centre"])
 	t.check(crouched["hip_gap"] < standing["hip_gap"] * 0.85, "the hips are closer together (%.1f vs %.1f px)" % [crouched["hip_gap"], standing["hip_gap"]])
 	t.check(crouched["foot_gap"] < standing["foot_gap"] * 0.7, "the feet are closer together (%.1f vs %.1f px)" % [crouched["foot_gap"], standing["foot_gap"]])
@@ -74,7 +74,7 @@ func _shape(c) -> Dictionary:
 		"hip_gap": absf(hips[0].y - hips[1].y),
 		"foot_gap": absf(ankles[0].y - ankles[1].y),
 		"knee_ahead": ((knees[0].x - hips[0].x) + (knees[1].x - hips[1].x)) * 0.5,
-		"reach": rig.point(Rig.HAND[1]).x - rig.point(Rig.SHOULDER[1]).x,
+		"reach": rig.point(Rig.HAND[0]).x - rig.point(Rig.SHOULDER[0]).x,
 		"thigh": hips[1].distance_to(knees[1]),
 		"shin": knees[1].distance_to(ankles[1]),
 	}

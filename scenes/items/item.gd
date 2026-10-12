@@ -17,7 +17,7 @@ var reach := 28.0
 var reloading := false
 
 
-## How `hand` (0 = left, 1 = right) is held while this item is out: the name of a stance in
+## How `hand` (0 = right as drawn, 1 = left) is held while this item is out: the name of a stance in
 ## CharacterConfig.stances — "relaxed" (arm hanging), "guard" (fists up), "aim" (arm out, steady,
 ## holding a weapon) or "support" (cupping the aiming hand). Default: relaxed.
 func hand_stance(_hand: int) -> StringName:
@@ -46,9 +46,9 @@ func is_automatic() -> bool:
 	return false
 
 
-## The hand that holds this item's weapon (the muzzle and the recoil are that hand's). Default: the right.
+## The hand that holds this item's weapon (the muzzle and the recoil are that hand's). Default: the right (hand 0).
 func weapon_hand() -> int:
-	return 1
+	return 0
 
 
 ## How far past the weapon hand the muzzle is (px): bullets leave there, and a long gun reaches further.

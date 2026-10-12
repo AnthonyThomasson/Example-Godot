@@ -3,7 +3,7 @@ class_name FistsItem extends Item
 ## Both fists. F throws a punch, alternating hands each press (the alternation state lives
 ## here, in the item). No secondary action.
 
-## Which hand punches next: 0 = left, 1 = right.
+## Which hand punches next: 0 = right as drawn, 1 = left.
 var _next_hand := 0
 
 

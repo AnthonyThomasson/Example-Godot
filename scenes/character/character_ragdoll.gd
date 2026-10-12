@@ -6,7 +6,7 @@ extends RefCounted
 ## cones at the neck, shoulders and hips, and hinges at the elbows and knees that only ever bend the
 ## natural way. It is launched with the body's momentum, a topple along the killing blow and a
 ## buckle at the knees, then left to fall. Owned and stepped by character.gd once dead; read by the
-## visuals, which draw it top-down by height. Index pairs are per hand side (0 = left, 1 = right),
+## visuals, which draw it top-down by height. Index pairs are per hand side (0 = right as drawn, 1 = left),
 ## matching the hands. Tuning: CharacterConfig.ragdoll_*.
 
 const Rig = preload("res://scenes/character/character_rig.gd")

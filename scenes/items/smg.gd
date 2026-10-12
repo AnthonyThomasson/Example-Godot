@@ -1,7 +1,7 @@
 class_name SmgItem extends GunItem
 
-## A submachine gun: a compact automatic held in both hands in front of the chest, its butt tucked against the
-## body, a longer reach than a pistol but nowhere near a rifle. Everything a gun does lives in `GunItem`, tuned
+## A submachine gun: a compact automatic held in both hands with its butt on the right shoulder, a longer reach
+## than a pistol but nowhere near a rifle. Everything a gun does lives in `GunItem`, tuned
 ## by the SMG's `GunConfig` row (fast, light rounds, a wide spread); this supplies its look and its hold. Its
 ## barrel is too long for a wall: touching one, it points up and cannot fire.
 
@@ -10,9 +10,10 @@ const SmgFlatPainter = preload("res://scenes/items/smg_flat_painter.gd")
 ## The SMG's footprint lying flat on its side (px): its profile across, its length along.
 const FLAT_SIZE := Vector2(11.0, 22.0)
 ## SMG sprite footprint (px): width across, length from butt to muzzle.
-const ART_SIZE := Vector2(6.0, 22.0)
-## How far the butt end sits behind the hand's center (px): the hand grips the pistol grip, mid-gun.
-const GRIP_BACK := 7.0
+const ART_SIZE := Vector2(6.0, 28.0)
+## How far the butt end sits behind the hand's center (px): the hand grips the pistol grip, the butt is on the
+## right shoulder.
+const GRIP_BACK := 10.0
 
 ## The kind of magazine it takes (`Magazine.gun`) and its `GunConfig` row.
 const GUN := &"smg"

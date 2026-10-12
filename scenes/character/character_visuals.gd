@@ -51,6 +51,7 @@ const FOLD_DRAW := 0.15
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
 var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
 var redraws := 0  ## How many times the standing body has been drawn (tests read it).
+var draw_order: Array[StringName] = []  ## What the last living draw painted over the body, in order (tests read it).
 
 
 func _ready() -> void:
@@ -106,6 +107,7 @@ func _draw() -> void:
 		_draw_fallen(_character.ragdoll)
 		return
 	redraws += 1
+	draw_order.clear()
 	var pose = _character.pose
 	var rig = _rig if _rig != null else _character.rig()
 	if draws_laid_out():
@@ -128,17 +130,22 @@ func _draw() -> void:
 		_draw_chain(_leg_chain(rig, i))
 	for i in 2:
 		_draw_chain(_arm_chain(rig, i))
+	# The weapon goes under the torso: its butt is tucked behind the shoulder, the barrel shows beyond.
+	if item:
+		item.draw_weapon(self, _character)
+		draw_order.append(&"weapon")
 	# Shoulders: the art through the flesh silhouette deformed by any shots (dents + darkening).
 	draw_set_transform(lunge, 0.0, Vector2.ONE)
 	Deformation.draw_shape(self, "circle", size, body_color, CharacterConfig.flesh_crack_color,
 		impacts, damage_total, Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR,
 		body, torso, false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	_draw_head(pose, rig, placed, damage_total)
-	if item:
-		item.draw_weapon(self, _character)
+	draw_order.append(&"torso")
 	for hand in 2:
 		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, placed, damage_total)
+	draw_order.append(&"hands")
+	_draw_head(pose, rig, placed, damage_total)  # The highest part: over the gun and the fists.
+	draw_order.append(&"head")
 	# Wound marks over everything, so a hit hand shows its wound: dark-red holes and cracks that
 	# read as bloody gashes (config-driven).
 	Deformation.draw_marks(self, placed, CharacterConfig.flesh_crack_color,
@@ -170,12 +177,18 @@ func draws_laid_out() -> bool:
 ## body is drawn (a lofted trunk showing its back, the limbs laid out), then what it holds and its fists on top.
 func _draw_lying(rig) -> void:
 	var pose = _character.pose
-	_draw_fallen(rig, false)
 	var item: Item = _character.current_item()
-	if item:
-		item.draw_weapon(self, _character)
+	# The weapon goes under the trunk: its butt is tucked behind the shoulder, the barrel shows beyond.
+	var weapon := func() -> void:
+		if item:
+			item.draw_weapon(self, _character)
+			draw_order.append(&"weapon")
+	_draw_fallen(rig, false, false, weapon)
 	for hand in 2:
 		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, [], 0.0)
+	draw_order.append(&"hands")
+	_draw_fallen_head(_head_part(rig))  # The highest part: over the gun and the fists.
+	draw_order.append(&"head")
 
 
 ## The shoulders' art canvas: the body's round footprint.
@@ -249,7 +262,7 @@ func _draw_head(pose, rig, impacts: Array, damage_total: float) -> void:
 	_draw_part(tex, size, at, angle, impacts, damage_total, skin_color)
 
 
-## A fist at the given hand (0 = left, 1 = right), turned to `angle`, dented by the shots that
+## A fist at the given hand (0 = right as drawn, 1 = left), turned to `angle`, dented by the shots that
 ## passed through where it is and darkened like the body.
 func _draw_hand(hand: int, angle: float, impacts: Array, damage_total: float) -> void:
 	var diameter: float = _hands.hand_radius * 2.0 + 2.0
@@ -366,9 +379,10 @@ func _draw_body_shadow() -> void:
 const STACK_BAND := 3.0
 
 
-## Every part of the fallen body, lowest first. A living body lying down draws its own fists (`with_hands`
-## off), over the weapon.
-func _draw_fallen(rd, with_hands := true) -> void:
+## Every part of the fallen body, lowest first. A living body bent over draws its own fists (`with_hands`
+## off), over the weapon, and its head (`with_head` off) over both; `before_trunk` draws the weapon just
+## under the trunk.
+func _draw_fallen(rd, with_hands := true, with_head := true, before_trunk := Callable()) -> void:
 	for part in _stack(_fallen_parts(rd)):
 		match part["kind"]:
 			"chain":
@@ -376,9 +390,14 @@ func _draw_fallen(rd, with_hands := true) -> void:
 			"hand":
 				_draw_fallen_hand(part)
 			"head":
-				_draw_fallen_head(part)
+				if with_head:
+					_draw_fallen_head(part)
 			"trunk":
+				if before_trunk.is_valid():
+					before_trunk.call()
 				_draw_trunk(rd)
+				if before_trunk.is_valid():
+					draw_order.append(&"torso")
 
 
 ## `parts` lowest first. The order carries over from the last frame and a pair swaps only once their
@@ -437,9 +456,16 @@ func _fallen_parts(rd) -> Array:
 	var neck := CharacterConfig.body_neck_width
 	parts.append(_keyed(_chain([_seg(chest, head, neck, neck,
 		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, skin_color, "")]), "neck"))
-	parts.append({ "kind": "head", "key": "head", "at": head, "height": head.z, "face": rd.face(), "neck": chest - head })
+	parts.append(_head_part(rd))
 	parts.append({ "kind": "trunk", "key": "trunk", "height": (chest.z + rd.point(Rig.PELVIS).z) * 0.5 })
 	return parts
+
+
+## The head as a fallen-body part: where it is, the way it faces and the neck it sits on.
+func _head_part(rd) -> Dictionary:
+	var head: Vector3 = rd.point(Rig.HEAD)
+	return { "kind": "head", "key": "head", "at": head, "height": head.z, "face": rd.face(),
+		"neck": rd.point(Rig.CHEST) - head }
 
 
 ## `part` tagged with the stable `key` its draw order is remembered by.

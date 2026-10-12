@@ -1,8 +1,8 @@
 extends GameTest
 
-## A gun's size decides how it is held. The pistol is held out at arm's length with the other hand cupping its
-## grip; the SMG is tucked in close; the rifle is shouldered, its butt against the body, the trigger hand at the
-## grip and the other hand out along the barrel — both hands on the barrel's line. In every hold the arms keep their
+## A gun's size decides how it is held. The pistol is held out at arm's length in both hands, side by side on its
+## grip; the SMG and the rifle are shouldered, the butt on the right shoulder, the trigger hand at the grip and the
+## other hand out along the barrel — both hands on the barrel's line. In every hold the arms keep their
 ## length, and the muzzle sits where the gun's own length says. Drawing the art runs every frame, so any engine
 ## error fails the test too.
 
@@ -12,6 +12,9 @@ const Rig = preload("res://scenes/character/character_rig.gd")
 const BONE_TOLERANCE := 0.06
 ## How far (px) a hand may sit off the line through the weapon hand along the aim.
 const LINE_TOLERANCE := 4.0
+## How far (px) a long gun's butt may sit from the right shoulder joint, and how far apart (px) the pistol's two fists may be.
+const SHOULDER_TOLERANCE := 4.0
+const FISTS_TOGETHER := 8.0
 
 const GUNS := {
 	&"pistol": [&"pistol_man", 3],
@@ -23,7 +26,7 @@ const GUNS := {
 func describe() -> Dictionary:
 	return {
 		"name": "Long guns are held by their size",
-		"description": "Pistol, SMG and rifle holds: hands on the barrel, butt of a long gun at the body, arms at their true length, muzzle at the gun's length.",
+		"description": "Pistol, SMG and rifle holds: hands on the barrel, pistol hands together, butt of a long gun on the right shoulder, arms at their true length, muzzle at the gun's length.",
 		"tags": ["gun", "stance", "rig", "arms", "pose"],
 		"timeout": 12.0,
 	}
@@ -63,16 +66,18 @@ func run(t: TestContext) -> void:
 		var muzzle: Vector2 = c.muzzle_origin(item.weapon_hand()) - c.hand_world(item.weapon_hand())
 		t.expect_near(muzzle.length(), item.muzzle_ahead(), 0.01, "%s: the muzzle sits muzzle_ahead past the weapon hand" % gun)
 		lengths[gun] = item.art_size().y
-		butts[gun] = butt
+		var shoulder: Vector3 = c.rig().point(Rig.SHOULDER[item.weapon_hand()])
+		butts[gun] = (grip - f * item.grip_back()).distance_to(Vector2(shoulder.x, shoulder.y))
+		t.check(grip.dot(f.orthogonal()) < 0.0, "%s: the weapon hand is on the character's right (%.1f px across)" % [gun, -grip.dot(f.orthogonal())])
+		if gun == &"pistol":
+			t.check(fore.distance_to(grip) <= FISTS_TOGETHER, "pistol: both fists are together on the grip (%.1f px apart)" % fore.distance_to(grip))
+			t.check(absf((fore - grip).dot(f)) <= 1.0, "pistol: neither fist is ahead of the other (%.1f px)" % (fore - grip).dot(f))
 	t.check(lengths[&"rifle"] > lengths[&"smg"] and lengths[&"smg"] > lengths[&"pistol"],
 		"the guns are drawn longer the bigger they are (%s)" % lengths)
-	var radius: float = t.actor(&"rifle_man").radius
 	for gun: StringName in [&"smg", &"rifle"]:
-		t.check(butts[gun] <= radius + 1.0, "a %s's butt is held in against the body (%.0f px out, body radius %.0f)" % [gun, butts[gun], radius])
-	t.check(butts[&"rifle"] < butts[&"smg"] and butts[&"smg"] < butts[&"pistol"],
-		"the bigger the gun, the nearer the body its butt is (%s)" % butts)
+		t.check(butts[gun] <= SHOULDER_TOLERANCE, "a %s's butt is on the right shoulder (%.1f px from the joint)" % [gun, butts[gun]])
 	var rifle = t.actor(&"rifle_man")
-	t.check(rifle.hand_position(0).dot(rifle.facing) > rifle.hand_position(1).dot(rifle.facing) + 8.0,
+	t.check(rifle.hand_position(1).dot(rifle.facing) > rifle.hand_position(0).dot(rifle.facing) + 8.0,
 		"the rifle's other hand reaches out along the barrel past the trigger hand")
 
 

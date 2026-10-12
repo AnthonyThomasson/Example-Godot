@@ -27,9 +27,9 @@ func configure(s: TestSetup) -> void:
 	s.set_static(GunConfig, "guns", _straight_guns())
 	# Pinned to its spot (speed 0) to begin with, aimed east at the intruder along y = 250.
 	s.actor(&"defender", &"defender", Vector2(300, 250), { "start_slot": RIFLE_SLOT, "speed": 0.0, "max_health": 400.0 })
-	# A chair whose south edge (y = 246) is just north of the defender's aim line (y = 250) and across its barrel's
-	# line (y = 244): clear to shoot past, but the barrel is against it.
-	s.object(&"chair", "chair", Vector2(336, 232))
+	# A chair whose north edge (y = 254) is just south of the defender's aim line (y = 250) and across its barrel's
+	# line (y = 259, the rifle is on the right): clear to shoot past, but the barrel is against it.
+	s.object(&"chair", "chair", Vector2(336, 268))
 	s.actor(&"intruder", &"puppet", Vector2(750, 250), { "start_slot": 1, "faction": &"invader", "max_health": 400.0 })
 
 
