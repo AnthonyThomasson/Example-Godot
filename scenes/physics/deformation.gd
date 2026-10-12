@@ -19,6 +19,11 @@ const NO_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 const HOLE_COLOR := Color(0.05, 0.05, 0.06)
 ## Multiplier that packs two piece ids into one dictionary key in `_convex_pieces` (ids stay far below it).
 const PIECE_PAIR_STRIDE := 65536
+## Dented silhouettes `shape_polygon` keeps before it starts over (a dozen bodies, a few parts each).
+const POLYGON_CACHE_SIZE := 256
+
+## `shape_polygon`'s kept results: inputs hash -> [the inputs, the polygon].
+static var _polygon_cache: Dictionary = {}
 
 
 ## Closed perimeter sample ring for a primitive shape, centered on the origin.
@@ -133,7 +138,27 @@ static func _exit_distance(ring: PackedVector2Array, p: Vector2, dir: Vector2) -
 ## Deformed perimeter polygon for a furniture shape — the single source both the visuals
 ## and the collider use. The central core scales with the shape, so a small body dents
 ## deeply without folding while big furniture (whose dents never reach the core) is unchanged.
+## A dented silhouette is the same until the next hit, but it is asked for several times by each hit (the collider
+## rebuild, the drop shadow, the drawing) and again by every repaint of a character, so the last few are kept, keyed by
+## everything the result is made from.
 static func shape_polygon(shape: String, size: Vector2, impacts: Array) -> PackedVector2Array:
+	if impacts.is_empty():
+		return _shape_polygon(shape, size, impacts)
+	var inputs: Array = [shape, size, impacts, PhysicsConfig.deform_core_fraction, PhysicsConfig.deform_radius,
+		PhysicsConfig.deform_back_margin, PhysicsConfig.deform_circle_points, PhysicsConfig.deform_rect_points_per_edge,
+		PhysicsConfig.deform_chunk_reach_scale, PhysicsConfig.deform_chunk_jitter, PhysicsConfig.deform_chunk_depth]
+	var key := inputs.hash()
+	var kept = _polygon_cache.get(key)
+	if kept != null and kept[0] == inputs:
+		return kept[1]
+	var poly := _shape_polygon(shape, size, impacts)
+	if _polygon_cache.size() >= POLYGON_CACHE_SIZE:
+		_polygon_cache.clear()
+	_polygon_cache[key] = [inputs.duplicate(true), poly]
+	return poly
+
+
+static func _shape_polygon(shape: String, size: Vector2, impacts: Array) -> PackedVector2Array:
 	var core := minf(size.x, size.y) * 0.5 * PhysicsConfig.deform_core_fraction
 	return deform(base_ring(shape, size), impacts, PhysicsConfig.deform_radius, core)
 
