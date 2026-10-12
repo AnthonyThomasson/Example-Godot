@@ -50,7 +50,11 @@ const REDRAW_RAISE_STEP := 0.1
 const FOLD_DRAW := 0.15
 ## A hand gripping lower than this (body radii off the floor: relaxed 3.7, running ~4-5.8) hangs below the shoulders and is drawn under them.
 const HAND_OVER_HEIGHT := 5.0
+## Px beyond the camera's view inside which a body is still drawn: the longest reach of a limb or a held gun past the body
+## centre, so a part poking into view from a body just outside it is never missing.
+const CULL_MARGIN := 120.0
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
+var _offscreen := false  ## The body was outside the camera's view last frame, so nothing was repainted.
 var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
 var redraws := 0  ## How many times the standing body has been drawn (tests read it).
 var draw_order: Array[StringName] = []  ## What the last living draw painted over the body, in order (tests read it).
@@ -62,6 +66,12 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if not _in_view():
+		if not _offscreen:
+			_offscreen = true
+			_redraw_key = PackedInt32Array()  # Whatever changes off screen, the first frame back repaints.
+		return
+	_offscreen = false
 	var ragdoll = _character.ragdoll
 	if ragdoll == null:
 		_rig = _character.rig()
@@ -76,6 +86,17 @@ func _process(_delta: float) -> void:
 	_settled_drawn = ragdoll.is_settled()
 	queue_redraw()
 	_shadow.queue_redraw()
+
+
+## Whether the body is within `CULL_MARGIN` px of the camera's view: the viewport's visible rect taken back into world space
+## through its canvas transform. A body outside it is not solved or repainted (its last drawing stays, unseen); with no
+## viewport it counts as in view.
+func _in_view() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return true
+	var seen: Rect2 = vp.get_canvas_transform().affine_inverse() * vp.get_visible_rect()
+	return seen.grow(CULL_MARGIN).has_point(global_position)
 
 
 ## The inputs of the standing draw for `rig`, each rounded to its redraw step: the joints and feet (which

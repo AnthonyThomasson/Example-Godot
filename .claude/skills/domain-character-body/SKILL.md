@@ -35,6 +35,12 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   join `_redraw_key_of`, or the body will not repaint when it changes. Test:
   `tests/character/standing_body_repaints_on_change_test.gd`; the idle crowd's frame cost is guarded by
   `tests/perf/crowd_deaths_stress_test.gd`.
+  **A body the camera cannot see is not drawn at all.** `_process` first asks `_in_view()`: the viewport's visible rect
+  taken into world space through its canvas transform, grown by `CULL_MARGIN` (120 px, the longest reach of a limb or a
+  held gun past the body centre). Outside it nothing is solved or repainted, standing or fallen, and its last drawing stays
+  unseen; the redraw key is cleared so the first frame back in view repaints. A test whose camera does not frame a body it
+  reads the drawing of (the spectator camera drops the dead from its framing) keeps it in view with `camera_follow`
+  (`tests/character/fallen_draw_order_stable_test.gd`). Test: `tests/character/offscreen_body_is_not_drawn_test.gd`.
 
 ## Pose (the living motion)
 

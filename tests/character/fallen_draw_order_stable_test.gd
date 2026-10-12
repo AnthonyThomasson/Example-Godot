@@ -22,6 +22,7 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"physics.blood", false)
 	s.actor(&"shooter", &"puppet", Vector2(200, 250), { "start_slot": 3 })
 	s.actor(&"target", &"puppet", Vector2(560, 250), { "max_health": 1.0 })
+	s.camera_follow([&"target"])  # The camera stays on the body: one out of its view is not drawn, so its order would not change.
 
 
 ## The highest part of a body, by height.
