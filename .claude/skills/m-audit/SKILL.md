@@ -1,17 +1,18 @@
 ---
 name: m-audit
-description: Audit the staged change before it is committed — domain isolation, architecture and domain skills in sync, current-state comments, load check and tests — as a checklist of file:line fixes. Manual only — invoked as `/m-audit`.
+description: Audit everything the branch changes against main (its commits plus anything staged) — domain isolation, architecture and domain skills in sync, current-state comments, load check and tests — as a checklist of file:line fixes. Manual only — invoked as `/m-audit`.
 disable-model-invocation: true
 model: claude-sonnet-5-5
 ---
 
 # Audit
 
-Run this over the **staged** change, before it is committed — it is the last gate between a
-diff and a commit. The output is always a **checklist of concrete issues**, each tied to a
-`file:line` and a specific fix, so the author can act on it directly (or a clean bill of health
-when there is nothing to fix). Do not commit, merge or push, and do not fix findings unless the
-user asks.
+Run this over the **branch's change**: every commit on the branch since it diverged from `main`,
+plus anything staged on top. It works before a commit (a staged diff) and after (committed work) —
+it is the last gate between a branch and a push or PR. The output is always a **checklist of
+concrete issues**, each tied to a `file:line` and a specific fix, so the author can act on it
+directly (or a clean bill of health when there is nothing to fix). Do not commit, merge or push,
+and do not fix findings unless the user asks.
 
 Three things make a change healthy in this project, in priority order: the domains stay
 **isolated**, the architecture skills stay **true**, and the comments describe the code **as it
@@ -26,19 +27,31 @@ are held to the same current-state bar as code comments — see Step 3.
 
 ## Step 0 — Gather the change and the ground truth
 
-If nothing is staged (`git diff --staged --stat` is empty), say so and stop. Do not stage files
-yourself.
+The change under audit is the **index compared with the branch's merge-base**: the committed work on
+the branch and whatever is staged, as one diff. The base is `origin/main` (falling back to `main`),
+or the ref the user named (`/m-audit <ref>`). Compare against the merge-base, not the tip of the
+base ref, so commits that landed on `main` after the branch diverged are not mistaken for the
+branch's own.
 
 ```bash
-git diff --staged --stat
-git diff --staged --name-only --diff-filter=d
-git diff --staged            # the actual hunks — read them, this is what you are verifying
+cd "$(git rev-parse --show-toplevel)"
+BASE_REF=origin/main; git rev-parse --verify -q "$BASE_REF" >/dev/null || BASE_REF=main   # or the user's ref
+BASE=$(git merge-base "$BASE_REF" HEAD)
+git log --oneline "$BASE"..HEAD            # the commits on the branch
+git diff --staged --stat "$BASE"           # committed + staged
+git diff --staged --name-only --diff-filter=d "$BASE"
+git diff --staged "$BASE"                  # the actual hunks — read them, this is what you are verifying
+git diff --stat                            # unstaged edits, if any (not part of the diff above)
 ```
+
+If `git diff --staged --stat "$BASE"` is empty, the branch has nothing beyond its base: say so and
+stop. Do not stage files yourself. Unstaged edits are not part of the diff, but the load check, lint
+and tests in Step 5 run on the working tree and see them — if there are any, say so in the report.
 
 Then load the **`architecture`** skill. It is the source of truth for this codebase's
 architecture: the domain table (one folder per domain under `scenes/`) and, crucially, **"The
 vital interfaces"** — the *entire* sanctioned cross-domain surface. Everything not on that list is
-private to its domain. You are checking the staged change against that contract, so you need it
+private to its domain. You are checking the branch's change against that contract, so you need it
 fresh in mind.
 
 Also read the `domain-<folder>/SKILL.md` for **every domain the diff touches** (map a changed
@@ -160,18 +173,18 @@ and true. The bar: **concise, present-tense, current-state only.**
 5. **File header:** one `##` block at the top of each script saying what the file is and which
    domain it belongs to.
 
-Run these audits over the **staged** `.gd` files (they are deterministic — prefer them to
-eyeballing). Collect the staged set once:
+Run these audits over the `.gd` files the branch changes (they are deterministic — prefer them to
+eyeballing). Collect the set once, with `$BASE` from Step 0:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
-STAGED_GD=$(git diff --staged --name-only --diff-filter=d -- '*.gd')
+CHANGED_GD=$(git diff --staged --name-only --diff-filter=d "$BASE" -- '*.gd')
 ```
 
-Undocumented non-lifecycle functions in staged files (should print nothing):
+Undocumented non-lifecycle functions in the changed files (should print nothing):
 
 ```bash
-for f in $STAGED_GD; do
+for f in $CHANGED_GD; do
   awk 'prev !~ /^[[:space:]]*##/ && $0 ~ /^[[:space:]]*(static )?func / {
     l=$0; sub(/\(.*/,"",l); gsub(/^[[:space:]]*/,"",l); print FILENAME":"NR": "l } { prev=$0 }' "$f"
 done | grep -vE 'func _(ready|process|physics_process|draw|init|input)\b'
@@ -180,16 +193,16 @@ done | grep -vE 'func _(ready|process|physics_process|draw|init|input)\b'
 Member vars / signals without a preceding or trailing `##` (skim — a trailing `## …` counts):
 
 ```bash
-for f in $STAGED_GD; do
+for f in $CHANGED_GD; do
   awk 'prev !~ /^##/ && prev !~ /^@onready/ && ($0 ~ /^@export/ || $0 ~ /^var / || $0 ~ /^signal /) {
     print FILENAME":"NR": "$0 } { prev=$0 }' "$f"
 done
 ```
 
-History / speculation sweep over staged files (each hit should be an ordinary word, not history):
+History / speculation sweep over the changed files (each hit should be an ordinary word, not history):
 
 ```bash
-for f in $STAGED_GD; do
+for f in $CHANGED_GD; do
   grep -nHiE '\b(was |were |renamed|moved to|moved from|used to|formerly|previously|today|tomorrow| later\b|in future|hardcoded|the animator)' "$f"
 done
 ```
@@ -206,15 +219,18 @@ a name that shadows a member or a built-in, a redundant `await`. Report each as 
 warning to make it pass: fix the code.** `@warning_ignore`, `@warning_ignore_start`, an underscore prefix that hides a
 parameter which should be removed or used, and a lowered warning level in `project.godot` are all last resorts. Accept one
 only when no code change can remove the warning, and then only on the one statement, with a comment saying why it cannot
-be fixed. Flag every `@warning_ignore*` the staged diff adds (`git diff --staged | grep -n 'warning_ignore'`) and every
-`[debug]` / `gdscript/warnings` line it adds to `project.godot` as a finding unless it meets that bar. When renaming to
+be fixed. Flag every `@warning_ignore*` the branch's diff adds (`git diff --staged "$BASE" | grep -n '^+.*warning_ignore'`)
+and every `[debug]` / `gdscript/warnings` line it adds to `project.godot` as a finding unless it meets that bar. When renaming to
 clear a shadowing warning, grep the function for the old name: a stale reference silently binds to the member it used to
 shadow (`name`, `visible`, `material`) and no lint or parse error follows.
 
 Then run the game tests (Bash sandbox disabled; AI changes are covered without a server by the scripted-Von
-tests, and `--include-von` adds the live-server ones): `tools/run_tests.sh --changed --summary` runs the touched
-domains plus the domains that compose them (and the self-tests for `scenes/testing/` or the Von stub); a change
-to worldgen, art, general or `main.gd` makes it run everything, so add `--jobs=auto` there. Report the totals line
+tests, and `--include-von` adds the live-server ones):
+`GAME_TEST_CHANGED_FILES="$(git diff --staged --name-only "$BASE")" tools/run_tests.sh --changed --summary` runs the
+touched domains plus the domains that compose them (and the self-tests for `scenes/testing/` or the Von stub). The
+variable hands `--changed` the branch's file list; without it `--changed` sees only uncommitted edits and, on a branch
+whose work is committed, runs nothing. A change to worldgen, art, general or `main.gd` makes it run everything, so add
+`--jobs=auto` there. Report the totals line
 and every FAIL / TIMEOUT with its ✗ lines; exit code 1
 also covers an engine error/warning logged during a test. A change that adds or alters behaviour should
 add or update a test in `tests/<domain>/` (see the `domain-testing` skill) — flag it if none covers it.
@@ -265,7 +281,7 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 
 ### Comments & docs
 - [ ] `scenes/physics/physics.gd:33` — comment describes the old signature ("(parent, hit, exclude)"). Fix: state the current 5-arg form.
-- [x] Every staged method/property is documented; no history framing.
+- [x] Every changed method/property is documented; no history framing.
 
 ### Load check & tests
 - [x] Headless load clean — no SCRIPT ERROR / Parse Error.
@@ -276,8 +292,11 @@ a `file:line`, the problem in a phrase, and the concrete fix. End with a one-lin
 ### Worktree editor
 - [x] `tools/editor.sh --autorun` running for `fix-the-flicker` (pid 4242, port 9345); setup menu shows `fix-the-flicker`.
 
-**Verdict:** 3 issues to address before commit.
+**Verdict:** 3 issues to address before the branch is pushed.
 ```
 
-If everything passes, the verdict is simply that the change is ready to commit — don't invent
+Open the report with the scope it covered: the base ref, the merge-base short sha, the number of
+commits on the branch, and whether anything was staged on top.
+
+If everything passes, the verdict is simply that the change is ready to push — don't invent
 issues to look thorough. A clean change is the goal, not a long list.

@@ -8,7 +8,7 @@ effort: xhigh
 
 # Audit everything — whole-codebase health audit
 
-`/m-audit` gates **one staged diff** before it is committed. This skill audits the **codebase as
+`/m-audit` gates **one branch's change** (its commits since `main`, plus anything staged) before it is pushed. This skill audits the **codebase as
 it stands**, looking for what accumulates *between* changes: code nothing calls any more,
 mechanisms whose consumer was removed, duplication that crept in, boundaries that eroded, domains
 that outgrew one folder, and documentation that quietly stopped being true.
