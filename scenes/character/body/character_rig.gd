@@ -32,6 +32,9 @@ const KNEE := [12, 13]
 const ANKLE := [14, 15]
 const SPINE := 16  ## The back, opposite the belly.
 
+## How many rigs have been solved in all (a test reads it to check a frame's callers share one solve).
+static var solves := 0
+
 var _points: Array = []                       ## Vector3 per joint index.
 var _toes := [Vector3.RIGHT, Vector3.RIGHT]   ## Per side: the way the foot points (unit, flat).
 var _face := Vector3.RIGHT                    ## The way the face looks (unit, flat).
@@ -44,6 +47,7 @@ var _shin := 0.0
 ## the legs layer rested it at against a wall or piece of furniture (`character.foot_clamp(i)`, when it has
 ## one); the legs layer itself solves without, to learn where the legs would go unobstructed.
 func _init(character, with_legs := true) -> void:
+	solves += 1
 	var r: float = character.radius
 	var pose = character.pose
 	var up := Vector3(0.0, 0.0, 1.0)

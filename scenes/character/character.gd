@@ -39,6 +39,8 @@ var facing := Vector2.RIGHT
 var pose: CharacterPose = CharacterPose.new()
 ## The falling body once dead (null while alive): stepped here, drawn by the visuals.
 var ragdoll: CharacterRagdoll
+var _rig_cache: CharacterRig = null  ## The standing rig solved for `_rig_frame` (see `rig()`).
+var _rig_frame := -1  ## The physics frame `_rig_cache` was solved in.
 ## True once the dead body has come to rest and started bleeding out.
 var _bled_out := false
 
@@ -248,6 +250,7 @@ func select_slot(slot: int) -> void:
 	if slot in _items and slot != _current_slot:
 		_cancel_reload()
 		_current_slot = slot
+		_rig_cache = null  # The weapon hand may change: the rig is solved afresh on the next read.
 		_update_weapon_raise(0.0)  # Judged for the new item now, so a shot in this same frame can't slip past a wall.
 
 
@@ -309,6 +312,7 @@ func set_posture(wanted: StringName) -> bool:
 		return false
 	_posture = wanted
 	_posture_cooldown = CharacterConfig.posture_change_time
+	_rig_cache = null
 	return true
 
 
@@ -658,9 +662,14 @@ func _muzzle_ahead(item: Item) -> float:
 
 
 ## The standing skeleton as it is held right now (see character_rig.gd), for the visuals and anything
-## that wants the arms' and legs' joints.
+## that wants the arms' and legs' joints. Solved once per physics frame and shared: the pose, the hands and the feet's
+## rests change only in `_physics_process`, so every caller in the same frame (the draw, a footfall, a test) gets the one solve.
 func rig() -> CharacterRig:
-	return CharacterRig.new(self)
+	var frame := Engine.get_physics_frames()
+	if _rig_cache == null or _rig_frame != frame:
+		_rig_cache = CharacterRig.new(self)
+		_rig_frame = frame
+	return _rig_cache
 
 
 ## The scene node transient projectiles/casings/debris spawn into (world space, not under us).
@@ -719,6 +728,7 @@ func _apply_damage(amount: float, direction := Vector2.ZERO) -> void:
 ## the hand lets go of what it held. Emits `died` for observers.
 func _die(direction: Vector2) -> void:
 	is_dead = true
+	_rig_cache = null
 	_cancel_reload()
 	_wound.stop()
 	# A corpse is just a body on the floor: clear its collision layer so the living (and bullets,

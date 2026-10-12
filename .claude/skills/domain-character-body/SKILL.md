@@ -18,7 +18,7 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   punch hit detection; exposes `hand_position(i)`, `punch_amount(i)` and the `punched` signal.
   `character_pose.gd` (a `RefCounted` the character owns as `pose`) owns the living motion of head,
   shoulders, hips and hands, and each hand's stance (below); `character_rig.gd` (a `RefCounted`
-  solved fresh by `character.rig()`) owns the standing skeleton, the 3D joints of the arms and legs
+  solved by `character.rig()`, once per physics frame) owns the standing skeleton, the 3D joints of the arms and legs
   (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
 - **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the legs and shoes, the arms
   (sleeve, then forearm), then `item.draw_weapon()` (under the torso, so a long gun's butt is tucked behind the shoulder), the shoulders (at the pose's lunge), then both fists (gripping the weapon; a hand gripping below `HAND_OVER_HEIGHT`, i.e. hanging relaxed, is drawn *before* the shoulders so they cover it — `tests/character/hanging_hands_under_shoulders_test.gd`), then the
@@ -103,7 +103,11 @@ leave (`muzzle_origin(hand)`); `Character._muzzle_ahead(item)` falls back to `Ch
 ## The rig (the standing skeleton)
 
 `character_rig.gd` solves the body's 3D joints (local x/y plus height z) from the live pose and the
-hands, every time `character.rig()` is called (cheap; no cache). It exposes them through `point(i)`
+hands. `character.rig()` solves it once per physics frame and hands every caller in that frame the same rig (the pose,
+the hands and the feet's rests change only in `_physics_process`; selecting a slot, taking a posture and dying drop the
+cached one at once, since they change its inputs mid-frame), so the draw, a footfall and a test share one solve; the
+legs layer solves its own unclamped rig (`Rig.new(character, false)`). `CharacterRig.solves` counts every solve for
+`tests/character/rig_is_solved_once_per_frame_test.gd`. It exposes the joints through `point(i)`
 by index (`HEAD`, `CHEST`, `PELVIS`, `BELLY`, `SPINE` and per-side `SHOULDER`, `HIP`, `ELBOW`,
 `HAND`, `KNEE`, `ANKLE`; side 0/1 matching the hands) and each foot's direction through `toes(i)`.
 `character_ragdoll.gd` re-exports the same indices.
