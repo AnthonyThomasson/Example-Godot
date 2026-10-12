@@ -34,7 +34,9 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   character (keyed, superseded while visible) carrying `pos`, a smoothed velocity track (`vel`),
   `facing`, a visible wound band, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
   remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
-  before testing sight, and reads each known set once per pass). The characters it tests are found by scanning the world
+  before testing sight, and reads each known set once per pass). That look runs every `LEARN_EVERY_FRAMES` (6) physics frames,
+  offset per NPC by instance id so a squad does not look on the same frame, and again at the start of every `sense()`, so what
+  it knows at a decision is what it sees at that moment. The characters it tests are found by scanning the world
   root once and keeping the list (`_other_characters`: rescanned only when a node with `current_item` enters or leaves the
   tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes and used to run per NPC per frame).
 - `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),

@@ -31,6 +31,10 @@ const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
 const AgentSnapshot := preload("res://scenes/ai/perception/agent_snapshot.gd")
 const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
 
+## Physics frames between an unfamiliar NPC's looks for rooms and furniture it does not know yet. Learning is permanent and
+## a decision looks again first, so a glimpse shorter than this still counts when it is the moment of a decision.
+const LEARN_EVERY_FRAMES := 6
+
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
 var contact_memory_ttl: float = 4.0
 ## Whether this NPC starts knowing the house (rooms + objects), else learns them by sight.
@@ -114,6 +118,8 @@ var _characters_root: Node = null  ## The world root `_characters` was scanned f
 var _characters_stale := true    ## Whether a character entered or left the tree since the last scan.
 var _watching_tree := false      ## Whether the tree's node_added / node_removed are connected yet.
 var _seeded := false             ## Whether the familiar-NPC house-knowledge seed has run.
+var _learn_next := 0             ## First physics frame the next look for unknown rooms and furniture may run.
+var _learned_frame := -1         ## Physics frame of the latest such look (-1 = none yet).
 var _visible_now := {}           ## Instance ids of characters visible on the latest observe() tick.
 var _tracks := {}                ## Per-character movement track: id → { pos, vel, t } (last seen).
 
@@ -411,23 +417,38 @@ func observe(character, rooms: Array) -> void:
 	if not here.is_empty():
 		_memory.remember(&"visited_room", { "key": here["key"] }, search_memory_ttl, str(here["key"]))
 
-	# An unfamiliar NPC learns rooms and objects by seeing them (permanent once learned).
-	if not familiar_with_house:
-		var known_rooms := _known_room_keys()  # Read once: what is learned here is permanent and only grows.
-		for room in rooms:
-			if known_rooms.has(room["key"]):
-				continue  # Already learned: looking again would change nothing.
-			var rect: Rect2 = room["rect"]
-			if rect.has_point(self_pos) or _vision.can_see(self_pos, facing, rect.position + rect.size * 0.5, space, exclude):
-				known_rooms[room["key"]] = true
-				_learn_room(room)
-		var known_objects := _known_object_ids()
-		for obj in _interactables:
-			if not is_instance_valid(obj) or known_objects.has(obj.get_instance_id()):
-				continue
-			if _vision.can_see_node(obj, self_pos, facing, space, exclude):
-				known_objects[obj.get_instance_id()] = true
-				_learn_object(obj)
+	if not familiar_with_house and Engine.get_physics_frames() >= _learn_next:
+		_learn_by_sight(character, rooms)
+
+
+## An unfamiliar NPC learns the rooms and objects it can see (permanent once learned). Runs every `LEARN_EVERY_FRAMES`
+## frames from `observe()`, offset per NPC so a squad does not look on the same frame, and at the start of every decision,
+## so what it knows when it decides is what it sees at that moment.
+func _learn_by_sight(character, rooms: Array) -> void:
+	var frame := Engine.get_physics_frames()
+	if frame == _learned_frame:
+		return
+	_learn_next = frame + (LEARN_EVERY_FRAMES if _learned_frame >= 0 else 1 + get_instance_id() % LEARN_EVERY_FRAMES)
+	_learned_frame = frame
+	var self_pos: Vector2 = character.global_position
+	var facing: Vector2 = character.facing
+	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
+	var exclude := [character.get_rid()]
+	var known_rooms := _known_room_keys()  # Read once: what is learned here is permanent and only grows.
+	for room in rooms:
+		if known_rooms.has(room["key"]):
+			continue  # Already learned: looking again would change nothing.
+		var rect: Rect2 = room["rect"]
+		if rect.has_point(self_pos) or _vision.can_see(self_pos, facing, rect.position + rect.size * 0.5, space, exclude):
+			known_rooms[room["key"]] = true
+			_learn_room(room)
+	var known_objects := _known_object_ids()
+	for obj in _interactables:
+		if not is_instance_valid(obj) or known_objects.has(obj.get_instance_id()):
+			continue
+		if _vision.can_see_node(obj, self_pos, facing, space, exclude):
+			known_objects[obj.get_instance_id()] = true
+			_learn_object(obj)
 
 
 ## Update character `id`'s movement track with a sighting at `pos` and return its smoothed velocity.
@@ -524,6 +545,8 @@ func _callouts() -> Array:
 ## the decision snapshot the planner walks: { facts, sections, sections_per_target, options }. The
 ## author reads this knowledge and the combat geometry only — it writes no memory and holds no policy.
 func sense(character, rooms: Array, goal: String, activity: String) -> Dictionary:
+	if not familiar_with_house:
+		_learn_by_sight(character, rooms)
 	var self_pos: Vector2 = character.global_position
 	var knowledge := {
 		"known_rooms": _known_rooms(rooms),
