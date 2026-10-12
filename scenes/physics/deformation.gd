@@ -17,6 +17,8 @@ class_name Deformation
 const NO_COLOR := Color(0.0, 0.0, 0.0, 0.0)
 ## Default near-black bullet-hole color when a caller supplies no override.
 const HOLE_COLOR := Color(0.05, 0.05, 0.06)
+## Multiplier that packs two piece ids into one dictionary key in `_convex_pieces` (ids stay far below it).
+const PIECE_PAIR_STRIDE := 65536
 
 
 ## Closed perimeter sample ring for a primitive shape, centered on the origin.
@@ -191,16 +193,28 @@ static func _convex_pieces(polygon: PackedVector2Array) -> Array:
 		if _turn(polygon, tri[0], tri[1], tri[2]) * sign_ < 0.0:
 			tri = [tri[0], tri[2], tri[1]]
 		pieces.append(tri)
+	# The scan restarts after every merge, and a pair that failed to merge fails again until one of its pieces changes,
+	# so each piece carries an id and failed pairs are remembered by theirs (the same merges, in the same order).
+	var ids: Array = range(pieces.size())
+	var next_id := pieces.size()
+	var failed := {}
 	var merged := true
 	while merged:
 		merged = false
 		for a in pieces.size():
 			for b in range(a + 1, pieces.size()):
+				var pair: int = mini(ids[a], ids[b]) * PIECE_PAIR_STRIDE + maxi(ids[a], ids[b])
+				if failed.has(pair):
+					continue
 				var union := _merge_across_edge(pieces[a], pieces[b])
 				if union.is_empty() or not _is_convex_loop(polygon, union, sign_):
+					failed[pair] = true
 					continue
 				pieces[a] = union
+				ids[a] = next_id
+				next_id += 1
 				pieces.remove_at(b)
+				ids.remove_at(b)
 				merged = true
 				break
 			if merged:
