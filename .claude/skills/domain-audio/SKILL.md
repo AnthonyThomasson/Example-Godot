@@ -42,7 +42,7 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
   (pistol 1.0), `heavy` ≥ 1.6 (rifle 2.2). Heavier = lower pitch, louder crack, +3 dB.
 - A `hard` material (metal, glass, ceramic, stone, electronics, wall) rings long on a ricochet and adds a falling
   whine; a soft one whips instead. Penetration adds a crunch, a hiss of air and a deeper thud. `thump` is how
-  much low body a hit has (flesh and fabric thud, metal and glass do not).
+  much low body a hit has (flesh and fabric thud, metal and glass do not). A material may also carry `heft` (metal 0.9): extra body gain, a longer thud and a quieter ring on a non-ricochet hit, so a round striking metal lands heavy.
 - The synth normalizes every sound, so a quiet one says so with a `db` trim in its table row (carpet −6, fabric
   −4, a punch −6 …) which `SoundBank` folds into `level_db`.
 
@@ -82,8 +82,8 @@ volume swing than other sounds and the feet 6 % apart in pitch. The cadence itse
 so it is regular only as far as the walking is. Test: `tests/audio/footstep_variety_test.gd`.
 
 **Every surface is a dull thud on purpose.** High-passed noise bursts and 1.5–2.7 kHz ring tones read as tinny, so the
-heel thump leads on every surface, the scuff is a soft noise low-passed at ≤ ~2.3 kHz, and the only ring a hard floor
-keeps (stone) is one low "tock" (≤ ~400 Hz); wood and tile have none and sit 3 dB quieter. Surfaces therefore sound alike (wood/tile/stone/concrete/outdoors all sit at
+heel thump leads on every surface, the scuff is a soft noise low-passed at ≤ ~2.3 kHz, and no floor keeps a ring
+(they pinged): wood, tile and stone (the slate tile floor) have none and sit 3 dB quieter. Surfaces therefore sound alike (wood/tile/stone/concrete/outdoors all sit at
 ~150–300 Hz RMS frequency, carpet softer and quieter via its `db`; wood and tile are the deepest of the hard floors,
 ~150–200 Hz, with a lower, longer heel thump). Keep scuff cut-offs low and give a new surface a `thump` first. Test:
 `tests/audio/footstep_tone_test.gd` (brightness ceiling 0.03 against a measured 0.010, and most energy under 300 Hz).

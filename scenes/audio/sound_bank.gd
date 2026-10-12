@@ -55,11 +55,12 @@ const SHOTS := {
 ## What a struck material sounds like. hard = rings and throws a bullet back with a ping (soft materials whip
 ## instead); thump = how much low body a hit has (0 = none, 1 = all); modes / amps / decays = the partials it
 ## rings at (Hz, relative level, decay s); lp = the cut-off of its noise (Hz); grit = how long the crack of the
-## hit lasts (s); db = its level trim (the synth normalizes every sound, so quiet materials say so here).
+## hit lasts (s); heft = optional extra weight (default 0): more low body, a longer thud, the struck ring turned down
+## (a ricochet still rings); db = its level trim (the synth normalizes every sound, so quiet materials say so here).
 const MATERIALS := {
 	"wood": { "hard": false, "db": 0.0, "thump": 0.6, "modes": [210.0, 380.0, 690.0], "amps": [1.0, 0.6, 0.4],
 		"decays": [0.045, 0.03, 0.02], "lp": 2800.0, "grit": 0.020 },
-	"metal": { "hard": true, "db": 1.0, "thump": 0.15, "modes": [620.0, 1480.0, 2330.0, 3410.0], "amps": [1.0, 0.8, 0.6, 0.4],
+	"metal": { "hard": true, "db": 2.0, "thump": 0.15, "heft": 0.9, "modes": [620.0, 1480.0, 2330.0, 3410.0], "amps": [1.0, 0.8, 0.6, 0.4],
 		"decays": [0.22, 0.18, 0.14, 0.10], "lp": 7000.0, "grit": 0.008 },
 	"glass": { "hard": true, "db": 0.0, "thump": 0.05, "modes": [1900.0, 3100.0, 4700.0], "amps": [1.0, 0.7, 0.5],
 		"decays": [0.16, 0.12, 0.09], "lp": 9500.0, "grit": 0.006 },
@@ -89,8 +90,7 @@ const MATERIALS := {
 const FOOTSTEPS := {
 	"wood": { "db": -3.0, "thump": [102.0, 56.0, 0.052, 1.0], "scuff": [1300.0, 140.0, 0.020, 0.34] },
 	"tile": { "db": -3.0, "thump": [112.0, 66.0, 0.042, 1.0], "scuff": [1300.0, 180.0, 0.015, 0.30] },
-	"stone": { "db": 1.0, "thump": [115.0, 72.0, 0.034, 1.0], "scuff": [2000.0, 200.0, 0.016, 0.42],
-		"ring": { "freqs": [330.0], "amps": [1.0], "decays": [0.045], "gain": 0.25 } },
+	"stone": { "db": -3.0, "thump": [115.0, 72.0, 0.034, 1.0], "scuff": [1300.0, 200.0, 0.016, 0.32] },
 	"concrete": { "db": 0.0, "thump": [105.0, 64.0, 0.030, 1.0], "scuff": [2000.0, 220.0, 0.020, 0.45] },
 	"carpet": { "db": -6.0, "thump": [95.0, 62.0, 0.030, 0.65], "scuff": [750.0, 0.0, 0.030, 0.45] },
 	"outdoor": { "db": -2.0, "thump": [90.0, 58.0, 0.040, 0.9], "scuff": [1600.0, 180.0, 0.040, 0.5], "again": 0.028 },
@@ -241,6 +241,7 @@ static func _impact(material: String, outcome: String, band_id: String) -> Dicti
 	var sub: float = b["sub"] if outcome != "punch" else 0.0
 	var hard: bool = m["hard"]
 	var thump: float = m["thump"]
+	var heft: float = m.get("heft", 0.0) if outcome != "punch" else 0.0
 	var grit: float = m["grit"]
 	var lp: float = m["lp"]
 	# How hard the material rings in this outcome: a ricochet off something hard keeps ringing, one off
@@ -258,6 +259,7 @@ static func _impact(material: String, outcome: String, band_id: String) -> Dicti
 			ring_gain = 0.4
 	if hard and outcome != "ricochet":
 		ring_gain *= 0.7  # a hard thing struck without glancing off rings less than it thuds
+		ring_gain *= 1.0 - 0.35 * heft
 	var layers := []
 	var length := 0.12
 	var freqs: Array = []
@@ -275,8 +277,8 @@ static func _impact(material: String, outcome: String, band_id: String) -> Dicti
 		"lp": lp, "hp": 120.0, "attack": 0.0004 })
 	# Every hit has weight, whatever it struck: a low thump (the material only decides how much of it), and under a
 	# heavier round a deep boom as well. This is what makes a strong hit land as one rather than ring thinly.
-	layers.append({ "type": "tone", "gain": (0.65 + 0.35 * thump) * body, "freq": 150.0 * pitch,
-		"freq_end": 55.0 * pitch, "sweep": 0.018, "decay": 0.06 + 0.03 * thump + 0.03 * body })
+	layers.append({ "type": "tone", "gain": (0.65 + 0.35 * thump) * body * (1.0 + 0.8 * heft), "freq": 150.0 * pitch,
+		"freq_end": 55.0 * pitch, "sweep": 0.018, "decay": 0.06 + 0.03 * thump + 0.03 * body + 0.04 * heft })
 	if sub > 0.0:
 		layers.append({ "type": "tone", "gain": sub * (0.8 + 0.4 * thump), "freq": 72.0 * pitch, "freq_end": 40.0 * pitch,
 			"sweep": 0.03, "decay": 0.07 + 0.05 * sub })
