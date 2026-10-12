@@ -60,7 +60,8 @@ and controller contract, EventBus and character signals) and never reaches into 
   the thing to suspect if one trips only under `--jobs`. `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
 - **Output:** `--summary` prints only non-passing tests and the totals; every run reports wall-clock ms
   per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` as before.
-- **Other flags:** `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
+- **Other flags:** `--skip-domain=a,b` (leave those exact domains out; wins over every other selection, `--changed`'s included),
+  `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
   `house()` uses that seed), and, in the wrapper only, `--changed` (see below). Options take the
   `--name=value` form.
 - **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
@@ -223,7 +224,9 @@ selector. They are ordinary tests that load other domains, so they live apart fr
 | `perf/furniture_pile_stress` | 120 rigid bodies shoved at once |
 | `perf/bake_and_path_stress`, `perf/generate_houses_stress` | one-shot work: nav re-bake and path queries, world-gen |
 
-`tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. They stay in the default run, balanced across shards
+`tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. The pre-commit hook leaves them out
+(`--skip-domain=perf`): their frame-time budgets fail when the machine is busy, so run them on their own before a push
+that touches a per-frame path. They stay in the default run, balanced across shards
 by measured cost like every test, and `--changed` adds the domain whenever a scene they exercise changes (`affected()` in
 `tools/run_tests.sh`) or `tests/_perf/` changes. The shared helper is `tests/_perf/perf_probe.gd` (`const Perf :=
 preload(...)`; not a test). `audio/bank` and `character/standing_body_repaints_on_change` keep a budget or a count but are

@@ -12,4 +12,5 @@ cross-domain interface surface. When working *inside* a domain, also load that d
 ticket's label and tells you which `ticket-<label>` skill to invoke (e.g. `spike` → `ticket-spike`).
 
 **Checks:** on Stop, Claude runs only lint + the headless load check (`tools/stop_hook_checks.sh`). The game
-tests run in a git pre-commit hook (`.githooks/pre-commit`); enable it once per clone with `tools/install_hooks.sh`.
+tests run in a git pre-commit hook (`.githooks/pre-commit`, without the performance tests, which are a separate
+`tools/run_tests.sh --domain=perf`); enable it once per clone with `tools/install_hooks.sh`.
