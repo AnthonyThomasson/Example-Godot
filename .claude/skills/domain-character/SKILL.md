@@ -84,8 +84,14 @@ frame's pose.
 `character_footsteps.gd` (a `RefCounted`, stepped by `character.gd` after the pose) spots each foot's landing:
 the foot is planted while `cos(stride_phase + (0|PI))` is >= 0, so a landing is cos rising through 0
 (only above `MIN_WALK` walk amount; none while an interaction holds the character or once dead). On a landing it
-solves the rig once and reports the sole (middle, toes, `body_foot` x radius long, `body_shoe_widths[0]` wide) to the
-`BloodFootprints` child (Physics), which decides whether it prints. Test: `tests/physics/footprints_trail_test.gd`.
+solves the rig once, reports the sole (middle, toes, `body_foot` x radius long, `body_shoe_widths[0]` wide) to the
+`BloodFootprints` child (Physics), which decides whether it prints, and posts a `&"footfall"` `EventBus` event
+(`{ position` (the sole)`, foot` (0 left / 1 right)`, speed, running }`) which the Audio domain turns into a step on the floor
+under it. Tests: `tests/physics/footprints_trail_test.gd`, `tests/audio/footstep_surface_sound_test.gd`.
+
+A reload posts `&"reload"` on `EventBus` twice: `stage = &"start"` from `reload()` and `&"done"` once the timer ends and the
+magazine is swapped (`_post_reload`; `{ position` (weapon hand)`, gun, stage, power, character }`). A reload cancelled by
+running, switching items, an interaction or death never posts `done`. Test: `tests/audio/reload_sound_test.gd`.
 
 ## Stances (how a hand is held)
 
@@ -357,7 +363,8 @@ Visuals) with **no controller**: a composer adds any `control()` child before it
 Every character has an exported `faction` (`&"player"` by default; the NPC presets set
 `&"household"` / `&"invader"`), read by AI perception to tell allies from potential hostiles. A
 landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus` event with
-`attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility.
+`attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
+`outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
 ## Interface recap (authoritative in the `architecture` skill)
 

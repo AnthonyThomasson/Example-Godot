@@ -1,7 +1,8 @@
 extends Node2D
 
 ## A spent shell tossed out when a gun fires: colliderless world-space debris that tweens
-## out, spins, and rests. Despawner-tracked. Drawing lives in casing_visuals.gd.
+## out, spins, and rests (posting a `casing` event when it lands). Despawner-tracked. Drawing lives in
+## casing_visuals.gd.
 
 ## Brass fill color.
 @export var color: Color = Color(0.85, 0.7, 0.3)
@@ -9,6 +10,9 @@ extends Node2D
 @export var eject_distance: float = 15.0
 ## Seconds spent flying out before it comes to rest.
 @export var eject_time: float = 0.3
+
+var gun: StringName = &""  ## The gun that fired the round (set by CasingSpawner); sent with the `casing` event.
+var power: float = 1.0  ## The penetration power of that round (set by CasingSpawner); sent with the `casing` event.
 
 
 func _ready() -> void:
@@ -25,3 +29,9 @@ func start(eject_dir: Vector2) -> void:
 	tween.set_parallel(true)
 	tween.tween_property(self, "position", target, eject_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "rotation", rotation + spin, eject_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(_landed)
+
+
+## The casing has come to rest on the ground: tell the world where, for any listener that wants to know.
+func _landed() -> void:
+	EventBus.post(&"casing", { "position": global_position, "gun": gun, "power": power })

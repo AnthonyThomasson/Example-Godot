@@ -73,7 +73,9 @@ casings and rugs). `floor_visuals.gd` repeats `ObjectArt.tile(...)` across the r
 A floor registers itself with Physics' `BloodSurface` (`_ready`; unregisters on exit) with `flow_groove(world, half)`,
 which asks `FloorPainter.groove(local, opts, half)` — analytic, mirroring the painted geometry (tile/mosaic/
 slab grid lines, plank row seams, parquet borders + strips; butt joints and cracks aren't modelled) — and
-`FloorPainter.porous(opts)` (carpet), so blood follows the texture.
+`FloorPainter.porous(opts)` (carpet), so blood follows the texture. It also registers its rect, `floor_material` and
+`art_opts.pattern` with the Audio domain's `SoundSurface` (interface 16) so footsteps sound like
+the floor (planks and parquet wood, ceramic tile, slate stone, concrete, carpet; no floor = outdoors).
 
 ## Pixel art (`objects/art/`, private to Objects)
 

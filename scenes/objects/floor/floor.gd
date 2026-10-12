@@ -15,16 +15,20 @@ extends Node2D
 const FloorPainter = preload("res://scenes/objects/art/floor_painter.gd")
 
 var _surface_id := -1  ## BloodSurface registration of this floor.
+var _sound_id := -1  ## SoundSurface registration of this floor.
 
 
 func _ready() -> void:
 	z_index = ObjectArtConfig.floor_z_index
 	# Tell the Physics blood flow where this floor's grooves are, so blood follows grout and seams.
 	_surface_id = BloodSurface.register(Rect2(global_position, size), flow_groove, FloorPainter.porous(art_opts))
+	# And the Audio domain what it is made of, so footsteps sound like it.
+	_sound_id = SoundSurface.register(Rect2(global_position, size), floor_material, String(art_opts.get("pattern", "")))
 
 
 func _exit_tree() -> void:
 	BloodSurface.unregister(_surface_id)
+	SoundSurface.unregister(_sound_id)
 
 
 ## 1 where world point `at` is on a groove of this floor's pattern (BloodSurface callback).

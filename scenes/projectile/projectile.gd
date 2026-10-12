@@ -24,6 +24,8 @@ var muzzle_speed: float = BallisticsConfig.projectile_speed
 ## Power to punch through what it hits (1 = a pistol round): it divides the speed lost to a surface and the
 ## deflection, and lowers the speed it needs to get through at all.
 var penetration_power: float = 1.0
+## The id of the gun that fired it (&"" when none), carried on its `hit` events so a listener can tell the rounds apart.
+var gun: StringName = &""
 
 ## Unit travel vector; reassigned on ricochet / penetration deflection.
 var direction := Vector2.RIGHT
@@ -120,7 +122,7 @@ func _resolve(result: Dictionary) -> void:
 		rotation = direction.angle()
 		speed *= BallisticsConfig.bounce_speed_retention
 		GameLog.say("Shot ricocheted off %s for %.0f damage (%.0f%% square)" % [body.name, bounce_dmg, squareness * 100.0])
-		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false))
+		_deal(body, _hit_info(result, incoming, speed_factor, bounce_dmg, false), &"ricochet", surface)
 		return
 
 	var dealt := damage * squareness * speed_factor
@@ -129,7 +131,7 @@ func _resolve(result: Dictionary) -> void:
 	if speed < BallisticsConfig.penetration_min_speed / penetration_power:
 		GameLog.say("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
-		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false))
+		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false), &"blocked", surface)
 		return
 	# 3b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
 	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness)
@@ -140,7 +142,7 @@ func _resolve(result: Dictionary) -> void:
 	rotation = direction.angle()
 	_exclude.append(rid)
 	GameLog.say("Shot penetrated %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
-	_deal(body, _hit_info(result, incoming, speed_factor, dealt, true))
+	_deal(body, _hit_info(result, incoming, speed_factor, dealt, true), &"penetrate", surface)
 
 
 ## The struck object's surface via get_surface(), or the wall-rating fallback for a collider
@@ -166,8 +168,10 @@ func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt
 
 ## Hand the hit to the object (if hittable), re-emit `hit`, and post a world `&"hit"` event so
 ## decoupled listeners (the AI's combat awareness) learn that something was struck, where, and by
-## whom (`attacker` = the shooter, or null).
-func _deal(body: Node, info: HitInfo) -> void:
+## whom (`attacker` = the shooter, or null). The event also says how the round met the surface: `outcome`
+## (&"ricochet" / &"blocked" / &"penetrate"), the struck `material` ("" for a wall), the surface `normal`, the
+## `speed_factor` it hit at and the firing `gun` and its penetration `power`.
+func _deal(body: Node, info: HitInfo, outcome: StringName, surface: Dictionary) -> void:
 	if body.has_method("take_hit"):
 		body.take_hit(info)
 	hit.emit(body, info.damage)
@@ -175,4 +179,6 @@ func _deal(body: Node, info: HitInfo) -> void:
 		"position": info.position, "victim": body, "source": info.source,
 		"direction": info.direction, "damage": info.damage,
 		"attacker": ignore if is_instance_valid(ignore) else null,
+		"outcome": outcome, "material": String(surface.get("material", "")), "normal": info.normal,
+		"speed_factor": info.speed_factor, "gun": gun, "power": penetration_power,
 	})

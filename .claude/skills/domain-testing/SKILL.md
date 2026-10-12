@@ -297,6 +297,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `ai.hostile_on_trespass` | Hostility toward anyone inside the house. |
 | `ai.hostile_on_attack` | Hostility toward an attacker. |
 | `nav.rebake` | `NavUpdater.enabled`. |
+| `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps and reloads make `sound` events and voices. |
 | `physics.blood` | `BloodConfig.enabled`. |
 | `physics.footprints` | `BloodConfig.footprints_enabled`. |
 | `physics.smear` | `BloodConfig.smear_enabled`. |

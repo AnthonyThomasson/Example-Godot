@@ -44,7 +44,8 @@ rifle 22 dmg / 0.11 s / auto / ×2.2 / 4400 px/s / 24 rounds. They are one table
 `GunItem` holds everything a gun does: the magazine, `rounds_loaded` / `ammo_capacity` / `can_reload` / `finish_reload`, `reload_time()`
 (the loaded magazine type's, `MagazineConfig.reload_time_of`), `secondary(user) -> bool` (refuses while reloading, empty or still cycling;
 else spends a round, rotates the aim by the spread, calls `ProjectileSpawner.spawn(muzzle_origin, dir, world, user, damage, muzzle_speed,
-penetration)`, ejects a casing and kicks the hand) and `primary` (a melee jab with the weapon hand). **Fire rate** is a cooldown: `tick(delta)`
+penetration, gun)`, ejects a casing, kicks the hand and posts a `&"shot"` event on `EventBus`
+(`{ position` (muzzle)`, gun, attacker, automatic, damage, power }`, which the Audio domain voices)) and `primary` (a melee jab with the weapon hand). **Fire rate** is a cooldown: `tick(delta)`
 counts it down (the character ticks every item it carries, before its controller runs, so it is deterministic and independent of the
 wall clock); firing does `cooldown += fire_interval`, carrying an overshoot so 0.07 s is not rounded to 5 frames, with the idle credit
 capped at one frame so a gun never bursts to catch up.
@@ -136,5 +137,6 @@ Guns are the one place Items reach into the Projectile System
   `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`,
   `weapon_raise()`, and for reloading
   `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Ammo hooks on `Item`: `rounds_loaded()`,
-  `ammo_capacity()`, `reload_time()`, `can_reload(user)`, `finish_reload(user)`, `reloading`.
+  `ammo_capacity()`, `reload_time()`, `can_reload(user)`, `finish_reload(user)`, `reloading`; and `gun_id()` / `round_power()`
+  (the gun's id and its rounds' penetration power; `&""` / 1 on a non-gun), read for the character's `reload` event.
 - **Items → Art** (interface 12): each gun's art via `PixelArt.render_turned` / `snap_angle`.

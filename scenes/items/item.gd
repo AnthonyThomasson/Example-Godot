@@ -79,6 +79,16 @@ func ammo_capacity() -> int:
 	return -1
 
 
+## The id of the gun this item is (a `GunConfig` row), or &"" for an item that is not a gun (the default).
+func gun_id() -> StringName:
+	return &""
+
+
+## The penetration power of the rounds it fires (1 = a pistol round); 1 for an item that fires none (the default).
+func round_power() -> float:
+	return 1.0
+
+
 ## Seconds a reload of this item takes. Default: 0 (instant).
 func reload_time() -> float:
 	return 0.0

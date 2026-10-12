@@ -6,7 +6,7 @@ description: Deep implementation detail for the General domain (scenes/general/)
 # General domain
 
 Infrastructure: input (Keybinds), saved settings (Settings), despawner, event bus, camera, dev command
-server, shared physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the only autoloads (`project.godot`).
+server, shared physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the General autoloads (`project.godot`; the Audio domain adds a fourth, `Sound`).
 HUDs and menus have moved to the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
 
 `physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
@@ -92,9 +92,15 @@ commands, or `tools/match.py` to run and score N matches in a row; each command 
 `event_bus.gd` (autoload `EventBus`) — a minimal generic publish/subscribe bus for decoupled
 cross-domain notifications: `post(topic, data)` broadcasts and the `posted(topic, data)` signal
 delivers to any listener, which filters by `topic`. Emitters and listeners never reference each
-other. Two topics are in use: `&"hit"`, posted by the Projectile System for each damaging hit and
-by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`)
-and consumed by the AI for combat awareness, hostility and gunfire heard; and `&"callout"`, an AI
+other. Topics in use: `&"hit"`, posted by the Projectile System for each damaging hit and
+by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`, plus
+`outcome` / `material` and, for bullets, `normal`, `speed_factor`, `gun`, `power`)
+and consumed by the AI for combat awareness, hostility and gunfire heard, and by Audio for impacts;
+`&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
+reload started / finished), posted by
+Items and Character and consumed only by Audio; `&"casing"` (a casing landed), posted by Projectile, which nothing
+consumes; `&"sound"`, which Audio posts for every sound it
+makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
 consumed by allied AIs.
 

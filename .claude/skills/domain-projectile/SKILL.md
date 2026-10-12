@@ -37,7 +37,9 @@ On any *damaging* outcome the projectile packages a `HitInfo` and calls `body.ta
 object then shoves/deforms/sprays via Physics), re-emits `hit(body, damage)` — which a gun
 forwards to the character's `hit_landed` — and posts a `&"hit"` event on `EventBus`
 (`{ position, victim, source, direction, damage, attacker }`, interface 10 — `attacker` is the
-shooter, the projectile's `ignore` body) so decoupled listeners (the AI's combat awareness and
+shooter, the projectile's `ignore` body; plus `outcome` (`&"ricochet"` / `&"blocked"` / `&"penetrate"`), the struck
+`material` (`surface.material`, `""` for a wall), `normal`, `speed_factor`, the firing `gun` and the round's `power`,
+which the Audio domain voices impacts from; a fly-over posts nothing) so decoupled listeners (the AI's combat awareness and
 hostility) learn what was struck, where, and by whom. Console lines: `Shot flew over /
 ricocheted off / penetrated / blocked by …`.
 
@@ -51,5 +53,7 @@ ricocheted off / penetrated / blocked by …`.
 
 - Reaches into Objects only through the hittable contract (interface 3): reads `get_surface()`
   and calls `take_hit(HitInfo)`. The guns (Items, `GunItem`) are the one caller of `ProjectileSpawner` /
-  `CasingSpawner`. Casings despawn via the Despawner. Each damaging hit also posts a `&"hit"` event
+  `CasingSpawner` (`ProjectileSpawner.spawn` / `CasingSpawner.spawn` take the firing `gun` id and the round's penetration
+  `power`, carried on the round's `hit` events and its `casing` event). Casings despawn via the Despawner; a casing posts a
+  `&"casing"` event (`{ position, gun, power }`) when its ~0.3 s toss ends (nothing consumes it). Each damaging hit also posts a `&"hit"` event
   on `EventBus` (interface 10).

@@ -42,6 +42,10 @@ static var ROWS := {
 		"description": "The navmesh is re-carved as furniture is shoved around.",
 		"world": { "node": "NavUpdater", "props": ["enabled"] },
 	},
+	&"audio.sound": {
+		"description": "Shots, impacts, footsteps and reloads make sound.",
+		"static": [[SoundConfig, &"enabled"]],
+	},
 	&"physics.blood": {
 		"description": "Wounds splatter and drip blood and dead bodies bleed out.",
 		"static": [[BloodConfig, &"enabled"]],

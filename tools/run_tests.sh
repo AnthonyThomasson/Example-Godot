@@ -153,7 +153,7 @@ affected() {
     objects) echo objects physics projectile character items interaction navigation ai ;;
     character) echo character items interaction projectile physics objects ai ;;
     ui) echo ui ;;
-    worldgen|art|general|testing) echo all ;;
+    worldgen|art|general|testing|audio) echo all ;;  # audio: the Sound autoload runs in every test
     *) echo all ;;  # anything unknown is treated as risky
   esac
 }

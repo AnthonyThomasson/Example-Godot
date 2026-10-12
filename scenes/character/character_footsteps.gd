@@ -1,10 +1,11 @@
 extends RefCounted
 
 ## Character FOOTSTEPS (Character domain, animate layer): spots the instant each foot lands in the walk
-## cycle and reports it to the Physics domain's BloodFootprints, which decides whether the sole prints
-## blood. A foot lands when its lift (max(-cos(phase), 0), see character_rig.gd) returns to the floor,
-## i.e. cos(phase) rises through zero, at the forward end of its stride. Stepped by character.gd after
-## the pose each physics frame; one rig solve per footfall, none otherwise.
+## cycle. It reports the sole to the Physics domain's BloodFootprints, which decides whether it prints blood, and
+## posts a `footfall` event on the EventBus (the Audio domain makes the step). A foot lands when its lift
+## (max(-cos(phase), 0), see character_rig.gd) returns to the floor, i.e. cos(phase) rises through zero, at the forward
+## end of its stride. Stepped by character.gd after the pose each physics frame; one rig solve per footfall, none
+## otherwise.
 
 const CharacterRig = preload("res://scenes/character/character_rig.gd")
 
@@ -39,4 +40,7 @@ func _report(character, footprints: BloodFootprints, foot: int) -> void:
 	var at: Vector2 = character.global_position + Vector2(ankle.x, ankle.y) + dir * length * 0.25
 	# Left foot (0) has its arch toward +y of the toe frame, right foot toward -y.
 	var inner := 1.0 if foot == 0 else -1.0
-	footprints.step(foot, at, dir, length, width, inner, character.get_real_velocity().length())
+	var speed: float = character.get_real_velocity().length()
+	footprints.step(foot, at, dir, length, width, inner, speed)
+	# The footfall itself, for whoever listens (the Audio domain picks the sound from the floor it lands on).
+	EventBus.post(&"footfall", { "position": at, "foot": foot, "speed": speed, "running": character.is_running() })

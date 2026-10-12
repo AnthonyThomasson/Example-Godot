@@ -222,6 +222,7 @@ func reload() -> void:
 	_reloading_item = item
 	_reload_left = item.reload_time()
 	item.reloading = true
+	_post_reload(item, &"start")
 
 
 ## Switch to inventory slot `slot`. Ignored while locked. Observers read the held item with
@@ -391,6 +392,16 @@ func _update_reload(delta: float) -> void:
 	var item := _reloading_item
 	_cancel_reload()
 	item.finish_reload(self)
+	_post_reload(item, &"done")
+
+
+## Tell the world a reload began (`stage` &"start": the magazine comes out) or finished (&"done": the new one is seated)
+## by `item`, from the weapon hand (the Audio domain voices it; a cancelled reload never posts "done").
+func _post_reload(item: Item, stage: StringName) -> void:
+	EventBus.post(&"reload", {
+		"position": hand_world(item.weapon_hand()), "gun": item.gun_id(), "stage": stage, "power": item.round_power(),
+		"character": self,
+	})
 
 
 ## Stop any reload in progress and clear the item's `reloading` flag.
@@ -441,13 +452,17 @@ func _update_stamina(wants_run: bool, delta: float) -> void:
 
 
 ## A punch landed: surface it as hit_landed and post a world `&"hit"` event (like a projectile's)
-## so listeners such as the AI learn who struck whom.
+## so listeners such as the AI learn who struck whom. The event is a `punch` outcome on the struck `material`
+## (what its surface reports; "" for a wall or anything without one).
 func _on_punched(hand: int, body: Node, damage: float) -> void:
 	hit_landed.emit(body, damage, hand)
 	var pos: Vector2 = body.global_position if body is Node2D else global_position
+	var material := ""
+	if body.has_method("get_surface"):
+		material = String(body.get_surface().get("material", ""))
 	EventBus.post(&"hit", {
 		"position": pos, "victim": body, "source": self, "attacker": self,
-		"direction": facing, "damage": damage,
+		"direction": facing, "damage": damage, "outcome": &"punch", "material": material,
 	})
 
 

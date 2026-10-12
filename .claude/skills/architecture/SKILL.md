@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the thirteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Example_Godot) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Example_Godot architecture
@@ -8,14 +8,14 @@ description: The architecture map for this Godot project (Example_Godot) — the
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a gun (pistol, SMG or
 assault rifle) that fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
-organized into **thirteen isolated domains** so each can be changed on its own.
+organized into **fourteen isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
 through the interfaces listed here. **When working *inside* a domain, also load its
 `domain-<name>` skill** — that is where the deep implementation detail lives.
 
-## The thirteen domains (one folder each under `scenes/`)
+## The fourteen domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
@@ -27,6 +27,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris. |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
+| **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads) and played by the `Sound` autoload through a capped pool of positional voices. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
@@ -39,7 +40,7 @@ player; the setup window's **Tests** button sends it to the test browser instead
 arms the player and every NPC with its side's loadout (`LoadoutConfig.apply`: a chosen gun, or by default one random gun
 drawn from an RNG seeded by the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting
 placement) through `Character.set_loadout`; tests and sandboxes never come through there and keep the weapon they ask for.
-`project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General).
+`project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General) and `Sound` (Audio).
 
 The setup window offers **Start** (a human joins the chosen side, on top of its NPC count, with the side's loadout
 and faction), **Watch** (AIs alone) and **Endless** (AIs alone; 5 s after each match ends — the MatchHUD's
@@ -173,7 +174,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
    `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their look and hold. **Ammo:** `Item` has inert hooks
    `rounds_loaded()` / `ammo_capacity()` (-1 = no ammo), `reload_time()`, `can_reload(user)`, `finish_reload(user)` and a
-   `reloading` flag the character sets. A `Magazine` (an `Item` subclass, types in `MagazineConfig`, each tied to one `gun` id,
+   `reloading` flag the character sets. **Gun identity:** `gun_id()` (the `GunConfig` id, `&""` for a non-gun) and `round_power()`
+   (the penetration power of its rounds, 1 for a non-gun), which the character reads for its `reload` event. A `Magazine` (an `Item` subclass, types in `MagazineConfig`, each tied to one `gun` id,
    with its own capacity and optional `reload_time`) is carried
    by the character, never held or selectable; a gun loads one and each shot spends a round. For a reload
    an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Guns are the one
@@ -248,11 +250,24 @@ interface(s) and describes how they're implemented; this list is authoritative f
 10. **Any domain ↔ General (EventBus)** — a generic decoupled notification bus (General autoload).
     - `EventBus.post(topic: StringName, data: Dictionary)` — broadcast an event.
     - `signal posted(topic, data)` — listeners connect and filter by `topic`.
-    Two topics are in use:
+    These topics are in use:
     - `&"hit"`: the Projectile System posts one per damaging hit and the Character one per landed
       punch (`{ position, victim, source, direction, damage, attacker }`; `attacker` = the striking
       character or null). The AI controller consumes it for combat awareness, hostility ("attacked
-      me") and gunfire heard farther off; the match HUD for its combat feed.
+      me") and gunfire heard farther off; the match HUD for its combat feed. It also says *how* the
+      hit met the surface, for the Audio domain: `outcome` (`&"blocked"` / `&"penetrate"` /
+      `&"ricochet"` for a bullet, `&"punch"` for a fist), `material` (the struck surface's, `""` for a
+      wall), and for bullets `normal`, `speed_factor`, `gun` and `power` (its penetration power). A shot
+      that flies over cover posts nothing.
+    - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
+      muzzle)`, gun, attacker, automatic, damage, power }`).
+    - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
+      foot` (0 left / 1 right)`, speed, running }`).
+    - `&"casing"`: a spent casing posts one when its toss ends (`{ position, gun, power }`). Nothing consumes it.
+    - `&"reload"`: `Character` posts one when a reload starts (`stage = &"start"`) and one when it finishes
+      (`&"done"`, never after a cancelled one): `{ position` (weapon hand)`, gun, stage, power, character }`.
+    - `&"sound"`: the Audio domain's `Sound` service posts one for every sound it accepts (`{ kind,
+      profile, variant, position, volume_db, pitch }`), which is what tests assert on.
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
       its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`). Allied
       AI controllers within `callout_range` consume it (which flank an ally holds, whom it fights,
@@ -295,7 +310,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
     its own input through `TestContext.inject` so the lock lets it through; the runner also builds the
     Navigation domain's draw-only `nav_debug.gd` (via the world, kept current by `nav_updater.gd`) and the
     UI's `PerformanceOverlay` for the overlay bar's global toggles. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
-    `PhysicsConfig.debris_enabled` master switches; statics are restored after each test. Main
+    `PhysicsConfig.debris_enabled` master switches and the Audio domain's `audio.sound` switch; statics are restored after each test. Main
     reaches it only by changing scene to `testing/test_browser.tscn`; the UI widgets it shows
     (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
     depends on Testing.
@@ -316,6 +331,17 @@ interface(s) and describes how they're implemented; this list is authoritative f
     perf numbers). `GameLog.enabled` is true in the game; the batch test runner sets it from `--verbose`, so
     test runs are quiet unless asked. Plain `print` is not used for gameplay logs.
 
+16. **Objects → Audio: `SoundSurface`** (a floor tells Audio what it is made of; Audio stays a leaf)
+    - `SoundSurface.register(rect: Rect2, material: String, pattern: String = "") -> int` /
+      `SoundSurface.unregister(id)` — Objects' `Floor` registers its world rect with its `floor_material` and
+      the painter's `pattern` in `_ready` and unregisters in `_exit_tree` (the same way it already feeds
+      `BloodSurface`).
+    - `SoundSurface.at(pos) -> StringName` — what the ground is at a world point (`wood tile stone concrete
+      carpet`, or `outdoor` when no floor covers it; the newest floor wins). Read only by the Audio domain's
+      `Sound` service, to voice a footfall.
+    Everything else Audio hears arrives as an EventBus event (interface 10): the gun, projectile and character
+    domains only *post*; none of them references Audio.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -331,23 +357,25 @@ AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Charac
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
+Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
+Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing)
 UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 ```
 
-Physics, Navigation, Art and World-Gen are leaves (World-Gen's only outward code dep is
+Physics, Navigation, Art, Audio and World-Gen are leaves (World-Gen's only outward code dep is
 the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into nine `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into ten `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
 push + punch + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
 types, capacities and reload times) and `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
-muzzle speed, spread, recoil, magazine, whether it raises at a wall). World-Gen's `LayoutRules` (which rooms may
+muzzle speed, spread, recoil, magazine, whether it raises at a wall) and `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands). World-Gen's `LayoutRules` (which rooms may
 hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
-tuning. There is no `Config` autoload. A tenth static holder, `PhysicsLayers`
+tuning. There is no `Config` autoload. An eleventh static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
 plays for doorway sides.
 
