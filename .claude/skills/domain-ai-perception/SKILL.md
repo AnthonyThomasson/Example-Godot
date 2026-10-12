@@ -102,9 +102,12 @@ A generic event log: `remember(topic, data, ttl, key := "")`; `is_fresh` / `reca
 live event with the same topic + key — something re-observed every tick stays one entry instead of
 flooding the log and volume-evicting every other expirable event. Cleanup on every write: age-expired
 first, then, while over `capacity`, the oldest expirable. Permanent events (ttl ≤ 0) never age out
-and are never volume-evicted. Writes are cheap by design (about eighteen a frame across ten NPCs): superseding is in
-place, `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every
-reader takes the clock once. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
+and are never volume-evicted. Events are stored as one list per topic, each in write order, every event carrying its write order across topics (`seq`): a keyed write
+supersedes in place within its own topic's list and every reader walks only the topic it names, so the cost of a call follows the number
+of events of that topic, not of everything remembered (a familiar NPC holds a permanent `saw_room` / `saw_object` per room and
+furniture piece). `seq` keeps the promised order: newest first for readers and `fresh()`, oldest expirable first for volume eviction.
+`_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every reader takes the clock
+once. `tests/ai/memory_matches_reference_test.gd` runs random writes through the memory and a plain ordered log and compares every reader. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
 `cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
 carries a `note` string is surfaced to Von.
 
