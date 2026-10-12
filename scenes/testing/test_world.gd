@@ -13,6 +13,9 @@ const PlayerController = preload("res://scenes/character/player_controller.gd")
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
+## Most wall-clock ms `build` waits for the shared navigation map to answer with this world's navmesh (the map is
+## built on a worker thread, so a loaded machine is slow in real time, not in sim frames).
+const NAV_SYNC_MS := 5000
 const ACTOR_SCENES := {
 	&"puppet": "res://scenes/character/character_base.tscn",
 	&"player": "res://scenes/character/character_base.tscn",
@@ -31,6 +34,8 @@ var objects: Dictionary = {}
 ## Original values of overridden statics: `[script, prop, value]`.
 var _saved_statics: Array = []
 var _overlay_flags: Dictionary = {}
+## The baked navigation region (see `_await_nav_sync`).
+var _nav_region: NavigationRegion2D = null
 ## The navmesh-holes overlay (the "Nav holes" toggle), kept in step with re-bakes by the updater.
 var _nav_debug: Node2D = null
 
@@ -56,6 +61,7 @@ func build(setup: TestSetup) -> void:
 	_build_nav()
 	await get_tree().physics_frame
 	await get_tree().physics_frame
+	await _await_nav_sync()
 	for a in setup.actors:
 		actors[a["id"]] = _spawn_actor(a, setup.switches)
 	_apply_world_switches(setup.switches)
@@ -112,6 +118,24 @@ func _set_static(script: Script, prop: StringName, value: Variant) -> void:
 	script.set(prop, value)
 
 
+## Wait (at most `NAV_SYNC_MS` of real time, a physics frame at a time) until the shared navigation map answers queries with this world's
+## navmesh: the closest map point to a room's centre belongs to this world's region. The map's iteration is built
+## asynchronously, so under load its id and region list can already show the new region while queries still run on an
+## empty (or the previous test's) iteration, and an NPC that snaps a point onto the map then gets the origin, and walks
+## there.
+func _await_nav_sync() -> void:
+	if rooms.is_empty() or not is_instance_valid(_nav_region):
+		return
+	var map: RID = get_world_2d().navigation_map
+	var centre: Vector2 = (rooms[0]["rect"] as Rect2).get_center()
+	var deadline := Time.get_ticks_msec() + NAV_SYNC_MS
+	while NavigationServer2D.map_get_closest_point_owner(map, centre) != _nav_region.get_rid():
+		if Time.get_ticks_msec() > deadline:
+			push_error("TestWorld: the navigation map did not take in the world's navmesh within %d ms" % NAV_SYNC_MS)
+			return
+		await get_tree().physics_frame
+
+
 ## Build the generated house or the arena, and read its rooms.
 func _build_world(world: Dictionary) -> void:
 	if world["kind"] == "house":
@@ -127,6 +151,7 @@ func _build_world(world: Dictionary) -> void:
 ## Bake the nav map (after the objects, so they are carved) and add the re-baker.
 func _build_nav() -> void:
 	var region := NavBuilder.build(house, rooms, self)
+	_nav_region = region
 	# Every test world shares the viewport's navigation map, which a previous test has already synced. Without
 	# this, the new region is not yet in the map when its NPCs first decide, and a path query against the stale map
 	# returns the origin (a point, not a route), so the NPC walks to (0, 0). Sync now, before any actor spawns.

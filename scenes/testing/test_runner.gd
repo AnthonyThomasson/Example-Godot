@@ -63,6 +63,8 @@ var _von_live := false
 var _entry: Dictionary = {}
 var _ctx: TestContext = null
 var _world: Node2D = null
+## The world is still being built: the test clock waits (the build may wait in real time for the navigation map).
+var _building := false
 ## Whether the open test's verdict has been taken (a later logged error then re-renders it).
 var _concluded := false
 ## While true, each frame sleeps out the rest of 1/REALTIME_FPS of wall time (Engine.max_fps is not
@@ -132,7 +134,7 @@ func _physics_process(delta: float) -> void:
 		_route_log(entry)
 	if get_tree().paused:
 		return  # the test clock (and so its timeout and waits) stops with the world
-	if _ctx != null and not _ctx.is_finished:
+	if _ctx != null and not _ctx.is_finished and not _building:
 		_ctx.time += delta
 		if not _entry.get("manual", false) and _ctx.time >= float(_entry.get("timeout", TestCatalog.DEFAULT_TIMEOUT)):
 			_ctx.reason = "timed out after %.1fs" % float(_entry["timeout"])
@@ -221,7 +223,9 @@ func _start(entry: Dictionary) -> void:
 	_world.child_entered_tree.connect(func(n: Node): _on_event(&"spawned", { "node": n, "name": String(n.name) }))
 	_world.child_exiting_tree.connect(func(n: Node): _on_event(&"removed", { "node": n, "name": String(n.name) }))
 	EventBus.posted.connect(_on_event)
+	_building = true
 	await _world.build(setup)
+	_building = false
 	if not is_instance_valid(_world):
 		return
 	_ctx.bind(_world, _world.actors, _world.objects, _world.rooms)
