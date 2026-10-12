@@ -17,6 +17,7 @@ const DROPLET_VERTS := 10
 ## The splat's merged outline polygons (local space), drawn in `BloodConfig.color`. Public so the draw
 ## step and tests can read them.
 var shapes: Array[PackedVector2Array] = []
+var _boxes: Array[Rect2] = []  ## `shapes[i]`'s bounding box while the splat is being built (see `_merge_in`).
 
 ## Core radius (px) and the heading (radians) its local +x runs along.
 var _radius := 3.0
@@ -163,8 +164,13 @@ static func drawable(poly: PackedVector2Array) -> PackedVector2Array:
 ## become one opaque shape), else keep it separate. Holes the union may leave are ignored.
 func _merge_in(poly: PackedVector2Array) -> void:
 	var current := poly
+	var current_box := _box_of(current)
 	var i := 0
 	while i < shapes.size():
+		# Outlines whose boxes are apart cannot touch: the union would keep them as two, so skip the merge.
+		if not current_box.intersects(_boxes[i]):
+			i += 1
+			continue
 		var merged := Geometry2D.merge_polygons(shapes[i], current)
 		var outer: Array[PackedVector2Array] = []
 		for m in merged:
@@ -172,11 +178,22 @@ func _merge_in(poly: PackedVector2Array) -> void:
 				outer.append(m)
 		if outer.size() == 1:
 			current = outer[0]
+			current_box = _box_of(current)
 			shapes.remove_at(i)
+			_boxes.remove_at(i)
 			i = 0
 		else:
 			i += 1
 	shapes.append(current)
+	_boxes.append(current_box)
+
+
+## The box around `poly`, a hair larger so outlines that merely touch still count as overlapping.
+static func _box_of(poly: PackedVector2Array) -> Rect2:
+	var box := Rect2(poly[0], Vector2.ZERO)
+	for p in poly:
+		box = box.expand(p)
+	return box.grow(0.1)
 
 
 ## A lighter fleck on the core so fresh blood reads wet; it fades as the splat dries.

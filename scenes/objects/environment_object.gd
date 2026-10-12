@@ -41,6 +41,7 @@ extends RigidBody2D
 var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
 var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
 var _smear: BloodSmear  ## Drags blood out of a puddle as the piece slides through it (solid pieces only).
+var _collider_rebuild_queued := false  ## A deferred `_rebuild_collider` is already waiting.
 
 
 func _ready() -> void:
@@ -102,13 +103,16 @@ func get_interactions() -> Array:
 
 ## Rebuild the collider when the silhouette deforms. Deferred: record() runs mid-physics
 ## (from the projectile), when swapping shapes is disallowed.
+## Hits that land before the deferred call runs share it: it rebuilds from the impacts as they stand then.
 func _on_deformable_changed() -> void:
-	if solid and PhysicsConfig.deform_update_collider:
+	if solid and PhysicsConfig.deform_update_collider and not _collider_rebuild_queued:
+		_collider_rebuild_queued = true
 		call_deferred("_rebuild_collider")
 
 
 ## Replace the collider(s) with convex pieces of the current deformed polygon.
 func _rebuild_collider() -> void:
+	_collider_rebuild_queued = false
 	var poly := Deformation.shape_polygon(shape_type, size, _deformable.impacts)
 	var shapes := Deformation.convex_shapes(poly)
 	if shapes.is_empty():
