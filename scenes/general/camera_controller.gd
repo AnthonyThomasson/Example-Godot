@@ -51,6 +51,7 @@ var _mouse_in_window: bool = false  ## Edge panning needs a live pointer: not ye
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS  # the viewer can still pan and zoom while the match is paused
 	_player = get_node_or_null(target_path)
 	if not _player:
 		push_warning("Camera: could not find target node at %s" % target_path)

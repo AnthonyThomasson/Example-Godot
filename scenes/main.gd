@@ -531,6 +531,9 @@ func _initial_overlays() -> Dictionary:
 	flags["show_room_zones"] = show_room_zones
 	flags["show_search"] = show_search
 	flags[OVERLAY_REGISTRY.NAV_HOLES] = show_nav_holes
+	for flag in Settings.overlays:  # the player's last toggles win over the exports
+		if flags.has(flag):
+			flags[flag] = Settings.overlays[flag]
 	if not debug_overlays:
 		for flag in flags:
 			flags[flag] = false
@@ -555,6 +558,7 @@ func _configure_debug() -> void:
 ## only); in player mode every NPC's overlay takes it directly.
 func _on_overlay_toggled(flag: String, on: bool) -> void:
 	_overlay_flags[flag] = on
+	Settings.set_overlay(flag, on)
 	if flag == OVERLAY_REGISTRY.NAV_HOLES:
 		if is_instance_valid(_nav_debug):
 			_nav_debug.show_holes = on

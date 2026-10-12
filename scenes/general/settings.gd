@@ -17,6 +17,9 @@ static var debug: bool = true
 ## The match-setup window's last choices (`{ side, seed, defenders, invaders }`, plain data as the window emits
 ## them), so it reopens the way it was left. Empty until something has been chosen.
 static var setup: Dictionary = {}
+## The overlay toggle bar's last states (`{ show_<x>: bool }`), so the overlays reopen as they were left. Only
+## flags the player has toggled are stored; the rest keep Main's defaults.
+static var overlays: Dictionary = {}
 
 
 ## Read the file: reset every binding to its default, then apply the saved differences, and take the
@@ -35,6 +38,11 @@ static func load_file() -> void:
 		debug = data["debug"]
 	if data.get("setup") is Dictionary:
 		setup = data["setup"]
+	if data.get("overlays") is Dictionary:
+		overlays = {}
+		for flag in data["overlays"]:
+			if data["overlays"][flag] is bool:
+				overlays[str(flag)] = data["overlays"][flag]
 	if data.get("keybinds") is Dictionary:
 		Keybinds.apply_overrides(data["keybinds"])
 
@@ -48,6 +56,7 @@ static func save() -> void:
 	file.store_string(JSON.stringify({
 		"debug": debug,
 		"setup": setup,
+		"overlays": overlays,
 		"keybinds": Keybinds.overrides(),
 	}, "  "))
 
@@ -65,6 +74,12 @@ static func set_setup(config: Dictionary) -> void:
 	for key in ["side", "seed", "defenders", "invaders"]:
 		if config.has(key):
 			setup[key] = config[key]
+	save()
+
+
+## Remember one overlay toggle (`flag`, as the toggle bar emits it) and save.
+static func set_overlay(flag: String, on: bool) -> void:
+	overlays[flag] = on
 	save()
 
 
