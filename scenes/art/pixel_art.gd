@@ -15,6 +15,15 @@ class_name PixelArt
 ## Painted textures by their inputs; identical pieces share one texture.
 static var _cache: Dictionary = {}
 
+## Most `render_turned` calls remembered by their exact arguments (see `_turned_memo`) before the memo is dropped and refills.
+const TURNED_MEMO_MAX := 4096
+
+## `render_turned`'s textures by the arguments of the calls that fetched them, so a repeat call with the same values (a
+## character repaints its parts every frame) is one lookup instead of building the key string below. Only a shortcut to
+## `_cache`: which texture a call gets is still decided by the string key, so values that key treats as equal still share one
+## texture. Bounded, so arguments that never repeat exactly cannot grow it.
+static var _turned_memo: Dictionary = {}
+
 
 ## `painter`'s art for a footprint of `size` world px whose front faces the cardinal `facing`.
 static func render(painter: Script, size: Vector2, color: Color, facing: Vector2 = Vector2.DOWN,
@@ -43,11 +52,22 @@ static func render(painter: Script, size: Vector2, color: Color, facing: Vector2
 ## steps so the cache stays small.
 static func render_turned(painter: Script, size: Vector2, color: Color, angle: float,
 		material: String = "", opts: Dictionary = {}) -> Texture2D:
+	var memo_key: Array = [painter, size, color, material, opts, ArtConfig.pixel_size, angle]
+	var memo: Variant = _turned_memo.get(memo_key)
+	if memo != null:
+		return memo
 	var base_key := _key(painter, size, color, material, opts)
 	var key := "%s|a%.4f" % [base_key, angle]
+	var tex: Texture2D
 	if _cache.has(key):
-		return _cache[key]
-	return _store(key, _paint(painter, _resolution(size), color, -angle, material, opts, base_key))
+		tex = _cache[key]
+	else:
+		tex = _store(key, _paint(painter, _resolution(size), color, -angle, material, opts, base_key))
+	if _turned_memo.size() >= TURNED_MEMO_MAX:
+		_turned_memo.clear()
+	memo_key[4] = opts.duplicate(true)  # The caller may change its dictionary later; the memo keeps the values it was asked with.
+	_turned_memo[memo_key] = tex
+	return tex
 
 
 ## `angle` snapped to the nearest of ArtConfig.turn_steps lighting steps (pass it to

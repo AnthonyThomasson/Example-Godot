@@ -31,6 +31,10 @@ registry), Character (`character/body/body_painter.gd`, `head_painter.gd`, `hand
 - Static cache keyed by painter path + inputs (+ orientation); survives scene reloads. Each
   piece's random detail is seeded by its inputs *without* orientation, so it doesn't change as the
   piece turns.
+- `render_turned` sits behind a bounded memo (`_turned_memo`, `TURNED_MEMO_MAX` entries) keyed by the call's exact arguments, so
+  a repeat call (a character repaints every part every frame) costs one lookup instead of formatting the key string. It only
+  shortcuts the string-keyed cache: values that key treats as equal (an angle within four decimals) still share one texture
+  (`tests/art/pixel_art_turned_cache_test.gd`).
 
 ## PixelCanvas (`pixel_canvas.gd`) — the surface
 
