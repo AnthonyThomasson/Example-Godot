@@ -25,7 +25,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet. |
-| **Physics System** | `physics/` | `domain-physics` | Physical reactions: forces, knockback, deformation, debris, ragdoll, and blood (its own sub-folder, `physics/blood/`). |
+| **Physics System** | `physics/` | `domain-physics` (+ `domain-physics-blood` for `physics/blood/`) | Physical reactions: forces, knockback, deformation, debris, ragdoll, and blood (its own sub-folder, `physics/blood/`). |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads) and played by the `Sound` autoload through a capped pool of positional voices. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
