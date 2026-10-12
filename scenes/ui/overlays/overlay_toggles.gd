@@ -9,8 +9,8 @@ extends CanvasLayer
 ## Its "Overlays" title is a drag handle that moves the bar. Runs PROCESS_MODE_ALWAYS so it still works while the match is paused, and its panel swallows clicks so
 ## pressing a button never selects an NPC underneath.
 
-const Registry := preload("res://scenes/ui/overlay_registry.gd")
-const DragHandle := preload("res://scenes/ui/drag_handle.gd")
+const Registry := preload("res://scenes/ui/overlays/overlay_registry.gd")
+const DragHandle := preload("res://scenes/ui/overlays/drag_handle.gd")
 
 ## Size multiplier for the whole bar (width, fonts, spacing).
 const SCALE := 1.5

@@ -9,7 +9,7 @@ extends Node
 ## after another in the runner scene, with a head.
 
 const TestCatalog = preload("res://scenes/testing/test_catalog.gd")
-const BROWSER_WINDOW := preload("res://scenes/ui/test_browser_window.gd")
+const BROWSER_WINDOW := preload("res://scenes/ui/testing/test_browser_window.gd")
 const RUNNER_SCENE := "res://scenes/testing/test_runner.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const META_FILTER := "test_filter"

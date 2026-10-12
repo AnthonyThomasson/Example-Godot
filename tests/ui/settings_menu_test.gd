@@ -5,7 +5,7 @@ extends GameTest
 ## Escape (cancel a capture, else go back) so it never reaches Main's "return to setup". Driven by feeding
 ## it events directly; it knows nothing of Keybinds, so the rows here are hand-made.
 
-const SettingsMenu := preload("res://scenes/ui/settings_menu.gd")
+const SettingsMenu := preload("res://scenes/ui/menus/settings_menu.gd")
 
 var _menu: CanvasLayer
 var _rebinds: Array = []

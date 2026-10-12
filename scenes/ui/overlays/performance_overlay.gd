@@ -7,8 +7,8 @@ extends CanvasLayer
 ## elsewhere. Reads only Godot's `Performance` monitors and the frame delta — it knows nothing of the
 ## domains. Runs PROCESS_MODE_ALWAYS so it keeps updating (and stays draggable) while the match is paused.
 
-const Toggles := preload("res://scenes/ui/overlay_toggles.gd")
-const DragHandle := preload("res://scenes/ui/drag_handle.gd")
+const Toggles := preload("res://scenes/ui/overlays/overlay_toggles.gd")
+const DragHandle := preload("res://scenes/ui/overlays/drag_handle.gd")
 
 ## Panel width in px, and its top edge (clears the match HUD's top-centre timer).
 const PANEL_WIDTH := 232.0

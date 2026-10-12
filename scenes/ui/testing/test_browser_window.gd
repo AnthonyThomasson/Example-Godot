@@ -24,7 +24,7 @@ signal checked_changed(ids: Array)
 ## The search text changed (so the host can restore it next time).
 signal filter_changed(text: String)
 
-const RESULT_HUD := preload("res://scenes/ui/test_result_hud.gd")
+const RESULT_HUD := preload("res://scenes/ui/testing/test_result_hud.gd")
 const STATUS_MARKS := { "PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱", "SKIPPED": "–" }
 ## Side of the ▶ run button's icon on a domain row, in pixels.
 const RUN_ICON_SIZE := 22

@@ -12,7 +12,7 @@ const ScriptedController = preload("res://scenes/testing/scripted_controller.gd"
 const PlayerController = preload("res://scenes/character/player_controller.gd")
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
-const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
+const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
 const ACTOR_SCENES := {
 	&"puppet": "res://scenes/character/character_base.tscn",
 	&"player": "res://scenes/character/character_base.tscn",

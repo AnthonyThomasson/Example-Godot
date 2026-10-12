@@ -30,7 +30,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads) and played by the `Sound` autoload through a capped pool of positional voices. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
-| **UI** | `ui/` | `domain-ui` | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
+| **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
 | **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`. |
 
@@ -325,7 +325,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
       read a developer's file), the saving mutators `set_debug(on)`, `rebind(action, event) -> bool`,
       `reset(action)`, `reset_all()`, and `binding_rows() -> Array` (plain dicts for the page). It persists
       the Debug switch and the `Keybinds` bindings that differ from the defaults to `user://settings.json`.
-    - `SettingsMenu` (`ui/settings_menu.gd`): `open({ debug, rows })`, `set_rows(rows)`; signals
+    - `SettingsMenu` (`ui/menus/settings_menu.gd`): `open({ debug, rows })`, `set_rows(rows)`; signals
       `debug_changed`, `rebind_requested(action, event)`, `reset_requested`, `reset_all_requested`,
       `back_requested`. It takes plain dicts and knows nothing of `Keybinds`/`Settings`; Main opens it from the
       setup window's `settings_requested`, applies each signal to `Settings` and redraws with `set_rows`.

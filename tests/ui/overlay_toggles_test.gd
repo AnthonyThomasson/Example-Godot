@@ -3,8 +3,8 @@ extends GameTest
 ## The overlay bar's bulk buttons: a group header flips just its group, "All" flips everything, each flag
 ## changed emits its own `overlay_toggled`, and the counts on the buttons follow the flags.
 
-const OverlayToggles := preload("res://scenes/ui/overlay_toggles.gd")
-const Registry := preload("res://scenes/ui/overlay_registry.gd")
+const OverlayToggles := preload("res://scenes/ui/overlays/overlay_toggles.gd")
+const Registry := preload("res://scenes/ui/overlays/overlay_registry.gd")
 
 var _bar: CanvasLayer
 var _events: Array = []

@@ -3,7 +3,7 @@ extends GameTest
 ## The setup window's three start buttons each report their mode with the chosen side and each side's
 ## count and loadout; a weapon without a gun hides its magazine rows.
 
-const SetupMenu := preload("res://scenes/ui/setup_menu.gd")
+const SetupMenu := preload("res://scenes/ui/menus/setup_menu.gd")
 
 const WEAPONS := [
 	{ "id": "pistol", "label": "Pistol", "magazines": [{ "id": "standard", "label": "Standard" }, { "id": "extended", "label": "Extended" }] },

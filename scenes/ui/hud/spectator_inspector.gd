@@ -25,7 +25,7 @@ const GOAL_LEFT := 24.0
 const GOAL_WIDTH := 560.0
 const GOAL_BOTTOM := 356.0
 
-const ContactMarkers := preload("res://scenes/ui/contact_markers.gd")
+const ContactMarkers := preload("res://scenes/ui/hud/contact_markers.gd")
 
 var _combatants: Array = []  ## The NPCs to pick from (public nodes), handed in by Main.
 var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from the setup menu).

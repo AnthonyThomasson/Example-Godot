@@ -76,16 +76,16 @@ const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 ## Periodic navmesh re-baker: re-carves furniture holes as pieces are shoved around (Navigation domain).
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 ## Spectator inspector (UI): Space-pause + click an NPC to show its tactical zones.
-const SPECTATOR_INSPECTOR := preload("res://scenes/ui/spectator_inspector.gd")
+const SPECTATOR_INSPECTOR := preload("res://scenes/ui/hud/spectator_inspector.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
-const OVERLAY_REGISTRY := preload("res://scenes/ui/overlay_registry.gd")
-const OVERLAY_TOGGLES := preload("res://scenes/ui/overlay_toggles.gd")
+const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
+const OVERLAY_TOGGLES := preload("res://scenes/ui/overlays/overlay_toggles.gd")
 ## The test browser scene (Testing domain), opened from the setup window's Tests button.
 const TEST_BROWSER := "res://scenes/testing/test_browser.tscn"
 ## The performance overlay (docks left of the toggle bar).
-const PERFORMANCE_OVERLAY := preload("res://scenes/ui/performance_overlay.gd")
+const PERFORMANCE_OVERLAY := preload("res://scenes/ui/overlays/performance_overlay.gd")
 ## The settings page (UI), opened over the setup window by its Settings button.
-const SETTINGS_MENU := preload("res://scenes/ui/settings_menu.gd")
+const SETTINGS_MENU := preload("res://scenes/ui/menus/settings_menu.gd")
 
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building

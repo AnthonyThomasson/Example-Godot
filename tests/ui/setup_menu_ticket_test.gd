@@ -2,7 +2,7 @@ extends GameTest
 
 ## The setup window shows the run's ticket name above its title when one is given, and nothing when blank.
 
-const SetupMenu := preload("res://scenes/ui/setup_menu.gd")
+const SetupMenu := preload("res://scenes/ui/menus/setup_menu.gd")
 
 
 func describe() -> Dictionary:

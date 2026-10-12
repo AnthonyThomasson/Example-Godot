@@ -61,7 +61,7 @@ approaching the house) — re-tagged out of `room`/`search` so these, which ofte
 room, don't read as misplaced room zones. Options with no location (a point-blank punch, the hostile
 picks) are skipped. These refresh each decision (the decide cadence). The overlay runs
 `PROCESS_MODE_ALWAYS` so it still redraws while the tree is paused — the spectator inspector
-(`scenes/ui/spectator_inspector.gd`) flips `show_tactics`/`show_room_zones` per NPC when you click one
+(`scenes/ui/hud/spectator_inspector.gd`) flips `show_tactics`/`show_room_zones` per NPC when you click one
 during a Space-pause, the usual way to study the zones.
 
 **Room zones (`show_room_zones`)** — every room of the house drawn as a rectangle (faint fill + 2px
@@ -97,7 +97,7 @@ so these overlays need no reference into the perception/behaviour internals.
 ## The behaviour overlays (all default off; toggled from the UI toggle bar / setup window)
 
 Each is a child of the NPC in `npc.tscn`, found by its `show_<x>` property (registry in
-`scenes/ui/overlay_registry.gd`), and reads only the controller's public `debug_*` getters:
+`scenes/ui/overlays/overlay_registry.gd`), and reads only the controller's public `debug_*` getters:
 
 | Overlay (flag) | Draws | Controller getter(s) |
 |---|---|---|

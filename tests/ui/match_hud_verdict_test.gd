@@ -3,7 +3,7 @@ extends GameTest
 ## The match HUD announces the result once (`match_ended`): when a faction is eliminated, or when the
 ## time limit runs out; and `begin` can be called again for a fresh match.
 
-const MatchHUD := preload("res://scenes/ui/match_hud.gd")
+const MatchHUD := preload("res://scenes/ui/hud/match_hud.gd")
 
 
 class Fighter extends Node:

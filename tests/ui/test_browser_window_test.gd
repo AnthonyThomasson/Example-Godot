@@ -5,7 +5,7 @@ extends GameTest
 ## a search, and "Run N checked" hands back the ticked tests' paths in list order. Driven through the
 ## window's own handlers; the descriptors here are hand-made.
 
-const Browser := preload("res://scenes/ui/test_browser_window.gd")
+const Browser := preload("res://scenes/ui/testing/test_browser_window.gd")
 
 var _window: CanvasLayer
 var _queued: Array = []

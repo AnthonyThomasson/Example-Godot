@@ -24,10 +24,10 @@ const TestCatalog = preload("res://scenes/testing/test_catalog.gd")
 const TestWorldScript = preload("res://scenes/testing/test_world.gd")
 const LogWatch = preload("res://scenes/testing/log_watch.gd")
 const LAUNCHER = preload("res://scenes/ai/decision/decision_server_launcher.gd")
-const RESULT_HUD = preload("res://scenes/ui/test_result_hud.gd")
-const OVERLAY_TOGGLES = preload("res://scenes/ui/overlay_toggles.gd")
-const OVERLAY_REGISTRY = preload("res://scenes/ui/overlay_registry.gd")
-const PERFORMANCE_OVERLAY = preload("res://scenes/ui/performance_overlay.gd")
+const RESULT_HUD = preload("res://scenes/ui/testing/test_result_hud.gd")
+const OVERLAY_TOGGLES = preload("res://scenes/ui/overlays/overlay_toggles.gd")
+const OVERLAY_REGISTRY = preload("res://scenes/ui/overlays/overlay_registry.gd")
+const PERFORMANCE_OVERLAY = preload("res://scenes/ui/overlays/performance_overlay.gd")
 const BROWSER_SCENE := "res://scenes/testing/test_browser.tscn"
 const REPORT_PATH := "user://test_report.json"
 ## Failed/timed-out tests write their event log, final state and traces here (one JSON per test id).
