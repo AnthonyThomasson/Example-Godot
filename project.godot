@@ -24,6 +24,10 @@ Despawner="*res://scenes/general/despawner.gd"
 EventBus="*res://scenes/general/event_bus.gd"
 Sound="*res://scenes/audio/sound.gd"
 
+[debug]
+
+file_logging/enable_file_logging=true
+
 [dotnet]
 
 project/assembly_name="Example_Godot"

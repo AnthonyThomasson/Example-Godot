@@ -273,7 +273,26 @@ the engine log file (`debug/file_logging/log_path`) from an offset marked at run
 - Teardown logs count too. Batch mode frees the world and polls again before taking the verdict;
   interactive mode re-renders the banner if a late error arrives.
 - Lines logged while no test is open (for example a test script's parse error when the catalog loads
-  it) are batch-level failures. The runner's own output never starts with an error header.
+  it) are batch-level failures. The runner's own output never starts with an error header. A batch run owns a
+  fresh log (`--log-file` + `--out`), so the watch starts at byte 0 and **start-up errors count too**.
+- **Nothing escapes the process either.** The runner writes `log_end` (bytes judged, `LogWatch.consumed()`) into its
+  report; `tools/run_tests.sh` then scans the log from there to the end with `tools/scan_godot_log.py` — whatever
+  the engine writes while shutting down — and from byte 0 when no report exists (`--list`, a crash, a runner that
+  never started), once per shard. Any hit prints `Logged outside any test` and fails the run. Godot's own
+  end-of-process leak report ("ObjectDB instances leaked at exit", "resources still in use at exit") is a `NOTE`
+  by default (`--strict-exit` fails it): runs that touch a character together with a reflectively read config
+  holder such as `CharacterConfig` print it at exit whatever the test does. `tools/load_check.sh` applies the same
+  gate to a plain headless start-up.
+- **Headless or windowed.** The gate reads the log file, so it is the same either way: `tools/run_tests.sh --shots`
+  runs the batch with a window, and the in-game runner (`-- --play …`, the browser) watches the default log
+  (`debug/file_logging/enable_file_logging` is set in `project.godot`). In-game, a logged error or warning fails the
+  open test and flips a verdict already shown; each verdict is also printed to the console, and the banner says so
+  when the log cannot be read.
+- **Tested by** `tools/test_log_gate.py` (`--headed` adds the windowed engine): the scanner on crafted logs,
+  `run_tests.sh` around a fake Godot for every way a run can end, and the real engine through the probe
+  `tests/_harness/log_gate_probe_test.gd` (set `GAME_TEST_PROBE=error|warning`) in batch and in-game;
+  `log_watch_offsets_test.gd` covers the read positions. Run it after editing `log_watch.gd`, `test_runner.gd`,
+  `run_tests.sh` or `scan_godot_log.py`.
 
 ## Behaviour switches (`test_switches.gd`)
 
@@ -324,7 +343,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `scripted_controller.gd` | The puppet controller. |
 | `test_switches.gd` | The switch table. |
 | (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test). |
-| `log_watch.gd` | The log tail. |
+| `log_watch.gd` | The log tail (`begin(from_start)`, `poll`, `consumed`). |
 | `test_catalog.gd` | `discover(root, domains, ids)`, `describe(path)` (descriptor dicts), `matches(entry, text)`, and the CLI selection helpers `csv()` / `shard()`. |
 | `test_runner.gd` / `.tscn` | Interactive and batch modes, one `TestWorld` child per test, a lazily created `DecisionServerLauncher` kept for the session, real-time pacing for Von tests, the JSON report. |
 | `test_browser.gd` / `.tscn` | Hosts the UI browser window. Engine metas `test_selection` / `test_results` / `test_filter` survive the round trip through a test. |

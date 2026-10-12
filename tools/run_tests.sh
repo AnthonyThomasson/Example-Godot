@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Run the game tests headless (scenes/testing/test_runner.gd, batch mode) and exit non-zero on any
-# failure, timeout, or engine error/warning logged during the run.
+# failure, timeout, or engine error/warning logged ANYWHERE in the run: while a test is open (that test
+# fails), between tests and at start-up (reported as "Logged outside any test"), and after the runner has
+# finished judging (engine shutdown; tools/scan_godot_log.py reads that tail of each process's log).
 #
 # Selecting tests
 #   tools/run_tests.sh                    every test (Von tests skipped)
@@ -34,6 +36,7 @@
 # Other
 #   --repeat=5      run each match 5 times; names FLAKY / FAILING tests
 #   --seed=42       pin every house() test to seed 42
+#   --strict-exit   also fail on Godot's own end-of-process leak report (reported as a NOTE by default)
 # Every run ends with a `Slowest:` line (wall-clock ms per test).
 # A failed test prints its final actor state and a `bundle:` path to a JSON with its event log,
 # state and traces. Each invocation gets its own engine log, report and bundles in a fresh temp dir
@@ -58,12 +61,14 @@ fi
 LAST="${TMPDIR:-/tmp}/example_godot_last_report_$(printf %s "$PWD" | shasum | cut -c1-8).json"
 
 HEADLESS=--headless
+STRICT=
 JOBS=1
 CHANGED=0
 args=()
 for a in "$@"; do
   case "$a" in
     --shots) HEADLESS=; args+=("$a") ;;
+    --strict-exit) STRICT=--strict-exit ;;
     --jobs=*) JOBS="${a#--jobs=}" ;;
     --changed) CHANGED=1 ;;
     --failed)
@@ -102,13 +107,29 @@ if results or stray:
 EOF
 }
 
+# Check the engine log of the process that wrote into dir $1 for errors and warnings the runner did not
+# judge: from the byte offset it reports as `log_end` (shutdown), or from the start when it wrote no report
+# (--list, a crash, a start-up failure). Prints what it finds; returns non-zero on any.
+scan_log() {
+  local dir="$1" listing="$2" from=0 bad=0
+  if [[ -f "$dir/report.json" ]]; then
+    from=$(python3 -c 'import json,sys; print(int(json.load(open(sys.argv[1])).get("log_end", 0)))' "$dir/report.json" 2>/dev/null || echo 0)
+  elif [[ "$listing" -eq 0 ]]; then
+    echo "Logged outside any test: the runner wrote no report (it crashed or stopped early) in $dir"
+    bad=1
+  fi
+  python3 "$(dirname "$0")/scan_godot_log.py" "$dir/godot.log" --from="$from" $STRICT || bad=1
+  return $bad
+}
+
 # One run of the runner with the given selection args, split over $JOBS processes when asked.
 run() {
-  local keep=1 sharded=0
+  local keep=1 sharded=0 listing=0
   [[ $JOBS -gt 1 ]] && sharded=1
   for x in "$@" ${args[@]+"${args[@]}"}; do
     case "$x" in --list|--self-test|--play|--shard=*) sharded=0 ;; esac
     case "$x" in --list|--self-test) keep=0 ;; esac
+    case "$x" in --list) listing=1 ;; esac
   done
   local out
   if [[ $sharded -eq 0 ]]; then
@@ -116,6 +137,7 @@ run() {
     local code=0
     godot_run "$out" "$@" ${args[@]+"${args[@]}"} || code=$?
     [[ $keep -eq 1 ]] && save_reports "$out"
+    [[ " $* ${args[*]-} " == *" --play "* ]] || scan_log "$out" $listing || code=1
     return $code
   fi
 
@@ -128,6 +150,7 @@ run() {
   done
   local status=0 pid
   for pid in "${pids[@]}"; do wait "$pid" || status=1; done
+  for ((i = 0; i < JOBS; i++)); do scan_log "${dirs[$i]}" 0 >>"${dirs[$i]}/stdout.txt" 2>&1 || status=1; done
   # Per-shard output without the repeated banners and totals, then one combined total.
   for ((i = 0; i < JOBS; i++)); do
     grep -Ev '^(Godot Engine|Godot [0-9]|Running [0-9]+ test|[0-9]+ passed, |Report: |$)' "${dirs[$i]}/stdout.txt" || true

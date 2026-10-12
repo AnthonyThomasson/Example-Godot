@@ -19,7 +19,7 @@ The run is mechanical and its raw output is noisy. Don't run it in your own cont
 > output). Do not edit any files. Reply with ONLY: `PASS` or `FAIL`, and if FAIL the matching error
 > lines verbatim (file:line included), max 20 lines. No commentary.
 >
-> [paste the commands from Steps 1–3 below; include Step 4's `--import` first if the change added a
+> [paste the commands from Steps 1–2 below; include Step 3's `--import` first if the change added a
 > `class_name` or new script]
 
 Then act on the verdict. If the reply is FAIL or ambiguous, fix the code (or re-run) yourself — the
@@ -37,46 +37,28 @@ echo "Using: $GODOT"
 
 Resolves to `/Applications/Godot_mono.app/Contents/MacOS/Godot`.
 
-## Step 2 — headless smoke test
+## Step 2 — run the load check
 
-Loads the main scene + autoloads, runs a few frames, then quits. `--quit-after` guarantees it won't
-hang (there is no `timeout` command on macOS). **Sandbox disabled.**
-
-```bash
-# from the checkout root; $LOG is a scratch file (use the session scratchpad dir)
-LOG="${TMPDIR:-/tmp}/godot_check.log"
-"$GODOT" --headless --path . --quit-after 30 2>&1 | tee "$LOG"
-```
-
-To check a single script instead of the whole project:
+One script loads the main scene and autoloads, runs a few frames, quits, and reads the engine log. It exits 1 and prints the
+lines on **any** engine error or warning (parse errors, failed loads, runtime script errors, anything logged while the process
+shuts down); 0 means clean. **Sandbox disabled.** Godot exits `0` even when a script fails to parse, which is why the verdict
+comes from the log, not the exit code.
 
 ```bash
-"$GODOT" --headless --path . --check-only --script scenes/character/character.gd 2>&1
+tools/load_check.sh              # headless
+tools/load_check.sh --windowed   # with a window (rendering warnings count too)
 ```
 
-## Step 3 — pass/fail by GREPPING the output, not the exit code
+A failure prints entries like `✗ script error: Parse Error: Expected expression … (res://scenes/character/character.gd:42)` and the
+log path. To check a single script instead: `"$GODOT" --headless --path . --check-only --script scenes/character/character.gd`.
 
-Godot exits `0` even when a script fails to parse. Judge by the output:
+Godot's own end-of-process leak report ("ObjectDB instances leaked at exit", "resources still in use at exit", …) is printed as a
+`NOTE` and does not fail the check; `--strict-exit` fails it too. Everything else fails.
 
-```bash
-grep -nE 'SCRIPT ERROR|Parse Error|ERROR:|Failed to load|Cannot infer' "$LOG" \
-  && echo "FAIL: errors found (see above)" \
-  || echo "PASS: no errors — project loads and runs"
-```
-
-Error lines include file and line, e.g.:
-
-```
-SCRIPT ERROR: Parse Error: Expected expression ... after "=".
-   at: GDScript::reload (scenes/character/character.gd:42)
-```
-
-A clean run prints only the engine version banner (plus any `print()` output).
-
-## Step 4 — stale class cache after adding a `class_name`
+## Step 3 — stale class cache after adding a `class_name`
 
 If the output says `Identifier "Foo" not declared` right after you added `class_name Foo`, the
-global class cache is stale. Rebuild it, then rerun Step 2 (ignore its `progress_dialog` noise):
+global class cache is stale. Rebuild it, then rerun Step 2 (the import's own `progress_dialog` noise is not part of the check):
 
 ```bash
 "$GODOT" --headless --path . --import
@@ -96,10 +78,5 @@ A clean load only proves it parses. For behaviour run `tools/run_tests.sh --chan
 
 - `--headless` skips rendering, so it won't catch visual issues, and it can't judge behaviour — use
   `godot-drive`.
-- Code that hard-requires a display/GPU may log rendering warnings under `--headless`; those are not
-  real errors. Focus on `SCRIPT ERROR` / `Parse Error` / `Failed to load` lines.
-- **Script load order and exit-time leaks.** A refactor that changes which script is analysed first can make the plain `--quit-after` run
-  end with `Condition "p_elem->_root != this"`, `ObjectDB instances leaked` and `resources still in use` for the Audio scripts, which
-  Step 3's `ERROR:` grep reports as FAIL although nothing is wrong at runtime and the test suite is unaffected. It appeared when the
-  inventory moved out of `character.gd` into a new `RefCounted` (no typed `Item` member left on the Node script); that extraction was
-  dropped rather than papered over. If a clean load matters, bisect by reverting the last extraction.
+- A warning that only a particular renderer or display logs fails the check in that mode, headless or windowed: run both
+  (`--windowed`) when a change touches rendering.

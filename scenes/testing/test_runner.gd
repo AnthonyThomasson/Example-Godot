@@ -89,7 +89,7 @@ func _ready() -> void:
 	var out := _option(args, "--out", "")
 	if out != "":
 		_watch.path_override = out.path_join("godot.log")
-	_watch.begin()
+	_watch.begin(args.has("--run-tests") and out != "")  # a batch run owns a fresh log: startup errors count too
 	if args.has("--play"):
 		_select_from_cli(args)
 	if args.has("--run-tests"):
@@ -298,7 +298,9 @@ func _route_log(entry: Dictionary) -> void:
 		var before := _ctx.checks.size()
 		_ctx.on_log(entry)
 		if _concluded and _ctx.checks.size() != before and _hud != null:
-			_hud.show_result(_result())  # a late error flips a shown verdict
+			var flipped := _result()  # a late error flips a shown verdict
+			_print_result(flipped)
+			_hud.show_result(flipped)
 	elif not LogWatch.matches_any(entry, []):
 		_stray_logs.append(entry)
 
@@ -362,7 +364,10 @@ func _select_from_cli(args: PackedStringArray) -> void:
 			break
 		words.append(a)
 	var filter := " ".join(words)
-	for e in TestCatalog.discover() + TestCatalog.discover_sandboxes():
+	TestCatalog.show_internal = true  # a named test is played even when it is a harness self-test
+	var found := TestCatalog.discover() + TestCatalog.discover_sandboxes()
+	TestCatalog.show_internal = false
+	for e in found:
 		if TestCatalog.matches(e, filter):
 			Engine.set_meta(TestCatalog.META_SELECTION, e["path"])
 			return
@@ -373,10 +378,22 @@ func _select_from_cli(args: PackedStringArray) -> void:
 func _run_interactive(path: String) -> void:
 	var entry := TestCatalog.describe(path)
 	_hud.show_running(entry)
+	_warn_if_unwatched()
 	await _start(entry)
 	var result := _result()
 	_remember(result)
+	_print_result(result)
 	_hud.show_result(result)
+
+
+## Say so on the banner (and the console) when the engine log cannot be read: errors and warnings would then
+## not fail the test, which must never pass silently.
+func _warn_if_unwatched() -> void:
+	if not _watch.available():
+		var text := "NOTE: engine log not found - errors and warnings will NOT fail this test"
+		print(text)
+		if _hud != null:
+			_hud.show_status(text)
 
 
 ## Play `paths` one after another: each runs to its verdict, which is held for QUEUE_PAUSE (or until Next), then
@@ -388,11 +405,13 @@ func _run_queue(paths: Array) -> void:
 		var entry := TestCatalog.describe(paths[i])
 		_hud.show_queue(i + 1, paths.size())
 		_hud.show_running(entry)
+		_warn_if_unwatched()
 		await _start(entry)
 		if not _queue_active:
 			return
 		var result := _result()
 		_remember(result)
+		_print_result(result)
 		counts[result["status"]] = counts.get(result["status"], 0) + 1
 		_hud.show_result(result)
 		if i < paths.size() - 1:
@@ -635,5 +654,7 @@ func _write_report(results: Array) -> void:
 	var f := FileAccess.open(_report_path, FileAccess.WRITE)
 	if f == null:
 		return
-	f.store_string(JSON.stringify({ "results": results, "stray_logs": _stray_logs }, "  "))
+	# `log_end`: how much of the engine log this run has judged; what the engine writes after it (shutdown) is
+	# checked by tools/run_tests.sh through tools/scan_godot_log.py.
+	f.store_string(JSON.stringify({ "results": results, "stray_logs": _stray_logs, "log_end": _watch.consumed() }, "  "))
 	print("Report: %s" % ProjectSettings.globalize_path(_report_path))

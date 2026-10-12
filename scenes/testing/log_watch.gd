@@ -33,12 +33,19 @@ func available() -> bool:
 	return FileAccess.file_exists(_log_path())
 
 
-## Start watching: everything already in the log is ignored.
-func begin() -> void:
+## Start watching. By default everything already in the log is ignored; `from_start` also takes in what the
+## engine logged before this call (startup errors), for a run whose log file is fresh (`--log-file`).
+func begin(from_start := false) -> void:
 	_path = _log_path()
-	_offset = _length()
+	_offset = 0 if from_start else _length()
 	_partial = ""
 	_pending = {}
+
+
+## How many bytes of the log have been read so far: what a run reports as `log_end`, so the part of the log
+## written after it (engine shutdown) can be checked by whoever started the process (tools/scan_godot_log.py).
+func consumed() -> int:
+	return _offset - _partial.length()
 
 
 ## The error/warning entries logged since the last poll: `{ severity, message, location, line }`.
