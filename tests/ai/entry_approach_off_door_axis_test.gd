@@ -15,7 +15,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry approach stays off the door axis",
 		"description": "Starting on the front door axis, the invader leaves the axis before it is within 100 px of the wall and comes in along the wall.",
-		"tags": ["ai", "entry", "scripted", "gap"],
+		"tags": ["ai", "entry", "scripted"],
 		"timeout": 25.0,
 	}
 

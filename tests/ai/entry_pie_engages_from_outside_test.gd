@@ -12,7 +12,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry engages what the pie reveals from outside",
 		"description": "A defender seen through the back door during the pie is shot at from outside the kitchen.",
-		"tags": ["ai", "entry", "scripted", "gap", "combat"],
+		"tags": ["ai", "entry", "scripted", "combat"],
 		"timeout": 40.0,
 	}
 

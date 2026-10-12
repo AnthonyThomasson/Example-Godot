@@ -12,7 +12,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry pair takes the hard corner first",
 		"description": "Through the corner-fed living room door, the pair stops at the two door-wall corners, never a far one.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 50.0,
 	}
 

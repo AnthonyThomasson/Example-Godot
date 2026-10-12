@@ -11,7 +11,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry stack slots are never claimed twice",
 		"description": "Two invaders deciding on the same frame end up in different stack slots of the back door.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 30.0,
 	}
 

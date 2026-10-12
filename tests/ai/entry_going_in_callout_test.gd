@@ -11,7 +11,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry point radios going in",
 		"description": "The point calls going in with the opening and its slot; the second crosses only after the point is through.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 50.0,
 	}
 

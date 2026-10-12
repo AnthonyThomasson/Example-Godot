@@ -12,7 +12,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry stack orders the slots",
 		"description": "Three invaders stack on one side of the back door in slot order, a body apart, out of its line of sight.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 35.0,
 	}
 

@@ -11,7 +11,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry ally joins a solo stack",
 		"description": "A late ally claims slot 2 of a solo entry; the point waits for it and they enter as a pair.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 60.0,
 	}
 

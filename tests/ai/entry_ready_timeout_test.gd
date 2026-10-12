@@ -12,7 +12,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry ready barrier times out",
 		"description": "A teammate that never arrives is given up on after the ready timeout and the point goes in.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 50.0,
 	}
 

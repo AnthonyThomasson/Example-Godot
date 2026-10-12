@@ -11,7 +11,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry never stops in the funnel",
 		"description": "Crossing the back door the invader never stands still in the doorway.",
-		"tags": ["ai", "entry", "scripted", "gap"],
+		"tags": ["ai", "entry", "scripted"],
 		"timeout": 45.0,
 	}
 

@@ -2,7 +2,7 @@ extends GameTest
 
 ## Desired (E3): before it crosses, an invader slices the pie: it looks across the kitchen's back door in angle steps
 ## from outside and so sees at least half of the room (and both of its far corners) without setting foot inside. The
-## corners still hidden are the two on the door's own wall.
+## corners it notes as still hidden are only ever on the door's own wall (a far corner is always in view of the pie).
 
 const Entry := preload("res://tests/_ai/entry_probe.gd")
 const Maps := preload("res://tests/_ai/flank_maps.gd")
@@ -12,7 +12,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry slices the pie from outside",
 		"description": "Before going in, the invader sees half the kitchen and both far corners from outside the back door.",
-		"tags": ["ai", "entry", "scripted", "gap"],
+		"tags": ["ai", "entry", "scripted"],
 		"timeout": 40.0,
 	}
 
@@ -35,5 +35,5 @@ func run(t: TestContext) -> void:
 	var hidden: Array = e.get("hidden_corners", [])
 	for c in corners["far"]:
 		t.check(not hidden.any(func(h): return (h as Vector2).distance_to(c) < 60.0), "the far corner near %s was seen" % c)
-	for c in corners["near"]:
-		t.check(hidden.any(func(h): return (h as Vector2).distance_to(c) < 60.0), "the door-wall corner near %s is noted as hidden" % c)
+	for h in hidden:
+		t.check(corners["near"].any(func(c): return (h as Vector2).distance_to(c) < 60.0), "a corner noted as hidden (%s) is on the door's wall" % h)

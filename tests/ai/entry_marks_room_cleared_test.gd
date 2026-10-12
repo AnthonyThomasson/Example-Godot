@@ -11,7 +11,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry marks the room cleared",
 		"description": "After clearing the kitchen the invader radios it clear; it and a listening ally regard it as searched.",
-		"tags": ["ai", "entry", "scripted", "gap", "callout"],
+		"tags": ["ai", "entry", "scripted", "callout"],
 		"timeout": 70.0,
 	}
 
