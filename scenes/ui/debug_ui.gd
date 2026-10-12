@@ -62,6 +62,16 @@ func _ammo_line() -> String:
 	return line + "  reloading…" if _character.is_reloading() else line
 
 
+## "Standing", "Crouching" or "Prone".
+func _posture_label() -> String:
+	match _character.posture():
+		&"crouch":
+			return "Crouching"
+		&"prone":
+			return "Prone"
+	return "Standing"
+
+
 func _process(_delta: float) -> void:
 	var item_name: String = _character.item_name()
 	var reach: float = _character.item_reach()
@@ -77,7 +87,7 @@ func _process(_delta: float) -> void:
 		"Interaction: %s" % (interaction if interaction != "" else "—"),
 		"Reach: %.1f" % reach,
 		"Stamina: %d%%%s" % [roundi(_character.stamina_fraction() * 100.0), " (running)" if _character.is_running() else ""],
-		"",
+		"Posture: %s" % _posture_label(),
 		"Last Hit:",
 	]
 

@@ -47,8 +47,9 @@ var _primed := false              ## False until the first update snaps every pa
 ## `stances` names each hand's stance (the held item's hand_stance()), `punch` is each hand's
 ## extension, 0 (resting) .. 1 (fully punched).
 func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, stances: Array,
-		punch: Array) -> void:
+		punch: Array, weapon_turn := 0.0) -> void:
 	var aim := facing.angle()
+	var hold := aim + weapon_turn  # Where the hands and weapon point: the aim, swung aside off a wall.
 	if not _primed:
 		torso_angle = aim
 		_torso_core = aim
@@ -83,16 +84,16 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	for i in 2:
 		var hand: Vector2
 		if _steady[i]:
-			hand = _turn(hand_angles[i], _hand_vels[i], aim, 0.0, CharacterConfig.pose_aim_freq,
+			hand = _turn(hand_angles[i], _hand_vels[i], hold, 0.0, CharacterConfig.pose_aim_freq,
 				CharacterConfig.pose_aim_damping, CharacterConfig.pose_aim_max_lag, delta)
 		else:
 			# Each free hand at its own pace, so the pair doesn't turn as one rigid piece.
 			var pace := 1.0 + CharacterConfig.pose_hand_pace_spread * (-0.5 if i == 0 else 0.5)
-			hand = _turn(hand_angles[i], _hand_vels[i], aim, 0.0, CharacterConfig.pose_hand_freq * pace,
+			hand = _turn(hand_angles[i], _hand_vels[i], hold, 0.0, CharacterConfig.pose_hand_freq * pace,
 				CharacterConfig.pose_hand_damping, CharacterConfig.pose_hand_max_lag, delta)
 		hand_angles[i] = hand.x
 		_hand_vels[i] = hand.y
-	var weapon := _turn(weapon_angle, _weapon_vel, aim, 0.0, CharacterConfig.pose_weapon_freq,
+	var weapon := _turn(weapon_angle, _weapon_vel, hold, 0.0, CharacterConfig.pose_weapon_freq,
 		CharacterConfig.pose_weapon_damping, CharacterConfig.pose_weapon_max_lag, delta)
 	weapon_angle = weapon.x
 	_weapon_vel = weapon.y

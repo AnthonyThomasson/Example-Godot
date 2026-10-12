@@ -56,6 +56,9 @@ var run_enabled: bool = true ## May sprint at all.
 var run_min_distance: float = 150.0 ## Only run when farther than this (px) from the destination.
 var run_start_fraction: float = 0.5 ## Stamina needed to START a run (once running it goes on until dry).
 var auto_reload: bool = true ## An empty gun with a spare magazine is reloaded on its own while holding or ducked in cover.
+# Posture: whether the NPC may crouch and go prone in a fight (see `_wanted_posture`), and how long it keeps one before changing.
+var posture_enabled: bool = true
+var posture_dwell: float = 0.7
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
 var rooms: Array = []
@@ -83,6 +86,8 @@ var _engage_node: Node2D          ## That contact's body (excluded from line-of-
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
 var _engage_inside := false       ## Whether that contact was last seen inside the house.
 var _running := false             ## The character was running last tick (for the status line).
+var _posture: StringName = &"stand" ## The character's posture last tick (for the status line and overlays).
+var _posture_hold := 0.0          ## Seconds before a crouch or prone may be swapped for another posture (no flicker).
 var _reloading := false           ## The character was reloading last tick (for the status line and overlay).
 var _reload_started := false      ## A `reload` leaf has seen its reload begin, so it ends when the reload does.
 var _hold_ground := false         ## Combat: stay inside the house (territorial vs. an outsider).
@@ -168,6 +173,8 @@ func debug_status() -> String:
 	var state := _progress()
 	if state != "":
 		line += "  · " + state
+	if _posture != &"stand":
+		line += "  · " + ("crouching" if _posture == &"crouch" else "lying prone")
 	if _perception != null and _perception.under_fire():
 		line += "  ⚠ under fire"
 	return line
@@ -212,6 +219,7 @@ func debug_state() -> Dictionary:
 		"params": _json_safe(_params),
 		"arrived": _arrived,
 		"running": _running,
+		"posture": String(_posture),
 		"reloading": _reloading,
 		"engage": str(_engage_node.name) if is_instance_valid(_engage_node) else "",
 		"engage_id": _engage_id,
@@ -483,8 +491,55 @@ func apply(character, delta: float) -> void:
 	_continue_burst(character)
 	character.run_input = _should_run(character)
 	_apply_back_off(character, delta)
+	_apply_posture(character, delta)
 	_running = character.is_running()
+	_posture = character.posture()
 	_reloading = character.is_reloading()
+
+
+## Take the posture `_wanted_posture` asks for. Standing back up is never delayed (a run, the end of a fight);
+## a crouch or prone is held for `posture_dwell` before it is swapped, so a peek-and-duck does not flicker. A
+## change the character refuses (its own pacing, an interaction) is simply asked again next tick.
+func _apply_posture(character, delta: float) -> void:
+	_posture_hold = maxf(_posture_hold - delta, 0.0)
+	var want := _wanted_posture(character)
+	if want == character.posture() or (want != &"stand" and _posture_hold > 0.0):
+		return
+	if character.set_posture(want):
+		_posture_hold = posture_dwell
+
+
+## The posture to take this tick: a manner of carrying out the leaf, not something Von chooses, so it works with
+## the server down. Only a standing body runs, so anything on the move to a destination stands, and so does
+## everything outside a fight. Fighting in place (an engaged NPC in position, or one holding / reloading while a hostile is known or
+## shots are landing) it keeps low: kneeling behind cover that stands as high as a crouch, lying behind lower cover, and lying in the
+## open when pinned (shots landing and nothing between it and the threat); else kneeling (steadier, a smaller target). Moving
+## about inside a fight it crouches rather than crawls.
+func _wanted_posture(character) -> StringName:
+	if not posture_enabled or character.run_input:
+		return &"stand"
+	var under_fire: bool = _perception != null and _perception.under_fire()
+	if _hostiles.is_empty() and not under_fire:
+		return &"stand"
+	match _primitive:
+		&"engage":
+			if not _arrived:
+				return &"stand"
+		&"hold", &"reload":
+			pass
+		_:
+			return &"stand"
+	if character.move_input != Vector2.ZERO:
+		return &"crouch"
+	var threat := _engage_pos if _engage_id != 0 else (_hostiles[0]["pos"] as Vector2 if not _hostiles.is_empty() else Vector2.INF)
+	var cover := 0.0
+	if threat != Vector2.INF:
+		cover = _perception.cover_height_to(character, _engage_node if _engage_id != 0 else null, threat)
+	if cover >= character.posture_coverage(&"crouch"):
+		return &"crouch"
+	if cover >= character.posture_coverage(&"prone") or under_fire:
+		return &"prone"
+	return &"crouch"
 
 
 ## Whether to sprint this tick, judged after the primitive has steered: only while travelling to a

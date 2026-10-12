@@ -126,7 +126,7 @@ func _raw_hand_position(hand: int) -> Vector2:
 	var pose = _character.pose
 	var along := Vector2.from_angle(pose.hand_angles[hand])
 	var side := -1.0 if hand == 0 else 1.0
-	var forward: float = pose.rest_forward(hand)
+	var forward: float = pose.rest_forward(hand) + _character.posture_hand_ahead()
 	var lateral: float = pose.rest_lateral(hand)
 	var rest := along * forward + along.orthogonal() * (lateral * side)
 	rest += pose.hand_offset(hand)

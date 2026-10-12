@@ -46,6 +46,17 @@ A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_sho
 while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
 Test: `tests/ai/ai_runs_to_destination_test.gd`.
 
+**Posture** is a behaviour policy too (spec: `docs/cover-and-stance.md`, A1 to A3): after the primitive has steered and `run_input` is set,
+`_apply_posture` writes the posture `_wanted_posture` asks for through `Character.set_posture` (idempotent, so every tick). Everything outside a
+fight and everything travelling to a destination (`move`, an `engage` not yet arrived, `melee`, `interact`) **stands** — only a standing body runs —
+and so does an NPC that is running. Fighting in place (`engage` arrived, or `hold` / `reload` with a hostile known or shots landing): with cover
+between it and the threat that is at least as tall as a crouch (`Character.posture_coverage(&"crouch")`, read through perception's
+`cover_height_to`) it crouches; behind lower cover, or in the open when `under_fire` (pinned) it goes prone; else it kneels; moving about inside a
+fight it crouches rather than crawls. A crouch or prone is held `posture_dwell` (0.7 s) before it is swapped; standing back up is never delayed.
+Exports on the controller: `posture_enabled` (the `ai.posture` switch), `posture_dwell`. `debug_status()` appends "crouching" / "lying prone";
+`debug_state()` has `posture`. Not a decision-tree level: Von is never asked, so it works with the server down. Tests:
+`tests/ai/posture_follows_cover_test.gd`, `posture_pinned_prone_test.gd`, `posture_stands_to_run_test.gd`.
+
 **No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
 lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
 

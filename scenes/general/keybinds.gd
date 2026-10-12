@@ -14,6 +14,10 @@ const MOVE_RIGHT := "move_right"
 const MOVE_UP := "move_up"
 const MOVE_DOWN := "move_down"
 const RUN := "run"
+## Crouch (toggle), and go prone (toggle): a lower posture is a smaller target but slower, and only a
+## standing character can run.
+const CROUCH := "crouch"
+const PRONE := "prone"
 const PUNCH := "punch"
 const FIRE := "fire"
 const INTERACT := "interact"
@@ -52,6 +56,8 @@ const DEFAULTS := {
 	MOVE_UP: KEY_W,
 	MOVE_DOWN: KEY_S,
 	RUN: KEY_SHIFT,
+	CROUCH: KEY_C,
+	PRONE: KEY_Z,
 	PUNCH: KEY_F,
 	INTERACT: KEY_SPACE,
 	RELOAD: KEY_R,
@@ -88,6 +94,8 @@ const LABELS := {
 	MOVE_LEFT: "Move left",
 	MOVE_RIGHT: "Move right",
 	RUN: "Run (hold)",
+	CROUCH: "Crouch",
+	PRONE: "Go prone",
 	PUNCH: "Punch",
 	FIRE: "Fire",
 	RELOAD: "Reload",
@@ -118,6 +126,8 @@ const GROUPS := {
 	MOVE_LEFT: "Movement",
 	MOVE_RIGHT: "Movement",
 	RUN: "Movement",
+	CROUCH: "Movement",
+	PRONE: "Movement",
 	PUNCH: "Combat",
 	FIRE: "Combat",
 	RELOAD: "Combat",
@@ -330,6 +340,16 @@ func get_move_vector() -> Vector2:
 ## True while the run key is held.
 func is_run_pressed() -> bool:
 	return Input.is_action_pressed(RUN)
+
+
+## True on the frame the crouch key is pressed (a toggle). Rebindable like the others.
+func is_crouch_just_pressed() -> bool:
+	return Input.is_action_just_pressed(CROUCH)
+
+
+## True on the frame the prone key is pressed (a toggle). Rebindable like the others.
+func is_prone_just_pressed() -> bool:
+	return Input.is_action_just_pressed(PRONE)
 
 
 ## Manual camera pan direction from the four camera actions (length <= 1).

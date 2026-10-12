@@ -6,4 +6,4 @@ A small top-down Godot 4.4 demo, organized into fourteen isolated domains under 
 It is the map: the fourteen domains, the cross-cutting conventions, and the whole sanctioned
 cross-domain interface surface. When working *inside* a domain, also load that domain's
 `domain-<name>` skill for its deep implementation detail. Behaviour specs that tests assert live in
-`docs/` (start with `docs/flanking-behavior.md`).
+`docs/` (`docs/flanking-behavior.md`, `docs/cover-and-stance.md`).

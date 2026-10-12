@@ -8,7 +8,7 @@ class_name BallisticsConfig
 ## imparts and the visual deformation it causes belong to the Physics System
 ## (PhysicsConfig); the character's walking-push knobs belong to CharacterConfig.
 ##
-## A bullet is a multi-hit traveler: on each collider it either flies over (no effect),
+## A bullet is a multi-hit traveler: on each collider it either flies over (no effect, its one height is above the collider),
 ## ricochets, or penetrates (dealing damage, bleeding speed), and it frees itself once
 ## its speed drops below `projectile_min_speed` or it exceeds its own `max_distance`.
 ## Coverage/penetration come from the struck object's surface (see Objects'
@@ -33,8 +33,17 @@ static var penetration_min_speed: float = 1600.0
 static var wall_coverage: float = 100.0
 static var wall_penetration: float = 100.0
 
-## Fly-over: chance = clamp((1 − coverage/100) × this, 0, 1). At 1.0, coverage 30 is
-## cleared ~70% of the time and coverage 90 ~10%; coverage 100 is never flown over.
+## Coverage is a height on a 0–100 scale. Each bullet flies at one height for its whole flight and flies over
+## every collider shorter than it, striking the taller ones. Drawn uniformly from 0–100 at spawn, a bullet
+## clears a collider of coverage C with chance (100 − C)/100: coverage 30 is cleared ~70% of the time and
+## coverage 90 ~10%; coverage 100 is never flown over. The same height serves every collider along the
+## flight: behind cover of 50, a body of 60 is struck only by the shots between 50 and 60 (or those that punch
+## through the cover), while a crouched body of 35 is never reached by a shot that cleared the cover.
+## Negative = random (the game); 0–100 pins every bullet to that height, which tests use to pick an outcome.
+static var bullet_height: float = -1.0
+
+## Scales the fly-over: the height a bullet needs to clear a collider is 100 − (100 − coverage) × this. At 1.0
+## it is the coverage itself; at 0 nothing is flown over (every shot meets what it reaches); above 1 more is.
 static var cover_flyover_scale: float = 1.0
 
 ## Ricochet: only material with penetration ≥ this can bounce, and only on a glancing

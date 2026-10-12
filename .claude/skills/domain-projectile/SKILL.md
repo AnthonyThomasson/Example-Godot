@@ -19,7 +19,13 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
 `damage` is what it deals at full speed head-on), the bullet's own penetration power `p` (`penetration_power`, 1 = a pistol round), coverage
 `C`, the target's penetration `P`, `_resolve()` picks one outcome in order:
 
-1. **Fly over** — `clamp((1 − C/100) × cover_flyover_scale, 0, 1)`; no damage, excluded, flies on.
+1. **Fly over** — the bullet's `height` is at or above `clamp(100 − (100 − C) × cover_flyover_scale, 0, 100)`; no damage, excluded, flies on.
+   **Coverage is a height (0–100) and a bullet flies at one height for its whole flight**: `height` is drawn uniformly 0–100 when it is fired
+   (`BallisticsConfig.bullet_height` pins it for tests; negative = random) and kept through ricochets and penetrations. It strikes every collider
+   whose coverage is above it and clears the rest, so a collider of coverage C is cleared with chance (100 − C)/100 (the old rate) but the same
+   height serves everything along the path: behind cover of 50, a body of 60 is struck only by the shots between 50 and 60 (or those that punch
+   through the cover), and a body of 35 (a crouch) by none that cleared it. A character's coverage is its posture's. Spec: `docs/cover-and-stance.md`.
+   Tests: `tests/projectile/cover_shared_bullet_height_test.gd`, `posture_hit_chance_test.gd`.
 2. **Ricochet** (`P ≥ penetration_bounce_min` and `s < bounce_square_max`) — reflects,
    `speed ×= bounce_speed_retention`, deals `damage × s × v × bounce_damage_retention`.
 3. **Penetrate** (else, while `speed ≥ penetration_min_speed / p`) — deals `damage × s × v`, bleeds

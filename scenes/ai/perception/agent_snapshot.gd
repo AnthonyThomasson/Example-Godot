@@ -124,6 +124,8 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"inside": not room_at(self_pos, rooms).is_empty(),
 		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
 		"in_cover": line.get("cover", "") != "",
+		"crouched": character.posture() == &"crouch",
+		"prone": character.posture() == &"prone",
 	}
 	var sections := {
 		"goal": fill_goal(goal, character),
@@ -183,8 +185,30 @@ func _situation_text(character, rooms: Array) -> String:
 	var room := room_at(character.global_position, rooms)
 	var where := ("in the %s, inside the house" % _room_name(room["type"])) if not room.is_empty() else "outside the house"
 	var busy := (" You are busy: %s." % character.interaction_label()) if character.is_busy() else ""
-	return "You are %s, holding a %s.%s You are %s." % [
-		where, character.current_item().display_name, busy, _health_band(character.damage_taken())]
+	return "You are %s, holding a %s.%s%s You are %s." % [
+		where, character.current_item().display_name, busy, _own_posture_text(character.posture()),
+		_health_band(character.damage_taken())]
+
+
+## How the NPC's own posture is worded in its situation: " You are crouching." / " You are lying prone.", and
+## nothing for a standing body, so the usual text is unchanged.
+func _own_posture_text(posture: StringName) -> String:
+	match posture:
+		&"crouch":
+			return " You are crouching."
+		&"prone":
+			return " You are lying prone."
+	return ""
+
+
+## How a contact seen low is worded: "crouched low" / "flat on the ground", and nothing for one standing.
+func _contact_posture_text(posture: StringName) -> String:
+	match posture:
+		&"crouch":
+			return "crouched low"
+		&"prone":
+			return "flat on the ground"
+	return ""
 
 
 ## The goal text with `{gun}` replaced by what `character` calls its gun ("shoot them with your {gun}" reads
@@ -271,6 +295,10 @@ func _contact_line(c: Dictionary, self_pos: Vector2, everyone: Array) -> String:
 	var aim := _aim_text(c, self_pos, everyone)
 	if aim != "":
 		parts.append(aim)
+	# A body seen low (and only while it is in sight: the last-seen posture may be stale).
+	var low := _contact_posture_text(c.get("posture", &"stand")) if c["visible"] else ""
+	if low != "":
+		parts.append(low)
 	parts.append("holding a %s" % c.get("item", "nothing"))
 	if c.get("reloading", false):
 		parts.append("reloading")

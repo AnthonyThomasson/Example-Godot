@@ -181,7 +181,7 @@ func run(t: TestContext) -> void:
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
     A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
-  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `stop()`, `select_slot(n)`, `punch()`, `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
+  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `set_posture(p)` (wants `stand` / `crouch` / `prone`, written every frame like the AI does; `&""` stops asking), `toggle_crouch()` / `toggle_prone()` (one press of C / Z), `stop()`, `select_slot(n)`, `punch()`, `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.
@@ -296,6 +296,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `ai.hostile_on_sight` | Hostility toward anyone seen. |
 | `ai.hostile_on_trespass` | Hostility toward anyone inside the house. |
 | `ai.hostile_on_attack` | Hostility toward an attacker. |
+| `ai.posture` | NPCs crouch and go prone while fighting in place (`GoalController.posture_enabled`). |
 | `nav.rebake` | `NavUpdater.enabled`. |
 | `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps and reloads make `sound` events and voices. |
 | `physics.blood` | `BloodConfig.enabled`. |
@@ -304,7 +305,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `physics.debris` | `PhysicsConfig.debris_enabled`. |
 | `physics.hit_particles` | `PhysicsConfig.hit_particles_enabled`. |
 | `physics.wall_collider_deform` | `PhysicsConfig.deform_update_collider`. |
-| `projectile.flyover` | `BallisticsConfig.cover_flyover_scale`, 0 when off. |
+| `projectile.flyover` | `BallisticsConfig.cover_flyover_scale`, 0 when off. A test that needs a chosen outcome instead pins `BallisticsConfig.bullet_height` (0–100) with `set_static`. |
 
 To add a switch, add a row. When the behaviour has no knob yet, add a master `static var` to that
 domain's config holder, guarded at its one spawn point (the way `BloodConfig.enabled` gates

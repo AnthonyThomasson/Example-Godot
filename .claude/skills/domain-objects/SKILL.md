@@ -12,7 +12,9 @@ from World-Gen into a node.
 ## The hittable contract (Objects ↔ strikers)
 
 Every world object (furniture **and** walls) implements:
-- `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }`
+- `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }` — `coverage` (0–100) is the
+  object's **height**: a bullet flies at one height and strikes what stands above it (a character's is its posture's;
+  see `docs/cover-and-stance.md`)
 - `take_hit(hit: HitInfo) -> void`
 
 `HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage, speed_factor,

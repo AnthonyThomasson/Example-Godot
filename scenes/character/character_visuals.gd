@@ -46,6 +46,10 @@ const REDRAW_POS_STEP := 0.1
 const REDRAW_ANGLE_STEP := 0.02
 ## How far a held weapon's raise (0..1) must change to repaint: the gun's art steps through a few lengths.
 const REDRAW_RAISE_STEP := 0.1
+## How far a body must have lain down (0..1) to be drawn lying (like a fallen one) rather than standing.
+const LIE_DRAW := 0.1
+## How folded (0..1) a crouching body is before it is drawn from the rig's trunk (its back showing), not as shoulders.
+const FOLD_DRAW := 0.15
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
 var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
 var redraws := 0  ## How many times the standing body has been drawn (tests read it).
@@ -106,7 +110,12 @@ func _draw() -> void:
 	redraws += 1
 	var pose = _character.pose
 	var rig = _rig if _rig != null else _character.rig()
-	var lunge: Vector2 = pose.torso_offset
+	if draws_laid_out():
+		_draw_lying(rig)
+		return
+	# The shoulders sit where the rig puts the chest: the torso's lunge, plus the forward shift of a folded spine, so
+	# the sleeves meet them in a crouch.
+	var lunge := _rig_xy(rig, Rig.CHEST)
 	var torso: float = pose.torso_angle - PI * 0.5  # Canonical art faces +y.
 	var size := _shoulder_size()
 	var body := _shoulder_art(torso)
@@ -127,7 +136,7 @@ func _draw() -> void:
 		impacts, damage_total, Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR,
 		body, torso, false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	_draw_head(pose, placed, damage_total)
+	_draw_head(pose, rig, placed, damage_total)
 	if item:
 		item.draw_weapon(self, _character)
 	for hand in 2:
@@ -136,6 +145,39 @@ func _draw() -> void:
 	# read as bloody gashes (config-driven).
 	Deformation.draw_marks(self, placed, CharacterConfig.flesh_crack_color,
 		CharacterConfig.flesh_hole_color, CharacterConfig.flesh_scorch_color)
+
+
+## Where the standing body's shoulders are drawn (local px): the rig's chest, so the sleeves meet them.
+func shoulder_centre() -> Vector2:
+	return _rig_xy(_character.rig(), Rig.CHEST)
+
+
+## Where the standing body's head is drawn (local px): the rig's head.
+func head_centre() -> Vector2:
+	return _rig_xy(_character.rig(), Rig.HEAD)
+
+
+static func _rig_xy(rig, joint: int) -> Vector2:
+	var p: Vector3 = rig.point(joint)
+	return Vector2(p.x, p.y)
+
+
+## Whether the living body is drawn laid out from the rig (like a fallen one: a lofted trunk showing its back, the
+## limbs by height) rather than as upright shoulders: lying prone, or bent over in a crouch.
+func draws_laid_out() -> bool:
+	return _character.posture_lie() > LIE_DRAW or _character.posture_folded() > FOLD_DRAW
+
+
+## A body lying prone or crouched: its parts from the rig's 3D points seen from above, lowest first, exactly as a fallen
+## body is drawn (a lofted trunk showing its back, the limbs laid out), then what it holds and its fists on top.
+func _draw_lying(rig) -> void:
+	var pose = _character.pose
+	_draw_fallen(rig, false)
+	var item: Item = _character.current_item()
+	if item:
+		item.draw_weapon(self, _character)
+	for hand in 2:
+		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, [], 0.0)
 
 
 ## The shoulders' art canvas: the body's round footprint.
@@ -194,14 +236,14 @@ func _draw_limb_shadow(chain: Dictionary, cast: Callable) -> void:
 
 ## The head at the pose's offset and angle, casting its shadow onto the shoulders first (the head
 ## sits above them, so its silhouette darkens them a few px away from the light).
-func _draw_head(pose, impacts: Array, damage_total: float) -> void:
+func _draw_head(pose, rig, impacts: Array, damage_total: float) -> void:
 	var px := ArtConfig.pixel_size
 	var side := float(HeadPainter.canvas_for(HeadPainter.radius_for(roundi(_character.radius * 2.0 / px)))) * px
 	var size := Vector2(side, side)
 	var angle: float = pose.head_angle - PI * 0.5
 	var tex := PixelArt.render_turned(HeadPainter, size, skin_color, PixelArt.snap_angle(angle), "",
 		{ "skin": skin_color, "hair": hair_color, "hair_style": hair_style })
-	var at: Vector2 = pose.head_offset
+	var at := _rig_xy(rig, Rig.HEAD)  # The pose's offset, plus the neck's pitch in a crouch.
 	var drop := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized() \
 		* ArtConfig.cast_shadow_px * px
 	draw_set_transform(at + drop, angle, Vector2.ONE)
@@ -314,18 +356,21 @@ func _build_shadow() -> void:
 ## The body's floor shadow, standing or fallen.
 func _draw_body_shadow() -> void:
 	var rd = _character.ragdoll
-	if rd == null:
-		_draw_standing_shadow()
-	else:
+	if rd != null:
 		_draw_fallen_shadow(rd)
+	elif draws_laid_out():
+		_draw_fallen_shadow(_rig if _rig != null else _character.rig())
+	else:
+		_draw_standing_shadow()
 
 
 ## Parts whose heights differ by less than this (px) keep the order they were drawn in last frame.
 const STACK_BAND := 3.0
 
 
-## Every part of the fallen body, lowest first.
-func _draw_fallen(rd) -> void:
+## Every part of the fallen body, lowest first. A living body lying down draws its own fists (`with_hands`
+## off), over the weapon.
+func _draw_fallen(rd, with_hands := true) -> void:
 	for part in _stack(_fallen_parts(rd)):
 		match part["kind"]:
 			"chain":

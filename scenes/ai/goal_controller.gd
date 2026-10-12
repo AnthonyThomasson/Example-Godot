@@ -223,6 +223,11 @@ const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 ## Reload an empty gun on its own (holding steady, or ducked in cover) when a spare magazine is carried,
 ## whatever the decision tree chose: the NPC is never left unarmed for lack of a decision.
 @export var auto_reload: bool = true
+## Crouch and go prone while fighting in place (kneel behind cover, lie low when pinned), standing to run and
+## move. Off = the NPC always stands.
+@export var posture_enabled: bool = true
+## Seconds a crouch or prone is held before the NPC swaps it for another, so a peek-and-duck does not flicker.
+@export var posture_dwell: float = 0.7
 ## Only run when the destination is farther than this (px), so short hops don't burn stamina.
 @export var run_min_distance: float = 150.0
 ## Stamina fraction (0..1) needed to start a run; once running it goes on until the Character runs dry.
@@ -375,6 +380,8 @@ func _apply_config() -> void:
 	_behavior.arrive_dist = arrive_dist
 	_behavior.run_enabled = run_enabled
 	_behavior.auto_reload = auto_reload
+	_behavior.posture_enabled = posture_enabled
+	_behavior.posture_dwell = posture_dwell
 	_behavior.run_min_distance = run_min_distance
 	_behavior.run_start_fraction = run_start_fraction
 	_behavior.apply_config()

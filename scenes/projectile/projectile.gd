@@ -27,6 +27,11 @@ var penetration_power: float = 1.0
 ## The id of the gun that fired it (&"" when none), carried on its `hit` events so a listener can tell the rounds apart.
 var gun: StringName = &""
 
+## How high the bullet flies, 0..100: the same scale as an object's `coverage` (its height). One number for the
+## whole flight, drawn once at spawn (see `BallisticsConfig.bullet_height`), so it clears or meets everything it
+## crosses consistently: cover that stands taller than it is struck, anything lower is flown over.
+var height := 0.0
+
 ## Unit travel vector; reassigned on ricochet / penetration deflection.
 var direction := Vector2.RIGHT
 ## Body to skip in the sweep (the shooter).
@@ -46,6 +51,7 @@ signal hit(body: Node, damage: float)
 
 func _ready() -> void:
 	rotation = direction.angle()
+	height = BallisticsConfig.bullet_height if BallisticsConfig.bullet_height >= 0.0 else randf() * 100.0
 	if ignore is CollisionObject2D:
 		_exclude.append(ignore.get_rid())
 
@@ -110,9 +116,11 @@ func _resolve(result: Dictionary) -> void:
 	var coverage: float = surface["coverage"]
 	var penetration: float = surface["penetration"]
 
-	# 1. Fly over cover: no damage, exclude the body, keep flying.
-	var flyover_chance := clampf((1.0 - coverage / 100.0) * BallisticsConfig.cover_flyover_scale, 0.0, 1.0)
-	if randf() < flyover_chance:
+	# 1. Fly over cover: the bullet is higher than the object stands. No damage, exclude the body, keep flying.
+	# Coverage is the object's height, so a body behind cover that is taller than the bullet is flown over too:
+	# cover 50 and a body of 60 -> a shot lower than 50 meets the cover (and may punch through to the body), one
+	# between 50 and 60 clears the cover and strikes only the body, and a higher one misses both.
+	if height >= _flyover_height(coverage):
 		_exclude.append(rid)
 		GameLog.say("Shot flew over %s" % body.name)
 		return
@@ -151,6 +159,13 @@ func _resolve(result: Dictionary) -> void:
 	# Leaving a body (flesh) it carries that body's blood on from the exit.
 	if StringName(surface.get("material", "")) == BallisticsConfig.blood_material:
 		_blood_from = _traveled + (info.exit_position.distance_to(result.position) if info.has_exit else 0.0)
+
+
+## The bullet height at and above which a collider of this `coverage` is flown over: its coverage, pushed toward
+## "never" by a `cover_flyover_scale` below 1 (0 = never fly over) and toward "always" above it. Coverage 100
+## stands taller than any bullet.
+func _flyover_height(coverage: float) -> float:
+	return clampf(100.0 - (100.0 - coverage) * BallisticsConfig.cover_flyover_scale, 0.0, 100.0)
 
 
 ## The struck object's surface via get_surface(), or the wall-rating fallback for a collider

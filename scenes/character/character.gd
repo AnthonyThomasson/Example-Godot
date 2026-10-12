@@ -53,6 +53,16 @@ var stamina := 1.0
 var _exhausted := false
 var _running := false  ## Running this frame.
 
+## The body's height: a `CharacterConfig.postures` key (`stand`, `crouch` or `prone`). A lower posture is a
+## smaller target and slower; only a standing character can run. Set through `set_posture()`.
+var _posture: StringName = &"stand"
+## Seconds until the posture may change again (`CharacterConfig.posture_change_time` after each change).
+var _posture_cooldown := 0.0
+## What the body is drawn at, easing toward the posture: its height as a share of a standing one (1 = standing,
+## down to the prone row's), and how far it lies down (0 = on its feet, 1 = flat on its belly).
+var _posture_height := 1.0
+var _posture_lie := 0.0
+
 ## Inventory (slot id -> Item) and the currently held slot.
 var _items := {}
 var _current_slot := 1  ## Held inventory slot.
@@ -64,6 +74,7 @@ var _reload_left := 0.0
 ## The held weapon's barrel is against a wall or object (only a weapon that `raises_at_contact`): it is held
 ## pointing up and cannot shoot. Set at once; `_raise` eases toward it (0 = held to the aim .. 1 = fully up).
 var _blocked := false
+var _side_dir := 1.0  ## Which way a prone long gun swings off a wall: +1 or -1 (the freer side, picked as it is blocked).
 var _raise := 0.0  ## How far the held weapon is raised off the aim, 0..1, easing toward `_blocked`.
 
 ## Knockback velocity from objects shoved into the character; decays each frame. Added on
@@ -80,6 +91,7 @@ var _wound: BloodWound
 ## Bloody footprints from blood the feet walk through (Physics domain component), fed by `_footsteps`.
 var _footprints: BloodFootprints
 var _footsteps := CharacterFootsteps.new()  ## Detects footfalls and feeds `_footprints`.
+var _legs := CharacterLegs.new()  ## Rests the legs against walls and furniture and shoves light pieces (see character_legs.gd).
 
 ## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
@@ -94,6 +106,7 @@ const CharacterPose = preload("res://scenes/character/character_pose.gd")
 const CharacterRig = preload("res://scenes/character/character_rig.gd")
 const CharacterRagdoll = preload("res://scenes/character/character_ragdoll.gd")
 const CharacterFootsteps = preload("res://scenes/character/character_footsteps.gd")
+const CharacterLegs = preload("res://scenes/character/character_legs.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -144,6 +157,8 @@ func _physics_process(delta: float) -> void:
 			Physics.bleed_out(get_parent(), self, [get_rid()])
 		return
 
+	_posture_cooldown = maxf(_posture_cooldown - delta, 0.0)
+	_ease_posture(delta)
 	# Items keep their own clocks (a gun's time between rounds); tick them before the controller pulls the
 	# trigger, so a round that is due this frame can leave this frame.
 	for item: Item in _items.values():
@@ -163,34 +178,37 @@ func _physics_process(delta: float) -> void:
 		_update_stamina(false, delta)
 		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
 		_hands.facing = facing
-		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts())
+		_legs.clear()
+		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts(), weapon_side_turn())
 		return
 
 	# Aim toward the aim point. Guard the degenerate zero-length case.
 	var to_aim := aim_point - global_position
 	if to_aim.length() > 0.001:
-		facing = to_aim.normalized()
+		facing = _turned_toward(to_aim.normalized(), delta)
 	# A parent's _physics_process runs before its children's, so the hands see this fresh
 	# facing on the same frame.
 	_hands.facing = facing
 	_update_weapon_raise(delta)
 
-	_update_stamina(run_input and move_input.length() > CharacterConfig.run_min_input, delta)
+	_update_stamina(run_input and _posture == &"stand" and move_input.length() > CharacterConfig.run_min_input, delta)
 	velocity = move_input * _move_speed() * _push_slow + _knockback
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
-	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts())
+	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts(), weapon_side_turn())
+	_legs.update(self, delta)
 	_footsteps.update(self, _footprints)
 
 
 # --- Controller-facing API -------------------------------------------------------------
 
-## Melee with the held item (F): runs its primary action. Ignored while locked in an interaction.
+## Melee with the held item (F): runs its primary action. Ignored while locked in an interaction, and while
+## prone (there is no swinging a fist lying down).
 func melee() -> void:
 	var item := current_item()
-	if is_busy() or item == null:
+	if is_busy() or item == null or _posture == &"prone":
 		return
 	item.primary(self)
 
@@ -236,9 +254,11 @@ func select_slot(slot: int) -> void:
 		_update_weapon_raise(0.0)  # Judged for the new item now, so a shot in this same frame can't slip past a wall.
 
 
-## Toggle an object interaction: start the best one in reach, or end the active one.
+## Toggle an object interaction: start the best one in reach, or end the active one. Starting one stands
+## the character up (sitting or lying is its own posture).
 func try_interact() -> void:
 	_interaction.try_interact()
+	_stand_if_busy()
 
 
 ## The reachable objects and their valid actions, for a controller that wants to choose
@@ -250,7 +270,9 @@ func interactions_in_reach() -> Array:
 ## Begin the action `id` on `object` if it is reachable and valid; true on success. Lets a
 ## controller pick both the object and the action, unlike the random `try_interact()`.
 func interact_with(object: Node, id: String) -> bool:
-	return _interaction.interact_with(object, id)
+	var began: bool = _interaction.interact_with(object, id)
+	_stand_if_busy()
+	return began
 
 
 ## End the active interaction, if any (explicit stop, vs the `try_interact()` toggle).
@@ -278,6 +300,79 @@ func stamina_fraction() -> float:
 	return stamina
 
 
+## Take a posture: `stand`, `crouch` or `prone` (`CharacterConfig.postures`). True when the character is in it
+## afterwards, so asking for the posture it already holds is a harmless `true`: a controller can write its wanted
+## posture every frame. Refused (false) while dead, locked in an interaction, or within
+## `CharacterConfig.posture_change_time` of the last change. A lower posture is slower, a smaller target and cannot
+## run; prone cannot punch.
+func set_posture(posture: StringName) -> bool:
+	if posture == _posture:
+		return true
+	if is_dead or is_busy() or _posture_cooldown > 0.0 or not CharacterConfig.postures.has(posture):
+		return false
+	_posture = posture
+	_posture_cooldown = CharacterConfig.posture_change_time
+	return true
+
+
+## C: crouch, or stand back up from a crouch (from prone, come up to a crouch).
+func toggle_crouch() -> void:
+	set_posture(&"stand" if _posture == &"crouch" else &"crouch")
+
+
+## Z: go prone, or stand back up from lying down.
+func toggle_prone() -> void:
+	set_posture(&"stand" if _posture == &"prone" else &"prone")
+
+
+## The current posture: `stand`, `crouch` or `prone`.
+func posture() -> StringName:
+	return _posture
+
+
+func is_crouching() -> bool:
+	return _posture == &"crouch"
+
+
+func is_prone() -> bool:
+	return _posture == &"prone"
+
+
+## The coverage (0..100, a height on the same scale as an object's) `posture` presents to a bullet; a controller
+## compares it with a piece of cover's to judge which postures that cover hides. Unknown postures read as standing.
+func posture_coverage(posture: StringName) -> float:
+	return float(CharacterConfig.postures.get(posture, CharacterConfig.postures[&"stand"])["coverage"])
+
+
+## Where side `i`'s ankle rests (local x/y px) against a wall or piece of furniture its leg has met, or null when
+## nothing is in its way. The rig draws the leg there (see character_legs.gd).
+func foot_clamp(i: int) -> Variant:
+	return _legs.ankle(i)
+
+
+## What the body is drawn at right now, easing toward the posture: a standing body's height as a share (1 =
+## standing .. the prone row's), and how far it has lain down (0 = on its feet .. 1 = flat). For the rig.
+func posture_height() -> float:
+	return _posture_height
+
+
+func posture_lie() -> float:
+	return _posture_lie
+
+
+## How folded the drawn body is, 0 (standing) .. 1 (crouched or lower): the share the rig pitches the spine by.
+func posture_folded() -> float:
+	var crouch_height: float = CharacterConfig.postures[&"crouch"]["height"]
+	return clampf((1.0 - _posture_height) / maxf(1.0 - crouch_height, 0.01), 0.0, 1.0)
+
+
+## How far further ahead (px) the hands are held at this posture: a crouch holds them out past its forward-leaning
+## chest, and lying prone the arms reach out past the head.
+func posture_hand_ahead() -> float:
+	var crouch: float = CharacterConfig.body_crouch_hand_ahead
+	return crouch * posture_folded() + (CharacterConfig.body_lying_hand_ahead - crouch) * _posture_lie
+
+
 ## True while a reload is in progress.
 func is_reloading() -> bool:
 	return _reloading_item != null
@@ -299,7 +394,13 @@ func weapon_blocked() -> bool:
 ## How far the held weapon is raised off the aim, 0 (held to the aim) .. 1 (fully up), easing toward the
 ## blocked state. For the weapon's art.
 func weapon_raise() -> float:
-	return _raise
+	return _raise * (1.0 - _posture_lie)  # Lying prone it swings aside instead (`weapon_side_turn`), never up.
+
+
+## How far (radians) the held weapon and its hands are swung off the aim, to the side: a long gun's barrel against a
+## wall while lying prone (0 otherwise). The hands and the drawn weapon chase it; shots still leave along `facing`.
+func weapon_side_turn() -> float:
+	return _side_dir * deg_to_rad(CharacterConfig.body_lying_side_turn) * _raise * _posture_lie
 
 
 ## The inventory slot of the gun this character fights with: the held item when it takes ammo, else the lowest
@@ -423,17 +524,59 @@ func _update_weapon_raise(delta: float) -> void:
 	else:
 		var hand := item.weapon_hand()
 		var stance: Dictionary = CharacterConfig.stances.get(item.hand_stance(hand), CharacterConfig.stances[&"relaxed"])
-		var reach: float = float(stance["forward"]) + _muzzle_ahead(item)
+		var reach: float = float(stance["forward"]) + posture_hand_ahead() + _muzzle_ahead(item)
 		var lateral: float = float(stance["lateral"]) * (-1.0 if hand == 0 else 1.0)
 		var from := global_position + facing.orthogonal() * lateral
 		var margin := 0.0 if not _blocked else CharacterConfig.weapon_contact_margin
+		var was_blocked := _blocked
 		_blocked = _hands.solid_distance(from, facing, reach + margin + 1.0) < reach + margin
+		if _blocked and not was_blocked:
+			_side_dir = _freer_side(reach, hand)
 	_raise = move_toward(_raise, 1.0 if _blocked else 0.0, CharacterConfig.weapon_raise_speed * delta)
 
 
-## Walking speed, or run speed while running.
+## Which side a prone long gun swings to when its barrel meets a wall: +1 or -1, whichever way the swung barrel
+## (`body_lying_side_turn` off the aim) has more room before something solid; the weapon hand's side on a tie.
+func _freer_side(reach: float, hand: int) -> float:
+	var turn := deg_to_rad(CharacterConfig.body_lying_side_turn)
+	var plus: float = _hands.solid_distance(global_position, facing.rotated(turn), reach)
+	var minus: float = _hands.solid_distance(global_position, facing.rotated(-turn), reach)
+	if is_equal_approx(plus, minus):
+		return -1.0 if hand == 0 else 1.0
+	return 1.0 if plus > minus else -1.0
+
+
+## Walking speed (slower in a lower posture), or run speed while running (only possible standing).
 func _move_speed() -> float:
-	return speed * (CharacterConfig.run_speed_mult if _running else 1.0)
+	return speed * float(CharacterConfig.postures[_posture]["speed"]) * (CharacterConfig.run_speed_mult if _running else 1.0)
+
+
+## `facing` turned toward the unit vector `want`: at once standing, but no faster than the posture's `turn` rate
+## (rad/s) crouched or prone, so a low body takes longer to come round. The aim point itself is never held back.
+func _turned_toward(want: Vector2, delta: float) -> Vector2:
+	var rate: float = CharacterConfig.postures[_posture]["turn"]
+	if rate <= 0.0:
+		return want
+	var step := rate * delta
+	return facing.rotated(clampf(facing.angle_to(want), -step, step)).normalized()
+
+
+## Ease the drawn body toward the posture (it snaps the last hair, so a settled body stops changing).
+func _ease_posture(delta: float) -> void:
+	var k := 1.0 - exp(-CharacterConfig.posture_ease * delta)
+	_posture_height = _eased_to(_posture_height, float(CharacterConfig.postures[_posture]["height"]), k)
+	_posture_lie = _eased_to(_posture_lie, 1.0 if _posture == &"prone" else 0.0, k)
+
+
+static func _eased_to(now: float, target: float, k: float) -> float:
+	var next := lerpf(now, target, k)
+	return target if absf(next - target) < 0.002 else next
+
+
+## An interaction began: stand up for it, whatever the posture was (no cooldown, it is not a controller's choice).
+func _stand_if_busy() -> void:
+	if is_busy():
+		_posture = &"stand"
 
 
 ## Settle this frame's running and spend or regain stamina. Running dry latches `_exhausted`,
@@ -523,7 +666,7 @@ func _stances() -> Array:
 	var item: Item = current_item()
 	if item == null:
 		return [&"relaxed", &"relaxed"]
-	if _blocked:
+	if _blocked and _posture != &"prone":  # Lying prone it is swung aside instead (`weapon_side_turn`).
 		return [item.raised_stance(0), item.raised_stance(1)]
 	return [item.hand_stance(0), item.hand_stance(1)]
 
@@ -574,11 +717,12 @@ func report_shot(body: Node, damage: float) -> void:
 
 # --- Hittable contract (struck by projectiles: flesh surface + deformation) -------------
 
-## The character's ballistic surface: partial cover, low penetration, flesh material and a
-## base color for debris styling. Read by the Projectile System.
+## The character's ballistic surface: partial cover (the body's height, so a lower posture is struck by fewer
+## shots and hides behind lower cover), low penetration, flesh material and a base color for debris styling.
+## Read by the Projectile System.
 func get_surface() -> Dictionary:
 	return {
-		"coverage": CharacterConfig.flesh_coverage,
+		"coverage": CharacterConfig.postures[_posture]["coverage"],
 		"penetration": CharacterConfig.flesh_penetration,
 		"material": CharacterConfig.flesh_material,
 		"color": CharacterConfig.flesh_color,
@@ -626,6 +770,11 @@ func _die(direction: Vector2) -> void:
 	z_index = CharacterConfig.ragdoll_z_index
 	end_interaction()
 	var momentum := move_input * _move_speed() * _push_slow + _knockback
+	# The body falls from the standing skeleton, whatever it was doing.
+	_posture = &"stand"
+	_posture_height = 1.0
+	_posture_lie = 0.0
+	_legs.clear()
 	ragdoll = CharacterRagdoll.new(self, momentum, direction)
 	_drop_item(momentum)
 	velocity = Vector2.ZERO

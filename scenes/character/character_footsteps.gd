@@ -22,7 +22,8 @@ func update(character, footprints: BloodFootprints) -> void:
 	var phase: float = pose.stride_phase()
 	for i in 2:
 		var c := cos(phase + (0.0 if i == 0 else PI))
-		var landed: bool = _last_cos[i] < 0.0 and c >= 0.0 and pose.walk_amount() >= MIN_WALK
+		var landed: bool = _last_cos[i] < 0.0 and c >= 0.0 and pose.walk_amount() >= MIN_WALK \
+			and character.posture_lie() < 0.5  # A crawler's feet drag; they do not step.
 		_last_cos[i] = c
 		if landed:
 			_report(character, footprints, i)

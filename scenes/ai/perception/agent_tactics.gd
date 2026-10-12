@@ -54,6 +54,16 @@ func is_cover(obj: Object) -> bool:
 	return float(obj.get_surface().get("coverage", 0.0)) >= cover_min
 
 
+## The height (coverage 0..100) of the first solid object on the line `a`→`b`: what stands between a body at one
+## end and a shot from the other (a bullet flies at one height, so a body lower than this is out of the way of
+## every shot that clears it). 0 when the line is clear or the first thing on it is a character.
+func cover_between(space, a: Vector2, b: Vector2, exclude: Array) -> float:
+	var obj := blocker(space, a, b, exclude)
+	if obj == null or obj.has_method("current_item") or not obj.has_method("get_surface"):
+		return 0.0
+	return float(obj.get_surface().get("coverage", 0.0))
+
+
 ## A readable name for a blocking object: a furniture piece's own name ("fridge"), a character's name,
 ## else "wall" — walls are named after their room, which would read as a place ("behind the kitchen").
 func object_label(obj: Object) -> String:

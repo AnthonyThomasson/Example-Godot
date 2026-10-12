@@ -20,6 +20,11 @@ func control(character, _delta: float) -> void:
 	if selected > 0:
 		character.select_slot(selected)
 
+	if Keybinds.is_crouch_just_pressed():
+		character.toggle_crouch()
+	if Keybinds.is_prone_just_pressed():
+		character.toggle_prone()
+
 	if Keybinds.is_punch_just_pressed():
 		character.melee()
 	# A click on a HUD control (the overlay bar, a panel) belongs to the UI, not the gun. Input polling

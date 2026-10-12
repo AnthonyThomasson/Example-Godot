@@ -3,7 +3,7 @@ extends Node
 ## Testing domain: a puppet controller — a character's `control(character, delta)` child (interface 7)
 ## driven by a test instead of a human or an AI. Commands are queued here and carried out on the
 ## character's own frame, through only the published controller API (`move_input`, `aim_point`,
-## `run_input`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`).
+## `run_input`, `set_posture`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`).
 ##
 ## Commands return at once; wait on their effect through the TestContext, e.g.
 ## `p.walk_to(spot)` then `await t.until(p.has_arrived, 3.0, "never arrived")`.
@@ -20,6 +20,8 @@ var _walk_target: Variant = null
 var _move_dir := Vector2.ZERO
 ## Whether the puppet holds run.
 var _run := false
+## The posture the puppet wants, written every frame like the AI does (`&""` = leave it alone).
+var _posture: StringName = &""
 ## Whether the puppet holds the trigger: an automatic gun keeps firing, a semi-auto one fires once per `shoot()`.
 var _firing := false
 ## Actions waiting for the character's next frame: Callables taking the character.
@@ -45,6 +47,8 @@ func control(character, _delta: float) -> void:
 	else:
 		character.move_input = _move_dir
 	character.run_input = _run
+	if _posture != &"":
+		character.set_posture(_posture)
 	if _firing and character.is_automatic():
 		character.shoot()
 	var actions := _pending.duplicate()
@@ -72,6 +76,21 @@ func walk(direction: Vector2) -> void:
 ## Hold (or release) run; it takes effect while the puppet moves.
 func set_run(on: bool) -> void:
 	_run = on
+
+
+## Want a posture (`stand`, `crouch` or `prone`): written to the character every frame, so it is taken as
+## soon as the character allows. `&""` stops asking.
+func set_posture(posture: StringName) -> void:
+	_posture = posture
+
+
+## Press C / Z once (the player's toggles), on the character's next frame.
+func toggle_crouch() -> void:
+	_pending.append(func(c): c.toggle_crouch())
+
+
+func toggle_prone() -> void:
+	_pending.append(func(c): c.toggle_prone())
 
 
 ## Stop walking.

@@ -38,6 +38,10 @@ static var ROWS := {
 		"description": "NPCs turn hostile toward whoever attacks them.",
 		"actor": { "child": "GoalController", "props": ["hostile_on_attack"] },
 	},
+	&"ai.posture": {
+		"description": "NPCs crouch and go prone while fighting in place (off = they always stand).",
+		"actor": { "child": "GoalController", "props": ["posture_enabled"] },
+	},
 	&"nav.rebake": {
 		"description": "The navmesh is re-carved as furniture is shoved around.",
 		"world": { "node": "NavUpdater", "props": ["enabled"] },
