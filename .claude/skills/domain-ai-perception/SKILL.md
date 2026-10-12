@@ -1,6 +1,6 @@
 ---
 name: domain-ai-perception
-description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows and how it is worded for Von. The sight sense, hostility rules, the generic event memory (with keyed supersede), movement tracks/facing/visible wounds, gunfire heard, allies' radio callouts, leads, searched rooms, the tactics geometry (flank sides, fire/advance/retreat spots, route length + exposure, cover) and the decision SNAPSHOT (state sections, facts, option groups) — plus the measured wording rules Von needs (situation phrases, bands, no negations). Use when editing scenes/ai/perception/ or working on vision, memory/eviction, what Von is told, option groups, flanking geometry, callouts, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes/ai/perception/) — what an NPC knows and how it is worded for Von. The sight sense, hostility rules, the generic event memory (with keyed supersede), movement tracks/facing/visible wounds, gunfire heard, allies' radio callouts, leads, searched rooms, the tactics geometry (flank sides, fire/advance/retreat spots, route length + exposure, cover) and its hand-off to the decision SNAPSHOT (the snapshot itself, its wording rules and option groups are the sub-domain `domain-ai-snapshot`). Use when editing scenes/ai/perception/ (except the snapshot) or working on vision, memory/eviction, hostility, flanking geometry, callouts, or combat line-of-sight. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Perception sub-domain (`scenes/ai/perception/`)
@@ -16,9 +16,8 @@ Files:
 - `agent_hostility.gd` — the hostility rules (categorization).
 - `agent_memory.gd` — a generic, behaviour-agnostic event log.
 - `agent_tactics.gd` — combat geometry: flank sides, fire/advance/retreat spots, routes, cover.
-- `agent_snapshot.gd` — the BUILD half: turns the gathered knowledge + the tactics geometry into the
-  decision SNAPSHOT (facts / sections / option groups), and owns the measured wording Von reads. Pure
-  transform — reads the memory and tactics modules, holds no state between calls, never writes or decides.
+- `agent_snapshot.gd` + `snapshot/` — the BUILD half (`domain-ai-snapshot`): turns the gathered knowledge + the tactics geometry
+  into the decision SNAPSHOT (facts / sections / option groups) and owns the measured wording Von reads. Pure transform.
 
 The controller (`ai/goal_controller.gd`) sets `agent_perception.gd`'s config fields from its exports,
 calls `setup()` once to BUILD the internal modules, then `apply_config()` to configure them — and
@@ -55,66 +54,13 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).
 
-## The snapshot (what the planner walks) — built by `agent_snapshot.gd`
+## The snapshot and the wording rules — `domain-ai-snapshot`
 
-The face's `sense(character, rooms, goal, activity)` gathers the knowledge (contacts, callouts,
-learned rooms/objects, lost hostiles) and hands it to `agent_snapshot.gd`'s
-`build(character, rooms, goal, activity, known, callouts, knowledge)`, which assembles the snapshot
-below from that knowledge + the tactics geometry. The author reads the memory and tactics modules
-only; it writes no memory and holds no policy. Everything in this section and the wording rules below
-lives in `agent_snapshot.gd`.
+`sense(character, rooms, goal, activity)` gathers the knowledge (contacts, callouts, learned rooms/objects, lost hostiles) and hands it to
+`agent_snapshot.gd`'s `build(...)`, which assembles the snapshot the planner walks (facts, state sections, option groups) and owns the
+measured wording Von reads. That whole sub-domain — `agent_snapshot.gd` and `snapshot/` (vocabulary + tuning, sections, option groups), the
+fact / section / option reference and the Von wording rules — is the **`domain-ai-snapshot`** skill.
 
-- **facts** — named booleans a `requires` or an entry rule can gate on: `threat_known`, `hostile_known`,
-  `hostile_visible`, `has_gun`, `gun_loaded` (the gun it fights with, `Character.gun_slot()`, has rounds and is not mid-reload), `weapon_empty`,
-  `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
-  rounds), `under_fire`, `hit_recently`, `engaged`, `leads`, `hurt`, `critical`,
-  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `gun_loaded`, `weapon_low`, `can_reload`,
-  `under_fire`, `engaged` and `leads`; the rest feed the brain overlay and are there for new rules.
-- **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
-  `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
-  (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
-  (clear shot / exposed to their fire / behind cover / line blocked, plus other hostiles that can see
-  you), `allies` (each ally's side of the target + their radio callouts), `flanks` (one-line digest),
-  `loadout` (the gun in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
-  once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
-  empty without a gun; the noun is the gun's display name lower-cased, `_gun_noun` ("pistol", "assault rifle", an acronym like "SMG" kept), so a
-  pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
-  `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile. The snapshot also carries `gun` (that noun), which the planner
-  fills into `{gun}` in the tree's templates. `shoot_range` and the "in pistol range" distance band are deliberately left gun-agnostic (pinned wording).
-- **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
-  `threat` (summary only), `hostiles` (bind: one per hostile, only DISTINGUISHING facts), per target
-  `fire_positions` (where you stand, firing spots around the target named by place and cover — "behind
-  the sofa in the kitchen", "the hallway, north of them" — with their route, and an ambush),
-  `flank_sides` (tagged `held` when an ally — seen or radioed — holds it, `crosses` when the route
-  there passes a known hostile; described as "route passes X"), `advance_positions` (halfway / close /
-  rush), `melee` (one `punch` option, only while the target is point-blank); globally
-  `reload` (one option, only while `can_reload`, so the planner takes it unasked), `retreat_positions`, `shooter`, `leads`
-  (last seen, where they were heading, gunfire heard, unseen shooter, support an ally), `search_rooms`
-  (+ front entrance / approach the house while outside), `explore` (unknown rooms by direction only),
-  `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
-  Options are places and things, never verbs; `tags.inside` drives the territorial filter.
-
-## Wording rules for Von (measured with `tools/von_probe.py`)
-
-Von is a CLASSIFIER: it picks the option whose text best matches the state. It can't do arithmetic or
-compare numbers, and an encoder reads "no cover" as "cover". So:
-1. **Bands, not numbers** — distance from `punch_range`/`shoot_range` ("point-blank", "close, in pistol
-   range", "too far to shoot"), route length (`route_buckets`: short/medium/long, plus hidden/exposed),
-   recency (`recency_bands`: just now / recently / a while ago).
-2. **Canonical phrases** — the state uses the exact phrases the tree's situation descriptions are
-   written in ("You have a clear shot at X from where you stand.", "You are exposed to their fire.",
-   "You are badly wounded.", "looks badly wounded", "moving away from you"), so a fact lights up the
-   option it argues for.
-3. **No negated attributes** — "in the open", "line blocked", "free", "taken by X", "unsearched",
-   "neutral", "too far to shoot".
-4. **Only distinguishing facts in options** — common facts (every hostile is hostile and has a pistol)
-   and the contacts section on a bind level blur the match.
-5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
-A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
-**Posture** words appear only when someone is not standing, so a standing body's text is byte-identical (the `tools/von_scenarios` fixtures pin it): the
-NPC's own in its situation line (" You are crouching.") and a *visible* contact's in its contact line ("crouched low"; a last-seen posture may be stale, so it is never shown for a remembered one). Fact `crouched` is in the snapshot's
-`facts`. Test: `tests/ai/posture_in_von_state_test.gd`.
-`low_ammo_fraction` is a controller export pushed through `apply_config`. Room types are humanized ("kitchen_living" → "kitchen living").
 
 ## Contacts and hostility
 

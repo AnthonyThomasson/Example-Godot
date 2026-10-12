@@ -28,6 +28,7 @@ const AgentMemory := preload("res://scenes/ai/perception/agent_memory.gd")
 const AgentTactics := preload("res://scenes/ai/perception/agent_tactics.gd")
 ## The BUILD half: turns what the NPC knows + the combat geometry into the decision snapshot Von walks.
 const AgentSnapshot := preload("res://scenes/ai/perception/agent_snapshot.gd")
+const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
 
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
 var contact_memory_ttl: float = 4.0
@@ -143,21 +144,21 @@ func apply_config() -> void:
 	_tactics.route_clearance = route_clearance
 	_tactics.watch_arc = watch_arc
 	_tactics.fire_spot_distances = fire_spot_distances
-	_snapshot.shoot_range = shoot_range
-	_snapshot.punch_range = punch_range
-	_snapshot.recency_bands = recency_bands
-	_snapshot.route_buckets = route_buckets
-	_snapshot.aim_cone = aim_cone
-	_snapshot.still_speed = still_speed
-	_snapshot.flank_ally_radius = flank_ally_radius
-	_snapshot.investigate_distance = investigate_distance
-	_snapshot.extrapolate_cap = extrapolate_cap
-	_snapshot.max_options_per_level = max_options_per_level
-	_snapshot.hurt_threshold = hurt_threshold
-	_snapshot.critical_threshold = critical_threshold
-	_snapshot.low_ammo_fraction = low_ammo_fraction
-	_snapshot.max_contacts_in_state = max_contacts_in_state
-	_snapshot.search_memory_ttl = search_memory_ttl
+	_snapshot.vocab.shoot_range = shoot_range
+	_snapshot.vocab.punch_range = punch_range
+	_snapshot.vocab.recency_bands = recency_bands
+	_snapshot.vocab.route_buckets = route_buckets
+	_snapshot.vocab.aim_cone = aim_cone
+	_snapshot.vocab.still_speed = still_speed
+	_snapshot.vocab.flank_ally_radius = flank_ally_radius
+	_snapshot.vocab.investigate_distance = investigate_distance
+	_snapshot.vocab.extrapolate_cap = extrapolate_cap
+	_snapshot.vocab.max_options_per_level = max_options_per_level
+	_snapshot.vocab.hurt_threshold = hurt_threshold
+	_snapshot.vocab.critical_threshold = critical_threshold
+	_snapshot.vocab.low_ammo_fraction = low_ammo_fraction
+	_snapshot.vocab.max_contacts_in_state = max_contacts_in_state
+	_snapshot.vocab.search_memory_ttl = search_memory_ttl
 
 
 ## Tell the hostility rules this NPC's own faction (so allies are never hostile). The controller
@@ -307,7 +308,7 @@ func debug_memory() -> Dictionary:
 ## zones. A pure read of knowledge + the visited-room memory; never perturbs it.
 func room_status(rooms: Array, self_pos: Vector2) -> Array:
 	var known := _known_room_keys()
-	var here := AgentSnapshot.room_at(self_pos, rooms)
+	var here := SnapshotVocab.room_at(self_pos, rooms)
 	var out: Array = []
 	for room in rooms:
 		var status: StringName
@@ -352,7 +353,7 @@ func observe(character, rooms: Array) -> void:
 			continue
 		var id: int = other.get_instance_id()
 		var pos: Vector2 = other.global_position
-		var room := AgentSnapshot.room_at(pos, rooms)
+		var room := SnapshotVocab.room_at(pos, rooms)
 		var item = other.current_item()
 		var f = other.get("faction")
 		var sighting := {
@@ -376,7 +377,7 @@ func observe(character, rooms: Array) -> void:
 		_hostility.classify(sighting, _memory)
 
 	# The room the NPC stands in counts as searched (superseded while it stays there).
-	var here := AgentSnapshot.room_at(self_pos, rooms)
+	var here := SnapshotVocab.room_at(self_pos, rooms)
 	if not here.is_empty():
 		_memory.remember(&"visited_room", { "key": here["key"] }, search_memory_ttl, str(here["key"]))
 

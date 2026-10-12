@@ -7,7 +7,7 @@ Each test's header comment names the behaviour (F, B1 to B9, C) it asserts.
 
 Flanking here means taking one of the sides of a known hostile, measured in the hostile's own frame
 (left, right, rear), and fighting it from there. The AI's side of this lives in `agent_tactics.gd`
-(candidate points and their annotations), `agent_snapshot.gd` (the words Von reads), `decision_tree.gd`
+(candidate points and their annotations), `agent_snapshot.gd` + `snapshot/` (the words Von reads), `decision_tree.gd`
 (which options a node offers) and the `engage` primitive (walking there and firing). See the
 `domain-ai-perception` and `domain-ai-decision` skills.
 
@@ -101,7 +101,7 @@ Terrace house                     Corridor spine                  Warehouse
 ## How the rules are enforced
 
 A side the AI will not take is still weighed: `debug_zones()` lists it with its words and tags, and the
-decision tree's `flank` node drops it through `drop_tags`. The tags, set in `agent_snapshot.gd`
+decision tree's `flank` node drops it through `drop_tags`. The tags, set in `snapshot/snapshot_options.gd`
 (`_flank_group`), are `held` (B4), `crosses` (B2), `no_shot` (B5/B6), `heading` (B7) and `lane` (B3). The
 geometry behind them is in `agent_tactics.gd` (`flank_sides`, `ally_lane`, `route_exposed`, which takes the
 target's front for B1). A FLANK tactic whose every side is dropped is not offered at all.
