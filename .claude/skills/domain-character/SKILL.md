@@ -103,7 +103,7 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
 `support` (the other hand on the grip beside the aim hand: both fists at the same forward point, 2 px either side of the aim line, so they grip the pistol together) and `reload` (that hand dropped to the belt
 for the next magazine, named by a gun's support hand while it reloads). The long guns have their own pairs, sized by the gun: `smg_grip` / `smg_fore`
-and `rifle_grip` / `rifle_fore` (the butt on the right shoulder, 9 px to the character's right of the aim line and just ahead of the shoulder joint, the grip hand
+and `rifle_grip` / `rifle_fore` (the butt in the right shoulder; the SMG's barrel line is 9 px to the character's right of the aim line, the rifle's only 5 px so it is held up in front of the face as if looking down the sight; the grip hand
 just ahead of it, the other hand out along the handguard); both hands lie on one line along the barrel (hand 0 at +`lateral`, hand 1 at
 −`lateral`) and an arm's stretch stays within the rig's tolerance. `ready_grip` / `ready_fore` are the shared **raised** pair (below).
 A `run` stance (arms down, big swing) is applied to both hands by the character itself while running, whatever is held. To add a pose, add a table row

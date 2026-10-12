@@ -13,7 +13,7 @@ const BONE_TOLERANCE := 0.06
 ## How far (px) a hand may sit off the line through the weapon hand along the aim.
 const LINE_TOLERANCE := 4.0
 ## How far (px) a long gun's butt may sit from the right shoulder joint, and how far apart (px) the pistol's two fists may be.
-const SHOULDER_TOLERANCE := 4.0
+const SHOULDER_TOLERANCE := 8.0
 const FISTS_TOGETHER := 8.0
 
 const GUNS := {

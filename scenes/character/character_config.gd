@@ -184,11 +184,12 @@ static var stances: Dictionary = {
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.5, -0.1, -1.0) },
 	&"smg_fore": { "forward": 24.0, "lateral": -9.0, "height": 5.8, "swing": 0.0, "steady": true,
 		"recoil_share": 0.8, "elbow_pole": Vector3(0.4, 0.0, -1.0) },
-	# An assault rifle: the butt on the right shoulder, the grip hand just ahead of it and the other hand reaching
-	# out along the handguard, both on the barrel line 9 px right of the aim.
-	&"rifle_grip": { "forward": 15.0, "lateral": 9.0, "height": 5.9, "swing": 0.0, "steady": true,
+	# An assault rifle: held in front of the face as if looking down the sight, the butt in the right shoulder, the
+	# grip hand just ahead of it and the other hand reaching out along the handguard, both on the barrel line 5 px
+	# right of the aim.
+	&"rifle_grip": { "forward": 15.0, "lateral": 5.0, "height": 5.9, "swing": 0.0, "steady": true,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.8, -0.1, -1.0) },
-	&"rifle_fore": { "forward": 27.0, "lateral": -9.0, "height": 5.8, "swing": 0.0, "steady": true,
+	&"rifle_fore": { "forward": 27.0, "lateral": -5.0, "height": 5.8, "swing": 0.0, "steady": true,
 		"recoil_share": 0.8, "elbow_pole": Vector3(0.4, 0.0, -1.0) },
 	# A long gun raised off a wall or object (butt still on the shoulder, barrel pointed up): both hands drawn in
 	# toward the chest, the front one higher as the barrel tips up.
