@@ -245,7 +245,15 @@ func watched_in_open(ctx: Dictionary, p: Vector2, path: PackedVector2Array = Pac
 				and not blocked(ctx["space"], hpos, p, ex) and cover_near(ctx["space"], p, hpos, ex) == "":
 			return h["name"]
 		if path.size() >= 2 and _looking_at(hpos, front, _along(path, path_length(path) * 0.5), half):
-			var covered := blocked(ctx["space"], hpos, self_pos, ex) or cover_near(ctx["space"], self_pos, hpos, ex) != ""
+			# Whether this NPC is hidden from `h` where it stands does not depend on the spot judged, so it is worked out
+			# once per hostile for the whole snapshot (`ctx.covered_from`) rather than for every candidate spot.
+			var covered_from: Dictionary = ctx.get("covered_from", {})
+			var covered: bool
+			if covered_from.has(h["id"]):
+				covered = covered_from[h["id"]]
+			else:
+				covered = blocked(ctx["space"], hpos, self_pos, ex) or cover_near(ctx["space"], self_pos, hpos, ex) != ""
+				covered_from[h["id"]] = covered
 			if covered and route_exposed(ctx["space"], path, hpos, ex):
 				return h["name"]
 	return ""
@@ -260,7 +268,7 @@ func _looking_at(hpos: Vector2, front: float, p: Vector2, half: float) -> bool:
 
 ## The flanking spots around `target` (one per side, excluding the side this NPC is already on), each
 ## annotated — `crosses` names a known hostile the route there passes. `ctx` = { space, map, self_pos,
-## exclude, hostiles, allies, callouts, fronts }.
+## exclude, hostiles, allies, callouts, fronts, covered_from }.
 func flank_sides(ctx: Dictionary, target: Dictionary, front: float) -> Array:
 	var tpos: Vector2 = target["pos"]
 	var ex: Array = ctx["exclude"] + body_rid(target)

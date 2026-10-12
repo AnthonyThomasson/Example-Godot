@@ -60,6 +60,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"allies": allies,
 		"callouts": callouts,
 		"fronts": {},
+		"covered_from": {},  # hostile id -> whether this NPC is hidden from it where it stands (see watched_in_open)
 	}
 	# Each hostile's front (its last-seen facing while recent, else toward this NPC): the frame its
 	# flanks are measured in, and where it is looking when a spot is judged watched.

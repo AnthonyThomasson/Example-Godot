@@ -37,6 +37,15 @@ var awareness_radius: float = 48.0
 ## and line-of-fire ignore it.
 var see_over_coverage: float = 60.0
 
+## The ray every cast reuses: the solid layer, nothing else configured.
+var _query := _solid_query()
+
+
+static func _solid_query() -> PhysicsRayQueryParameters2D:
+	var q := PhysicsRayQueryParameters2D.new()
+	q.collision_mask = QUERY_MASK
+	return q
+
 
 ## Whether `point` is visible to an agent at `from_pos` facing `facing`, given a physics space state
 ## and the rids to exclude from the sight raycast (typically the agent itself). See the class note
@@ -122,7 +131,7 @@ func blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
 ## The first solid hit along `from`→`to` on the query layer, or an empty dict when the line is clear.
 ## Callers that need the blocking collider itself (e.g. a cover test) use this instead of `blocked()`.
 func raycast(space, from: Vector2, to: Vector2, exclude: Array) -> Dictionary:
-	var p := PhysicsRayQueryParameters2D.create(from, to)
-	p.collision_mask = QUERY_MASK
-	p.exclude = exclude
-	return space.intersect_ray(p)
+	_query.from = from  # One query object, refilled: a snapshot casts thousands of rays.
+	_query.to = to
+	_query.exclude = exclude
+	return space.intersect_ray(_query)
