@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload) and the System-Two state Von lacks: engagement + retargeting, peek-and-cover and ambush, fire-at-will on the move, territorial confinement, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, furniture bulldozing). Use when editing scenes/ai/behavior/ or working on how a chosen option becomes movement and shooting, combat maneuvering, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload) and the System-Two state Von lacks: engagement + retargeting, territorial confinement, posture and run policy, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, room queries, furniture bulldozing). The fighting itself is `domain-ai-combat` (combat.gd) and room search by sight is `domain-ai-coverage` (search_coverage.gd). Use when editing scenes/ai/behavior/ (behavior.gd, locomotion.gd) or working on how a chosen option becomes movement, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -12,19 +12,21 @@ perception sub-domain and drives the character only through its public controlle
 (`move_input`/`aim_point`, `select_slot`, `shoot`, `melee`, `interact_with`, `end_interaction`).
 
 Files:
-- `behavior.gd` — the primitive executor (a `Node`); owns engagement + commitment state.
-- `locomotion.gd` — the pathing layer (a `Node` child of behaviour); owns the NavigationAgent2D.
+- `behavior.gd` — the primitive executor (a `Node`); owns engagement + commitment state, posture / run policy and the read-outs.
+- `combat.gd` — shots, punches, bursts, back-off, the peek-and-cover cycle (`RefCounted`; `domain-ai-combat`).
+- `search_coverage.gd` — covering a room by sight (`RefCounted`; `domain-ai-coverage`).
+- `locomotion.gd` — the pathing layer (a `Node` child of behaviour); owns the NavigationAgent2D and answers `room_key_at(p)` / `inside_house(p)`.
 
 The controller sets the behaviour's config fields from its exports, calls `setup(perception, nav_agent)`
-once to build its `Locomotion` child, then `apply_config()` to push the forwarded locomotion tunables
+once to build its `Locomotion`, `SearchCoverage` and `Combat` children, then `apply_config()` to push the tunables they hold
 in — re-calling `apply_config()` each decision so a runtime retune takes effect. (The behaviour's own
-fields are read live, so only locomotion needs the push.)
+fields are read live, so only those modules need the push.)
 
 ## The primitives (a leaf = `{ path, labels, primitive, params }`)
 
 | Primitive | Params | What it does | Done / re-decides |
 |---|---|---|---|
-| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `fire_at_will`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked; with `fire_at_will`, shoots a known hostile on a clear line once facing settles (`AIM_TOLERANCE`). Holds on arrival. A `look_around` move (search / explore) ignores the `arrive_room` early-out, walks all the way INTO the room (its interior `point`), then **covers it by sight**: it grid-samples the room (`search_coverage_spacing`, inset `search_coverage_margin` off the walls, dropping points off the navmesh so none land on furniture) into points to be seen, and each tick drops the ones now in view (perception's `visible_points` — view cone + line of sight), turns the gaze (at `search_look_rate`) toward the nearest still-unseen point and — when that point is far (`search_coverage_approach`) or its line is blocked by furniture — walks toward it so a new vantage reveals it, until `search_coverage_target` of the points are seen or `search_coverage_budget` seconds elapse. So a searcher actively looks throughout the room until it has SEEN all of it, rather than looking from one spot. ADVANCE is a `move` with `aim: target` + `fire_at_will`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
+| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `fire_at_will`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked; with `fire_at_will`, shoots a known hostile on a clear line once facing settles (`Combat.fire_at_will`). Holds on arrival. A `look_around` move (search / explore) walks all the way INTO the room, then **covers it by sight** (`search_coverage.gd`, the `domain-ai-coverage` skill) until it has SEEN the room or its budget runs out. ADVANCE is a `move` with `aim: target` + `fire_at_will`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
 | `engage` | `point` (anchor), `target_id`, `style` (peek_cover / ambush), `confine_inside` | Path to the anchor firing at will, then fight from it: **peek-and-cover** (peek to the nearest spot with a clear shot, fire on `fire_cooldown`, duck to cover for `cover_time`, positions committed for `reposition_interval`) or **ambush** (hold the covered spot, fire the moment a line opens). ENGAGE and FLANK use this, anchored at the chosen spot or side. | Moving: at `max_commit_time`. In position: every `tactic_interval` (timer starts on arrival) or when `engaged` lapses. |
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
@@ -32,8 +34,7 @@ fields are read live, so only locomotion needs the push.)
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
-NPC's combat leaves) and a contact last seen outside, fire/cover spots are restricted to inside the
-house, the peek fallback holds instead of advancing, and melee won't chase out.
+NPC's combat leaves) and a contact last seen outside, `Behavior` sets `hold_ground`, which `Combat` honours (see `domain-ai-combat`).
 
 **Running** is a behaviour policy, not a primitive: after the primitive steers, `_should_run()` sets
 `character.run_input` only while TRAVELLING (a `move` or `engage` not yet arrived — never a `look_around`
@@ -42,7 +43,7 @@ the NPC is under fire, the destination is farther than `run_min_distance` (strai
 start (`run_start_fraction` of the stamina bar, or already running). The Character spends the stamina and
 walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `run_start_fraction`.
 `debug_status()` reads "running" / "running into position" while it sprints; `debug_state()` has `running`.
-A running NPC cannot shoot (`Character.shoot()` is ignored while running): `_shoot()` skips a shot
+A running NPC cannot shoot (`Character.shoot()` is ignored while running): `Combat.shoot()` skips a shot
 while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
 Test: `tests/ai/ai_runs_to_destination_test.gd`.
 
@@ -55,34 +56,13 @@ Exports on the controller: `posture_enabled` (the `ai.posture` switch), `posture
 `debug_state()` has `posture`. Not a decision-tree level: Von is never asked, so it works with the server down. Tests:
 `tests/ai/posture_crouches_in_fight_test.gd`, `posture_pinned_crouch_test.gd`, `posture_stands_to_run_test.gd`.
 
-**No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
-lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
-
-**Firing** (`_shoot(character) -> bool`, true = a round left the barrel; the fists are `_punch`). It holds fire at a run or mid-reload (cooldown kept);
-a dry gun is a click (below); otherwise it equips the gun and, **if `weapon_blocked()` (the barrel is against a wall or object), sets
-`_back_off_timer = back_off_time`, keeps the cooldown and returns false**, else calls `shoot()` and, only on success, notes engagement and starts
-the cooldown. `apply()` ends each tick with `_apply_back_off`: while the timer runs it overrides `move_input = -facing` (away from where the gun
-points) and clears `run_input`, so the NPC steps back until the barrel is clear, then shoots. Callers that advance state on a shot (peek-and-cover
-switching to its cover phase) wait for the back-off to finish. A pistol never reports blocked, so a chair against it changes nothing. An
-`is_automatic()` gun's trigger pull is a **burst**: `_burst_left = fire_burst − 1` more rounds, fired from `apply()` (`_continue_burst`) as the gun's own
-fire rate allows, ending early on a run, reload, wall or empty gun. Controller exports: `fire_burst` (3), `back_off_time` (0.45 s).
-Tests: `tests/ai/blocked_gun_steps_back_test.gd` (a rifle with a chair against its barrel), `pistol_fires_against_object_test.gd`.
-Not modelled: a rifleman cornered with a wall behind it can still stall (bounded by the back-off timer and re-decisions); cover logic treats walls as
-bulletproof though a rifle shoots through them.
-
-**Ammo.** An empty gun cannot fire, so the behaviour never "fights" with one: `_fire_at_will` returns early when the gun
-is empty or reloading, and `_shoot()` on an empty gun is a dry click that does not note engagement or call `shoot()`; it spends
-`fire_cooldown` and flags the task resolved, so the NPC re-decides (the snapshot now says the gun is empty) at most once per
-cooldown. `auto_reload` (controller export, default on) is a reflex in `hold` (the server-down fallback, and after a
-reload) and in the cover phase of peek-and-cover: an EMPTY gun with a spare magazine is reloaded without a decision. A reload
-runs only while standing (running cancels it, so the `reload` primitive never sets `run_input`). `debug_state()` / `debug_combat()`
-carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/scripted_reload_decision_test.gd`,
-`dry_pistol_fallback_test.gd`, `empty_pistol_no_spares_test.gd`.
+**Combat** — the gunnery, the peek-and-cover cycle, bursts, backing off a blocked barrel, the reload reflex, melee and the
+no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `Behavior` passes it the engaged contact and `hold_ground`.
 
 ## Public interface (what the orchestrator calls)
 
-- `setup(perception, nav_agent)` (build the Locomotion child), `apply_config()` (push the forwarded
-  locomotion tunables in; re-callable each decision); config fields; `rooms` (set each tick).
+- `setup(perception, nav_agent)` (build the Locomotion, coverage and combat modules), `apply_config()` (push their tunables
+  in; re-callable each decision); config fields; `rooms` (set each tick; forwarded to Locomotion).
 - `set_leaf(leaf)` — adopt: snap the point onto the navmesh, capture the target (a fight whose target
   is no longer known drops to hold and forces a re-decision), commit.
 - `update_known(known, delta) -> bool` — adopt the perception's hostiles; retarget a lost engaged
@@ -109,4 +89,5 @@ an unreachable target it steps toward the closest reachable point. Furniture phy
 (a piece shoved off its baked hole) is bulldozed by the character's own push physics; there is no RVO
 avoidance and no straight-at-the-destination fallback. `reachable(p)` snaps a point onto the navmesh
 (every leaf destination goes through it); `reached(character, point)` reports arrival. Falls back to
-straight-line steering with no agent.
+straight-line steering with no agent. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
+`inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules.

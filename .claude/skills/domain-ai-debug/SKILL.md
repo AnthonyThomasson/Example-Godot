@@ -14,6 +14,7 @@ Files:
 - `vision_debug.gd` — the NPC's actual visible area.
 - `agent_debug.gd` — the NPC's current decision + path.
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
+- `zone_list.gd` — a static transform (`ZoneList.from_options`) that flattens a snapshot's option groups into the point zones the tactics overlay draws; the orchestrator's `debug_zones()` calls it (the only file here the orchestrator preloads).
 - `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
 - Eight further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
   character, runs `PROCESS_MODE_ALWAYS`, redraws only while its `show_<x>` is on, plus ring/arrow/line/
@@ -74,7 +75,7 @@ invader's rooms turn from `unknown` to known as it sees them. Drawn behind the p
 
 ## `search_debug.gd` (toggle `show_search` — off by default; shown for the SELECTED NPC)
 
-Visualizes how a `look_around` search move is covering the room by sight (see the behaviour skill).
+Visualizes how a `look_around` search move is covering the room by sight (see `domain-ai-coverage`).
 Defaults off like the tactics overlay: in spectator mode the inspector turns it on only for the
 clicked NPC (it is one of the `_flags`), and in player mode `main.gd`'s `show_search` drives it.
 From the controller's `debug_search_coverage()` (`{ active, points, unseen, target, budget }`) it
@@ -90,7 +91,7 @@ API, and runs `PROCESS_MODE_ALWAYS`.
 All the overlays depend on the controller keeping its observer getters and the Vision exports public.
 The controller is the single authoring/observer surface: it forwards `debug_status()` (and
 `current_act()`) from the behaviour sub-domain, builds `debug_zones()` from the last perception snapshot
-it holds, forwards `debug_room_zones()` from the perception's `room_status()` and
+it holds (the flattening is `zone_list.gd` in this folder: a static `ZoneList.from_options(options)`, which also owns the `waypoint` tagging), forwards `debug_room_zones()` from the perception's `room_status()` and
 `debug_search_coverage()` from the behaviour's `debug_coverage()`, and holds the Vision group exports —
 so these overlays need no reference into the perception/behaviour internals.
 

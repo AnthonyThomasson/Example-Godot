@@ -32,6 +32,7 @@ const AgentPerception := preload("res://scenes/ai/perception/agent_perception.gd
 const DecisionClient := preload("res://scenes/ai/decision/decision_client.gd")
 const DecisionPlanner := preload("res://scenes/ai/decision/decision_planner.gd")
 const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
+const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 
 ## The behaviour to pursue, in plain language — what Von ranks every level of the decision against. `{gun}` stands
 ## for whatever gun the NPC carries ("shoot them with your {gun}"); read it filled in through `goal_text()`.
@@ -438,30 +439,10 @@ func debug_state() -> Dictionary:
 	return out
 
 
-## Read-only: the tactical navigation ZONES the NPC's perception laid out for its last decision —
-## every candidate position it weighed, flattened to world points (each with its `label` + `desc`)
-## tagged by the kind of zone each is
-## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `room` / `interaction`, plus
-## `waypoint` for the non-room go-to points — your starting post, the front entrance, approaching the
-## house — which the room/search groups carry but which aren't rooms and often sit outside one), for
-## the tactics debug overlay to draw. A pure read of the last snapshot's option groups; empty until the
-## first decision. Options with no world location (a point-blank punch, the hostile picks) are skipped.
+## Read-only: the tactical navigation ZONES the NPC's perception laid out for its last decision, flattened to world points
+## tagged by kind (see `debug/zone_list.gd`), for the tactics debug overlay to draw. Empty until the first decision.
 func debug_zones() -> Array:
-	var out: Array = []
-	if _last_options.is_empty():
-		return out
-	for groups in _last_options.get("per_target", {}).values():
-		_collect_zones(out, groups.get("fire_positions", {}), &"fire")
-		_collect_zones(out, groups.get("flank_sides", {}), &"flank")
-		_collect_zones(out, groups.get("advance_positions", {}), &"advance")
-	_collect_zones(out, _last_options.get("retreat_positions", {}), &"retreat")
-	_collect_zones(out, _last_options.get("leads", {}), &"lead")
-	_collect_zones(out, _last_options.get("shooter", {}), &"lead")
-	_collect_zones(out, _last_options.get("search_rooms", {}), &"search")
-	_collect_zones(out, _last_options.get("explore", {}), &"search")
-	_collect_zones(out, _last_options.get("rooms", {}), &"room")
-	_collect_zones(out, _last_options.get("interactions", {}), &"interaction")
-	return out
+	return ZoneList.from_options(_last_options)
 
 
 ## Read-only: the tactical ROOM zones — every room of the house tagged by how this NPC regards it now
@@ -479,31 +460,6 @@ func debug_room_zones() -> Array:
 ## the NPC isn't currently covering a room.
 func debug_search_coverage() -> Dictionary:
 	return _behavior.debug_coverage() if _behavior != null else {}
-
-
-## Non-room go-to options the room/search groups carry: the NPC's starting post, the front entrance,
-## and approaching the house. They aren't rooms (and an outside NPC's often sit well outside one), so
-## the overlay tags them `waypoint` instead of `room`/`search` rather than letting them read as rooms.
-const WAYPOINT_IDS := ["post", "entrance", "approach"]
-
-
-## Append each option in `group` that has a world location to `out`, tagged `category` — except the
-## non-room waypoints (WAYPOINT_IDS), re-tagged `waypoint`. Each entry also carries the option's `label`
-## and `desc` (the human text Von reads, which spells out the deciding facts: cover, route, range) so an
-## inspector can expose a clicked point's details. The location is the option's `point` param, or an
-## interactable's current position. Options with neither (a punch, a hostile bind) are skipped.
-func _collect_zones(out: Array, group: Dictionary, category: StringName) -> void:
-	for opt in group.get("options", []):
-		var params: Dictionary = opt.get("params", {})
-		var cat: StringName = &"waypoint" if str(opt.get("id", "")) in WAYPOINT_IDS else category
-		var point = null
-		if params.has("point"):
-			point = params["point"]
-		elif params.get("object") is Node2D and is_instance_valid(params["object"]):
-			point = (params["object"] as Node2D).global_position
-		if point != null:
-			out.append({ "point": point, "category": cat,
-				"label": opt.get("label", ""), "desc": opt.get("desc", ""), "tags": opt.get("tags", {}) })
 
 
 ## Read-only: what the NPC has heard and been told (gunfire heard, under-fire direction, ally callouts,

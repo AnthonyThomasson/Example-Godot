@@ -9,10 +9,14 @@ extends Node
 ## Steering always aims at the next navmesh waypoint, so the character's own push physics bulldoze
 ## furniture sitting on the route without ever tunnelling a wall. It is behaviour's movement tool
 ## only — it holds no decision or combat state. Falls back to straight-line steering when there is
-## no nav agent.
+## no nav agent. It also knows the house's rooms (set each tick by `Behavior`), so the behaviour modules can ask which
+## room, if any, a point lies in.
 
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
 var arrive_dist: float = 10.0
+
+## World-space room rects (`{ key, type, rect }`) of the house, set each tick by `Behavior` from the controller's inject.
+var rooms: Array = []
 
 ## Stuck-sensing window (s): displacement is compared over this span while the NPC is trying to move.
 const STALL_WINDOW := 0.75
@@ -29,6 +33,19 @@ var _stall_speed := 0.0           ## Speed (px/s) measured over the last full wi
 var _stalled_for := 0.0           ## Seconds the NPC has been trying to move without progressing.
 var _trail_clock := 0.0           ## Seconds since the last trail point.
 var _trail: Array = []            ## Recent world positions, oldest first.
+
+
+## The key of the room containing world point `p`, or "" when `p` is in no room.
+func room_key_at(p: Vector2) -> String:
+	for room in rooms:
+		if (room["rect"] as Rect2).has_point(p):
+			return str(room["key"])
+	return ""
+
+
+## Whether a world point lies within any of the house's rooms (the "inside the house" test).
+func inside_house(p: Vector2) -> bool:
+	return room_key_at(p) != ""
 
 
 ## Resolve + wire the navigation agent. `agent` may be null (then everything falls back to straight

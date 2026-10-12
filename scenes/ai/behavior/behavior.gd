@@ -7,7 +7,8 @@ extends Node
 ## re-decision is due. The primitives:
 ##   move     — go to `point` (or until entering `arrive_room`), aiming along the way (`aim`: travel /
 ##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`; a
-##              `look_around` search move covers the room by sight: it turns and relocates until it has seen all of it.
+##              `look_around` search move covers the room by sight (`search_coverage.gd`): it turns and relocates
+##              until it has seen all of it.
 ##   engage   — go to `point`, then fight `target_id` from there: `peek_cover` (step out, shoot, duck)
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
@@ -16,17 +17,15 @@ extends Node
 ##   hold     — stay and watch.
 ## It never chooses WHAT to do — the planner does — and applies no policy beyond the params it is
 ## handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
-## `Locomotion` child for all pathing, reads the world only through the PERCEPTION sub-domain (known
+## `Locomotion` child for all pathing, a `Combat` module (shots, punches, bursts, the peek-and-cover cycle) and a
+## `SearchCoverage` module, reads the world only through the PERCEPTION sub-domain (known
 ## contacts, combat geometry, engagement memory) and drives the character only through its public
 ## controller contract (`move_input` / `aim_point`, `select_slot`, `shoot`, `melee`, `interact_with`,
 ## `end_interaction`). All tunables are set by the controller before `setup()`.
 
 const Locomotion := preload("res://scenes/ai/behavior/locomotion.gd")
-## Inventory slot of the fists (ItemRegistry id). The gun it shoots is whatever the character fights with
-## (`Character.gun_slot()`): nothing here knows one gun from another.
-const FISTS_SLOT := 2
-## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
-const AIM_TOLERANCE := 0.15
+const Combat := preload("res://scenes/ai/behavior/combat.gd")
+const SearchCoverage := preload("res://scenes/ai/behavior/search_coverage.gd")
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
@@ -60,11 +59,18 @@ var auto_reload: bool = true ## An empty gun with a spare magazine is reloaded o
 var posture_enabled: bool = true
 var posture_dwell: float = 0.7
 
-## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject.
-var rooms: Array = []
+## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject; handed on to the
+## Locomotion child, which answers the room queries.
+var rooms: Array = []:
+	set(value):
+		rooms = value
+		if _loco != null:
+			_loco.rooms = value
 
 var _perception: Node             ## The perception sub-domain (contacts, combat geometry, engagement memory).
-var _loco: Node                   ## The Locomotion child (pathing).
+var _loco: Node                   ## The Locomotion child (pathing, rooms).
+var _coverage: RefCounted         ## Room coverage by sight for a search move; see search_coverage.gd.
+var _combat: RefCounted           ## Shots, punches, bursts and the peek-and-cover cycle; see combat.gd.
 var _hostiles: Array = []         ## Known hostile contacts this tick (nearest first), from perception.
 var _primitive: StringName = &"hold" ## The running primitive.
 var _params := {}                 ## Its params (from the leaf).
@@ -75,12 +81,6 @@ var _point := Vector2.ZERO        ## The leaf's destination, snapped onto the na
 var _arrive_room := ""            ## A move that completes on ENTERING this room ("" = on reaching `_point`); ignored while looking around.
 var _arrived := false             ## Whether the destination has been reached.
 var _look_around := false         ## A search/explore move that covers the room by sight on arrival (vs resolving at once).
-var _look_angle := 0.0            ## Current gaze angle (rad), eased toward the nearest unseen point so looking is smooth.
-var _cover_points: Array = []     ## All room sample points this search (kept whole for the coverage fraction + debug).
-var _cover_unseen: Array = []     ## The subset of `_cover_points` not yet SEEN (view cone + line of sight).
-var _cover_target := Vector2.ZERO ## The unseen point currently being looked at / walked to (for the debug overlay).
-var _cover_room := ""             ## Key of the room being covered, locked on arrival.
-var _cover_budget := 0.0          ## Seconds left before the coverage gives up on unseeable nooks and re-decides.
 var _engage_id := 0               ## Instance id of the contact being fought (0 = none).
 var _engage_node: Node2D          ## That contact's body (excluded from line-of-fire rays).
 var _engage_pos := Vector2.ZERO   ## That contact's last-KNOWN position (from memory).
@@ -91,13 +91,6 @@ var _posture_hold := 0.0          ## Seconds before a crouch may be swapped for 
 var _reloading := false           ## The character was reloading last tick (for the status line and overlay).
 var _reload_started := false      ## A `reload` leaf has seen its reload begin, so it ends when the reload does.
 var _hold_ground := false         ## Combat: stay inside the house (territorial vs. an outsider).
-var _combat_phase := "peek"       ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
-var _cover_timer := 0.0           ## Seconds left ducking behind cover before peeking again.
-var _fire_timer := 0.0            ## Seconds left before the next shot/punch may be thrown.
-var _burst_left := 0              ## Rounds still to fire in the automatic gun's current burst.
-var _back_off_timer := 0.0        ## Seconds left stepping back from whatever the gun's barrel is against.
-var _combat_dest := Vector2.ZERO  ## Committed fire/cover position the NPC is steering toward.
-var _combat_dest_timer := 0.0     ## Seconds left before a new combat position may be chosen.
 var _tactic_timer := 0.0          ## Seconds left before a fight re-asks which tactic to use.
 var _target_obj: Node             ## The object to approach + use (interact), else null.
 var _interact_id := ""            ## The interaction id to run on `_target_obj`.
@@ -114,14 +107,36 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_perception = perception
 	_loco = Locomotion.new()
 	_loco.setup(nav_agent)
+	_loco.rooms = rooms
 	add_child(_loco)
+	_coverage = SearchCoverage.new()
+	_coverage.setup(_loco, perception)
+	_combat = Combat.new()
+	_combat.setup(_loco, perception)
+	_combat.dry.connect(_on_dry)
 
 
-## Push the current config into the Locomotion child. The behaviour's own fields are read live, so only
-## the forwarded locomotion tunables need pushing. Idempotent, so the controller may call it each
+## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
+## fields are read live, so only what those hold needs pushing. Idempotent, so the controller may call it each
 ## decision to pick up an export retuned at runtime.
 func apply_config() -> void:
 	_loco.arrive_dist = arrive_dist
+	_coverage.spacing = search_coverage_spacing
+	_coverage.target_fraction = search_coverage_target
+	_coverage.budget_max = search_coverage_budget
+	_coverage.approach = search_coverage_approach
+	_coverage.margin = search_coverage_margin
+	_coverage.look_rate = search_look_rate
+	_combat.shoot_range = shoot_range
+	_combat.punch_range = punch_range
+	_combat.ring_radius = combat_ring_radius
+	_combat.ring_count = combat_ring_count
+	_combat.cover_time = cover_time
+	_combat.fire_cooldown = fire_cooldown
+	_combat.fire_burst = fire_burst
+	_combat.back_off_time = back_off_time
+	_combat.reposition_interval = reposition_interval
+	_combat.auto_reload = auto_reload
 
 
 # --- Read-only views -------------------------------------------------------------------------
@@ -199,7 +214,7 @@ func _progress() -> String:
 				return "running into position" if _running else "moving into position"
 			if _params.get("style", &"peek_cover") == &"ambush":
 				return "in ambush, waiting for a shot"
-			return "in position, %s" % ("ducking behind cover" if _combat_phase == "cover" else "looking for a shot")
+			return "in position, %s" % ("ducking behind cover" if _combat.phase == "cover" else "looking for a shot")
 		&"melee":
 			return "running in to punch" if _running else "closing in to punch"
 		&"interact":
@@ -224,7 +239,7 @@ func debug_state() -> Dictionary:
 		"engage": str(_engage_node.name) if is_instance_valid(_engage_node) else "",
 		"engage_id": _engage_id,
 		"engage_inside": _engage_inside,
-		"combat_phase": _combat_phase,
+		"combat_phase": _combat.phase,
 		"hold_ground": _hold_ground,
 		"hostiles_known": _hostiles.size(),
 		"in_interaction": _in_interaction,
@@ -232,9 +247,9 @@ func debug_state() -> Dictionary:
 			"commit": _commit_timer,
 			"tactic": _tactic_timer,
 			"interaction": _interaction_timer,
-			"fire": _fire_timer,
-			"cover": _cover_timer,
-			"combat_dest": _combat_dest_timer,
+			"fire": _combat.fire_timer,
+			"cover": _combat.cover_timer,
+			"combat_dest": _combat.dest_timer,
 		},
 		"loco": _loco.debug_state(),
 	}
@@ -244,13 +259,9 @@ func debug_state() -> Dictionary:
 ## while a `look_around` move is actually covering a room (arrived, not yet resolved); `points` are all
 ## the room's sample points, `unseen` the ones still to be seen, `target` the one being looked at now.
 func debug_coverage() -> Dictionary:
-	return {
-		"active": _primitive == &"move" and _look_around and _arrived and not _resolved,
-		"points": _cover_points,
-		"unseen": _cover_unseen,
-		"target": _cover_target,
-		"budget": _cover_budget,
-	}
+	var out: Dictionary = _coverage.debug()
+	out["active"] = _primitive == &"move" and _look_around and _arrived and not _resolved
+	return out
 
 
 ## Read-only: the running combat / movement / interaction state as world-space data (Vector2s, not the
@@ -278,12 +289,12 @@ func debug_combat(character) -> Dictionary:
 		"fire_clear": fire_clear,
 		"shoot_range": shoot_range,
 		"punch_range": punch_range,
-		"combat_phase": _combat_phase if fighting else "",
-		"cover_timer": _cover_timer,
+		"combat_phase": _combat.phase if fighting else "",
+		"cover_timer": _combat.cover_timer,
 		"cover_time": cover_time,
-		"fire_timer": _fire_timer,
+		"fire_timer": _combat.fire_timer,
 		"fire_cooldown": fire_cooldown,
-		"combat_dest": _combat_dest if _primitive == &"engage" and _arrived and _combat_dest != Vector2.ZERO else null,
+		"combat_dest": _combat.dest if _primitive == &"engage" and _arrived and _combat.dest != Vector2.ZERO else null,
 		"aim_point": character.aim_point if character != null else Vector2.ZERO,
 		"fire_at_will": bool(_params.get("fire_at_will", false)),
 		"reloading": _reloading,
@@ -335,10 +346,7 @@ func set_leaf(leaf: Dictionary) -> void:
 	_commit_timer = max_commit_time
 	_arrive_room = str(_params.get("arrive_room", ""))
 	_look_around = bool(_params.get("look_around", false))
-	_cover_points = []          # Room sample points, built on arrival once we know which room we're in.
-	_cover_unseen = []
-	_cover_target = Vector2.ZERO
-	_cover_room = ""
+	_coverage.reset()           # Room sample points are built on arrival, once we know which room we're in.
 	_point = _loco.reachable(_params["point"]) if _params.has("point") else Vector2.ZERO
 	_target_obj = null
 	_engage_id = 0
@@ -351,8 +359,7 @@ func set_leaf(leaf: Dictionary) -> void:
 				_primitive = &"hold"  # The target was lost while deciding; re-decide.
 				_resolved = true
 				return
-			_combat_phase = "peek"
-			_combat_dest_timer = 0.0
+			_combat.begin_fight()
 			_tactic_timer = tactic_interval
 			_perception.note_engaged()  # Commit to the fight (refreshed by firing).
 		&"interact":
@@ -473,7 +480,7 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 
 ## Carry out the running primitive this tick.
 func apply(character, delta: float) -> void:
-	_fire_timer -= delta
+	_combat.tick(delta)
 	_loco.sample(character, delta)  # Observation only (stuck overlay); never alters the tick.
 	match _primitive:
 		&"move":
@@ -488,13 +495,18 @@ func apply(character, delta: float) -> void:
 			_apply_reload(character)
 		_:
 			_apply_hold(character)
-	_continue_burst(character)
+	_combat.continue_burst(character)
 	character.run_input = _should_run(character)
-	_apply_back_off(character, delta)
+	_combat.apply_back_off(character, delta)
 	_apply_posture(character, delta)
 	_running = character.is_running()
 	_posture = character.posture()
 	_reloading = character.is_reloading()
+
+
+## The gun ran dry mid-fight: the task is resolved, so the controller re-decides (the empty gun is in the snapshot now).
+func _on_dry() -> void:
+	_resolved = true
 
 
 ## Take the posture `_wanted_posture` asks for. Standing back up is never delayed (a run, the end of a fight);
@@ -560,63 +572,29 @@ func _should_run(character) -> bool:
 ## Move: walk to the destination (or into the destination room), aiming as the leaf asks, and — when
 ## `fire_at_will` — shoot a known hostile the moment there is a clear line. A `look_around` move (search /
 ## explore) walks all the way to the interior point and, on arrival, COVERS the room by sight — turning
-## and relocating until it has seen (near-)every sampled point (see `_cover_room_step`) — before flagging
+## and relocating until it has seen (near-)every sampled point (see `search_coverage.gd`) — before flagging
 ## the task resolved; any other move flags resolved the moment it arrives.
 func _apply_move(character, delta: float) -> void:
 	if not _arrived:
 		if _arrive_room != "" and not _look_around:
-			_arrived = _room_key_at(character.global_position) == _arrive_room
+			_arrived = _loco.room_key_at(character.global_position) == _arrive_room
 		if not _arrived:
 			_arrived = _loco.reached(character, _point)
 		if _arrived:
 			if _look_around:
-				_begin_coverage(character)
+				_coverage.begin(character)
 			else:
 				_resolved = true
 	if not _arrived:
 		_loco.move_to(character, _point)
 	elif _look_around:
-		_cover_room_step(character, delta)  # Look around until the room is covered by sight.
+		if _coverage.step(character, delta):  # Look around until the room is covered by sight.
+			_look_around = false
+			_resolved = true
 		return
 	_aim_move(character)
 	if _params.get("fire_at_will", false):
 		_fire_at_will(character)
-
-
-## Start covering the room on arrival: lock the room, sample it into points to be seen, and begin the
-## time budget. `_room_key_at` may be "" (an explore point in no room); then the sample is empty and
-## coverage resolves at once (a single look), which is the graceful fallback.
-func _begin_coverage(character) -> void:
-	_cover_room = _room_key_at(character.global_position)
-	_cover_points = _sample_room(_cover_room)
-	_cover_unseen = _cover_points.duplicate()
-	_cover_target = character.global_position
-	_cover_budget = search_coverage_budget
-	_look_angle = character.facing.angle()
-
-
-## One tick of room coverage: drop every sample point now in sight, then — if the room isn't covered
-## yet and the budget holds — turn the gaze toward the nearest unseen point and, when it is far or its
-## line is blocked (behind furniture), walk toward it so a new vantage reveals it. Resolves (forcing a
-## re-decision) once `search_coverage_target` of the points are seen or the budget runs out.
-func _cover_room_step(character, delta: float) -> void:
-	for p in _perception.visible_points(character, _cover_unseen):
-		_cover_unseen.erase(p)
-	_cover_budget -= delta
-	if _cover_unseen.size() <= floori(_cover_points.size() * (1.0 - search_coverage_target)) or _cover_budget <= 0.0:
-		_look_around = false
-		_resolved = true
-		return
-	var self_pos: Vector2 = character.global_position
-	var target: Vector2 = _nearest(self_pos, _cover_unseen)
-	_cover_target = target
-	var desired := (target - self_pos).angle()
-	_look_angle = rotate_toward(_look_angle, desired, search_look_rate * delta)
-	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
-	if self_pos.distance_to(target) > search_coverage_approach or not _perception.has_line_to(character, null, target):
-		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
-	else:
-		character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.
 
 
 ## Where a moving NPC looks: its target, the nearest known threat, the destination, or (default) the
@@ -638,26 +616,13 @@ func _aim_move(character) -> void:
 		character.aim_point = character.global_position + character.move_input * 100.0
 
 
-## Shoot the engaged (else nearest) known hostile when it is in range with a clear line, once the
-## facing has settled on it; aims at it meanwhile. No-op without a loaded gun (or mid-reload).
+## Shoot the engaged (else nearest) known hostile when `Combat` finds it in range on a clear line.
 func _fire_at_will(character) -> void:
-	var gun: int = character.gun_slot()
-	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading():
-		return
 	var target: Dictionary = {}
 	for c in _hostiles:
 		if c["id"] == _engage_id or target.is_empty():
 			target = c
-	if target.is_empty():
-		return
-	var pos: Vector2 = target["pos"]
-	if character.global_position.distance_to(pos) > shoot_range:
-		return
-	if not _perception.has_line_to(character, target["node"], pos):
-		return
-	character.aim_point = pos
-	if _fire_timer <= 0.0 and absf(character.facing.angle_to(pos - character.global_position)) <= AIM_TOLERANCE:
-		_shoot(character)
+	_combat.fire_at_will(character, target)
 
 
 ## Engage: walk to the chosen spot (shooting on the way when a line opens), then fight from it —
@@ -678,66 +643,9 @@ func _apply_engage(character, delta: float) -> void:
 		_tactic_timer = tactic_interval  # In position: the tactic gets its full run from here.
 		_perception.note_engaged()
 	if _params.get("style", &"peek_cover") == &"ambush":
-		character.move_input = Vector2.ZERO
-		if character.global_position.distance_to(_engage_pos) <= shoot_range \
-				and _perception.has_line_to(character, _engage_node, _engage_pos) and _fire_timer <= 0.0:
-			_shoot(character)
+		_combat.ambush(character, _engage_node, _engage_pos)
 		return
-	_apply_peek_cover(character, delta)
-
-
-## Peek-and-cover shooting: in the PEEK phase, move to a spot with a clear shot and fire, then duck;
-## in the COVER phase, hold behind a shielding object for `cover_time` before peeking again. The
-## fire/cover destination is committed for `reposition_interval` rather than re-picked every frame,
-## so the NPC steers smoothly instead of vibrating between near-equal candidates.
-func _apply_peek_cover(character, delta: float) -> void:
-	var dist: float = character.global_position.distance_to(_engage_pos)
-	_combat_dest_timer -= delta
-	if _combat_phase == "cover":
-		_cover_timer -= delta
-		if _combat_dest_timer <= 0.0:
-			_combat_dest = _choose_combat_dest(character, "cover")
-			_combat_dest_timer = reposition_interval
-		_loco.move_to(character, _combat_dest)
-		_reload_if_dry(character)
-		if _cover_timer <= 0.0:
-			_combat_phase = "peek"
-			_combat_dest_timer = 0.0  # Re-pick a firing spot immediately on peeking out.
-		return
-	# PEEK: take the shot if a clear line to the known position is in range, else reposition to get one.
-	if dist <= shoot_range and _perception.has_line_to(character, _engage_node, _engage_pos):
-		character.move_input = Vector2.ZERO
-		if _fire_timer <= 0.0:
-			_shoot(character)
-			# A gun whose barrel is against something (stepping back to clear it) has not shot yet: keep
-			# peeking until it does, rather than ducking without having fired.
-			if _back_off_timer <= 0.0:
-				_combat_phase = "cover"
-				_cover_timer = cover_time
-				_combat_dest_timer = 0.0  # Pick a cover spot immediately after shooting.
-		return
-	if _combat_dest_timer <= 0.0:
-		_combat_dest = _choose_combat_dest(character, "peek")
-		_combat_dest_timer = reposition_interval
-	_loco.move_to(character, _combat_dest)
-
-
-## The committed destination for the current phase: the nearest spot with a clear shot (peek) or the
-## nearest shielded spot (cover); falls back to closing on the contact (peek) or holding (cover) when
-## no suitable spot exists this sample. While holding ground, spots are restricted to inside the house
-## and the peek fallback holds position instead of advancing out.
-func _choose_combat_dest(character, phase: String) -> Vector2:
-	var spots: Dictionary = _perception.combat_spots(character, _engage_node, _engage_pos, combat_ring_radius, combat_ring_count)
-	var fire: Array = spots["fire"]
-	var cover: Array = spots["cover"]
-	if _hold_ground:
-		fire = fire.filter(func(p): return _inside_house(p))
-		cover = cover.filter(func(p): return _inside_house(p))
-	if phase == "cover":
-		return cover[0] if not cover.is_empty() else character.global_position
-	if not fire.is_empty():
-		return fire[0]
-	return character.global_position if _hold_ground else _engage_pos
+	_combat.peek_cover(character, delta, _engage_node, _engage_pos, _hold_ground)
 
 
 ## Melee: close to punch range and swing on the fire cooldown (no cover cycle for fists). While
@@ -748,76 +656,7 @@ func _apply_melee(character) -> void:
 		return
 	character.aim_point = _engage_pos
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
-	if character.global_position.distance_to(_engage_pos) > punch_range:
-		if not _hold_ground:
-			_loco.move_to(character, _engage_pos)
-		else:
-			character.move_input = Vector2.ZERO
-		return
-	character.move_input = Vector2.ZERO
-	if _fire_timer <= 0.0:
-		_punch(character)
-
-
-## Equip the character's gun and fire it, refreshing the combat engagement so an active fight stays
-## committed; true when a round left the barrel. Nothing here is specific to a gun:
-##   - at a run or mid-reload it holds fire and keeps the cooldown for when that stops;
-##   - dry, a click is not a shot, so it neither commits the fight nor needs a hand free to reload — it
-##     re-decides (the empty gun is in the snapshot now), at most once per cooldown;
-##   - with the barrel against a wall or object (`weapon_blocked()`) it cannot fire, so it steps back until
-##     it can, keeping the cooldown;
-##   - an automatic gun's pull is a burst (`fire_burst` rounds, `_continue_burst`), the rest at the gun's own rate.
-func _shoot(character) -> bool:
-	if character.is_running() or character.is_reloading():
-		return false
-	var gun: int = character.gun_slot()
-	if gun < 0:
-		return false
-	if character.ammo(gun) == 0:
-		_fire_timer = fire_cooldown
-		_resolved = true
-		return false
-	character.select_slot(gun)
-	if character.weapon_blocked():
-		_back_off_timer = back_off_time
-		return false
-	if not character.shoot():
-		return false
-	_perception.note_engaged()
-	_fire_timer = fire_cooldown
-	_burst_left = maxi(fire_burst - 1, 0) if character.is_automatic() else 0
-	return true
-
-
-## Equip the fists and throw a punch, refreshing the combat engagement.
-func _punch(character) -> void:
-	_perception.note_engaged()
-	_fire_timer = fire_cooldown
-	character.select_slot(FISTS_SLOT)
-	character.melee()
-
-
-## Keep the trigger down for the rest of an automatic gun's burst: one more round each time the gun's own fire
-## rate allows, until the burst is spent or something stops it (a run, a reload, a swap, a wall, running dry).
-func _continue_burst(character) -> void:
-	if _burst_left <= 0:
-		return
-	if not character.is_automatic() or character.is_running() or character.is_reloading() \
-			or character.weapon_blocked() or character.ammo() <= 0:
-		_burst_left = 0
-		return
-	if character.shoot():
-		_burst_left -= 1
-
-
-## Step back from whatever the gun's barrel is against (`_shoot` set the timer): away from where it points,
-## walking, until the barrel is clear or the time is up. Applied after the primitive has steered, so it wins.
-func _apply_back_off(character, delta: float) -> void:
-	if _back_off_timer <= 0.0:
-		return
-	_back_off_timer -= delta
-	character.move_input = -character.facing
-	character.run_input = false
+	_combat.melee(character, _engage_pos, _hold_ground)
 
 
 ## Interact: walk to the chosen object facing it (or a known hostile, to keep eyes on them); once its
@@ -852,7 +691,7 @@ func _apply_hold(character) -> void:
 	character.move_input = Vector2.ZERO
 	if not _hostiles.is_empty():
 		character.aim_point = _hostiles[0]["pos"]
-	_reload_if_dry(character)
+	_combat.reload_if_dry(character)
 
 
 ## Reload: stand and swap magazines, watching the nearest known hostile; when the reload ends (or can't
@@ -879,69 +718,7 @@ func _apply_reload(character) -> void:
 	_resolved = true
 
 
-## Reflex: swap in a fresh magazine when the gun is empty and one is carried (`auto_reload`). It
-## equips the gun first, since a reload works on the held item.
-func _reload_if_dry(character) -> void:
-	var gun: int = character.gun_slot()
-	if not auto_reload or gun < 0 or character.is_reloading() or character.ammo(gun) != 0 or not character.can_reload(gun):
-		return
-	character.select_slot(gun)
-	character.reload()
-
-
 # --- Helpers ---------------------------------------------------------------------------------
-
-## Whether a world point lies within any of the house's rooms (the "inside the house" test).
-func _inside_house(p: Vector2) -> bool:
-	return _room_key_at(p) != ""
-
-
-## The key of the room containing world point `p`, or "" when `p` is in no room.
-func _room_key_at(p: Vector2) -> String:
-	for room in rooms:
-		if (room["rect"] as Rect2).has_point(p):
-			return str(room["key"])
-	return ""
-
-
-## Grid-sample room `room_key` into the points a searcher must SEE to have covered it: the rect inset
-## by `search_coverage_margin` (to keep points off the walls), stepped by `search_coverage_spacing`,
-## dropping any point not on the navmesh — i.e. inside a carved furniture footprint — so search points
-## sit on open floor, not on furniture (which also keeps unseeable points out of the coverage set).
-## Deterministic (no RNG). Empty when the room is unknown (coverage then resolves at once).
-func _sample_room(room_key: String) -> Array:
-	var points: Array = []
-	for room in rooms:
-		if str(room["key"]) != room_key:
-			continue
-		var r: Rect2 = (room["rect"] as Rect2).grow(-search_coverage_margin)
-		if r.size.x <= 0.0 or r.size.y <= 0.0:
-			r = room["rect"]  # Too small to inset; use the whole rect.
-		var step: float = maxf(search_coverage_spacing, 8.0)
-		var x: float = r.position.x + step * 0.5
-		while x < r.end.x:
-			var y: float = r.position.y + step * 0.5
-			while y < r.end.y:
-				var p := Vector2(x, y)
-				if _loco.on_navmesh(p):  # Skip furniture holes / off-walkable so points land on open floor.
-					points.append(p)
-				y += step
-			x += step
-		break
-	return points
-
-
-## The point in `points` nearest `from` (world space); `from` when the list is empty.
-func _nearest(from: Vector2, points: Array) -> Vector2:
-	var best: Vector2 = from
-	var best_d := INF
-	for p in points:
-		var d: float = from.distance_squared_to(p)
-		if d < best_d:
-			best_d = d
-			best = p
-	return best
-
 
 ## Whether the chosen interaction on `_target_obj` is currently reachable (lets the approach stop and
 ## the action begin).
