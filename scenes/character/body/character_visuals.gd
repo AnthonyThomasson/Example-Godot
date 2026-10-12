@@ -465,9 +465,10 @@ func _draw_fallen_shadow(rd) -> void:
 			"head":
 				_shadow.draw_circle(cast.call(part["at"]), CharacterConfig.ragdoll_head_radius * _character.radius,
 					Color.BLACK)
-	var outline := _trunk_outline(rd, cast)
-	if outline.size() >= 3:
-		_shadow.draw_colored_polygon(outline, Color.BLACK)
+	# The trunk's slices, each its own polygon: the shadow group flattens overlapping black into one shade, so they
+	# render as the one outline the body draws, without the union that outline costs.
+	for hull in _trunk_hulls(rd, cast):
+		_shadow.draw_colored_polygon(hull, Color.BLACK)
 
 
 ## The fallen body's parts as dicts with their `kind` and mean `height`: limb chains (arms, legs with
@@ -659,6 +660,41 @@ static func _trunk_steps() -> PackedFloat32Array:
 ## CharacterConfig.ragdoll_trunk_sections and domed at both ends), so it is waisted and rounded from
 ## any side and shrinks to the shoulders seen from above.
 func _trunk_outline(rd, project: Callable) -> PackedVector2Array:
+	var outline := PackedVector2Array()
+	var hulls := _trunk_hulls(rd, project)
+	for hull in hulls:
+		if outline.is_empty():
+			outline = hull
+			continue
+		var best := PackedVector2Array()
+		var best_area := 0.0
+		var outer := 0
+		for poly in Geometry2D.merge_polygons(outline, hull):
+			var area := _area(poly)
+			if area > best_area:
+				best = poly
+				best_area = area
+			if not Geometry2D.is_polygon_clockwise(poly) and area > PIECE_MIN_AREA:
+				outer += 1
+		if outer > 1:
+			# The union came apart (two outer pieces): keep both slices in one hull rather than
+			# drop the body so far.
+			outline = _open(Geometry2D.convex_hull(outline + hull))
+		else:
+			# The union's outer boundary is its largest piece (any others would be holes).
+			outline = best if best.size() >= 3 else outline
+	if Geometry2D.triangulate_polygon(outline).is_empty():
+		var everything := PackedVector2Array()
+		for hull in hulls:
+			everything.append_array(hull)
+		outline = _open(Geometry2D.convex_hull(everything))
+	return outline
+
+
+## The trunk's slices seen through `project` (3D → 2D): the hull of each pair of neighbouring cross-sections (ellipses
+## across the spine, eased between CharacterConfig.ragdoll_trunk_sections and domed at both ends), each grown by
+## `HULL_OVERLAP`. Their union is the trunk's outline (`_trunk_outline`); the shadow draws them as they are.
+func _trunk_hulls(rd, project: Callable) -> Array[PackedVector2Array]:
 	var r: float = _character.radius
 	var basis: Basis = rd.torso()
 	var pelvis: Vector3 = rd.point(Rig.PELVIS)
@@ -672,32 +708,10 @@ func _trunk_outline(rd, project: Callable) -> PackedVector2Array:
 			var around := Vector2.from_angle(TAU * k / SECTION_POINTS)
 			ring.append(project.call(centre + basis.x * around.x * half.x + basis.z * around.y * half.y))
 		rings.append(ring)
-	var outline := PackedVector2Array()
+	var hulls: Array[PackedVector2Array] = []
 	for k in range(1, rings.size()):
-		var hull := _grown(_open(Geometry2D.convex_hull(rings[k - 1] + rings[k])))
-		if outline.is_empty():
-			outline = hull
-			continue
-		var best := PackedVector2Array()
-		var outer := 0
-		for poly in Geometry2D.merge_polygons(outline, hull):
-			if _area(poly) > _area(best):
-				best = poly
-			if not Geometry2D.is_polygon_clockwise(poly) and _area(poly) > PIECE_MIN_AREA:
-				outer += 1
-		if outer > 1:
-			# The union came apart (two outer pieces): keep both slices in one hull rather than
-			# drop the body so far.
-			outline = _open(Geometry2D.convex_hull(outline + hull))
-		else:
-			# The union's outer boundary is its largest piece (any others would be holes).
-			outline = best if best.size() >= 3 else outline
-	if Geometry2D.triangulate_polygon(outline).is_empty():
-		var everything := PackedVector2Array()
-		for ring in rings:
-			everything.append_array(ring)
-		outline = _open(Geometry2D.convex_hull(everything))
-	return outline
+		hulls.append(_grown(_open(Geometry2D.convex_hull(rings[k - 1] + rings[k]))))
+	return hulls
 
 
 ## `poly` grown by `HULL_OVERLAP`, so neighbouring slices of the trunk overlap in area. They share a
