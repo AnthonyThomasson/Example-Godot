@@ -16,7 +16,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Nav re-bake and path queries stay fast",
 		"description": "A generated house is re-baked ten times and 300 paths are queried between its rooms; per-bake and per-query wall time stay within budget.",
-		"tags": ["perf", "stress", "navigation", "bake", "path"],
+		"tags": ["navigation", "bake", "path"],
 		"timeout": 10.0,
 	}
 

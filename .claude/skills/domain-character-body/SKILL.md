@@ -34,7 +34,7 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   every frame. `redraws` counts the standing body's draws for tests. A new input to the standing draw must
   join `_redraw_key_of`, or the body will not repaint when it changes. Test:
   `tests/character/standing_body_repaints_on_change_test.gd`; the idle crowd's frame cost is guarded by
-  `tests/physics/crowd_deaths_stress_test.gd`.
+  `tests/perf/crowd_deaths_stress_test.gd`.
 
 ## Pose (the living motion)
 

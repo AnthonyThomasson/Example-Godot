@@ -14,7 +14,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "The sound bank voices every profile",
 		"description": "Every profile renders a sane, cached clip; variants and neighbouring profiles differ; unknown profiles are refused; the library renders within budget.",
-		"tags": ["sound", "bank", "perf"],
+		"tags": ["sound", "bank"],
 		"timeout": 15.0,
 	}
 

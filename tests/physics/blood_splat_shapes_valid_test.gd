@@ -3,7 +3,7 @@ extends GameTest
 ## Every outline a BloodSplat draws can be triangulated (blood_splat.gd). A splat is built from random
 ## blobs, spikes and droplets unioned into opaque outlines, and about 1 splat in 100,000 comes out with an
 ## outline the engine cannot triangulate; `draw_colored_polygon` then logs "Invalid polygon data,
-## triangulation failed", which failed whatever test happened to draw it (physics/hit_overload_stress,
+## triangulation failed", which failed whatever test happened to draw it (perf/hit_overload_stress,
 ## a few percent of runs). `BloodSplat.drawable` keeps a valid outline, swaps an invalid one for its hull
 ## and drops one with no area; `setup` runs every outline through it. The helper is checked on a
 ## self-crossing polygon (deterministic); a sweep of random splats checks the whole build.

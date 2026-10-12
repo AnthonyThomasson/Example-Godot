@@ -2,7 +2,7 @@ extends GameTest
 
 ## Performance guard: a room packed with furniture is shoved all at once. Many rigid bodies collide, then
 ## settle and sleep; frame cost while they move and once they rest stays within budget, and no nodes are
-## created or leaked. (Nav re-baking is covered by navigation/bake_and_path_stress.)
+## created or leaked. (Nav re-baking is covered by perf/bake_and_path_stress.)
 
 const Perf := preload("res://tests/_perf/perf_probe.gd")
 
@@ -22,7 +22,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A shoved pile of furniture stays cheap",
 		"description": "120 pieces of furniture are shoved at once; frame cost while they collide and after they settle stays within budget, with no node growth.",
-		"tags": ["perf", "stress", "furniture", "rigid body"],
+		"tags": ["furniture", "rigid body"],
 		"timeout": 30.0,
 	}
 

@@ -20,7 +20,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Hundreds of hits keep deformation, debris and blood capped",
 		"description": "600 hits land on a chair and 600 on a sturdy character; recorded dents, tracked debris and blood splatters stay capped and frame cost stays within budget.",
-		"tags": ["perf", "stress", "deformation", "debris", "blood"],
+		"tags": ["deformation", "debris", "blood"],
 		"timeout": 30.0,
 	}
 

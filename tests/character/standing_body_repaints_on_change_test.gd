@@ -3,7 +3,7 @@ extends GameTest
 ## A standing body is repainted only when what it draws has changed (character_visuals.gd). One standing
 ## still mostly stops repainting; a walking one repaints every frame; a wound, a change of the held item and
 ## a fresh walk each repaint it promptly, and it goes quiet again once it stops. Guards the idle cost of a
-## crowd (tests/physics/crowd_deaths_stress_test.gd) without leaving a stale body on screen.
+## crowd (tests/perf/crowd_deaths_stress_test.gd) without leaving a stale body on screen.
 
 ## Frames each repaint count is read over.
 const WINDOW := 120
@@ -13,7 +13,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Standing body repaints only on change",
 		"description": "A still body skips most repaints, a walking one repaints every frame, and a wound, a new held item and a walk each repaint it.",
-		"tags": ["draw", "pose", "perf"],
+		"tags": ["draw", "pose"],
 		"timeout": 20.0,
 	}
 

@@ -23,7 +23,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "A crowd dying at once stays cheap",
 		"description": "36 characters are killed in one frame; frame cost while they fall stays within budget, all ragdolls settle, and node growth is bounded.",
-		"tags": ["perf", "stress", "ragdoll", "blood", "death"],
+		"tags": ["ragdoll", "blood", "death"],
 		"timeout": 40.0,
 	}
 

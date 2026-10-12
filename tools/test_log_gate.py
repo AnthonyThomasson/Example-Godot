@@ -111,7 +111,6 @@ while [ $# -gt 0 ]; do
     --shard=*) shard="${1#--shard=}" ;;
     --costs=*) costs="${1#--costs=}" ;;
     --id=*|--domain=*) selection="$selection $1" ;;
-    perf) selection="$selection perf" ;;
   esac
   shift
 done
@@ -285,17 +284,17 @@ class WrapperTests(unittest.TestCase):
 
     def test_changed_maps_scene_edits_to_the_domains_that_compose_them_and_helpers_to_their_users(self):
         _, lines = self.changed(["scenes/ai/behavior/behavior.gd"])
-        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai,perf"])
         _, lines = self.changed(["tests/_ai/flank_probe.gd"])
         self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai"])
         _, lines = self.changed(["tests/_perf/perf_probe.gd"])
-        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: perf"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=perf"])
 
     def test_changed_does_not_repeat_a_test_whose_domain_already_runs(self):
         _, lines = self.changed(["scenes/ai/behavior/behavior.gd", "tests/ai/goal_names_the_gun_test.gd",
                                  "tests/audio/bank_test.gd", "tests/audio/bank_test.gd.uid"])
         self.assertEqual([l for l in lines if l.startswith("selection:")],
-                         ["selection: --domain=ai", "selection: --id=audio/bank"])
+                         ["selection: --domain=ai,perf", "selection: --id=audio/bank"])
 
 
 class LintReportTests(unittest.TestCase):

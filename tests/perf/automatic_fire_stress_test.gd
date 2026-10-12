@@ -30,7 +30,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Sustained gunfire stays cheap",
 		"description": "Four SMGs and four rifles hold the trigger for 5 s while four pistols fire every 4th frame, into a furnished arena; frame cost stays within budget and the Despawner cap holds.",
-		"tags": ["perf", "stress", "gun", "automatic", "smg", "rifle", "pistol", "projectile", "debris", "casing"],
+		"tags": ["gun", "automatic", "smg", "rifle", "pistol", "projectile", "debris", "casing"],
 		"timeout": 40.0,
 	}
 
@@ -39,7 +39,7 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 1400, 900))
 	s.switch(&"projectile.flyover", false)
 	s.switch(&"physics.debris", true)
-	s.switch(&"nav.rebake", false)  # shot pieces can overlap; nav re-baking is covered by navigation/bake_and_path_stress
+	s.switch(&"nav.rebake", false)  # shot pieces can overlap; nav re-baking is covered by perf/bake_and_path_stress
 	# Magazines big enough that no automatic gun runs dry in the window: the guard is for sustained fire.
 	var deep: Dictionary = MagazineConfig.types.duplicate(true)
 	deep[&"smg_standard"]["capacity"] = 1000

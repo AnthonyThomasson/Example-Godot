@@ -236,14 +236,14 @@ run() {
 # composes it (from the architecture skill's dependency graph). "all" = the whole suite.
 affected() {
   case "$1" in
-    ai) echo ai ;;
-    navigation) echo navigation ai ;;
+    ai) echo ai perf ;;
+    navigation) echo navigation ai perf ;;
     interaction) echo interaction character ai ;;
-    items) echo items projectile character ai ;;
-    projectile) echo projectile physics objects character items ai ;;
-    physics) echo physics objects projectile character items ai ;;
-    objects) echo objects physics projectile character items interaction navigation ai ;;
-    character) echo character items interaction projectile physics objects ai ;;
+    items) echo items projectile character ai perf ;;
+    projectile) echo projectile physics objects character items ai perf ;;
+    physics) echo physics objects projectile character items ai perf ;;
+    objects) echo objects physics projectile character items interaction navigation ai perf ;;
+    character) echo character items interaction projectile physics objects ai perf ;;
     ui) echo ui ;;
     worldgen|art|general|testing|audio) echo all ;;  # audio: the Sound autoload runs in every test
     *) echo all ;;  # anything unknown is treated as risky
@@ -282,7 +282,7 @@ if [[ $CHANGED -eq 1 ]]; then
   domains=""   # domains a changed scene can break, with the ones that compose it (see `affected`)
   exact=""     # domains whose own tests a changed test helper feeds, and nothing beyond them
   ids=""       # test ids of changed test files: an edited test can only change its own result
-  perf=0       # the shared perf helper changed: every test tagged perf
+  perf=0       # the shared perf helper changed: every test of the perf domain
   self_test=0
   for f in $files; do
     case "$f" in
@@ -331,7 +331,7 @@ if [[ $CHANGED -eq 1 ]]; then
     if [[ $perf -eq 1 ]]; then
       ran=1
       echo "== perf tests (tests/_perf changed) =="
-      run perf || status=1
+      run --domain=perf || status=1
     fi
   fi
   if [[ $self_test -eq 1 ]]; then

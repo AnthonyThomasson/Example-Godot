@@ -69,7 +69,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
   (`tests/<domain>/<name>_test.gd`) runs only that test** (`--id=<domain>/<name>`; it can only change its own
   result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
-  `tests/_perf` runs `perf`, `tests/_harness` the self-tests, and an unknown helper folder everything.
+  `tests/_perf` runs the `perf` domain, `tests/_harness` the self-tests, and an unknown helper folder everything.
   `GAME_TEST_CHANGED_FILES` (newline-separated paths) stands in for git's view of the changes, which is how
   `tools/test_log_gate.py` tests this mapping.
 - **Which command?**
@@ -208,15 +208,17 @@ func run(t: TestContext) -> void:
 - Make randomness deterministic where the assertion depends on it (e.g. `projectile.flyover` off,
   since a character is partial cover).
 
-## Performance stress tests (tag `perf`)
+## Performance tests (domain `perf`, `tests/perf/`)
 
-Regression guards for speed and runaway object counts. They are ordinary tests in the domain they
-load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/furniture_pile_stress`,
-`physics/crowd_deaths_stress`, `physics/hit_overload_stress`, `projectile/automatic_fire_stress` (SMGs and
-rifles on the trigger plus pistols clicking: one run covers the single-shot and the automatic path),
-`worldgen/generate_houses_stress`), so `--changed` runs them with their domain and
-`tools/run_tests.sh perf` runs just them. The shared helper is `tests/_perf/perf_probe.gd`
-(`const Perf := preload(...)`; not a test).
+Their own category: regression guards for speed and runaway object counts, one folder, one browser section, one
+selector. They are ordinary tests that load other domains, so they live apart from them
+(`perf/npc_crowd_stress`, `bake_and_path_stress`, `furniture_pile_stress`, `crowd_deaths_stress`,
+`hit_overload_stress`, `automatic_fire_stress` (SMGs and rifles on the trigger plus pistols clicking: one run covers the
+single-shot and the automatic path), `generate_houses_stress`). `tools/run_tests.sh --domain=perf` (or the word `perf`)
+runs just them; they stay in the default run, balanced across shards by measured cost like every test, and `--changed` adds the
+domain whenever a scene they exercise changes (`affected()` in `tools/run_tests.sh`) or `tests/_perf/` changes.
+The shared helper is `tests/_perf/perf_probe.gd` (`const Perf := preload(...)`; not a test). `audio/bank` and
+`character/standing_body_repaints_on_change` keep a budget or a count but are functional tests of their domain.
 
 - **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
   outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms

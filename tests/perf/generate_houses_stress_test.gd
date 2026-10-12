@@ -17,7 +17,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Generating many houses stays fast",
 		"description": "WorldGen.generate for a dozen seeds: total and worst-house wall time, and a fixed seed's node count, stay within budget.",
-		"tags": ["perf", "stress", "worldgen", "house"],
+		"tags": ["worldgen", "house"],
 		"timeout": 5.0,
 	}
 
