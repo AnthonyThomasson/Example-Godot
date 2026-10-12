@@ -7,7 +7,7 @@ extends RefCounted
 ## drawn over this one so it can turn on its own. Options (`opts`, defaulting to
 ## CharacterConfig.art_*): `backpack`, `pack`.
 
-const HeadPainter = preload("res://scenes/character/head_painter.gd")
+const HeadPainter = preload("res://scenes/character/body/head_painter.gd")
 
 const _SHOULDER_HEIGHT := 4  ## Heights for cast shadows, floor-up.
 const _PACK_HEIGHT := 6

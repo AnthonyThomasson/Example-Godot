@@ -6,7 +6,7 @@ extends GameTest
 ## opposition and the hips stay planted under a turning upper body, and a body that dies falls from
 ## exactly the pose it stood in. Drawing it all runs every frame, so any engine error fails the test too.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 
 ## How far a bone may differ from its configured length (fraction): a punch stretches its arm a little.
 const BONE_TOLERANCE := 0.06

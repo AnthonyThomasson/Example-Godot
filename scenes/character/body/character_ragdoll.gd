@@ -9,7 +9,7 @@ extends RefCounted
 ## visuals, which draw it top-down by height. Index pairs are per hand side (0 = right as drawn, 1 = left),
 ## matching the hands. Tuning: CharacterConfig.ragdoll_*.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 
 # Joint indices, shared with the rig the body starts from.
 const HEAD := Rig.HEAD

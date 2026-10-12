@@ -5,7 +5,7 @@ extends GameTest
 ## lead over the toes but not past the body). A body in the open, well away from anything, is untouched (no leg is
 ## held).
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 ## The west wall's inner face (world x): the arena wall is 12 px thick, centred on the arena's edge.
 const WALL_FACE := 6.0
 

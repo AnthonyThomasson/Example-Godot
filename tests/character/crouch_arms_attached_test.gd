@@ -4,7 +4,7 @@ extends GameTest
 ## shoulders and head go with it (character_visuals.gd draws them at the rig's chest and head), so each sleeve starts
 ## inside the shoulders instead of floating ahead of them. Standing, nothing moves, and the arms keep their length.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 const BONE_TOLERANCE := 0.06
 
 

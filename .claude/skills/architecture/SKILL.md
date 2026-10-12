@@ -22,7 +22,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **World Generation** | `worldgen/` | `domain-worldgen` | Picking a logical floorplan (front door, exits, hallways) and building/furnishing a house. |
 | **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their painters (what each piece looks like). |
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
-| **Character** | `character/` | `domain-character` | The player character (built so other character types can exist). |
+| **Character** | `character/` | `domain-character` (+ `domain-character-body` for `character/body/`) | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet. |
 | **Physics System** | `physics/` | `domain-physics` (+ `domain-physics-blood` for `physics/blood/`) | Physical reactions: forces, knockback, deformation, debris, ragdoll, and blood (its own sub-folder, `physics/blood/`). |

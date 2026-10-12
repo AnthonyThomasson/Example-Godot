@@ -98,3 +98,8 @@ A clean load only proves it parses. For behaviour run `tools/run_tests.sh --chan
   `godot-drive`.
 - Code that hard-requires a display/GPU may log rendering warnings under `--headless`; those are not
   real errors. Focus on `SCRIPT ERROR` / `Parse Error` / `Failed to load` lines.
+- **Script load order and exit-time leaks.** A refactor that changes which script is analysed first can make the plain `--quit-after` run
+  end with `Condition "p_elem->_root != this"`, `ObjectDB instances leaked` and `resources still in use` for the Audio scripts, which
+  Step 3's `ERROR:` grep reports as FAIL although nothing is wrong at runtime and the test suite is unaffected. It appeared when the
+  inventory moved out of `character.gd` into a new `RefCounted` (no typed `Item` member left on the Node script); that extraction was
+  dropped rather than papered over. If a clean load matters, bisect by reverting the last extraction.

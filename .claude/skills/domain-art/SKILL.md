@@ -15,7 +15,7 @@ A painter is any script with
 draws in a **canonical frame** — front toward +y, width across the front — under `canvas.light`,
 the world light already turned into that frame, so its shading lands correctly after the art is
 turned. Painters live in their own domain: Objects (`objects/art/*_painter.gd` + the `ObjectArt`
-registry), Character (`character/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`), Items
+registry), Character (`character/body/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`), Items
 (`items/pistol_painter.gd`). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
 
 ## PixelArt (`pixel_art.gd`) — the renderer

@@ -15,7 +15,7 @@ extends RefCounted
 ## Other characters are solid to a leg (it rests against them) but are never shoved by it. Nothing is cast while
 ## nothing is near. Tuning: CharacterConfig.leg_*.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 
 ## Physics layer a leg meets: walls, solid furniture and living characters (the hands' mask).
 const MASK := PhysicsLayers.SOLID

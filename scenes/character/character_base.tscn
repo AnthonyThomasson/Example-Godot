@@ -1,8 +1,8 @@
 [gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="1_character"]
-[ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/character/character_hands.gd" id="2_hands"]
-[ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/character_visuals.gd" id="3_visuals"]
+[ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/character/body/character_hands.gd" id="2_hands"]
+[ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/body/character_visuals.gd" id="3_visuals"]
 
 [node name="Character" type="CharacterBody2D"]
 script = ExtResource("1_character")

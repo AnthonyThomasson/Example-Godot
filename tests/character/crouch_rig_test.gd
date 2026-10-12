@@ -5,7 +5,7 @@ extends GameTest
 ## the hips and feet are closer together than standing, the knees lead over the toes, and the bones keep their
 ## length. A standing body has none of this lean.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 const BONE_TOLERANCE := 0.06
 
 

@@ -3,7 +3,7 @@ extends GameTest
 ## A run looks like a run: the feet stride wider than a walk, both arms drop to the sides (a pistol is
 ## carried in its hand rather than aimed), and the pistol cannot be fired until the run stops.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 const WEAPON_HAND := 0
 
 

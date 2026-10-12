@@ -7,7 +7,7 @@ extends RefCounted
 ## end of its stride. Stepped by character.gd after the pose each physics frame; one rig solve per footfall, none
 ## otherwise.
 
-const CharacterRig = preload("res://scenes/character/character_rig.gd")
+const CharacterRig = preload("res://scenes/character/body/character_rig.gd")
 
 ## Below this walk amount (0..1) a shuffle makes no steps.
 const MIN_WALK := 0.2

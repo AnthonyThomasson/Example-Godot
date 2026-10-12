@@ -100,11 +100,11 @@ signal hit_landed(body: Node, damage: float, hand: int)
 ## code like the other components; the character only forwards `try_interact()` and reads
 ## `is_busy()` / `interaction_label()`.
 const CharacterInteraction = preload("res://scenes/interaction/character_interaction.gd")
-const CharacterPose = preload("res://scenes/character/character_pose.gd")
-const CharacterRig = preload("res://scenes/character/character_rig.gd")
-const CharacterRagdoll = preload("res://scenes/character/character_ragdoll.gd")
+const CharacterPose = preload("res://scenes/character/body/character_pose.gd")
+const CharacterRig = preload("res://scenes/character/body/character_rig.gd")
+const CharacterRagdoll = preload("res://scenes/character/body/character_ragdoll.gd")
 const CharacterFootsteps = preload("res://scenes/character/character_footsteps.gd")
-const CharacterLegs = preload("res://scenes/character/character_legs.gd")
+const CharacterLegs = preload("res://scenes/character/body/character_legs.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands

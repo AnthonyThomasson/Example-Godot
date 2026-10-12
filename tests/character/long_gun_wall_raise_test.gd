@@ -4,7 +4,7 @@ extends GameTest
 ## up with the butt still on the shoulder, and cannot fire. The pistol can, point-blank. Backing off lowers the gun
 ## again and it fires. A person standing in front of the barrel is not a wall, and does not stop it.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 
 ## How far a bone may differ from its configured length (fraction), as in the standing-body rig test.
 const BONE_TOLERANCE := 0.06

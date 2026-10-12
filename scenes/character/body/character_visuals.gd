@@ -11,12 +11,12 @@ extends Node2D
 ## only — no item-specific weapon logic lives here (that's each Item's draw_weapon()). Once dead it
 ## draws the fallen ragdoll instead.
 
-const BodyPainter = preload("res://scenes/character/body_painter.gd")
-const HeadPainter = preload("res://scenes/character/head_painter.gd")
-const HandPainter = preload("res://scenes/character/hand_painter.gd")
-const LimbPainter = preload("res://scenes/character/limb_painter.gd")
-const TorsoPainter = preload("res://scenes/character/torso_painter.gd")
-const Rig = preload("res://scenes/character/character_rig.gd")  # The joint indices, shared with the ragdoll.
+const BodyPainter = preload("res://scenes/character/body/body_painter.gd")
+const HeadPainter = preload("res://scenes/character/body/head_painter.gd")
+const HandPainter = preload("res://scenes/character/body/hand_painter.gd")
+const LimbPainter = preload("res://scenes/character/body/limb_painter.gd")
+const TorsoPainter = preload("res://scenes/character/body/torso_painter.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")  # The joint indices, shared with the ragdoll.
 
 @export var body_color: Color = Color(0.32549, 0.65098, 1.0)  ## Shirt color.
 @export var hand_color: Color = Color(0.93, 0.76, 0.6)        ## Hands: skin, or a glove color.

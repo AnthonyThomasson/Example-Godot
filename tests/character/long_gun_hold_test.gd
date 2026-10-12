@@ -6,7 +6,7 @@ extends GameTest
 ## length, and the muzzle sits where the gun's own length says. Drawing the art runs every frame, so any engine
 ## error fails the test too.
 
-const Rig = preload("res://scenes/character/character_rig.gd")
+const Rig = preload("res://scenes/character/body/character_rig.gd")
 
 ## How far a bone may differ from its configured length (fraction), as in the standing-body rig test.
 const BONE_TOLERANCE := 0.06
