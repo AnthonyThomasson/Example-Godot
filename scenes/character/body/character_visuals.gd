@@ -762,12 +762,15 @@ func _trunk_face(rd) -> Dictionary:
 	var ay := _flat(y3)
 	var size: Vector2 = best["size"]
 	var angle := ay.angle() - PI * 0.5 if ay.length() > 0.05 else ax.angle()  # The art's turn.
+	# The art is asked for at whole pixels, as the limbs' is (`_draw_segment`): the spine's length changes a little every frame
+	# as the ragdoll flexes, and a size that is never the same twice paints (and caches) a new texture every frame.
+	var art_size := Vector2(roundf(size.x), roundf(size.y))
 	var tex: Texture2D
 	if best["kind"] == "top":
-		tex = PixelArt.render_turned(BodyPainter, size, body_color, PixelArt.snap_angle(angle), "fabric",
+		tex = PixelArt.render_turned(BodyPainter, art_size, body_color, PixelArt.snap_angle(angle), "fabric",
 			{ "backpack": backpack, "pack": pack_color })
 	else:
-		tex = PixelArt.render_turned(TorsoPainter, size, body_color, PixelArt.snap_angle(angle), "fabric",
+		tex = PixelArt.render_turned(TorsoPainter, art_size, body_color, PixelArt.snap_angle(angle), "fabric",
 			{ "face": best["kind"], "pants": pants_color, "backpack": backpack, "pack": pack_color })
 	return { "texture": tex, "center": _flat(best["centre"]), "x": ax, "y": ay, "size": size }
 

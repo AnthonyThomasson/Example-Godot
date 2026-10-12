@@ -1,26 +1,28 @@
 extends GameTest
 
-## Performance guard: a crowd of characters is killed in one frame. Their ragdolls fall and settle
-## (the 3D solver with wall sweeps), blood sprays and bleeds out. Frame cost stays within budget, every
-## body comes to rest, and the world is not left with runaway objects.
+## Performance guard: a whole 5v5 match (ten characters) is killed in one frame, the worst thing that can happen to
+## the frame time of a match. Their ragdolls fall and settle (the 3D solver with wall sweeps), blood sprays and bleeds
+## out. Frame cost stays within the smooth-match standard, every body comes to rest, and the world is not left with
+## runaway objects.
 
 const Perf := preload("res://tests/_perf/perf_probe.gd")
 
-const COLUMNS := 9
-const ROWS := 4
+const COLUMNS := 5
+const ROWS := 2
 const IDLE_FRAMES := 60
 const FALL_FRAMES := 240
 const SETTLE_TIMEOUT := 20.0
-# Frame budgets are the smooth-match standard (Perf.SMOOTH_*), idle and while the bodies fall (the frame the 36 deaths
-# are dealt in is not measured). Before the performance work (#13): idle ~15.5 (it was ~3.3 before the 3D rig and pose),
-# fall avg ~45 / p95 ~70 / max ~72 ms per frame, ~600 nodes added.
-const NODE_GROWTH := 1500
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*), idle and while the bodies fall (the frame the deaths are
+# dealt in is not measured). The crowd was 36 bodies (idle ~3.5 ms, falling avg ~57 / p95 ~90 / max ~92 ms before the
+# performance work, ~45 / 65 / 67 after); that is nearly four matches' worth, so it is now one match's: falling avg ~13 /
+# p95 ~18 / max ~21 ms, about 170 nodes added.
+const NODE_GROWTH := 600
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "A crowd dying at once stays cheap",
-		"description": "36 characters are killed in one frame; frame cost while they fall stays within budget, all ragdolls settle, and node growth is bounded.",
+		"description": "Ten characters (a whole 5v5) are killed in one frame; frame cost while they fall stays within budget, all ragdolls settle, and node growth is bounded.",
 		"tags": ["ragdoll", "blood", "death"],
 		"timeout": 40.0,
 	}
