@@ -116,7 +116,7 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **Pause and overlays (headed runs):** the banner's **Pause / Resume** (and Space, unless the test has a `player`
   actor, where Space is INTERACT) freezes the world. The runner stays `PROCESS_MODE_ALWAYS`, each `TestWorld` is
   explicitly pausable, and the test clock (`ctx.time`, so waits and the timeout) stops with the tree; the tree is
-  always unpaused on a new test, Back and exit. The overlay bar works on the test's actors; its **Nav holes**
+  always unpaused on a new test, Back and exit. The overlay bar works on the test's actors; its **Navigation holes**
   (a `NavDebug` the `TestWorld` builds and the re-baker keeps current) and **Performance** (the runner's own
   panel) toggles work too.
 - **Locking interactions:** `s.lock_interaction([&"camera", &"pause", &"overlays"])` in `configure` switches off
@@ -411,7 +411,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map answers with this world's region, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |
