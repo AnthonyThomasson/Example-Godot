@@ -22,6 +22,8 @@ const OBSTACLE_MARGIN := 6.0
 const MIN_POLYGON_AREA := 0.5
 ## Segment count approximating a circular furniture footprint as an obstruction polygon.
 const CIRCLE_SEGMENTS := 10
+## Slack (px) around an outline's box when deciding whether two outlines could overlap.
+const BOUNDS_EPSILON := 0.5
 
 
 ## Build and add a NavigationRegion2D under `parent`, covering `rooms` (each `{ key, type, rect }`
@@ -186,20 +188,37 @@ static func _on_grid(outlines: Array) -> Array:
 ## snaps the result to the map's 1 px cell grid. An enclosed gap in a union is filled in.
 static func _union_outlines(outlines: Array) -> Array:
 	var out: Array = []
+	var bounds: Array = []  # out[k]'s bounding box, kept in step with `out`
 	for outline in outlines:
 		var cur: PackedVector2Array = outline
+		var cur_bounds := _outline_bounds(cur)
 		var k := 0
 		while k < out.size():
+			# Separate outlines (boxes apart) cannot fuse: the union would hand back both, as below, so skip the merge.
+			if not cur_bounds.intersects(bounds[k]):
+				k += 1
+				continue
 			var fused := Geometry2D.merge_polygons(cur, out[k])
 			var outer: Array = fused.filter(func(poly: PackedVector2Array) -> bool: return not Geometry2D.is_polygon_clockwise(poly))
 			if outer.size() == 1:
 				cur = outer[0]
+				cur_bounds = _outline_bounds(cur)
 				out.remove_at(k)
+				bounds.remove_at(k)
 				k = 0  # the grown polygon may now touch ones already passed
 			else:
 				k += 1
 		out.append(cur)
+		bounds.append(cur_bounds)
 	return out
+
+
+## The box around `outline`, a hair larger than the polygon so outlines that merely touch still count as overlapping.
+static func _outline_bounds(outline: PackedVector2Array) -> Rect2:
+	var box := Rect2(outline[0], Vector2.ZERO)
+	for p in outline:
+		box = box.expand(p)
+	return box.grow(BOUNDS_EPSILON)
 
 
 ## Every descendant node of `root`, depth-first (so furniture nested under room containers is found).
