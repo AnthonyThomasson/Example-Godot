@@ -34,6 +34,7 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"ai.pursuit", true)
 	s.switch(&"projectile.flyover", false)
 	s.switch(&"nav.rebake", false)  # fighting shoves furniture into overlaps; re-baking is covered by perf/bake_and_path_stress
+	s.switch(&"audio.sound", false)  # first-play synthesis is a one-off the game pre-warms away; sound is costed in perf/match_5v5_stress
 	var kinds := ["bookshelf", "armchair", "side_table", "chair", "plant"]
 	for i in 20:
 		s.object(StringName("deco%d" % i), kinds[i % kinds.size()], Vector2(300 + (i % 5) * 250, 250 + (int(i / 5.0)) * 160))

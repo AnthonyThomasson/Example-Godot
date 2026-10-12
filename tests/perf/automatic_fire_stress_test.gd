@@ -37,6 +37,7 @@ func configure(s: TestSetup) -> void:
 	s.switch(&"projectile.flyover", false)
 	s.switch(&"physics.debris", true)
 	s.switch(&"nav.rebake", false)  # shot pieces can overlap; nav re-baking is covered by perf/bake_and_path_stress
+	s.switch(&"audio.sound", false)  # first-play synthesis is a one-off the game pre-warms away; sound is costed in perf/match_5v5_stress
 	# Magazines big enough that no automatic gun runs dry in the window: the guard is for sustained fire.
 	var deep: Dictionary = MagazineConfig.types.duplicate(true)
 	deep[&"smg_standard"]["capacity"] = 1000

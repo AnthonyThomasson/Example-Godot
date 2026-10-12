@@ -1,9 +1,10 @@
 extends GameTest
 
 ## `Deformation.convex_shapes` cuts a dented silhouette into convex collider pieces by merging triangles
-## (Hertel-Mehlhorn), restarting its scan after every merge. It now remembers the pairs that failed to merge instead
-## of trying them again after each restart. This pins its pieces to the plain restart-everything scan over
-## silhouettes of every shape with up to the most dents a piece keeps.
+## (Hertel-Mehlhorn), restarting its scan after every merge. It finds the neighbouring pieces through an edge map,
+## remembers the pairs that failed to merge, and checks only the two corners where a merge joins. This pins its pieces
+## to the plain scan (every pair after every merge, every corner of the union) over silhouettes of every shape with up
+## to the most dents a piece keeps.
 
 const SEED := 4242
 const SHAPES := ["circle", "square", "rect"]
@@ -11,8 +12,8 @@ const SHAPES := ["circle", "square", "rect"]
 
 func describe() -> Dictionary:
 	return {
-		"name": "Convex collider pieces are the same with failed merges remembered",
-		"description": "Deformation cuts dented silhouettes into the same convex pieces as the scan that retries every pair after each merge.",
+		"name": "Convex collider pieces are the same as the plain scan cuts",
+		"description": "Deformation cuts dented silhouettes into the same convex pieces as the scan that retries every pair after each merge and checks every corner.",
 		"tags": ["deformation", "collider"],
 		"timeout": 30.0,
 	}
@@ -63,7 +64,7 @@ func _every_pair(polygon: PackedVector2Array) -> Array:
 		for a in pieces.size():
 			for b in range(a + 1, pieces.size()):
 				var union := Deformation._merge_across_edge(pieces[a], pieces[b])
-				if union.is_empty() or not Deformation._is_convex_loop(polygon, union, sign_):
+				if union.is_empty() or not _is_convex_loop(polygon, union, sign_):
 					continue
 				pieces[a] = union
 				pieces.remove_at(b)
@@ -72,3 +73,11 @@ func _every_pair(polygon: PackedVector2Array) -> Array:
 			if merged:
 				break
 	return pieces
+
+
+## True when every turn around `loop` goes the polygon's way (`sign_` = +1 / -1), straight allowed.
+func _is_convex_loop(polygon: PackedVector2Array, loop: Array, sign_: float) -> bool:
+	for k in loop.size():
+		if Deformation._turn(polygon, loop[k], loop[(k + 1) % loop.size()], loop[(k + 2) % loop.size()]) * sign_ < 0.0:
+			return false
+	return true

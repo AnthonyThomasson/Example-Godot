@@ -32,15 +32,15 @@ var _now := 0.0
 var _voices: Array = []
 ## Last variant played per profile, so the same one is not repeated back to back.
 var _last_variant: Dictionary = {}
-## Profiles still to pre-render in the background (empty once the library is warm).
-var _warm: Array[StringName] = []
+## `[profile, variant]` pairs still to pre-render in the background (empty once the library is warm).
+var _warm: Array = []
 
 
 func _ready() -> void:
 	_rng.seed = SoundConfig.rng_seed
 	EventBus.posted.connect(_on_posted)
 	if SoundConfig.prewarm and DisplayServer.get_name() != "headless":
-		_warm = SoundBank.profiles()
+		_warm = _library()
 
 
 func _process(delta: float) -> void:
@@ -200,10 +200,30 @@ func _acquire(category: StringName) -> Dictionary:
 	return voice
 
 
+## Every `[profile, variant]` the service can play: the first variant of each profile, then the others. A variant
+## nobody has rendered yet is synthesized when it first plays, a hitch of several frames in the middle of a fight.
+func _library() -> Array:
+	var profiles := SoundBank.profiles()
+	var out: Array = []
+	for profile in profiles:
+		out.append([profile, 0])
+	for profile in profiles:
+		for variant in range(1, _variants_of(profile)):
+			out.append([profile, variant])
+	return out
+
+
+## How many variants `_pick_variant` chooses between for `profile` (its category is the profile id's first part).
+func _variants_of(profile: StringName) -> int:
+	var category := StringName(String(profile).get_slice("/", 0))
+	return maxi(int(SoundConfig.category_variants.get(category, SoundConfig.variants)), 1)
+
+
 ## Render the library a little at a time (a few ms a frame) so no sound hitches the first time it plays.
 func _prewarm() -> void:
 	if _warm.is_empty():
 		return
 	var t0 := Time.get_ticks_usec()
 	while not _warm.is_empty() and (Time.get_ticks_usec() - t0) / 1000.0 < SoundConfig.prewarm_budget_ms:
-		SoundBank.sound(_warm.pop_front(), 0)
+		var next: Array = _warm.pop_front()
+		SoundBank.sound(next[0], next[1])

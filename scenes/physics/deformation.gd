@@ -222,7 +222,10 @@ static func _convex_pieces(polygon: PackedVector2Array) -> Array:
 				if failed.has(pair):
 					continue
 				var union := _merge_across_edge(pieces[a], pieces[b])
-				if union.is_empty() or not _is_convex_loop(polygon, union, sign_):
+				# Both pieces are convex already, so only the two corners where they now join can turn the wrong way:
+				# the union's first vertex and the one ending piece a's run (see _merge_across_edge).
+				if union.is_empty() or not (_turns_right_at(polygon, union, 0, sign_)
+						and _turns_right_at(polygon, union, pieces[a].size() - 1, sign_)):
 					failed[pair] = true
 					continue
 				_own_edges(owner, pieces[a], ids[a], count, false)
@@ -275,12 +278,13 @@ static func _merge_across_edge(a: Array, b: Array) -> Array:
 	return []
 
 
-## True when every turn around `loop` goes the polygon's way (`sign_` = +1 / -1), straight allowed.
-static func _is_convex_loop(polygon: PackedVector2Array, loop: Array, sign_: float) -> bool:
-	for k in loop.size():
-		if _turn(polygon, loop[k], loop[(k + 1) % loop.size()], loop[(k + 2) % loop.size()]) * sign_ < 0.0:
-			return false
-	return true
+## True when `loop` turns the polygon's way (`sign_` = +1 / -1, straight allowed) at its vertex number `at`.
+static func _turns_right_at(polygon: PackedVector2Array, loop: Array, at: int, sign_: float) -> bool:
+	var n := loop.size()
+	var a: Vector2 = polygon[loop[(at - 1 + n) % n]]
+	var b: Vector2 = polygon[loop[at]]
+	var c: Vector2 = polygon[loop[(at + 1) % n]]
+	return not ((b - a).cross(c - b) * sign_ < 0.0)
 
 
 ## Draw a deformed primitive shape (furniture, characters): filled polygon (darkened by
