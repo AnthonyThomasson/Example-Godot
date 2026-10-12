@@ -255,7 +255,7 @@ for x in ${args[@]+"${args[@]}"}; do
   case "$x" in --list|--self-test|--play) LINT=0 ;; esac
 done
 # The same sources lint the same: the fingerprint of the last clean lint (HEAD plus every uncommitted change,
-# the way tools/stop_hook_tests.sh fingerprints) is kept in $LINT_OK, and a run on an identical tree skips the
+# the way tools/stop_hook_checks.sh fingerprints) is kept in $LINT_OK, and a run on an identical tree skips the
 # ~4 s. Any edit, new file or new commit changes it, so the lint still runs before every first test run.
 lint_fingerprint() {
   { git rev-parse HEAD; git diff HEAD; git ls-files --others --exclude-standard | while read -r f; do echo "$f"; shasum "$f"; done; } \
