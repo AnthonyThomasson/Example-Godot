@@ -1,0 +1,12 @@
+{
+  "name": "enter: an unsearched room near beats an unexplored one far",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the kitchen, inside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH → ENTER.",
+  "question": "Which doorway should you go through? Prefer the shortest route.",
+  "options": {
+    "door_480_150": "the doorway into the living room — unsearched — short route",
+    "door_690_360": "the doorway to the south — unexplored — long route"
+  },
+  "expect": [
+    "door_480_150"
+  ]
+}

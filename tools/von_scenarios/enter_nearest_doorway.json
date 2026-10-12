@@ -1,0 +1,16 @@
+{
+  "name": "enter: two doorways into unexplored rooms -> the nearer one",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH → ENTER.",
+  "question": "Which doorway should you go through? Prefer the shortest route.",
+  "options": {
+    "door_840_190": "the doorway to the south-west — unexplored — short route",
+    "door_0_415": "the doorway to the west — unexplored — long route"
+  },
+  "expect": [
+    "door_840_190"
+  ],
+  "ablate": [
+    "short route",
+    "long route"
+  ]
+}
