@@ -53,8 +53,10 @@ find scenes -name '*.gd' -exec wc -l {} + | sort -rn | sed -n 2,16p   # the larg
 ```
 
 Read the `domain-<folder>/SKILL.md` for each domain as you reach it — don't load all fourteen up
-front. The AI domain is split into sub-domains, each with its own `domain-ai-<sub>` skill plus the
-`domain-ai` overview; treat its sub-domain boundaries exactly as seriously as the top-level ones.
+front. Domains that have been split into sub-domains keep an overview skill plus one `domain-<domain>-<sub>` skill per
+sub-domain (`ai/*`, `physics/blood/`, `character/body/`, `ui/*`, `perception/snapshot/`, `behavior/combat.gd`,
+`behavior/search_coverage.gd`; the composition root is `domain-main`); treat their boundaries exactly as seriously as
+the top-level ones.
 
 `tools/audit_scan.py` holds the mechanical detectors used below (`deps`, `dead`, `signals`,
 `facts`; `all` runs them together). It reads files only — no Godot needed.
@@ -219,8 +221,12 @@ like a cross-domain one.
 
 A concern earns its own module when **its complexity bleeds into several others**, or when one
 folder has grown a second, unrelated responsibility. This is how `interaction/` and `ai/` came to
-exist, how `ai/` then split internally into four sub-domains around a thin orchestrator, and how
-`objects/` and `worldgen/` came by their `art/ wall/ floor/` and `categories/` sub-folders.
+exist, how `ai/` then split internally into four sub-domains around a thin orchestrator, how `objects/` and
+`worldgen/` came by their `art/ wall/ floor/` and `categories/` sub-folders, and how `physics/blood/`,
+`character/body/`, `ui/{menus,hud,overlays,testing}/` and `ai/perception/snapshot/` were cut out later. Prefer a seam where
+the extracted piece owns the state it mutates (a back-reference into the parent's private fields means the seam is wrong);
+note that a new script that changes which script loads first can make the headless load check print exit-time
+leak errors (see `godot-debug`).
 
 Produce numbers first — the Step 0 table plus, for every domain over ~1,500 lines or ~15 files, the
 files grouped by what they are about. Signals to weigh:
@@ -235,6 +241,11 @@ files grouped by what they are about. Signals to weigh:
 
 Judge by **coupling and responsibility, not line count** — `worldgen/` is large but cohesive, and a
 big folder with one job is healthy.
+
+**A split comes with its own skill.** Cut the matching detail out of the parent skill into a new
+`domain-<parent>-<sub>` skill (frontmatter `name` = the folder, a trigger-rich `description`), leave the parent an overview and a
+one-line pointer per child, and list the child in the `architecture` domain table. A split without its skill leaves the parent
+describing two things.
 
 For every split you recommend, be concrete: the proposed sub-folder name(s), which files move, what
 the new module owns, and the one interface the rest of the codebase keeps talking to it through

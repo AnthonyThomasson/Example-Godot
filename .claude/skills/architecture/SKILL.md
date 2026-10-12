@@ -13,7 +13,9 @@ organized into **fourteen isolated domains** so each can be changed on its own.
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
 through the interfaces listed here. **When working *inside* a domain, also load its
-`domain-<name>` skill** — that is where the deep implementation detail lives.
+`domain-<name>` skill** — that is where the deep implementation detail lives. A domain that has been split into
+sub-domains keeps a short overview skill and one `domain-<domain>-<sub>` skill per sub-domain (listed in the table below); the
+composition root is `domain-main`.
 
 ## The fourteen domains (one folder each under `scenes/`)
 
@@ -31,29 +33,15 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
-| **AI** | `ai/` | `domain-ai` | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
+| **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
-(interface 13), the only code that knows every domain. It asks World-Gen for a house and holds the
-player; the setup window's **Tests** button sends it to the test browser instead. After the NPCs are placed it
-arms the player and every NPC with its side's loadout (`LoadoutConfig.apply`: a chosen gun, or by default one random gun
-drawn from an RNG seeded by the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting
-placement) through `Character.set_loadout`; tests and sandboxes never come through there and keep the weapon they ask for.
-`project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General) and `Sound` (Audio).
-
-The setup window offers **Start** (a human joins the chosen side, on top of its NPC count, with the side's loadout
-and faction), **Watch** (AIs alone) and **Endless** (AIs alone; 5 s after each match ends — the MatchHUD's
-`match_ended` — Main frees its `World` node and builds a fresh match with a new seed, random counts up to the chosen
-ones and random loadouts; an undecided match is called a draw after `endless_time_limit`). Everything one match
-builds lives under Main's `World` node so it can be freed in place; weapon choices come from the Items domain's
-`LoadoutConfig` (Main hands the UI plain dicts and arms each character with `LoadoutConfig.apply` → `Character.set_loadout`; the choices are Random or any gun in `GunConfig`).
-
-On a fresh launch Main opens the UI setup window and builds nothing until a start button is pressed, then **awaits the
-AI domain's `DecisionServerLauncher.resolved(live)`** before `_spawn_world()`, so no NPC makes its
-first decision against a still-booting Von server. That launcher is a root node of `main.tscn`, so
-it begins probing/launching at scene load and usually resolves while the window is still open (no
-delay); it always resolves, so a run with no server still starts, with NPCs that hold steady.
+(interface 13), the only code that knows every domain. It asks World-Gen for a house, places the NPCs (`scenes/match_spawner.gd`),
+arms every character with its side's loadout and wires the HUDs, overlays and settings page; the setup window's **Tests** button
+sends it to the test browser instead. Match lifecycle (Start / Watch / Endless, teardown, the Von-server wait), the placement rules and
+the exports are the **`domain-main`** skill. `project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General) and
+`Sound` (Audio).
 
 ## The vital interfaces (this is the whole cross-domain surface)
 
@@ -73,11 +61,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
 	 `WorldGen.wall_style() -> Dictionary` (the house wall `style` for `WallFactory.spawn`).
-   `main.gd` positions the front entrance, fixes draw order, builds the nav map from the rooms
-   (interface 9), drops the defender NPC at a clear spot in a random room (its centre unless solid
-   furniture or another defender is within `spawn_clearance` — read off `NavBuilder.furniture_holes` —
-   else a random clear point) and the invader NPC just outside the house (all via `get_rooms`); it never touches
-   world-gen internals.
+   `main.gd` positions the front entrance, fixes draw order and builds the nav map from the rooms (interface 9); its
+   `match_spawner.gd` drops each defender at a clear spot in a random room (its centre unless solid furniture or another
+   combatant is within `spawn_clearance` — read off `NavBuilder.furniture_holes` — else a random clear point) and each invader
+   just outside the house (all via `get_rooms`); it never touches world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
    - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`

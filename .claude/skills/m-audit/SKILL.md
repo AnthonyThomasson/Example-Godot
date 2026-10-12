@@ -45,11 +45,14 @@ Also read the `domain-<folder>/SKILL.md` for **every domain the diff touches** (
 `scenes/<folder>/…` file to `.claude/skills/domain-<folder>/SKILL.md`). That skill is the deep
 detail for the domain, and the change must leave it true (Step 3).
 
-The **AI domain is split into sub-domains** under `scenes/ai/`, each with its own skill: map a changed
-`scenes/ai/<sub>/…` file to `.claude/skills/domain-ai-<sub>/SKILL.md` (e.g. `scenes/ai/behavior/…` →
-`domain-ai-behavior`), and a change to `scenes/ai/goal_controller.gd` (the orchestrator) or to the
-set/role of sub-domains to the `domain-ai` overview. Keep both the touched sub-skill and the overview
-true. A cross-sub-domain coupling that doesn't flow through the published sub-domain interfaces is an
+**Sub-domains have their own skills.** A domain's sub-folder or extracted module that has a skill maps to
+`.claude/skills/domain-<domain>-<sub>/SKILL.md`: `ai/{perception,decision,behavior,debug}/` → `domain-ai-<sub>`
+(plus `perception/snapshot/` + `agent_snapshot.gd` → `domain-ai-snapshot`, `behavior/combat.gd` → `domain-ai-combat`,
+`behavior/search_coverage.gd` → `domain-ai-coverage`), `physics/blood/` → `domain-physics-blood`, `character/body/` →
+`domain-character-body`, `ui/{menus,hud,overlays,testing}/` → `domain-ui-<folder>`, and `scenes/main.gd` /
+`match_spawner.gd` → `domain-main`. A change to the parent (`goal_controller.gd`, `character.gd`, the set or role of
+sub-domains) goes to the parent skill (`domain-ai` overview, `domain-character`, …). Keep both the touched sub-skill and its
+parent true. A cross-sub-domain coupling that doesn't flow through the published sub-domain interfaces is an
 isolation issue, flagged the same as cross-domain coupling.
 
 ## Step 1 — Domain isolation (highest priority)

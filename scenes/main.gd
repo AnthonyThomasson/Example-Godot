@@ -63,10 +63,8 @@ extends Node2D
 ## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
 @export var show_nav_holes: bool = false
 
-## The house defender, dropped into one of the generated rooms.
-const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
-## The house invader, dropped just outside the house. Same AI, different data.
-const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
+## NPC placement for one match (where defenders and invaders start; see match_spawner.gd).
+const MATCH_SPAWNER := preload("res://scenes/match_spawner.gd")
 ## Faction tags the two NPC scenes carry (authored on the scenes); a human joining a side takes its tag
 ## so that side's NPCs treat them as an ally.
 const DEFENDER_FACTION := &"household"
@@ -107,8 +105,8 @@ var _endless: bool = false
 var _endless_max := { "defenders": 1, "invaders": 1 }
 ## Endless run: seconds left until the next match (-1 while a match is being played).
 var _next_match_in: float = -1.0
-## Every NPC spawned this run, in spawn order — the spectator camera + match HUD observe these.
-var _combatants: Array = []
+## Places this match's NPCs and keeps the list of them (`combatants`) — the spectator camera + match HUD observe it.
+var _spawner: RefCounted = null
 ## Every debug overlay's on/off state, `{ show_<x>: bool }` keyed like `overlay_registry.gd`.
 var _overlay_flags: Dictionary = {}
 ## The spectator inspector (spectator mode only), told of live toggles so the selected NPC follows them.
@@ -340,6 +338,10 @@ func _spawn_world() -> void:
 	_world.name = "World"
 	_world.add_to_group(&"match_world")  # how the dev command server finds the match's nodes
 	add_child(_world)
+	_spawner = MATCH_SPAWNER.new()
+	_spawner.world = _world
+	_spawner.spawn_clearance = spawn_clearance
+	_spawner.invader_margin = invader_margin
 	var front_entrance := _anchor + Vector2(0, -entrance_distance)
 	var house := WorldGen.generate(house_seed, force_plan, front_entrance, _world)
 	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
@@ -363,10 +365,10 @@ func _spawn_world() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed
 	for i in defender_count:
-		_spawn_defender(rooms, rng, i)
+		_spawner.spawn_defender(rooms, rng, i)
 	for i in invader_count:
-		_spawn_invader(rooms, rng, i, invader_count, front_entrance)
-	var combatants := _combatants.filter(func(c): return is_instance_valid(c))
+		_spawner.spawn_invader(rooms, rng, i, invader_count, front_entrance)
+	var combatants: Array = _spawner.combatants.filter(func(c): return is_instance_valid(c))
 	if not spectator_mode and is_instance_valid(_player):
 		_join_player(rooms, rng)
 		combatants.append(_player)
@@ -405,7 +407,7 @@ func _teardown_world() -> void:
 		remove_child(_world)
 		_world.queue_free()
 	_world = null
-	_combatants.clear()
+	_spawner = null
 	_inspector = null
 	_nav_debug = null
 
@@ -453,7 +455,7 @@ func _join_player(rooms: Array, rng: RandomNumberGenerator) -> void:
 	var defending := player_side == &"defender"
 	_player.set("faction", DEFENDER_FACTION if defending else INVADER_FACTION)
 	if defending and not rooms.is_empty():
-		_player.global_position = _clear_spot(rooms[rng.randi() % rooms.size()]["rect"], rng)
+		_player.global_position = _spawner.clear_spot(rooms[rng.randi() % rooms.size()]["rect"], rng)
 	_player.reparent(_world, true)
 	_world.move_child(_player, 1)  # just above the house (child 0), below the NPCs
 
@@ -518,117 +520,6 @@ func _random_count(rng: RandomNumberGenerator, most: int) -> int:
 	return 0 if most <= 0 else rng.randi_range(1, most)
 
 
-## Drop defender number `index` at a clear spot (`_clear_spot`) in a random room. `rng` is seeded from
-## `house_seed` so a pinned layout also pins the NPCs. Added after the house, so it draws above it. `rooms`
-## is WorldGen.get_rooms(house), already fetched by the caller.
-func _spawn_defender(rooms: Array, rng: RandomNumberGenerator, index: int) -> void:
-	if rooms.is_empty():
-		return
-	var room: Dictionary = rooms[rng.randi() % rooms.size()]
-	_add_npc(DEFENDER_SCENE, _npc_name("Defender", index), _clear_spot(room["rect"], rng), rooms)
-
-
-## Random points tried in a room, after its centre, before `_clear_spot` gives up.
-const SPAWN_TRIES := 32
-
-
-## Where a character can be dropped in room `rect`: its centre when clear, else the first clear point of
-## SPAWN_TRIES drawn from `rng` (inset from the walls). Clear = at least `spawn_clearance` from every solid
-## furniture footprint (Navigation's `furniture_holes`, read off the shapes, so it is right on the frame the
-## house is built) and twice that from every combatant already placed. The centre when nothing is clear.
-func _clear_spot(rect: Rect2, rng: RandomNumberGenerator) -> Vector2:
-	var holes := NavBuilder.furniture_holes(_world)
-	var taken: Array = []
-	for c in _combatants:
-		if is_instance_valid(c):
-			taken.append((c as Node2D).global_position)
-	var centre := rect.get_center()
-	if _is_clear(centre, holes, taken):
-		return centre
-	var inner := rect.grow(-spawn_clearance * 2.0)
-	if inner.size.x > 0.0 and inner.size.y > 0.0:
-		for i in SPAWN_TRIES:
-			var p := inner.position + Vector2(rng.randf(), rng.randf()) * inner.size
-			if _is_clear(p, holes, taken):
-				return p
-	GameLog.say("No clear spawn spot in the room at %s; using its centre" % centre)
-	return centre
-
-
-## Whether `p` keeps `spawn_clearance` from every footprint in `holes` and twice that from every point in `taken`.
-func _is_clear(p: Vector2, holes: Array, taken: Array) -> bool:
-	for q in taken:
-		if p.distance_to(q) < spawn_clearance * 2.0:
-			return false
-	for poly: PackedVector2Array in holes:
-		if Geometry2D.is_point_in_polygon(p, poly):
-			return false
-		for i in poly.size():
-			if Geometry2D.get_closest_point_to_segment(p, poly[i], poly[(i + 1) % poly.size()]).distance_to(p) < spawn_clearance:
-				return false
-	return true
-
-
-## Drop invader number `index` (of `count`) just outside the house (the rooms' bounding box),
-## `invader_margin` px out. Invaders are spread evenly around the perimeter (one even fraction per
-## index, plus a little jitter) so several attackers start on different sides and flank a shared
-## target rather than stacking on one side. `front_entrance_world` is injected so the controller heads
-## straight for the entrance rather than circling.
-func _spawn_invader(rooms: Array, rng: RandomNumberGenerator, index: int, count: int, front_entrance_world: Vector2) -> void:
-	if rooms.is_empty():
-		return
-	var bounds: Rect2 = rooms[0]["rect"]
-	for room in rooms:
-		bounds = bounds.merge(room["rect"])
-	bounds = bounds.grow(invader_margin)
-	var frac := fposmod((index + 0.5) / maxi(count, 1) + rng.randf_range(-0.05, 0.05), 1.0)
-	_add_npc(INVADER_SCENE, _npc_name("Invader", index), _perimeter_point(bounds, frac), rooms, front_entrance_world)
-
-
-## A point at fraction `frac` (0..1, clockwise from the top-left) around the perimeter of `rect`.
-func _perimeter_point(rect: Rect2, frac: float) -> Vector2:
-	var d := frac * 4.0  # Four equal sides.
-	if d < 1.0:
-		return Vector2(lerpf(rect.position.x, rect.end.x, d), rect.position.y)          # top
-	elif d < 2.0:
-		return Vector2(rect.end.x, lerpf(rect.position.y, rect.end.y, d - 1.0))         # right
-	elif d < 3.0:
-		return Vector2(lerpf(rect.end.x, rect.position.x, d - 2.0), rect.end.y)         # bottom
-	return Vector2(rect.position.x, lerpf(rect.end.y, rect.position.y, d - 3.0))        # left
-
-
-## The node name for NPC `index` of a kind: the plain base for the first (so existing tooling that
-## addresses "Defender"/"Invader" keeps working), then "<base> 2", "<base> 3", … for the rest.
-func _npc_name(base: String, index: int) -> String:
-	return base if index == 0 else "%s %d" % [base, index + 1]
-
-
-## Instance an NPC scene named `npc_name` at `pos`, hand its controller the house's rooms and optional
-## entry point, and record it as a combatant (for the spectator camera + match HUD). It joins the `World`
-## node; `_arm_characters` gives it its weapon afterwards.
-func _add_npc(scene: PackedScene, npc_name: String, pos: Vector2, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
-	var npc := scene.instantiate()
-	npc.name = npc_name
-	_world.add_child(npc)
-	npc.global_position = pos
-	_bind_npc(npc, rooms, entry_point)
-	_combatants.append(npc)
-
-
-## Wire an NPC's controller to the world: hand it the house's `rooms` (world-space rects) and,
-## when given, an `entry_point` the NPC heads for first while outside all rooms. Found by the same
-## `control` duck-type the character uses to pick its controller — so Main doesn't depend on the
-## controller's node name. This keeps the World-Gen boundary in Main: the AI never calls WorldGen.
-func _bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
-	for child in npc.get_children():
-		if child.has_method("control"):
-			if "rooms" in child:
-				child.rooms = rooms
-			if "entry_point" in child and entry_point != Vector2.ZERO:
-				child.entry_point = entry_point
-			return
-
-
 ## The overlays' starting state: each registry default, overridden by the Main exports that name an
 ## overlay (labels / paths / vision / tactics / room zones / search / furniture holes).
 func _initial_overlays() -> Dictionary:
@@ -650,7 +541,9 @@ func _initial_overlays() -> Dictionary:
 ## doesn't depend on the debug nodes' class or path — any NPC child with a matching `show_<x>` property
 ## gets that flag's value. (In spectator mode the inspector then shows them only on the selected NPC.)
 func _configure_debug() -> void:
-	for npc in _combatants:
+	if _spawner == null:
+		return
+	for npc in _spawner.combatants:
 		for child in npc.get_children():
 			for flag in _overlay_flags:
 				if not OVERLAY_REGISTRY.is_global(flag) and flag in child:

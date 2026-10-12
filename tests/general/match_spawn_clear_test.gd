@@ -4,9 +4,9 @@ extends GameTest
 ## another defender. World-gen puts a free-standing piece (a bed, an island, a table) at a room's dead centre
 ## first, so a defender dropped at the centre used to spawn inside it; the first physics step ejected the
 ## piece, which handed its momentum back and flung the defender across the map (seen most in endless runs).
-## Runs Main's own spawn helper on a Main that never enters the tree, like match_setup_test.
+## Runs the match spawner (the placement helper `main.gd` uses) on the test's own world.
 
-const MainScript := preload("res://scenes/main.gd")
+const MatchSpawner := preload("res://scenes/match_spawner.gd")
 ## A seed whose bedroom has a solid piece over its centre (checked below, so a world-gen change that moves
 ## it fails loudly instead of quietly testing nothing).
 const SEED := 1
@@ -45,15 +45,14 @@ func run(t: TestContext) -> void:
 			"precondition: a solid piece covers the %s's centre (pick another SEED if world-gen changed)" % ROOM):
 		return
 
-	var main = MainScript.new()
-	main._world = t.world
+	var spawner = MatchSpawner.new()
+	spawner.world = t.world
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
-	main._spawn_defender([room], rng, 0)
-	main._spawn_defender([room], rng, 1)
-	var npcs: Array = main._combatants.duplicate()
+	spawner.spawn_defender([room], rng, 0)
+	spawner.spawn_defender([room], rng, 1)
+	var npcs: Array = spawner.combatants.duplicate()
 	if not t.require(npcs.size() == 2, "two defenders spawned"):
-		main.free()
 		return
 	var starts: Array = npcs.map(func(n): return (n as Node2D).global_position)
 	for i in npcs.size():
@@ -69,7 +68,6 @@ func run(t: TestContext) -> void:
 	for i in npcs.size():
 		var drift: float = (npcs[i] as Node2D).global_position.distance_to(starts[i])
 		t.check(drift <= MAX_DRIFT, "defender %d stays where it started (moved %.0f px)" % [i + 1, drift])
-	main.free()
 
 
 ## The index of the first footprint in `holes` that `p` lies inside or within `clearance` of, else -1.
