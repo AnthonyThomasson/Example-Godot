@@ -105,12 +105,14 @@ func npc_name(base: String, index: int) -> String:
 
 ## Instance an NPC scene named `node_name` at `pos`, hand its controller the house's rooms and optional
 ## entry point, and record it as a combatant (for the spectator camera + match HUD). It joins the `World`
-## node; `_arm_characters` gives it its weapon afterwards.
+## node; `_arm_characters` gives it its weapon afterwards. It is positioned BEFORE it joins the tree: a body
+## added at the world origin and moved afterwards overlaps whatever stands there for a moment, and the
+## physics launches that piece (or the NPC) across the map.
 func add_npc(scene: PackedScene, node_name: String, pos: Vector2, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
 	var npc := scene.instantiate()
 	npc.name = node_name
+	npc.position = world.to_local(pos)
 	world.add_child(npc)
-	npc.global_position = pos
 	bind_npc(npc, rooms, entry_point)
 	combatants.append(npc)
 

@@ -1,15 +1,13 @@
 ---
-name: m-fix
-description: Fix a bug the user describes by first reproducing it as a failing game test, then fixing the code until it passes. Manual-only — run as `/m-fix <description of what is going wrong>`.
+name: fix
+description: Fix a bug by first reproducing it as a failing game test, then fixing the code until it passes. Use whenever asked to fix a bug or work a ticket labelled `bug` (via `ticket-bug`), or run as `/fix <description of what is going wrong>`.
 argument-hint: <description of what is going wrong>
-disable-model-invocation: true
-model: opus
 effort: high
 ---
 
 # Fix: reproduce with a test, then fix
 
-The bug, as the user described it: **$ARGUMENTS**
+The bug, as described (by the user or the ticket): **$ARGUMENTS**
 
 If that is empty, or too vague to tell expected from actual behaviour, ask one concise question
 before doing anything else.
