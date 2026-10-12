@@ -183,6 +183,33 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 ## Seconds a heard callout stays current.
 @export var callout_ttl: float = 6.0
 
+@export_group("Entry")
+## Tactical entry (`docs/tactical-entry.md`): offer doorways into rooms left to search as an ENTER tactic, carried
+## out as a team or alone — stack beside the door, slice the pie, cross without stopping, take the corners, clear.
+@export var entry_enabled: bool = false
+## Seconds the point waits at the door, once in its slot, for the rest of the stack before going in without them.
+@export var entry_ready_timeout: float = 6.0
+## Seconds a follower leaves after the member ahead of it is through, so the stack crosses one at a time.
+@export var entry_follow_gap: float = 0.3
+## Distance (px) between neighbouring stack slots along the wall: a body's width and a little.
+@export var entry_stack_spacing: float = 34.0
+## Distance (px) of a stack slot off the wall's centreline.
+@export var entry_wall_standoff: float = 28.0
+## Distance (px) from the threshold of the arc the point slices the pie from.
+@export var entry_pie_radius: float = 100.0
+## Angle steps on that arc.
+@export var entry_pie_steps: int = 5
+## Seconds the point looks through the door from each step of the arc.
+@export var entry_pie_dwell: float = 0.35
+## Inset (px) of a corner point from the room's walls: where an entrant stops in a corner.
+@export var entry_corner_inset: float = 40.0
+## Seconds an entrant holds its corner, looking across the room, before it clears the rest by sight.
+@export var entry_corner_dwell: float = 0.6
+## Seconds the last of a team holds the doorway it came in by, facing back out, once the room is clear.
+@export var rear_security_time: float = 10.0
+## Safety cap (s) on reaching the stack: an entrant that cannot get to its slot in this time gives up its claim.
+@export var entry_approach_time: float = 20.0
+
 @export_group("Vision")
 ## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
 @export var vision_enabled: bool = true
@@ -241,6 +268,8 @@ var rooms: Array = []
 ## The house entrance in world space, injected by Main for NPCs that start outside. Handed to the
 ## perception once (it offers "the front entrance" as a search option while outside).
 var entry_point: Vector2 = Vector2.ZERO
+## The house's doorways (`{ pos, width, front, exit, rooms }`) from Main, for tactical entry.
+var openings: Array = []
 
 var _perception: Node ## SENSE sub-domain: knowledge, the decision snapshot, combat geometry.
 var _client: Node ## THINK transport: the Von round-trip (decision/decision_client.gd).
@@ -345,6 +374,12 @@ func _apply_config() -> void:
 	_perception.fire_spot_distances = fire_spot_distances
 	_perception.callout_range = callout_range
 	_perception.callout_ttl = callout_ttl
+	_perception.entry_enabled = entry_enabled
+	_perception.entry_stack_spacing = entry_stack_spacing
+	_perception.entry_wall_standoff = entry_wall_standoff
+	_perception.entry_pie_radius = entry_pie_radius
+	_perception.entry_pie_steps = entry_pie_steps
+	_perception.entry_corner_inset = entry_corner_inset
 	_perception.apply_config()
 	# The pursuit/territory primitives become planner config: pursuit disables IDLE and starts a walk at
 	# COMBAT once a hostile is known; territory confines combat options inside the house.
@@ -385,6 +420,12 @@ func _apply_config() -> void:
 	_behavior.posture_dwell = posture_dwell
 	_behavior.run_min_distance = run_min_distance
 	_behavior.run_start_fraction = run_start_fraction
+	_behavior.entry_ready_timeout = entry_ready_timeout
+	_behavior.entry_follow_gap = entry_follow_gap
+	_behavior.entry_pie_dwell = entry_pie_dwell
+	_behavior.entry_corner_dwell = entry_corner_dwell
+	_behavior.rear_security_time = rear_security_time
+	_behavior.entry_approach_time = entry_approach_time
 	_behavior.apply_config()
 
 
@@ -453,6 +494,13 @@ func debug_room_zones() -> Array:
 	if _character == null or _perception == null:
 		return []
 	return _perception.room_status(rooms, _character.global_position)
+
+
+## Read-only: the running tactical entry — the doorway (`opening`, `into`), the NPC's stack `slot` and `side`,
+## whether it is going `solo`, its `phase`, what the pie saw (`seen_fraction`, `pie_sides`, `hidden_corners`), its
+## `corner` and `stack_point`. Empty when the NPC isn't entering a room.
+func debug_entry() -> Dictionary:
+	return _behavior.debug_entry() if _behavior != null else {}
 
 
 ## Read-only: the behaviour's running search-coverage state (which room sample points it has seen vs.
@@ -551,6 +599,7 @@ func control(character, delta: float) -> void:
 	_decide_timer -= delta
 	# SENSE.
 	_process_events(character)
+	_perception.openings = openings
 	_perception.observe(character, rooms)
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
@@ -576,6 +625,9 @@ func control(character, delta: float) -> void:
 		_start_decision(character)
 	# ACT.
 	_behavior.apply(character, delta)
+	for step in _behavior.take_entry_calls():
+		if send_callouts:
+			_post_entry_call(step)
 
 
 ## Raise the force-decide flag and remember why, for the brain debug overlay.
@@ -585,9 +637,12 @@ func _force_now(reason: String) -> void:
 	_force_ms = Time.get_ticks_msec()
 
 
-## Whether a new decision may start now: always when forced; otherwise the behaviour decides whether
-## its current commitment still holds (a fight, a move, an approach) or the decide cadence has elapsed.
+## Whether a new decision may start now: never while crossing a doorway (a forced one waits until the NPC is
+## through); always when forced; otherwise the behaviour decides whether its current commitment still holds (a
+## fight, a move, an approach) or the decide cadence has elapsed.
 func _should_decide() -> bool:
+	if _behavior.committed():
+		return false
 	if _force:
 		return true
 	return _behavior.wants_decision(_character, _decide_timer <= 0.0)
@@ -660,16 +715,7 @@ func _on_decided(leaf: Dictionary) -> void:
 ## where, its state, the decision path, its target and destination. Allies within range hear it.
 func _post_callout(leaf: Dictionary) -> void:
 	var params: Dictionary = leaf["params"]
-	var status: Array = []
-	if _perception.under_fire():
-		status.append("under fire")
-	var dmg: float = _character.damage_taken()
-	if dmg >= _perception.critical_threshold:
-		status.append("badly wounded")
-	elif dmg >= _perception.hurt_threshold:
-		status.append("hurt")
-	if leaf["primitive"] == &"reload" or _character.is_reloading():
-		status.append("reloading")
+	var status := _status(leaf["primitive"] == &"reload")
 	_last_callout = { "position": _character.global_position, "point": params.get("point", _character.global_position),
 		"label": " - ".join(leaf["labels"]), "at": Time.get_ticks_msec() }
 	EventBus.post(&"callout", {
@@ -682,6 +728,49 @@ func _post_callout(leaf: Dictionary) -> void:
 		"target_id": params.get("target_id", 0),
 		"point": params.get("point", _character.global_position),
 	})
+
+
+## Radio one step of a tactical entry (`{ step, opening, slot, side, cleared_room? }` from the behaviour) as an
+## `&"callout"`: the usual fields plus `opening`, `slot`, `side` and `entry_step` (claim / ready / going_in / in /
+## clear / rear / abort), and `cleared_room` with a clear. It is how the stack claims slots, waits for the team and
+## crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
+func _post_entry_call(step: Dictionary) -> void:
+	var status := _status(false)
+	if step["step"] == "going_in":
+		status.push_front("going in")
+	var labels: String = _behavior.path_label()
+	_last_callout = { "position": _character.global_position, "point": _character.global_position,
+		"label": "%s (%s)" % [labels, String(step["step"]).replace("_", " ")], "at": Time.get_ticks_msec() }
+	EventBus.post(&"callout", {
+		"speaker": _character,
+		"faction": _character.faction,
+		"position": _character.global_position,
+		"status": ", ".join(status),
+		"path": _behavior.current_act(),
+		"label": labels,
+		"target_id": 0,
+		"point": _character.global_position,
+		"opening": step["opening"],
+		"slot": step["slot"],
+		"side": step["side"],
+		"entry_step": step["step"],
+		"cleared_room": step.get("cleared_room", ""),
+	})
+
+
+## The speaker's state for a callout: under fire, wounded, reloading.
+func _status(reloading: bool) -> Array:
+	var status: Array = []
+	if _perception.under_fire():
+		status.append("under fire")
+	var dmg: float = _character.damage_taken()
+	if dmg >= _perception.critical_threshold:
+		status.append("badly wounded")
+	elif dmg >= _perception.hurt_threshold:
+		status.append("hurt")
+	if reloading or _character.is_reloading():
+		status.append("reloading")
+	return status
 
 
 ## The driven character's name, for log lines.

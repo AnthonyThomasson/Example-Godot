@@ -7,18 +7,21 @@ extends RefCounted
 ## (`know`, set by `AgentSnapshot.build()`). `agent_snapshot.gd` calls it from `build()`.
 
 const SnapshotVocab = preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
+const AgentEntry = preload("res://scenes/ai/perception/agent_entry.gd")
 
 var know := {}            ## The knowledge the perception hands in for this decision (see `AgentSnapshot.build()`).
 var _v: SnapshotVocab  ## The shared vocabulary and tuning; see snapshot_vocab.gd.
 var _memory: RefCounted   ## The agent's event memory (read-only here); see agent_memory.gd.
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
+var _entry: RefCounted    ## The doorway geometry; see agent_entry.gd.
 
 
 ## Capture the collaborators the groups read. Called once by `AgentSnapshot.setup()`.
-func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted) -> void:
+func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted, entry: RefCounted) -> void:
 	_v = vocab
 	_memory = memory
 	_tactics = tactics
+	_entry = entry
 
 
 ## Whether the NPC is currently under fire (a recent incoming/nearby hit) — a read of the memory the perception folds hits into.
@@ -303,14 +306,15 @@ func shooter_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 
 
 ## Which known room to search next: not-recently-searched first, then nearest; plus the entrance or
-## the house itself while outside.
-func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary:
+## the house itself while outside. With doorways to enter by (`entered`: the keys of the rooms they lead into), those
+## rooms and the front entrance are left to ENTER.
+func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array, entered := {}) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
 	var here := SnapshotVocab.room_at(self_pos, rooms)
 	var candidates: Array = []
 	var unsearched := 0
 	for room in known_rooms:
-		if not here.is_empty() and room["key"] == here["key"]:
+		if (not here.is_empty() and room["key"] == here["key"]) or entered.has(str(room["key"])):
 			continue
 		var age: float = _memory.age_of(&"visited_room", "key", room["key"])
 		var point: Vector2 = _tactics.snap(ctx["map"], (room["rect"] as Rect2).get_center())
@@ -323,7 +327,7 @@ func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictiona
 			return x["stale"]
 		return x["len"] < y["len"])
 	var options: Array = []
-	if here.is_empty():
+	if here.is_empty() and entered.is_empty():  # With doorways to enter by, ENTER offers the way in.
 		if know["entry_point"] != Vector2.ZERO:
 			options.append({ "id": "entrance", "label": "the front entrance",
 				"desc": "the front entrance — %s route" % _v.route_band(_route_len(ctx, know["entry_point"])),
@@ -347,14 +351,71 @@ func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictiona
 	return { "summary": summary, "options": options }
 
 
+## The doorways the NPC could enter a room by, for a tactical entry (ENTER): from outside the outer doors, from a room
+## its doors into the next, each into a room it has not seen (named by direction only) or not searched lately. A
+## doorway's place is the NPC's stack slot beside it (the lowest the radio leaves free, on the side the team stacks
+## on), out of the doorway's line of sight; the behaviour runs the entry from there. Nearest first, capped.
+func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
+	if not know.get("entry_enabled", false):
+		return { "summary": "", "options": [] }
+	var self_pos: Vector2 = ctx["self_pos"]
+	var here := SnapshotVocab.room_at(self_pos, rooms)
+	var known: Dictionary = know["known_room_keys"]
+	var picks: Array = []
+	for e in _entry.entries_from(str(here.get("key", ""))):
+		var into: String = e["into"]
+		var status := "unexplored"
+		if known.has(into) or known.has(StringName(into)):
+			if _memory.age_of(&"visited_room", "key", into) <= _v.search_memory_ttl:
+				continue  # Searched lately: nothing to clear.
+			status = "unsearched"
+		var g: Dictionary = _entry.geometry(e["id"], into, ctx["map"], ctx["space"])
+		if g.is_empty():
+			continue
+		var team := AgentEntry.claims(e["id"], ctx["callouts"])
+		var slot := AgentEntry.free_slot(team, ctx["self_id"])
+		var side := AgentEntry.stack_side(g, team, self_pos)
+		var point := AgentEntry.slot_point(g, side, slot)
+		picks.append({ "e": e, "status": status, "point": point, "slot": slot, "side": side, "len": _route_len(ctx, point) })
+	picks.sort_custom(func(x, y): return x["len"] < y["len"])
+	var options: Array = []
+	for p in picks.slice(0, _v.max_options_per_level):
+		var e: Dictionary = p["e"]
+		var room := _room(rooms, e["into"])
+		var place := "the doorway into the %s" % _v.room_name(room["type"]) if p["status"] == "unsearched" \
+			else "the doorway to the %s" % _v.compass((e["pos"] as Vector2) - self_pos)
+		options.append({ "id": e["id"], "label": place,
+			"desc": "%s — %s — %s route" % [place, p["status"], _v.route_band(p["len"])],
+			"params": { "opening": e["id"], "into": e["into"], "point": p["point"], "slot": p["slot"], "side": p["side"] },
+			"tags": { "inside": not here.is_empty() } })
+	return { "summary": options[0]["desc"] if not options.is_empty() else "", "options": options }
+
+
+## The keys of the rooms the doorways of an `entry_group` lead into: those are entered by ENTER, not walked into.
+static func entry_rooms(entries: Dictionary) -> Dictionary:
+	var out := {}
+	for opt in entries.get("options", []):
+		out[str(opt["params"]["into"])] = true
+	return out
+
+
+## The room with key `key` in `rooms`, or {}.
+func _room(rooms: Array, key: String) -> Dictionary:
+	for r in rooms:
+		if str(r["key"]) == key:
+			return r
+	return {}
+
+
 ## Unexplored parts of the house (rooms not yet seen), named by direction only — the NPC doesn't know
-## what they are. One per compass direction, nearest first, at most two.
-func explore_group(ctx: Dictionary, rooms: Array) -> Dictionary:
+## what they are. One per compass direction, nearest first, at most two. A room a doorway of ENTER leads into
+## (`entered`) is left to it.
+func explore_group(ctx: Dictionary, rooms: Array, entered := {}) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
 	var known: Dictionary = know["known_room_keys"]
 	var by_dir := {}
 	for room in rooms:
-		if known.has(room["key"]):
+		if known.has(room["key"]) or entered.has(str(room["key"])):
 			continue
 		var point: Vector2 = _tactics.snap(ctx["map"], (room["rect"] as Rect2).get_center())
 		var dir := _v.compass(point - self_pos)

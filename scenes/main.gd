@@ -346,6 +346,7 @@ func _spawn_world() -> void:
 	var house := WorldGen.generate(house_seed, force_plan, front_entrance, _world)
 	# Bake the navigation map from the rooms + walls before the NPC starts pathing.
 	var rooms := WorldGen.get_rooms(house)
+	_spawner.openings = WorldGen.get_openings(house)
 	var nav_region := NavBuilder.build(house, rooms, _world)
 	# Debug overlay (world-space, single node): snapshot the furniture holes carved into the navmesh
 	# right after the bake. The updater below re-snapshots it after each re-bake so it tracks furniture.

@@ -29,14 +29,14 @@ var _memory: RefCounted   ## The agent's event memory (read-only here); see agen
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
 
 
-## Capture the collaborators the author reads: the event memory and the combat geometry. Called once by
-## the perception in its setup(), after it has built both. The config fields are set directly by the
-## perception's apply_config() (like the other modules), so there is no separate configure step.
-func setup(memory: RefCounted, tactics: RefCounted) -> void:
+## Capture the collaborators the author reads: the event memory, the combat geometry and the doorway geometry.
+## Called once by the perception in its setup(), after it has built them. The config fields are set directly by
+## the perception's apply_config() (like the other modules), so there is no separate configure step.
+func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted) -> void:
 	_memory = memory
 	_tactics = tactics
 	_sections.setup(vocab, memory, tactics)
-	_options.setup(vocab, memory, tactics)
+	_options.setup(vocab, memory, tactics, entry)
 
 
 ## BUILD pass — run at the start of each decision. Assemble the snapshot the decision planner walks,
@@ -55,6 +55,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"space": character.get_world_2d().direct_space_state,
 		"map": character.get_world_2d().navigation_map,
 		"self_pos": self_pos,
+		"self_id": character.get_instance_id(),
 		"exclude": [character.get_rid()],
 		"hostiles": hostiles,
 		"allies": allies,
@@ -90,6 +91,8 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var primary: Dictionary = hostiles[0] if not hostiles.is_empty() else {}
 	var line: Dictionary = analyses[primary["id"]]["line"] if not primary.is_empty() else {}
 	var leads := _options.lead_group(ctx, hostiles)
+	var entries := _options.entry_group(ctx, rooms)
+	var entered := SnapshotOptions.entry_rooms(entries)
 	var dmg: float = character.damage_taken()
 	# Rounds in the gun it fights with (-1 without one): the AI shoots, reloads and plans around it.
 	var gun: int = character.gun_slot()
@@ -134,8 +137,9 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"retreat_positions": _options.retreat_group(ctx, hostiles, known_rooms, dmg),
 		"leads": leads,
 		"shooter": _options.shooter_group(ctx, hostiles),
-		"search_rooms": _options.search_group(ctx, known_rooms, rooms),
-		"explore": _options.explore_group(ctx, rooms),
+		"entries": entries,
+		"search_rooms": _options.search_group(ctx, known_rooms, rooms, entered),
+		"explore": _options.explore_group(ctx, rooms, entered),
 		"interactions": _options.interaction_group(character, self_pos),
 		"rooms": _options.room_group(ctx, known_rooms, rooms),
 	}

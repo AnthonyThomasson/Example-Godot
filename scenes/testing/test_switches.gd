@@ -18,6 +18,10 @@ static var ROWS := {
 		"description": "NPCs send and hear team radio callouts.",
 		"actor": { "child": "GoalController", "props": ["send_callouts", "hear_callouts"] },
 	},
+	&"ai.entry": {
+		"description": "Invaders enter rooms tactically: stack, slice the pie, cross, take the corners.",
+		"actor": { "child": "GoalController", "props": ["entry_enabled"] },
+	},
 	&"ai.pursuit": {
 		"description": "NPCs chase hostiles they have seen.",
 		"actor": { "child": "GoalController", "props": ["pursue_hostiles"] },

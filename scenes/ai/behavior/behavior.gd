@@ -14,6 +14,8 @@ extends Node
 ##   melee    — close on `target_id` and punch.
 ##   interact — walk to `object`, run its interaction `id`, hold it for `interaction_dwell`.
 ##   reload   — stand and swap in a fresh magazine (`Character.reload()`), then re-decide.
+##   entry    — go through doorway `opening` into room `into` as a team member or alone: stack, slice the pie,
+##              cross without stopping, take a corner, clear the room (`entry.gd`).
 ##   hold     — stay and watch.
 ## It never chooses WHAT to do — the planner does — and applies no policy beyond the params it is
 ## handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
@@ -26,6 +28,7 @@ extends Node
 const Locomotion := preload("res://scenes/ai/behavior/locomotion.gd")
 const Combat := preload("res://scenes/ai/behavior/combat.gd")
 const SearchCoverage := preload("res://scenes/ai/behavior/search_coverage.gd")
+const Entry := preload("res://scenes/ai/behavior/entry.gd")
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
@@ -58,6 +61,13 @@ var auto_reload: bool = true ## An empty gun with a spare magazine is reloaded o
 # Posture: whether the NPC may crouch in a fight (see `_wanted_posture`), and how long it keeps one before changing.
 var posture_enabled: bool = true
 var posture_dwell: float = 0.7
+# Tactical entry (see entry.gd).
+var entry_ready_timeout: float = 6.0
+var entry_follow_gap: float = 0.3
+var entry_pie_dwell: float = 0.35
+var entry_corner_dwell: float = 0.6
+var rear_security_time: float = 10.0
+var entry_approach_time: float = 20.0
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject; handed on to the
 ## Locomotion child, which answers the room queries.
@@ -71,6 +81,8 @@ var _perception: Node             ## The perception sub-domain (contacts, combat
 var _loco: Node                   ## The Locomotion child (pathing, rooms).
 var _coverage: RefCounted         ## Room coverage by sight for a search move; see search_coverage.gd.
 var _combat: RefCounted           ## Shots, punches, bursts and the peek-and-cover cycle; see combat.gd.
+var _entry: RefCounted            ## A tactical entry through a doorway; see entry.gd.
+var _entry_pending := false       ## An ENTER leaf was adopted and its entry starts on the next tick (it needs the character).
 var _hostiles: Array = []         ## Known hostile contacts this tick (nearest first), from perception.
 var _primitive: StringName = &"hold" ## The running primitive.
 var _params := {}                 ## Its params (from the leaf).
@@ -114,6 +126,8 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_combat = Combat.new()
 	_combat.setup(_loco, perception)
 	_combat.dry.connect(_on_dry)
+	_entry = Entry.new()
+	_entry.setup(_loco, perception, _coverage)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
@@ -137,6 +151,13 @@ func apply_config() -> void:
 	_combat.back_off_time = back_off_time
 	_combat.reposition_interval = reposition_interval
 	_combat.auto_reload = auto_reload
+	_entry.ready_timeout = entry_ready_timeout
+	_entry.follow_gap = entry_follow_gap
+	_entry.pie_dwell = entry_pie_dwell
+	_entry.corner_dwell = entry_corner_dwell
+	_entry.rear_time = rear_security_time
+	_entry.approach_time = entry_approach_time
+	_entry.look_rate = search_look_rate
 
 
 # --- Read-only views -------------------------------------------------------------------------
@@ -144,6 +165,11 @@ func apply_config() -> void:
 ## Read-only: the decision path the NPC is carrying out, as ids ("combat/t_12/flank/side_left").
 func current_act() -> String:
 	return "/".join(_path) if not _path.is_empty() else "hold"
+
+
+## Read-only: the decision path as labels, joined ("SEARCH - ENTER - the doorway into the kitchen").
+func path_label() -> String:
+	return " - ".join(_labels)
 
 
 ## Read-only: the broad mode of the running leaf (combat / investigate / search / idle / hold).
@@ -169,6 +195,8 @@ func ongoing() -> bool:
 			return true
 		&"reload":
 			return _reloading
+		&"entry":
+			return _entry_pending or _entry.phase not in ["", "done"]
 	return false
 
 
@@ -204,6 +232,13 @@ func activity_text() -> String:
 	return "%s (%s, for %ds)" % [" - ".join(_labels), _progress(), secs]
 
 
+## How each phase of a tactical entry reads in the status line.
+const ENTRY_PROGRESS := {
+	"approach": "heading for the door", "stack": "stacked at the door", "pie": "slicing the pie",
+	"cross": "going in", "corner": "taking a corner", "clear": "clearing the room", "rear": "holding the door",
+}
+
+
 ## Where the running primitive stands ("en route", "in position, ducking behind cover", …).
 func _progress() -> String:
 	match _primitive:
@@ -221,6 +256,8 @@ func _progress() -> String:
 			return "using it" if _in_interaction else "walking to it"
 		&"reload":
 			return "reloading"
+		&"entry":
+			return ENTRY_PROGRESS.get(_entry.phase, "heading for the door")
 	return "waiting" if not _labels.is_empty() else ""
 
 
@@ -251,8 +288,30 @@ func debug_state() -> Dictionary:
 			"cover": _combat.cover_timer,
 			"combat_dest": _combat.dest_timer,
 		},
+		"entry": _json_safe(debug_entry()),
 		"loco": _loco.debug_state(),
 	}
+
+
+## Read-only: the running tactical entry (doorway, slot, side, phase, what the pie saw, the corner), or {} when the
+## NPC isn't entering. See entry.gd `debug()`.
+func debug_entry() -> Dictionary:
+	return _entry.debug() if _primitive == &"entry" else {}
+
+
+## Whether the NPC is committed to crossing a doorway: the controller holds every re-decision until it is through.
+func committed() -> bool:
+	return _primitive == &"entry" and _entry.committed()
+
+
+## The entry steps to radio since the last call (`{ step, cleared_room? }`), with the doorway, slot and side they are
+## about; the controller posts them as callouts.
+func take_entry_calls() -> Array:
+	var out: Array = []
+	for c in _entry.take_calls():
+		c.merge({ "opening": _entry.opening, "slot": _entry.slot, "side": _entry.side })
+		out.append(c)
+	return out
 
 
 ## Read-only: the running search-coverage state, for the search debug overlay. `active` is true only
@@ -260,7 +319,8 @@ func debug_state() -> Dictionary:
 ## the room's sample points, `unseen` the ones still to be seen, `target` the one being looked at now.
 func debug_coverage() -> Dictionary:
 	var out: Dictionary = _coverage.debug()
-	out["active"] = _primitive == &"move" and _look_around and _arrived and not _resolved
+	out["active"] = (_primitive == &"move" and _look_around and _arrived and not _resolved) \
+		or (_primitive == &"entry" and _entry.phase == "clear")
 	return out
 
 
@@ -336,6 +396,7 @@ func _json_safe(d: Dictionary) -> Dictionary:
 ## Adopt the planner's leaf `{ path, labels, primitive, params }`: capture its destination (snapped
 ## onto the navmesh), its target and its object, and commit to it.
 func set_leaf(leaf: Dictionary) -> void:
+	_entry.abandon()  # A new choice ends any entry in progress (the stack is told).
 	_primitive = leaf.get("primitive", &"hold")
 	_params = leaf.get("params", {})
 	_path = leaf.get("path", [])
@@ -367,6 +428,8 @@ func set_leaf(leaf: Dictionary) -> void:
 			_interact_id = _params.get("id", "")
 		&"reload":
 			_reload_started = false
+		&"entry":
+			_entry_pending = true
 
 
 ## Fight known contact `id`: capture its body and last-known position (no-op when it isn't known).
@@ -473,6 +536,8 @@ func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
 			return _commit_timer <= 0.0
 		&"interact", &"reload":
 			return _commit_timer <= 0.0
+		&"entry":
+			return false  # It ends itself: the room clear, or the entry given up.
 	return decide_timer_elapsed
 
 
@@ -493,6 +558,8 @@ func apply(character, delta: float) -> void:
 			_apply_interact(character)
 		&"reload":
 			_apply_reload(character)
+		&"entry":
+			_apply_entry(character, delta)
 		_:
 			_apply_hold(character)
 	_combat.continue_burst(character)
@@ -560,6 +627,10 @@ func _should_run(character) -> bool:
 				return false
 		&"melee":
 			dest = _engage_pos
+		&"entry":
+			dest = _entry.travel_target()
+			if dest == Vector2.INF:
+				return false
 		_:
 			return false
 	if not _params.get("run", false) and not (_perception != null and _perception.under_fire()):
@@ -657,6 +728,23 @@ func _apply_melee(character) -> void:
 	character.aim_point = _engage_pos
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
 	_combat.melee(character, _engage_pos, _hold_ground)
+
+
+## Entry: start the entry on the first tick (it needs the character), then run its phases; it shoots a known
+## hostile on a clear line once it is crossing or in the room. Done (the room clear, or the entry given up) → re-decide.
+func _apply_entry(character, delta: float) -> void:
+	if _entry_pending:
+		_entry_pending = false
+		if not _entry.begin(character, _params):
+			_primitive = &"hold"
+			_resolved = true
+			return
+	if _entry.step(character, delta):
+		_primitive = &"hold"
+		_resolved = true
+		return
+	if _entry.fires_at_will():
+		_fire_at_will(character)
 
 
 ## Interact: walk to the chosen object facing it (or a known hostile, to keep eyes on them); once its

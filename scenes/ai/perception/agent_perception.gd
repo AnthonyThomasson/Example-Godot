@@ -26,6 +26,7 @@ const AgentVision := preload("res://scenes/ai/perception/agent_vision.gd")
 const AgentHostility := preload("res://scenes/ai/perception/agent_hostility.gd")
 const AgentMemory := preload("res://scenes/ai/perception/agent_memory.gd")
 const AgentTactics := preload("res://scenes/ai/perception/agent_tactics.gd")
+const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
 ## The BUILD half: turns what the NPC knows + the combat geometry into the decision snapshot Von walks.
 const AgentSnapshot := preload("res://scenes/ai/perception/agent_snapshot.gd")
 const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
@@ -36,6 +37,8 @@ var contact_memory_ttl: float = 4.0
 var familiar_with_house: bool = true
 ## The house entrance in world space (injected by Main for some NPCs), offered while outside.
 var entry_point: Vector2 = Vector2.ZERO
+## The house's doorways (`WorldGen.get_openings`, injected by Main), for tactical entry.
+var openings: Array = []
 
 # --- Config fields the controller copies from its exports before calling setup(). ---
 # Vision (the sight sense).
@@ -88,11 +91,19 @@ var fire_spot_distances: Array[float] = [200.0, 350.0]
 # Callouts (allies' radio).
 var callout_range: float = 1500.0
 var callout_ttl: float = 6.0
+# Tactical entry (the doorway geometry; see agent_entry.gd).
+var entry_enabled: bool = false        ## Whether doorways into rooms left to clear are offered (ENTER).
+var entry_stack_spacing: float = 34.0
+var entry_wall_standoff: float = 28.0
+var entry_pie_radius: float = 100.0
+var entry_pie_steps: int = 5
+var entry_corner_inset: float = 40.0
 
 var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
 var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
 var _memory: RefCounted          ## The event memory; see agent_memory.gd.
 var _tactics: RefCounted         ## The combat geometry; see agent_tactics.gd.
+var _entry: RefCounted           ## The doorway geometry and the team's claims; see agent_entry.gd.
 var _snapshot: RefCounted        ## The BUILD half: writes the decision snapshot; see agent_snapshot.gd.
 var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the first observe() call.
 var _post_set := false           ## Whether _post has been captured yet.
@@ -117,8 +128,10 @@ func setup() -> void:
 	_memory = AgentMemory.new()
 	_tactics = AgentTactics.new()
 	_tactics.vision = _vision
+	_entry = AgentEntry.new()
+	_entry.vision = _vision
 	_snapshot = AgentSnapshot.new()
-	_snapshot.setup(_memory, _tactics)
+	_snapshot.setup(_memory, _tactics, _entry)
 
 
 ## Push the current config fields into the owned modules. Idempotent and state-free (it only sets
@@ -148,6 +161,11 @@ func apply_config() -> void:
 	_tactics.route_clearance = route_clearance
 	_tactics.watch_arc = watch_arc
 	_tactics.fire_spot_distances = fire_spot_distances
+	_entry.stack_spacing = entry_stack_spacing
+	_entry.wall_standoff = entry_wall_standoff
+	_entry.pie_radius = entry_pie_radius
+	_entry.pie_steps = entry_pie_steps
+	_entry.corner_inset = entry_corner_inset
 	_snapshot.vocab.shoot_range = shoot_range
 	_snapshot.vocab.punch_range = punch_range
 	_snapshot.vocab.recency_bands = recency_bands
@@ -205,8 +223,10 @@ func process_hit(character, data: Dictionary) -> bool:
 
 
 ## Fold one ally radio `&"callout"` (interface 10) into memory: what an ally says it is doing — its
-## tactic, target and destination. Ignores its own, non-allies, dead speakers, and anything beyond
-## `callout_range` (<= 0 = unlimited). Each speaker's latest callout supersedes its earlier one.
+## tactic, target and destination, or its step through a doorway. Ignores its own, non-allies, dead speakers,
+## and anything beyond `callout_range` (<= 0 = unlimited). Each speaker's latest callout supersedes its earlier
+## one. An ally that radios a room clear (`cleared_room`) teaches this NPC the room and marks it searched, so the
+## team does not clear it twice.
 func process_callout(character, data: Dictionary) -> void:
 	var speaker = data.get("speaker")
 	if speaker == character or not speaker is Node or not is_instance_valid(speaker) or speaker.get("is_dead") == true:
@@ -217,6 +237,10 @@ func process_callout(character, data: Dictionary) -> void:
 	if callout_range > 0.0 and character.global_position.distance_to(at) > callout_range:
 		return
 	_memory.remember(&"heard_callout", data, callout_ttl, str(speaker.get_instance_id()))
+	var cleared := str(data.get("cleared_room", ""))
+	if cleared != "":
+		_learn_room({ "key": cleared })
+		_memory.remember(&"visited_room", { "key": cleared }, search_memory_ttl, cleared)
 
 
 ## Refresh the combat engagement (called by the behaviour when it fires or adopts a fight), so an
@@ -340,6 +364,7 @@ func observe(character, rooms: Array) -> void:
 		_post_set = true
 	_ensure_interactables(character)
 	_seed_house(rooms)
+	_entry.set_house(openings, rooms)
 
 	var self_pos: Vector2 = character.global_position
 	var facing: Vector2 = character.facing
@@ -506,6 +531,7 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 		"interactables": _interactables,
 		"post": _post,
 		"entry_point": entry_point,
+		"entry_enabled": entry_enabled,
 		"lost": lost_hostiles(),
 	}
 	return _snapshot.build(character, rooms, goal, activity, contacts(self_pos), _callouts(), knowledge)
@@ -656,6 +682,18 @@ func visible_points(character, points: Array) -> Array:
 		if _vision.can_see(self_pos, facing, p, space, exclude):
 			seen.append(p)
 	return seen
+
+
+## The geometry of going through doorway `opening_id` into room `into` (see agent_entry.gd `geometry`): the door's
+## frame, the stack slots and pie arc on either side, and the room's corners tagged hard or soft. {} when unknown.
+func entry_geometry(character, opening_id: String, into: String) -> Dictionary:
+	return _entry.geometry(opening_id, into, character.get_world_2d().navigation_map, character.get_world_2d().direct_space_state)
+
+
+## The allies' live claims on doorway `opening_id`, off the radio: `{ id, name, slot, side, step, pos, age }`,
+## lowest slot first (see agent_entry.gd `claims`).
+func entry_team(opening_id: String) -> Array:
+	return AgentEntry.claims(opening_id, _callouts())
 
 
 ## Candidate standing points on a ring around the NPC, classified for peek-and-cover against the

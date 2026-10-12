@@ -59,6 +59,7 @@ func run(t: TestContext) -> void:
 func _spawn_match(t: TestContext) -> Array:
 	var spawner = MatchSpawner.new()
 	spawner.world = t.world
+	spawner.openings = t.world.openings
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEED
 	var entrance := _front_entrance(t)

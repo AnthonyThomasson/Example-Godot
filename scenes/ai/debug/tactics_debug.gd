@@ -27,6 +27,7 @@ const ZONE_COLORS := {
 	&"retreat": Color(0.3, 0.6, 1.0),    # blue — somewhere to fall back to
 	&"lead": Color(0.8, 0.4, 1.0),       # purple — an investigation lead (last seen / gunfire)
 	&"search": Color(0.5, 0.9, 0.5),     # green — a room or unexplored area to search
+	&"entry": Color(0.2, 0.9, 0.9),      # cyan — a stack slot beside a doorway to enter a room by
 	&"room": Color(0.4, 0.8, 0.8),       # teal — a known room to go to
 	&"interaction": Color(0.9, 0.9, 0.9),# white — an object to use
 	&"waypoint": Color(0.9, 0.3, 0.8),   # magenta — a non-room go-to (starting post / entrance / approach)

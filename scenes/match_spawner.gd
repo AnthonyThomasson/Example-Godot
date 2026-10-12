@@ -20,6 +20,8 @@ var spawn_clearance: float = 20.0
 var invader_margin: float = 80.0
 ## Every NPC placed so far, in spawn order.
 var combatants: Array = []
+## The house's doorways (`WorldGen.get_openings`), handed to every NPC it binds alongside the rooms.
+var openings: Array = []
 
 
 ## Drop defender number `index` at a clear spot (`clear_spot`) in a random room. `rng` is seeded from
@@ -117,8 +119,9 @@ func add_npc(scene: PackedScene, node_name: String, pos: Vector2, rooms: Array, 
 	combatants.append(npc)
 
 
-## Wire an NPC's controller to the world: hand it the house's `rooms` (world-space rects) and,
-## when given, an `entry_point` the NPC heads for first while outside all rooms. Found by the same
+## Wire an NPC's controller to the world: hand it the house's `rooms` (world-space rects), its `openings`
+## (the doorways, for tactical entry) and, when given, an `entry_point` the NPC heads for first while
+## outside all rooms. Found by the same
 ## `control` duck-type the character uses to pick its controller — so Main doesn't depend on the
 ## controller's node name. This keeps the World-Gen boundary in Main: the AI never calls WorldGen.
 func bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> void:
@@ -126,6 +129,8 @@ func bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> v
 		if child.has_method("control"):
 			if "rooms" in child:
 				child.rooms = rooms
+			if "openings" in child:
+				child.openings = openings
 			if "entry_point" in child and entry_point != Vector2.ZERO:
 				child.entry_point = entry_point
 			return

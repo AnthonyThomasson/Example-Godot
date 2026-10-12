@@ -43,7 +43,7 @@ func reset() -> void:
 ## (a single look), which is the graceful fallback.
 func begin(character) -> void:
 	room = _loco.room_key_at(character.global_position)
-	points = _sample_room(room)
+	points = sample_room(room)
 	unseen = points.duplicate()
 	target = character.global_position
 	budget = budget_max
@@ -77,11 +77,12 @@ func debug() -> Dictionary:
 	return { "points": points, "unseen": unseen, "target": target, "budget": budget }
 
 
-## Grid-sample room `room_key` into the points a searcher must SEE to have covered it: the rect inset by `margin` (to
+## Grid-sample room `room_key` into the points a searcher must SEE to have covered it (also what a tactical entry
+## measures the share of a room seen from outside against): the rect inset by `margin` (to
 ## keep points off the walls), stepped by `spacing`, dropping any point not on the navmesh — i.e. inside a carved
 ## furniture footprint — so search points sit on open floor, not on furniture (which also keeps unseeable points out
 ## of the coverage set). Deterministic (no RNG). Empty when the room is unknown (coverage then finishes at once).
-func _sample_room(room_key: String) -> Array:
+func sample_room(room_key: String) -> Array:
 	var sampled: Array = []
 	for r in _loco.rooms:
 		if str(r["key"]) != room_key:

@@ -12,7 +12,8 @@ const WAYPOINT_IDS := ["post", "entrance", "approach"]
 
 ## The tactical navigation ZONES in a snapshot's `options` — every candidate position the NPC's perception laid out for its
 ## last decision, flattened to world points (each with its `label`, `desc` and `tags`) tagged by the kind of zone each is
-## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `room` / `interaction`, plus `waypoint` for the non-room
+## (`fire` / `flank` / `advance` / `retreat` / `lead` / `search` / `entry` (the stack slot beside a doorway to enter by) /
+## `room` / `interaction`, plus `waypoint` for the non-room
 ## go-to points — your starting post, the front entrance, approaching the house — which the room/search groups carry but
 ## which aren't rooms and often sit outside one). Empty until the first decision. Options with no world location (a
 ## point-blank punch, the hostile picks) are skipped.
@@ -27,6 +28,7 @@ static func from_options(options: Dictionary) -> Array:
 	_collect(out, options.get("retreat_positions", {}), &"retreat")
 	_collect(out, options.get("leads", {}), &"lead")
 	_collect(out, options.get("shooter", {}), &"lead")
+	_collect(out, options.get("entries", {}), &"entry")
 	_collect(out, options.get("search_rooms", {}), &"search")
 	_collect(out, options.get("explore", {}), &"search")
 	_collect(out, options.get("rooms", {}), &"room")

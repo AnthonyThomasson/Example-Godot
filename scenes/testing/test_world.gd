@@ -23,6 +23,8 @@ const ACTOR_SCENES := {
 ## The house or arena root, its rooms, and the placed actors/objects by id.
 var house: Node2D
 var rooms: Array = []
+## Its doorways (`WorldGen.get_openings`), injected into every NPC beside `rooms`.
+var openings: Array = []
 var actors: Dictionary = {}
 var objects: Dictionary = {}
 
@@ -119,6 +121,7 @@ func _build_world(world: Dictionary) -> void:
 	else:
 		house = ArenaBuilder.build(world, self)
 	rooms = WorldGen.get_rooms(house)
+	openings = WorldGen.get_openings(house)
 
 
 ## Bake the nav map (after the objects, so they are carved) and add the re-baker.
@@ -180,9 +183,11 @@ func _spawn_actor(a: Dictionary, switches: Dictionary) -> Node:
 		for flag in _overlay_flags:
 			if flag in child:
 				child.set(flag, _overlay_flags[flag])
-		# The AI learns the house's rooms from its composer (main.gd does the same).
+		# The AI learns the house's rooms and doorways from its composer (main.gd does the same).
 		if child.has_method("control") and "rooms" in child:
 			child.rooms = rooms
+			if "openings" in child:
+				child.openings = openings
 	# Positioned before it joins the tree: a body added at the origin and moved afterwards launches whatever
 	# stands there (the same trap `match_spawner.gd` avoids).
 	character.position = to_local(a["position"])
