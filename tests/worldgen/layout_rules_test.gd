@@ -1,26 +1,22 @@
 extends GameTest
 
-## Every floorplan is a logical layout: the front door opens into a living space on the south wall (never a
-## bathroom or bedroom), exits sit on rooms that can have one, doors join room types that may share one,
-## bathrooms are dead ends, nothing is a pass-through and every room is reachable from outside. Also pins
-## the validator itself (LayoutRules.check) against deliberately illogical layouts.
-
-const SEEDS := [1, 2, 3, 4, 5, 6]  ## Both mirror states of every plan.
-const FAR_AWAY := Vector2(5000, 5000)
+## The layout validator (LayoutRules.check) accepts a logical layout and reports each kind of illogical one: a
+## bathroom or bedroom front door, a front door off the south wall, a bathroom with two doors or joined to the
+## kitchen, a pass-through bedroom, a room nothing reaches, an exit in a bathroom. That every generated floorplan
+## passes it (and has at most one exit) is checked per house in house_doorways_connected.
 
 
 func describe() -> Dictionary:
 	return {
-		"name": "Every floorplan is a logical layout",
-		"description": "For every floorplan and several seeds LayoutRules.check finds nothing (front door in a living space on the south wall, legal exits and doors, bathrooms are dead ends, no pass-through rooms); and the rules reject illogical layouts.",
+		"name": "The layout rules reject illogical layouts",
+		"description": "LayoutRules.check finds nothing in a logical layout and reports each kind of illogical one (front door in a bathroom or bedroom or off the south wall, bathrooms that are not dead ends, pass-through rooms, unreachable rooms, a bathroom exit).",
 		"tags": ["worldgen", "house", "layout", "doorway"],
-		"timeout": 20.0,
+		"timeout": 5.0,
 	}
 
 
 func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 200, 200))
-	s.set_static(WorldGenConfig, "fill_enabled", false)  # furnishing is not under test: keep it fast
 
 
 ## A room dict as WorldGen.get_rooms returns it.
@@ -36,18 +32,6 @@ func _door(pos: Vector2, rooms: Array, front := false, exit := false) -> Diction
 ## True if some reported problem contains `fragment`.
 func _reports(problems: Array, fragment: String) -> bool:
 	return problems.any(func(p: String) -> bool: return p.contains(fragment))
-
-
-## Every floorplan, over both mirror states, has no LayoutRules violation and at most one exit.
-func _check_plans(t: TestContext) -> void:
-	for plan in HouseDefinitions.get_all():
-		for house_seed in SEEDS:
-			var house := WorldGen.generate(house_seed, plan, FAR_AWAY, t.world)
-			var problems := LayoutRules.check(WorldGen.get_rooms(house), WorldGen.get_openings(house))
-			t.check(problems.is_empty(), "%s seed %d is illogical: %s" % [plan, house_seed, "; ".join(problems)])
-			var exits := WorldGen.get_openings(house).filter(func(o: Dictionary) -> bool: return o["exit"])
-			t.check(exits.size() <= 1, "%s seed %d has %d exits" % [plan, house_seed, exits.size()])
-			house.free()
 
 
 ## A small valid house to start the bad ones from: living (front) with a bedroom off it and an en-suite.
@@ -117,5 +101,4 @@ func _check_validator(t: TestContext) -> void:
 
 func run(t: TestContext) -> void:
 	_check_validator(t)
-	_check_plans(t)
 	await t.frames(1)

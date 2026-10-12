@@ -63,7 +63,8 @@ static func low_share(s: PackedFloat32Array, hz: float = 250.0) -> float:
 ## The low-end energy `profile` actually puts out, in its own level: the low share of its (peak-normalized) render,
 ## scaled by its level trim. This is what "a heavier hit" means in numbers.
 static func low_weight(profile: StringName, variant: int = 0) -> float:
+	var s := samples(profile, variant)
 	var energy := 0.0
-	for x in samples(profile, variant):
+	for x in s:
 		energy += x * x
-	return low_share(samples(profile, variant)) * energy * pow(10.0, float(SoundBank.sound(profile, variant)["level_db"]) / 10.0)
+	return low_share(s) * energy * pow(10.0, float(SoundBank.sound(profile, variant)["level_db"]) / 10.0)

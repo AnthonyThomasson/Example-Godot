@@ -8,7 +8,7 @@ class_name HouseDefinitions
 ##          openings (a back/side/garage door: exterior, on exactly one room's wall).
 ## What may connect to what (which rooms can hold the front door or an exit, which room types may
 ## share a door, which must be dead ends) is LayoutRules; HouseSpawner warns about a plan that breaks it
-## and tests/worldgen/house_layout_logical_test.gd fails on it. Bedrooms and bathrooms open off a
+## and tests/worldgen/house_doorways_connected_test.gd fails on it. Bedrooms and bathrooms open off a
 ## hallway (or a living space) rather than off each other.
 
 const PLANS := {

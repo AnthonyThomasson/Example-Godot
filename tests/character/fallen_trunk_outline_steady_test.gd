@@ -7,8 +7,11 @@ extends GameTest
 ## of both its neighbouring frames' areas. Reads the outline; draws nothing.
 
 const TARGETS := 4
-## Frames sampled after the last target is down: the landing and settling.
+## Frames sampled at most after the last target is down: the landing and settling. Sampling stops early once every
+## body has come to rest (its outline cannot change any more), but not before MIN_FRAMES, which keeps well over
+## 100 sampled frames per target.
 const FRAMES := 300
+const MIN_FRAMES := 110
 ## A frame's outline area counts as collapsed below this share of both neighbours'.
 const COLLAPSE := 0.5
 
@@ -54,10 +57,18 @@ func run(t: TestContext) -> void:
 	var series := {}
 	for i in TARGETS:
 		series[i] = []
+	var at_rest := func() -> bool:
+		for i in TARGETS:
+			var rd = t.actor(StringName("target%d" % i)).ragdoll
+			if rd == null or not rd.is_settled():
+				return false
+		return true
 	for frame in FRAMES:
 		for i in TARGETS:
 			(series[i] as Array).append(_outline_area(t.actor(StringName("target%d" % i))))
 		await t.frames(1)
+		if frame >= MIN_FRAMES and at_rest.call():
+			break
 
 	var collapses := []
 	var sampled := 0

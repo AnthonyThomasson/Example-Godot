@@ -40,12 +40,15 @@ func _furniture(house: Node2D) -> Dictionary:
 	return result
 
 
-## Total solid pieces across every plan and seed, and (when `check_cover`) the per-room cover assertions.
+## Total solid pieces across every plan and seed, and (when `check_cover`) the per-room cover assertions. The
+## houses are built under a node that is never in the tree: only their pieces' fields and metas are read, so
+## there is no need to paint, collide or register anything.
 func _survey(t: TestContext, check_cover: bool) -> int:
 	var pieces := 0
+	var holder := Node2D.new()
 	for plan in HouseDefinitions.get_all():
 		for house_seed in SEEDS:
-			var house := WorldGen.generate(house_seed, plan, FAR_AWAY, t.world)
+			var house := WorldGen.generate(house_seed, plan, FAR_AWAY, holder)
 			var furniture := _furniture(house)
 			for room in WorldGen.get_rooms(house):
 				var f: Dictionary = furniture[room["key"]]
@@ -56,6 +59,7 @@ func _survey(t: TestContext, check_cover: bool) -> int:
 					t.check(f["area"] / floor_area >= floor_min, "%s seed %d: the %s (%s) is %.0f%% furnished, at least %.0f%% expected" % [
 						plan, house_seed, room["key"], room["type"], 100.0 * f["area"] / floor_area, 100.0 * floor_min])
 			house.free()
+	holder.free()
 	return pieces
 
 

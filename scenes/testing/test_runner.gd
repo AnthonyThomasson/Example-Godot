@@ -9,9 +9,10 @@ extends Node2D
 ##                 next; Back/Escape cancels the rest;
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
 ##                 --run-tests [filter] [--domain=a,b] [--id=a,b] [--failed=<report>] [--shard=I/N]
-##                 [--fail-fast] [--summary] [--include-von]` runs every matching test (`--domain` / `--id`
-##                 keep only those exact domains / ids, unlike the prefix-matching filter; `--shard` takes
-##                 one balanced slice of the run) in turn, prints one
+##                 [--costs=<json>] [--fail-fast] [--summary] [--include-von]` runs every matching test
+##                 (`--domain` / `--id` keep only those exact domains / ids, unlike the prefix-matching filter;
+##                 `--shard` takes one balanced slice of the run, balanced by the per-test wall-clock ms in the
+##                 `--costs` file when there is one, by declared timeout when not) in turn, prints one
 ##                 line each (just the non-passing ones with `--summary`) plus a summary, writes `user://test_report.json` and exits 1 on any
 ##                 failure (or any error/warning logged outside a test). `--out=<dir>` puts the report
 ##                 and failure bundles in <dir> instead; started with `--log-file <dir>/godot.log` it
@@ -513,7 +514,7 @@ func _run_batch(args: PackedStringArray) -> void:
 		and TestCatalog.matches(e, filter))
 	var shard := _option(args, "--shard", "")
 	if shard != "":
-		picked = TestCatalog.shard(picked, shard)
+		picked = TestCatalog.shard(picked, shard, TestCatalog.load_costs(_option(args, "--costs", "")), _include_von or _require_von)
 	if args.has("--list"):
 		_print_list(picked)
 		get_tree().quit(0)

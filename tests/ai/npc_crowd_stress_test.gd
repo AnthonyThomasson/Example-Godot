@@ -1,6 +1,6 @@
 extends GameTest
 
-## Performance guard: six defenders and six invaders share a furnished arena for 15 s with Von scripted (no
+## Performance guard: six defenders and six invaders share a furnished arena (a 2 s warm-up, then 300 measured frames) with Von scripted (no
 ## server), so every NPC senses, decides, paths and fights each frame. Frame cost stays within budget and
 ## the AI does not leak nodes per decision.
 
@@ -8,18 +8,21 @@ const Perf := preload("res://tests/_perf/perf_probe.gd")
 
 const PER_SIDE := 6
 const WARMUP_S := 2.0
-const MEASURE_FRAMES := 600
-# Baseline: avg ~15 / p95 ~19 / max ~65 ms per frame, ~1000 nodes added (capped by the Despawner). Budgets ~4x.
+const MEASURE_FRAMES := 300
+# Baseline (8 runs, 600 and 300 measured frames agree): avg 22-25 / p95 30-37 / max 64-77 ms per frame; ~850 nodes added
+# over 300 frames (the Despawner caps what firing adds). Budgets 2.4-3.5x. The window is 300 frames, not the 600 it
+# once was, because the three frame statistics do not move with a longer one; the node budget went from 3000 to 2000
+# with it, so a leak per frame is caught at least as early.
 const AVG_MS := 60.0
 const P95_MS := 80.0
 const MAX_MS := 260.0
-const NODE_GROWTH := 3000
+const NODE_GROWTH := 2000
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "A crowd of NPCs stays cheap",
-		"description": "12 scripted-Von NPCs (two factions) sense, decide, path and shoot in a furnished arena; frame cost over 10 s stays within budget.",
+		"description": "12 scripted-Von NPCs (two factions) sense, decide, path and shoot in a furnished arena; frame cost over 5 s stays within budget.",
 		"tags": ["perf", "stress", "ai", "scripted", "crowd"],
 		"timeout": 40.0,
 	}

@@ -17,6 +17,7 @@ Layer 3 is skipped when no Godot binary is found.
 """
 import json
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -102,12 +103,15 @@ for a in "$@"; do
     echo "LINT-DONE 1"; exit 0
   fi
 done
-log=""; out=""
+log=""; out=""; costs=""; selection=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --log-file) log="$2"; shift ;;
     --out=*) out="${1#--out=}" ;;
     --shard=*) shard="${1#--shard=}" ;;
+    --costs=*) costs="${1#--costs=}" ;;
+    --id=*|--domain=*) selection="$selection $1" ;;
+    perf) selection="$selection perf" ;;
   esac
   shift
 done
@@ -115,9 +119,17 @@ head='Godot Engine v4.4'
 judged='ERROR: a test provoked this (the runner already failed that test)'
 echo "$head" > "$log"
 report() { printf '{"results": [], "stray_logs": [], "log_end": %s}' "$(wc -c < "$log" | tr -d ' ')" > "$out/report.json"; }
+timed() {
+  printf '{"results": [{"id": "a/x", "status": "PASS", "wall_ms": 120}, {"id": "a/z", "status": "PASS", "wall_ms": 80}, {"id": "a/s", "status": "SKIPPED", "wall_ms": 5}], "stray_logs": [], "log_end": %s}' \
+    "$(wc -c < "$log" | tr -d ' ')" > "$out/report.json"
+  echo "Slowest: a/x 120 ms, a/z 80 ms"
+}
+[ -n "$costs" ] && echo "costs-arg $costs"
+[ -n "$selection" ] && echo "selection:$selection"
 echo "0 passed, 0 failed, 0 timed out, 0 skipped"
 case "$FAKE_SCENARIO" in
   clean) report ;;
+  timed) timed ;;
   judged_error) echo "$judged" >> "$log"; report ;;
   shutdown_error) report; echo "ERROR: engine complained while quitting" >> "$log" ;;
   shutdown_warning) report; echo "WARNING: engine muttered while quitting" >> "$log" ;;
@@ -146,9 +158,14 @@ class WrapperTests(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_wrapper(self, scenario, *args, lint=None):
-        """`lint` = None skips the lint (these tests are about the log gate); "clean" / "dirty" runs it on the fake."""
-        env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, FAKE_LINT=lint or "", TMPDIR=str(self.tmp))
+    def run_wrapper(self, scenario, *args, lint=None, state=None):
+        """`lint` = None skips the lint (these tests are about the log gate); "clean" / "dirty" runs it on the fake.
+        A lint run keeps its state (the fingerprint of the last clean lint) in `state`, a fresh directory unless the
+        caller passes one, so one test's clean lint never makes the next test skip its lint."""
+        if lint and state is None:
+            state = Path(tempfile.mkdtemp(dir=self.tmp))
+        env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, FAKE_LINT=lint or "",
+                   TMPDIR=str(state or self.tmp))
         flags = list(args) + ([] if lint else ["--no-lint"])
         r = subprocess.run(["bash", str(RUN), *flags], cwd=ROOT, env=env, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
@@ -197,6 +214,25 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertIn("passed,", out)
 
+    def test_a_clean_lint_is_not_repeated_on_an_unchanged_tree_but_any_change_runs_it_again(self):
+        state = Path(tempfile.mkdtemp(dir=self.tmp))
+        self.assertEqual(self.run_wrapper("clean", lint="clean", state=state)[0], 0)
+        # Same sources: the lint is skipped, so a lint that would now fail does not stop the run.
+        code, out = self.run_wrapper("clean", lint="dirty", state=state)
+        self.assertEqual(code, 0)
+        self.assertIn("lint skipped", out)
+        # A new untracked file changes the fingerprint: the lint runs again and fails.
+        probe = ROOT / "zz_lint_skip_probe.tmp"
+        probe.write_text("changed")
+        try:
+            code, out = self.run_wrapper("clean", lint="dirty", state=state)
+        finally:
+            probe.unlink()
+        self.assertEqual(code, 1)
+        self.assertIn("no tests were run", out)
+        # The failed lint recorded nothing, and with the probe gone the tree is the one the clean lint saw: skipped again.
+        self.assertEqual(self.run_wrapper("clean", lint="dirty", state=state)[0], 0)
+
     def test_no_lint_flag_and_listing_skip_the_lint(self):
         self.assertEqual(self.run_wrapper("clean", "--no-lint", lint="dirty")[0], 0)
         self.assertEqual(self.run_wrapper("listing_clean", "--list", lint="dirty")[0], 0)
@@ -204,6 +240,62 @@ class WrapperTests(unittest.TestCase):
     def test_one_failing_shard_fails_the_whole_run(self):
         self.assertEqual(self.run_wrapper("shard1_error", "--jobs=2")[0], 1)
         self.assertEqual(self.run_wrapper("clean", "--jobs=2")[0], 0)
+
+    def test_measured_times_are_kept_and_the_next_sharded_run_balances_by_them(self):
+        state = Path(tempfile.mkdtemp(dir=self.tmp))
+        code, out = self.run_wrapper("timed", "--jobs=2", state=state)
+        self.assertEqual(code, 0)
+        self.assertNotIn("costs-arg", out)  # nothing was measured yet
+        costs = json.loads(next(state.glob("example_godot_costs_*.json")).read_text())
+        self.assertEqual(costs, {"a/x": 120, "a/z": 80})  # the skipped test says nothing about how long a test takes
+        code, out = self.run_wrapper("timed", "--jobs=2", state=state)
+        self.assertEqual(out.count("costs-arg"), 2)  # every shard gets the same file
+        self.assertIn(str(next(state.glob("example_godot_costs_*.json"))), out)
+
+    def test_a_sharded_run_prints_one_combined_slowest_list(self):
+        out = self.run_wrapper("timed", "--jobs=2")[1]
+        self.assertEqual(out.count("Slowest:"), 1)
+        self.assertIn("Slowest: a/x 120 ms, a/z 80 ms", out)
+        self.assertNotIn("Slowest:", self.run_wrapper("timed", "--jobs=2", "--summary")[1])
+
+    @staticmethod
+    def shards(out):
+        """How many processes a run was split over: the wrapper's combined total says so, a single process says nothing."""
+        m = re.search(r"\((\d+) shards\)", out)
+        return int(m.group(1)) if m else 1
+
+    def test_the_jobs_default_is_every_core_for_the_whole_suite_and_one_for_a_selection(self):
+        self.assertGreater(self.shards(self.run_wrapper("clean")[1]), 1)
+        self.assertEqual(self.shards(self.run_wrapper("clean", "--id=a/x")[1]), 1)
+        self.assertEqual(self.shards(self.run_wrapper("clean", "--domain=ai")[1]), 1)
+        self.assertEqual(self.shards(self.run_wrapper("clean", "pistol")[1]), 1)
+        self.assertEqual(self.shards(self.run_wrapper("clean", "--jobs=3", "--id=a/x,b/y")[1]), 2)  # never more than the ids
+
+    def changed(self, files, scenario="clean"):
+        """What `--changed` runs when git reports exactly `files` as changed: the selection lines the fake prints."""
+        env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, TMPDIR=str(self.tmp),
+                   GAME_TEST_CHANGED_FILES="\n".join(files))
+        r = subprocess.run(["bash", str(RUN), "--changed", "--no-lint", "--jobs=1"], cwd=ROOT, env=env, capture_output=True, text=True)
+        return r.returncode, [ln for ln in (r.stdout + r.stderr).splitlines() if ln.startswith(("selection:", "== "))]
+
+    def test_changed_runs_only_an_edited_test_not_the_domains_that_compose_its_code(self):
+        code, lines = self.changed(["tests/projectile/pistol_shot_wounds_test.gd"])
+        self.assertEqual(code, 0)
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --id=projectile/pistol_shot_wounds"])
+
+    def test_changed_maps_scene_edits_to_the_domains_that_compose_them_and_helpers_to_their_users(self):
+        _, lines = self.changed(["scenes/ai/behavior/behavior.gd"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai"])
+        _, lines = self.changed(["tests/_ai/flank_probe.gd"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai"])
+        _, lines = self.changed(["tests/_perf/perf_probe.gd"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: perf"])
+
+    def test_changed_does_not_repeat_a_test_whose_domain_already_runs(self):
+        _, lines = self.changed(["scenes/ai/behavior/behavior.gd", "tests/ai/goal_names_the_gun_test.gd",
+                                 "tests/audio/bank_test.gd", "tests/audio/bank_test.gd.uid"])
+        self.assertEqual([l for l in lines if l.startswith("selection:")],
+                         ["selection: --domain=ai", "selection: --id=audio/bank"])
 
 
 class LintReportTests(unittest.TestCase):

@@ -4,6 +4,8 @@ extends GameTest
 ## from one another (they correlate only loosely, and differ in loudness and in when the toe lands), and each take is
 ## two beats: the heel strikes, then the toe taps a few ms later and softer.
 
+const Probe := preload("res://tests/_audio/sound_probe.gd")
+
 const SAMPLES_PER_MS := 22.05
 
 
@@ -20,26 +22,27 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 400, 300))
 
 
-func _samples(profile: StringName, variant: int) -> PackedFloat32Array:
-	var data: PackedByteArray = SoundBank.sound(profile, variant)["stream"].data
-	var out := PackedFloat32Array()
-	out.resize(int(data.size() / 2.0))
-	for i in out.size():
-		out[i] = data.decode_s16(i * 2) / 32768.0
-	return out
+## Running totals of the samples' magnitudes (`totals[i]` = the sum over the first `i` samples), so the sum over any
+## window is one subtraction.
+func _magnitude_totals(samples: PackedFloat32Array) -> PackedFloat64Array:
+	var totals := PackedFloat64Array()
+	totals.resize(samples.size() + 1)
+	var sum := 0.0
+	for i in samples.size():
+		sum += absf(samples[i])
+		totals[i + 1] = sum
+	return totals
 
 
-## Peak of the smoothed envelope between `from_ms` and `to_ms`.
-func _peak(samples: PackedFloat32Array, from_ms: float, to_ms: float) -> float:
+## Peak of the smoothed envelope (a 4 ms moving average of the magnitudes, from `_magnitude_totals`) between
+## `from_ms` and `to_ms`.
+func _peak(totals: PackedFloat64Array, from_ms: float, to_ms: float) -> float:
 	var peak := 0.0
 	var window := 88  # 4 ms
 	var start := int(from_ms * SAMPLES_PER_MS)
-	var stop := mini(int(to_ms * SAMPLES_PER_MS), samples.size() - window)
+	var stop := mini(int(to_ms * SAMPLES_PER_MS), totals.size() - 1 - window)
 	for i in range(start, stop, 4):
-		var sum := 0.0
-		for j in window:
-			sum += absf(samples[i + j])
-		peak = maxf(peak, sum / window)
+		peak = maxf(peak, (totals[i + window] - totals[i]) / window)
 	return peak
 
 
@@ -63,7 +66,7 @@ func run(t: TestContext) -> void:
 			var profile := StringName("footstep/%s/%s" % [surface, gait])
 			var all: Array = []
 			for v in takes:
-				all.append(_samples(profile, v))
+				all.append(Probe.samples(profile, v))
 			var total := 0.0
 			var pairs := 0
 			var identical := 0
@@ -80,9 +83,10 @@ func run(t: TestContext) -> void:
 			var loudness: Array = []
 			for v in takes:
 				var s: PackedFloat32Array = all[v]
-				heel = _peak(s, 0.0, 30.0)
+				var totals := _magnitude_totals(s)
+				heel = _peak(totals, 0.0, 30.0)
 				# The toe beat: after the heel's first 30 ms, before the step's tail.
-				var toe := _peak(s, 35.0, 110.0)
+				var toe := _peak(totals, 35.0, 110.0)
 				t.check(toe > heel * 0.12, "%s take %d has a toe tap after the heel (%.3f vs heel %.3f)" % [profile, v, toe, heel])
 				var energy := 0.0
 				for x in s:

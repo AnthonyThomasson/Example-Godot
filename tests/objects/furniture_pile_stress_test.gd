@@ -57,7 +57,14 @@ func run(t: TestContext) -> void:
 		travelled += (t.object(_id(i)) as Node2D).global_position.distance_to(starts[i])
 	t.check(travelled / count > 10.0, "the shove actually moved the pieces (avg %.1f px)" % (travelled / count))
 
-	await t.seconds(6.0)
+	# Settle: until every piece is asleep (at most 6 s), so the resting cost below is measured on a pile at rest.
+	var all_asleep := func() -> bool:
+		for i in count:
+			var body := t.object(_id(i)) as RigidBody2D
+			if body != null and not body.sleeping:
+				return false
+		return true
+	await t.until(all_asleep, 6.0)
 	var resting := await Perf.frame_stats(t, RESTING_FRAMES)
 	Perf.within(t, "furniture pile resting avg ms/frame", resting["avg_ms"], RESTING_AVG_MS)
 	var grown := Perf.nodes() - nodes_before

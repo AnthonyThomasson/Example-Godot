@@ -12,7 +12,9 @@ and controller contract, EventBus and character signals) and never reaches into 
 ## Running tests
 
 - **Lint first:** every `tools/run_tests.sh` run starts with `tools/lint.sh` (about 5 s; skipped for `--list`,
-  `--self-test`, `--play` and with `--no-lint`). It loads every project script with the engine's debugger on, the only
+  `--self-test`, `--play`, with `--no-lint`, and when the sources are the ones the last clean lint saw: the wrapper
+  keeps a fingerprint of HEAD plus every uncommitted change in `$TMPDIR`, so a rerun of an unchanged tree does not
+  lint again, while any edit, new file or commit does). It loads every project script with the engine's debugger on, the only
   way a headless run reports GDScript analyzer warnings (unused variable or parameter, integer division, a name that
   shadows a member or built-in, a redundant `await` ...), and prints them per file; any warning ends the run with exit 1
   before a test starts. The engine names no line, so the report gives candidate lines, and the exact `line:col` of each
@@ -45,11 +47,17 @@ and controller contract, EventBus and character signals) and never reaches into 
   `--list [words]` (id, von flag, tags; runs nothing). Domain/id selection is decided from the file
   path, so unselected test scripts are never loaded.
 - **Speed:** `--jobs=N|auto` (wrapper only) splits the run over N parallel godot processes via the runner's
-  `--shard=I/N` (longest `timeout` first onto the lightest shard, so they finish together; Von tests all stay in shard 0), merges their output into one
-  combined total and one `--failed` report. `auto` = cores, at most 4. Not used with `--list`/`--self-test`
-  (the `_a`/`_b` restore pairs need one process in id order). Perf tests budget wall-clock ms about 4x
-  their baseline, so heavy CPU contention is the thing to suspect if one trips only under `--jobs`.
-  `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
+  `--shard=I/N`, merges their output into one combined total, one `Slowest:` list and one `--failed` report.
+  `auto` = cores, at most 6 (the stress tests stay under half their budgets at 6 jobs on a 12-core machine). **Without `--jobs`, a run of the whole suite uses `auto` and any selection (filter
+  words, `--id`, `--domain`, `--failed`, `--repeat`) one process**, since a process costs ~2 s to start; an explicit
+  `--jobs` never starts more processes than the `--id` list has ids. Not used with `--list`/`--self-test`/`--play`/`--shots`
+  (the `_a`/`_b` restore pairs need one process in id order). **Shards are balanced by measured cost:** the wrapper
+  keeps each test's wall-clock ms (the mean of the previous and the latest measurement) in
+  `$TMPDIR/example_godot_costs_<checkout hash>.json`, rewritten only after all shards have finished, and passes it to
+  every shard as `--costs=<file>`; costliest tests go first onto the lightest shard (Von tests all stay in shard 0 and
+  weigh it only when they run). With no costs file (a fresh checkout) it falls back to the declared `timeout`, an
+  unmeasured id costs the median. Perf tests budget wall-clock ms about 4x their baseline, so heavy CPU contention is
+  the thing to suspect if one trips only under `--jobs`. `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
 - **Output:** `--summary` prints only non-passing tests and the totals; every run reports wall-clock ms
   per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` as before.
 - **Other flags:** `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
@@ -58,7 +66,12 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
   runs those domains plus the ones that compose them (its `affected()` table, from the architecture
   dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art and general
-  run everything, and `scenes/testing/` / the Von stub add `--self-test`.
+  run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
+  (`tests/<domain>/<name>_test.gd`) runs only that test** (`--id=<domain>/<name>`; it can only change its own
+  result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
+  `tests/_perf` runs `perf`, `tests/_harness` the self-tests, and an unknown helper folder everything.
+  `GAME_TEST_CHANGED_FILES` (newline-separated paths) stands in for git's view of the changes, which is how
+  `tools/test_log_gate.py` tests this mapping.
 - **Which command?**
 
   | Situation | Command |
@@ -66,7 +79,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   | One test | `tools/run_tests.sh --id=<domain>/<name>` |
   | Just saw failures, fixed something | `tools/run_tests.sh --failed` |
   | Finished an edit | `tools/run_tests.sh --changed --summary` |
-  | Before committing / big change | `tools/run_tests.sh --jobs=auto --summary` |
+  | Before committing / big change | `tools/run_tests.sh --summary` (the whole suite shards over `auto` jobs by default) |
   | Intermittent | `--id=<id> --repeat=10` (`--seed=N` pins the layout) |
   | What exists? | `tools/run_tests.sh --list [words]` |
   | Edited `scenes/testing/` | `tools/run_tests.sh --self-test` (`--changed` adds it) |
@@ -199,7 +212,8 @@ func run(t: TestContext) -> void:
 
 Regression guards for speed and runaway object counts. They are ordinary tests in the domain they
 load (`tests/ai/npc_crowd_stress`, `navigation/bake_and_path_stress`, `objects/furniture_pile_stress`,
-`physics/crowd_deaths_stress`, `physics/hit_overload_stress`, `projectile/bullet_barrage_stress`,
+`physics/crowd_deaths_stress`, `physics/hit_overload_stress`, `projectile/automatic_fire_stress` (SMGs and
+rifles on the trigger plus pistols clicking: one run covers the single-shot and the automatic path),
 `worldgen/generate_houses_stress`), so `--changed` runs them with their domain and
 `tools/run_tests.sh perf` runs just them. The shared helper is `tests/_perf/perf_probe.gd`
 (`const Perf := preload(...)`; not a test).

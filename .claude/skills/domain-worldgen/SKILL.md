@@ -35,8 +35,8 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
   hang off them) and `max_doors` (a bathroom has exactly one door); `LINKS` = the room-type pairs that may
   share an interior door (bathrooms only open onto a hallway, bedroom, living space or studio; a garage
   only onto kitchen/laundry/hallway). `LayoutRules.check(rooms, openings)` returns one string per
-  violation; `HouseSpawner._validate` warns with them and `tests/worldgen/house_layout_logical_test.gd`
-  fails on any plan. A new room type needs its `ROOMS`/`LINKS` entries before a plan can use it. Bedrooms
+  violation; `HouseSpawner._validate` warns with them and `tests/worldgen/house_doorways_connected_test.gd`
+  fails on any plan (`layout_rules_test.gd` pins the validator itself against illogical layouts). A new room type needs its `ROOMS`/`LINKS` entries before a plan can use it. Bedrooms
   and bathrooms open off a **hallway** (type `hallway`, ≥120 px deep: `family_home`, `luxury_home`) or a
   living space, never off each other.
 - **Catalogues** (`worldgen/categories/*.gd`, one `<Name>Catalog` per room type; `general.gd`
