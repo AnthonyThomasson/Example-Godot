@@ -3,9 +3,9 @@
 
   python3 tools/audit_scan.py [deps|dead|signals|facts|all]
 
-  deps     unit -> unit edge matrix by class_name use (scenes/ai/<sub>/ is its own unit; main.gd is
-           the composition root and skipped). Every edge must be a vital interface in the
-           `architecture` skill.
+  deps     unit -> unit edge matrix by class_name use in code (comments and string literals are ignored;
+           scenes/ai/<sub>/ is its own unit; main.gd is the composition root and skipped). Every edge
+           must be a vital interface in the `architecture` skill.
   dead     functions nothing references and declarations (const/var/signal/enum) nothing reads —
            any non-comment token anywhere in scenes/ tests/ tools/ addons/ counts as a reference.
   signals  every signal with its emit sites and its listeners (connect / await / .tscn wiring).
@@ -46,6 +46,22 @@ def strip_comment(line: str) -> str:
         elif c == "#":
             return line[:i]
     return line
+
+
+def strip_strings(line: str) -> str:
+    """The line with the contents of its string literals removed (the quotes stay): a class name inside a string is text."""
+    out = []
+    quote = None
+    for i, c in enumerate(line):
+        if quote:
+            if c == quote and line[i - 1] != "\\":
+                quote = None
+                out.append(c)
+        else:
+            if c in "\"'":
+                quote = c
+            out.append(c)
+    return "".join(out)
 
 
 def read(path: str) -> str:
@@ -90,7 +106,7 @@ def deps() -> None:
         if u == "main":
             continue
         for l in read(f).split("\n"):
-            for m in pattern.finditer(l):
+            for m in pattern.finditer(strip_strings(l)):
                 t = owner[m.group(1)]
                 if t != u:
                     edges[(u, t)][m.group(1)] += 1

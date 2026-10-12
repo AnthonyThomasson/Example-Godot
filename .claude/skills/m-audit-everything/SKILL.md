@@ -176,9 +176,9 @@ almost nothing. Start from the edge matrix:
 python3 -I tools/audit_scan.py deps
 ```
 
-It prints every `unit -> unit` edge with the symbols crossing it (`scenes/ai/<sub>/` counts as its
-own unit; `scenes/main.gd` is the composition root and is *allowed* to know every domain, so it is
-skipped). Then check:
+It prints every `unit -> unit` edge with the symbols crossing it, counting class names used in code
+(comments and string literals are ignored; `scenes/ai/<sub>/` counts as its own unit; `scenes/main.gd`
+is the composition root and is *allowed* to know every domain, so it is skipped). Then check:
 
 1. **Every edge is published.** Each row must correspond to a vital interface or the dependency graph
    in the `architecture` skill. An edge that isn't is the smell; fix by rerouting through the existing
