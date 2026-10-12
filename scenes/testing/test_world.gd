@@ -183,8 +183,10 @@ func _spawn_actor(a: Dictionary, switches: Dictionary) -> Node:
 		# The AI learns the house's rooms from its composer (main.gd does the same).
 		if child.has_method("control") and "rooms" in child:
 			child.rooms = rooms
+	# Positioned before it joins the tree: a body added at the origin and moved afterwards launches whatever
+	# stands there (the same trap `match_spawner.gd` avoids).
+	character.position = to_local(a["position"])
 	add_child(character)
-	character.global_position = a["position"]
 	return character
 
 

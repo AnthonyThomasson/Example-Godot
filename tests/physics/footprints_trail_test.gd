@@ -41,7 +41,8 @@ func run(t: TestContext) -> void:
 	t.check(trail.size() <= 30, "the trail ends instead of running forever (%d)" % trail.size())
 
 	var first_x: float = trail[0]["poly"][0].x
-	t.check(first_x > SPLAT_AT.x - SPLAT_SIZE * 3.0, "no prints before the splatter (first at x=%.0f)" % first_x)
+	# A satellite droplet lands up to `splat_satellite_reach_max` (3.4) core radii out, so a foot may print that far short.
+	t.check(first_x > SPLAT_AT.x - SPLAT_SIZE * 4.0, "no prints before the splatter (first at x=%.0f)" % first_x)
 	# Past the splatter and its satellites no foot can pick blood up again, so each only ever fades.
 	var clear: Array = trail.filter(func(m): return m["poly"][0].x > SPLAT_AT.x + SPLAT_SIZE * 4.0)
 	var tapering := clear.size() >= 4

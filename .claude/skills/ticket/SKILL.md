@@ -20,6 +20,7 @@ Interact with GitHub through the **GitHub CLI** (`gh`): read tickets with `gh is
    | Label | Skill |
    |---|---|
    | `spike` | `ticket-spike` |
+| `bug` | `ticket-bug` |
 
    Invoke the skill by name through the `Skill` tool, then follow it. A ticket with several labels: invoke
    each matching skill. A label with no skill listed here (e.g. `harness`) is a topic tag, not a ticket kind —
