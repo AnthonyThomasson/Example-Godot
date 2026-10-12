@@ -59,21 +59,25 @@ func tick(delta: float) -> void:
 	fire_timer -= delta
 
 
-## Shoot `target` (a known-contact dict) when it is in range with a clear line, once the facing has settled on it; aims at
-## it meanwhile. No-op without a loaded gun (or mid-reload) or with an empty `target`.
-func fire_at_will(character, target: Dictionary) -> void:
+## Whether `target` (a known-contact dict) can be shot at now: a loaded gun not mid-reload, the target within range, and a clear
+## line to where it is known to be. The cooldown, the facing and a run are not counted: they pass in a moment, this says
+## the NPC is in a position to fire.
+func can_fire_at(character, target: Dictionary) -> bool:
 	var gun: int = character.gun_slot()
-	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading():
-		return
-	if target.is_empty():
+	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading() or target.is_empty():
+		return false
+	var pos: Vector2 = target["pos"]
+	return character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(character, target["node"], pos)
+
+
+## Shoot `target` (a known-contact dict) when it can be shot at (`can_fire_at`), once the facing has settled on it; aims at it
+## meanwhile. No-op otherwise.
+func fire_at_will(character, target: Dictionary) -> void:
+	if not can_fire_at(character, target):
 		return
 	var pos: Vector2 = target["pos"]
-	if character.global_position.distance_to(pos) > shoot_range:
-		return
-	if not _perception.has_line_to(character, target["node"], pos):
-		return
 	character.aim_point = pos
-	if fire_timer <= 0.0 and absf(character.facing.angle_to(pos - character.global_position)) <= AIM_TOLERANCE:
+	if fire_timer <= 0.0 and _faces(character, pos):
 		shoot(character)
 
 
@@ -81,7 +85,7 @@ func fire_at_will(character, target: Dictionary) -> void:
 func ambush(character, node, pos: Vector2) -> void:
 	character.move_input = Vector2.ZERO
 	if character.global_position.distance_to(pos) <= shoot_range \
-			and _perception.has_line_to(character, node, pos) and fire_timer <= 0.0:
+			and _perception.has_line_to(character, node, pos) and fire_timer <= 0.0 and _faces(character, pos):
 		shoot(character)
 
 
@@ -106,11 +110,12 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 	# PEEK: take the shot if a clear line to the known position is in range, else reposition to get one.
 	if dist <= shoot_range and _perception.has_line_to(character, node, pos):
 		character.move_input = Vector2.ZERO
-		if fire_timer <= 0.0:
-			shoot(character)
-			# A gun whose barrel is against something (stepping back to clear it) has not shot yet: keep
-			# peeking until it does, rather than ducking without having fired.
-			if _back_off_timer <= 0.0:
+		# Shoot only once the facing has settled on it. A refused shot (a barrel against a wall stepping back, a reload under
+		# way) keeps the NPC peeking until it fires, rather than ducking without having fired; a click on an empty gun
+		# ducks, where the cover phase reloads it.
+		if fire_timer <= 0.0 and _faces(character, pos):
+			var fired := shoot(character)
+			if fired or character.ammo(character.gun_slot()) == 0:
 				phase = "cover"
 				cover_timer = cover_time
 				dest_timer = 0.0  # Pick a cover spot immediately after shooting.
@@ -199,11 +204,22 @@ func apply_back_off(character, delta: float) -> void:
 ## Reflex: swap in a fresh magazine when the gun is empty and one is carried (`auto_reload`). It
 ## equips the gun first, since a reload works on the held item.
 func reload_if_dry(character) -> void:
-	var gun: int = character.gun_slot()
-	if not auto_reload or gun < 0 or character.is_reloading() or character.ammo(gun) != 0 or not character.can_reload(gun):
+	if not reload_due(character):
 		return
-	character.select_slot(gun)
+	character.select_slot(character.gun_slot())
 	character.reload()
+
+
+## Whether the reload reflex is due: `auto_reload` is on and the gun is empty with a spare magazine to put in it. (A reload runs
+## only while standing, so a run is dropped for it.)
+func reload_due(character) -> bool:
+	var gun: int = character.gun_slot()
+	return auto_reload and gun >= 0 and not character.is_reloading() and character.ammo(gun) == 0 and character.can_reload(gun)
+
+
+## Whether the facing has settled on world point `pos` (within `AIM_TOLERANCE`).
+func _faces(character, pos: Vector2) -> bool:
+	return absf(character.facing.angle_to(pos - character.global_position)) <= AIM_TOLERANCE
 
 
 ## The committed destination for the current phase `kind`: the nearest spot with a clear shot ("peek") or the nearest

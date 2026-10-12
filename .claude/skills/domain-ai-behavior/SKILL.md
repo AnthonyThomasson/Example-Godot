@@ -1,6 +1,6 @@
 ---
 name: domain-ai-behavior
-description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload / entry) and the System-Two state Von lacks: the tactical entry phase machine (entry.gd: stack, slice the pie, cross, corners, clear, rear security, over the team radio), engagement + retargeting, territorial confinement, posture and run policy, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, room queries, furniture bulldozing). The fighting itself is `domain-ai-combat` (combat.gd) and room search by sight is `domain-ai-coverage` (search_coverage.gd). Use when editing scenes/ai/behavior/ (behavior.gd, entry.gd, locomotion.gd) or working on how a chosen option becomes movement, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
+description: Deep implementation detail for the AI BEHAVIOUR sub-domain (scenes/ai/behavior/) — running the decision planner's leaf as one primitive (move / engage / melee / interact / hold / reload / entry) and the System-Two state Von lacks: the tactical entry phase machine (entry.gd: stack, slice the pie, cross, corners, clear, rear security, over the team radio), engagement + retargeting, territorial confinement, posture and run policy, commitment (when a running choice re-decides), the full-path debug label, and the locomotion layer (nav pathing, room queries, furniture bulldozing). The fighting itself is `domain-ai-combat` (combat.gd), room search by sight is `domain-ai-coverage` (search_coverage.gd) and where it looks and when it takes the shot is `domain-ai-watch` (watch.gd). Use when editing scenes/ai/behavior/ (behavior.gd, entry.gd, locomotion.gd) or working on how a chosen option becomes movement, holding ground, commitment/dwell timers, or pathing. Complements the light `domain-ai` overview and the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI · Behaviour sub-domain (`scenes/ai/behavior/`)
@@ -15,6 +15,7 @@ Files:
 - `behavior.gd` — the primitive executor (a `Node`); owns engagement + commitment state, posture / run policy and the read-outs.
 - `combat.gd` — shots, punches, bursts, back-off, the peek-and-cover cycle (`RefCounted`; `domain-ai-combat`).
 - `search_coverage.gd` — covering a room by sight (`RefCounted`; `domain-ai-coverage`).
+- `watch.gd` + the watch stage of `behavior.gd` — where it looks and when it takes the shot, in every primitive (`RefCounted`; `domain-ai-watch`, spec `docs/gaze-and-fire.md`).
 - `entry.gd` — a tactical entry through a doorway, as a team member or alone (`RefCounted`; see "Tactical entry" below).
 - `locomotion.gd` — the pathing layer (a `Node` child of behaviour); owns the NavigationAgent2D and answers `room_key_at(p)` / `inside_house(p)`.
 
@@ -27,27 +28,36 @@ fields are read live, so only those modules need the push.)
 
 | Primitive | Params | What it does | Done / re-decides |
 |---|---|---|---|
-| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `fire_at_will`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked; with `fire_at_will`, shoots a known hostile on a clear line once facing settles (`Combat.fire_at_will`). Holds on arrival. A `look_around` move (search / explore) walks all the way INTO the room, then **covers it by sight** (`search_coverage.gd`, the `domain-ai-coverage` skill) until it has SEEN the room or its budget runs out. ADVANCE is a `move` with `aim: target` + `fire_at_will`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
+| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked (a threat in sight takes the eyes and the gun: the watch stage, below). Stops on arrival. A `look_around` move (search / explore) walks all the way INTO the room, then **covers it by sight** (`search_coverage.gd`, the `domain-ai-coverage` skill) until it has SEEN the room or its budget runs out. ADVANCE is a `move` with `aim: target`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
 | `engage` | `point` (anchor), `target_id`, `style` (peek_cover / ambush), `confine_inside` | Path to the anchor firing at will, then fight from it: **peek-and-cover** (peek to the nearest spot with a clear shot, fire on `fire_cooldown`, duck to cover for `cover_time`, positions committed for `reposition_interval`) or **ambush** (hold the covered spot, fire the moment a line opens). ENGAGE and FLANK use this, anchored at the chosen spot or side. | Moving: at `max_commit_time`. In position: every `tactic_interval` (timer starts on arrival) or when `engaged` lapses. |
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
-| `reload` | — | Equip the gun (`gun_slot()`), stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
-| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. The entry guard (below) also runs it, as a detour in the middle of another order. |
-| `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
+| `reload` | — | Equip the gun (`gun_slot()`), stand still (its eyes where the watch stage puts them) and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
+| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots a threat in sight in every phase (the watch stage). | When the entry is over (room clear, rear watch done, or given up); never on the cadence. The entry guard (below) also runs it, as a detour in the middle of another order. |
+| `hold` | — | Stand; the watch stage looks at the threat (and shoots it) or turns among the room's doorways. | Decide cadence. |
+
+**Gaze and fire** are a policy too, the **watch stage** (`Behavior._apply_watch`, `watch.gd`; the `domain-ai-watch` skill, spec `docs/gaze-and-fire.md`):
+after the primitive steers, a threat in sight (or one seen a moment ago with a clear line) takes the NPC's eyes and gun whatever the primitive
+is (a move, a hold, a reload, an engage still walking, any entry phase; not a melee, an arrived engage or an interaction); no primitive
+or entry phase has its own fire call. With no threat a walker looks down its path (`Watch.travel_point`) and a resting NPC (hold / reload /
+an arrived move) turns among its room's doorways. An arrived move zeroes `move_input`. Tests: `tests/ai/gaze_*`,
+`entry_guard_fires_from_outside`, `fire_dry_gun_on_move_reloads`, `engaged_retargets_to_visible`.
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
 NPC's combat leaves) and a contact last seen outside, `Behavior` sets `hold_ground`, which `Combat` honours (see `domain-ai-combat`).
 
-**Running** is a behaviour policy, not a primitive: after the primitive steers, `_should_run()` sets
+**Running** is a behaviour policy, not a primitive: after the primitive steers and the watch stage has picked its threat, `_should_run()` sets
 `character.run_input` only while TRAVELLING (a `move` or `engage` not yet arrived — never a `look_around`
 search, ambush/peek, interaction, hold or tactical entry — or a `melee` closing in), when the leaf carries `run: true` or
 the NPC is under fire, the destination is farther than `run_min_distance` (straight line), and a run can
 start (`run_start_fraction` of the stamina bar, or already running). The Character spends the stamina and
 walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `run_start_fraction`.
 `debug_status()` reads "running" / "running into position" while it sprints; `debug_state()` has `running`.
-A running NPC cannot shoot (`Character.shoot()` is ignored while running): `Combat.shoot()` skips a shot
-while `is_running()` without spending the fire cooldown, so it fires as soon as the run ends.
-Test: `tests/ai/ai_runs_to_destination_test.gd`.
+A running NPC cannot shoot or reload (`Character.shoot()` is ignored while running), so `_should_run` is false while a shot is available
+(`Combat.can_fire_at(threat)`: loaded, in range, clear line) or the reload reflex is due (`Combat.reload_due`): it drops to a walk and
+takes the shot instead of sprinting on past its range. A leaf with `run_through_fire` (the RETREAT node) keeps sprinting. `Combat.shoot()`
+still skips a shot while `is_running()` without spending the fire cooldown.
+Tests: `tests/ai/ai_runs_to_destination_test.gd`, `retreat_keeps_running_test.gd`.
 
 **Posture** is a behaviour policy too (spec: `docs/cover-and-stance.md`, A1 to A3): after the primitive has steered and `run_input` is set,
 `_apply_posture` writes the posture `_wanted_posture` asks for through `Character.set_posture` (idempotent, so every tick). Everything outside a

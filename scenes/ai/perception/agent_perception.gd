@@ -716,6 +716,12 @@ func entry_watch_doors(into: String, opening_id: String) -> Array:
 	return _entry.watch_doors(into, opening_id, is_cleared)
 
 
+## Every doorway of room `room_key`, outer doors included, as `{ id, pos, width }` (see agent_entry.gd `room_doorways`): the
+## places a resting NPC watches.
+func room_doorways(room_key: String) -> Array:
+	return _entry.room_doorways(room_key)
+
+
 ## The allies' live claims on doorway `opening_id`, off the radio: `{ id, name, slot, side, step, covering, pos, age }`,
 ## lowest slot first (see agent_entry.gd `claims`).
 func entry_team(opening_id: String) -> Array:

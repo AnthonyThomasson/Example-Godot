@@ -17,6 +17,8 @@ static var active := false
 static var fail := false
 static var rules: Array = []
 static var requests: Array = []
+## Physics frames an answer is held back, like a slow server (0 = the next frame). The old leaf keeps running meanwhile.
+static var latency_frames := 0
 
 
 ## The id to answer `options` (id → description) with, or "" when `fail` is set. Logs the request.

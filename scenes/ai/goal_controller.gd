@@ -223,6 +223,14 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 ## Seconds a doorway whose entry was given up (a fight, a failed start) is left alone before the guard may try it again.
 @export var entry_guard_rearm: float = 6.0
 
+@export_group("Watch")
+## How far (px) down its path a walking NPC looks: through the doorway it is lining up, not at the wall beside it.
+@export var watch_look_ahead: float = 150.0
+## Seconds a resting NPC looks at one doorway of its room before turning to the next.
+@export var watch_door_dwell: float = 2.5
+## Seconds a hostile that is no longer in sight still holds the NPC's eyes, while it has a clear line to where it was.
+@export var watch_lost_gaze: float = 2.0
+
 @export_group("Vision")
 ## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
 @export var vision_enabled: bool = true
@@ -444,6 +452,9 @@ func _apply_config() -> void:
 	_behavior.entry_guard = entry_guard
 	_behavior.entry_guard_range = entry_guard_range
 	_behavior.entry_guard_rearm = entry_guard_rearm
+	_behavior.watch_look_ahead = watch_look_ahead
+	_behavior.watch_door_dwell = watch_door_dwell
+	_behavior.watch_lost_gaze = watch_lost_gaze
 	_behavior.apply_config()
 
 

@@ -6,9 +6,8 @@ extends Node
 ## interaction in progress, and the COMMITMENT that keeps a choice running until it completes or a
 ## re-decision is due. The primitives:
 ##   move     — go to `point` (or until entering `arrive_room`), aiming along the way (`aim`: travel /
-##              target / threat / point), shooting a known hostile on a clear line when `fire_at_will`; a
-##              `look_around` search move covers the room by sight (`search_coverage.gd`): it turns and relocates
-##              until it has seen all of it.
+##              target / threat / point); a `look_around` search move covers the room by sight
+##              (`search_coverage.gd`): it turns and relocates until it has seen all of it.
 ##   engage   — go to `point`, then fight `target_id` from there: `peek_cover` (step out, shoot, duck)
 ##              or `ambush` (hold the covered spot, fire the moment a line opens).
 ##   melee    — close on `target_id` and punch.
@@ -17,8 +16,9 @@ extends Node
 ##   entry    — go through doorway `opening` into room `into` as a team member or alone: stack, slice the pie,
 ##              cross without stopping, take a corner, clear the room (`entry.gd`).
 ##   hold     — stay and watch.
-## It never chooses WHAT to do — the planner does — and applies no policy beyond the params it is
-## handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
+## Whatever the primitive, a final WATCH stage (`watch.gd`, `docs/gaze-and-fire.md`) puts a threat in sight under the NPC's eyes and
+## gun and, with none, makes it look down its path or at its doors. It never chooses WHAT to do — the planner does — and applies no
+## policy beyond the params it is handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
 ## `Locomotion` child for all pathing, a `Combat` module (shots, punches, bursts, the peek-and-cover cycle) and a
 ## `SearchCoverage` module, reads the world only through the PERCEPTION sub-domain (known
 ## contacts, combat geometry, engagement memory) and drives the character only through its public
@@ -29,6 +29,7 @@ const Locomotion := preload("res://scenes/ai/behavior/locomotion.gd")
 const Combat := preload("res://scenes/ai/behavior/combat.gd")
 const SearchCoverage := preload("res://scenes/ai/behavior/search_coverage.gd")
 const Entry := preload("res://scenes/ai/behavior/entry.gd")
+const Watch := preload("res://scenes/ai/behavior/watch.gd")
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
@@ -74,6 +75,9 @@ var entry_approach_time: float = 20.0
 var entry_guard: bool = true
 var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).
 var entry_guard_rearm: float = 6.0 ## Seconds a doorway whose entry was given up is left alone before the guard may start another.
+var watch_look_ahead: float = 150.0 ## A walking NPC looks this far (px) down its path.
+var watch_door_dwell: float = 2.5   ## A resting NPC looks at one doorway this long (s) before the next.
+var watch_lost_gaze: float = 2.0    ## A hostile out of sight keeps the NPC's eyes this long (s) while there is a clear line to where it was.
 
 ## World-space room rects (`{ key, type, rect }`), set each tick by the controller from Main's inject; handed on to the
 ## Locomotion child, which answers the room queries.
@@ -88,6 +92,9 @@ var _loco: Node                   ## The Locomotion child (pathing, rooms).
 var _coverage: RefCounted         ## Room coverage by sight for a search move; see search_coverage.gd.
 var _combat: RefCounted           ## Shots, punches, bursts and the peek-and-cover cycle; see combat.gd.
 var _entry: RefCounted            ## A tactical entry through a doorway; see entry.gd.
+var _watch: RefCounted            ## The threat that takes the eyes and the doors a resting NPC watches; see watch.gd.
+var _threat: Dictionary = {}      ## The contact holding the NPC's eyes and gun this tick ({} = none); see `_apply_watch`.
+var _gaze := "primitive"          ## What set the gaze this tick, for the read-outs: threat / doors / primitive.
 var _entry_pending := false       ## An ENTER leaf was adopted and its entry starts on the next tick (it needs the character).
 var _resume := {}                 ## The leaf an entry detour paused (see `_begin_detour`); {} when the entry is the NPC's own order.
 var _guard_clock := 0.0           ## Seconds the guard has been watching (sim time), for the re-arm of a given-up doorway.
@@ -135,8 +142,10 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_combat = Combat.new()
 	_combat.setup(_loco, perception)
 	_combat.dry.connect(_on_dry)
+	_watch = Watch.new()
+	_watch.setup(_loco, perception)
 	_entry = Entry.new()
-	_entry.setup(_loco, perception, _coverage)
+	_entry.setup(_loco, perception, _coverage, _watch)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
@@ -144,6 +153,10 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 ## decision to pick up an export retuned at runtime.
 func apply_config() -> void:
 	_loco.arrive_dist = arrive_dist
+	_watch.look_ahead = watch_look_ahead
+	_watch.door_dwell = watch_door_dwell
+	_watch.lost_gaze = watch_lost_gaze
+	_watch.look_rate = search_look_rate
 	_coverage.spacing = search_coverage_spacing
 	_coverage.target_fraction = search_coverage_target
 	_coverage.budget_max = search_coverage_budget
@@ -291,6 +304,7 @@ func debug_state() -> Dictionary:
 		"combat_phase": _combat.phase,
 		"hold_ground": _hold_ground,
 		"hostiles_known": _hostiles.size(),
+		"gaze": { "mode": _gaze, "threat": str(_threat["node"].name) if not _threat.is_empty() and is_instance_valid(_threat["node"]) else "" },
 		"in_interaction": _in_interaction,
 		"timers": {
 			"commit": _commit_timer,
@@ -406,7 +420,6 @@ func debug_combat(character) -> Dictionary:
 		"fire_cooldown": fire_cooldown,
 		"combat_dest": _combat.dest if _primitive == &"engage" and _arrived and _combat.dest != Vector2.ZERO else null,
 		"aim_point": character.aim_point if character != null else Vector2.ZERO,
-		"fire_at_will": bool(_params.get("fire_at_will", false)),
 		"reloading": _reloading,
 		"requested_point": _params["point"] if _params.has("point") else null,
 		"point": (_point as Variant) if _params.has("point") else null,
@@ -485,6 +498,7 @@ func _adopt(leaf: Dictionary) -> void:
 	_arrive_room = str(_params.get("arrive_room", ""))
 	_look_around = bool(_params.get("look_around", false))
 	_coverage.reset()           # Room sample points are built on arrival, once we know which room we're in.
+	_watch.reset()
 	_point = _loco.reachable(_params["point"]) if _params.has("point") else Vector2.ZERO
 	_target_obj = null
 	_engage_id = 0
@@ -549,6 +563,12 @@ func update_known(known: Array, delta: float) -> bool:
 	for c in _hostiles:
 		if c["id"] == _engage_id:
 			engaged = c
+	if not engaged.is_empty() and not engaged["visible"]:
+		# The one it is fighting has slipped out of sight and another stands in plain view: fight that one.
+		var seen: Array = _hostiles.filter(func(c): return c["visible"])
+		if not seen.is_empty():
+			engaged = seen[0]
+			_engage_id = engaged["id"]
 	if engaged.is_empty():
 		engaged = _hostiles[0] if not _hostiles.is_empty() else {}
 		_engage_id = engaged.get("id", 0)
@@ -641,6 +661,7 @@ func apply(character, delta: float) -> void:
 			_apply_entry(character, delta)
 		_:
 			_apply_hold(character)
+	_apply_watch(character, delta)
 	_guard_clock += delta
 	_entry_guard(character)
 	_combat.continue_burst(character)
@@ -650,6 +671,50 @@ func apply(character, delta: float) -> void:
 	_running = character.is_running()
 	_posture = character.posture()
 	_reloading = character.is_reloading()
+
+
+## The watch stage (docs/gaze-and-fire.md), run after the primitive has steered: an NPC is always either looking at (and, when
+## it can, shooting) a threat, or watching its doors, never a wall and never with its back to a known threat. A threat
+## (`Watch.threat`: the hostile it is fighting or the nearest it sees, else one it saw a moment ago with a clear line to where
+## it was) takes the eyes and the gun whatever the primitive is doing: `Combat` shoots it as soon as a shot is on, and an empty
+## gun is reloaded. A melee and an engaged NPC in position fight their own target and aim at it themselves; an interaction has
+## its own gaze. With nothing to look at, a resting NPC (a hold, a reload, a move that has arrived) turns among its room's doorways.
+func _apply_watch(character, delta: float) -> void:
+	_threat = {}
+	_gaze = "primitive"
+	if character.is_busy():
+		return
+	match _primitive:
+		&"melee", &"interact":
+			return
+		&"engage":
+			if _arrived:
+				return
+	var t: Dictionary = _watch.threat(_hostiles, _engage_id)
+	if not t.is_empty() and not t["visible"] and not _perception.has_line_to(character, t["node"], t["pos"]):
+		t = {}  # Remembered behind a wall: not worth staring at the wall for.
+	if not t.is_empty():
+		_threat = t
+		_gaze = "threat"
+		character.aim_point = t["pos"]
+		_combat.fire_at_will(character, t)
+		if not _entry.committed():
+			_combat.reload_if_dry(character)
+		return
+	if _resting():
+		_gaze = "doors"
+		_watch.idle_gaze(character, delta)
+
+
+## Whether the running primitive leaves the NPC standing with nowhere in particular to look: a hold, a reload, a move that has
+## arrived (and is not covering the room by sight).
+func _resting() -> bool:
+	match _primitive:
+		&"hold", &"reload":
+			return true
+		&"move":
+			return _arrived and not _look_around
+	return false
 
 
 ## The gun ran dry mid-fight: the task is resolved, so the controller re-decides (the empty gun is in the snapshot now).
@@ -690,12 +755,14 @@ func _wanted_posture(character) -> StringName:
 	return &"crouch"
 
 
-## Whether to sprint this tick, judged after the primitive has steered: only while travelling to a
+## Whether to sprint this tick, judged after the primitive has steered and the watch stage has picked its threat: only while travelling to a
 ## destination (a move or engage approach that hasn't arrived, a melee closing in; never an ambush,
 ## peek, room search, interaction, hold or tactical entry — a running character cannot shoot, so an entrant
 ## walks with its gun up from the moment it heads for the door), when the leaf asks for it (`params.run`) or the NPC is under
 ## fire, the destination is farther than `run_min_distance`, and a run can be started (stamina
-## `run_start_fraction`, or already running). The Character spends the stamina and runs dry on its own.
+## `run_start_fraction`, or already running). It never sprints with a shot to take or an empty gun to reload (a running
+## character can do neither), except a retreat (`params.run_through_fire`), which is about leaving the line, not trading shots.
+## The Character spends the stamina and runs dry on its own.
 func _should_run(character) -> bool:
 	if not run_enabled or character.move_input == Vector2.ZERO:
 		return false
@@ -715,14 +782,17 @@ func _should_run(character) -> bool:
 		return false
 	if character.global_position.distance_to(dest) <= run_min_distance:
 		return false
+	if not _threat.is_empty() and not bool(_params.get("run_through_fire", false)) \
+			and (_combat.can_fire_at(character, _threat) or _combat.reload_due(character)):
+		return false  # A shot (or the reload an empty gun needs) is on: a running character can do neither, so walk and take it.
 	return character.is_running() or character.stamina_fraction() >= run_start_fraction
 
 
-## Move: walk to the destination (or into the destination room), aiming as the leaf asks, and — when
-## `fire_at_will` — shoot a known hostile the moment there is a clear line. A `look_around` move (search /
-## explore) walks all the way to the interior point and, on arrival, COVERS the room by sight — turning
-## and relocating until it has seen (near-)every sampled point (see `search_coverage.gd`) — before flagging
-## the task resolved; any other move flags resolved the moment it arrives.
+## Move: walk to the destination (or into the destination room), aiming as the leaf asks (a threat in sight takes the
+## eyes and the gun in the watch stage). A `look_around` move (search / explore) walks all the way to the interior
+## point and, on arrival, COVERS the room by sight — turning and relocating until it has seen (near-)every sampled
+## point (see `search_coverage.gd`) — before flagging the task resolved; any other move stops on arrival and flags
+## resolved at once.
 func _apply_move(character, delta: float) -> void:
 	if not _arrived:
 		if _arrive_room != "" and not _look_around:
@@ -744,13 +814,13 @@ func _apply_move(character, delta: float) -> void:
 			if covered != "":
 				_perception.mark_cleared(covered)  # Seen all of it: cleared, as by an entry.
 		return
+	else:
+		character.move_input = Vector2.ZERO  # Arrived: stand. (The last steering input would walk it on into the wall ahead.)
 	_aim_move(character)
-	if _params.get("fire_at_will", false):
-		_fire_at_will(character)
 
 
-## Where a moving NPC looks: its target, the nearest known threat, the destination, or (default) the
-## direction of travel so its view cone sweeps ahead.
+## Where a moving NPC looks when no threat has its eyes (`_apply_watch` puts one there): its target, the nearest known
+## threat, the destination, or (default) a few paces down its path, so its view cone sweeps the way it is going.
 func _aim_move(character) -> void:
 	match _params.get("aim", &"travel"):
 		&"target":
@@ -764,17 +834,11 @@ func _aim_move(character) -> void:
 		&"point":
 			character.aim_point = _point
 			return
-	if character.move_input != Vector2.ZERO:
+	var ahead: Vector2 = _watch.travel_point(character)
+	if ahead != Vector2.INF:
+		character.aim_point = ahead
+	elif character.move_input != Vector2.ZERO:
 		character.aim_point = character.global_position + character.move_input * 100.0
-
-
-## Shoot the engaged (else nearest) known hostile when `Combat` finds it in range on a clear line.
-func _fire_at_will(character) -> void:
-	var target: Dictionary = {}
-	for c in _hostiles:
-		if c["id"] == _engage_id or target.is_empty():
-			target = c
-	_combat.fire_at_will(character, target)
 
 
 ## Engage: walk to the chosen spot (shooting on the way when a line opens), then fight from it —
@@ -790,7 +854,6 @@ func _apply_engage(character, delta: float) -> void:
 		_arrived = _loco.reached(character, _point)
 		if not _arrived:
 			_loco.move_to(character, _point)
-			_fire_at_will(character)
 			return
 		_tactic_timer = tactic_interval  # In position: the tactic gets its full run from here.
 		_perception.note_engaged()
@@ -811,9 +874,10 @@ func _apply_melee(character) -> void:
 	_combat.melee(character, _engage_pos, _hold_ground)
 
 
-## Entry: start the entry on the first tick (it needs the character), then run its phases; it shoots a known
-## hostile on a clear line once it is crossing or in the room. Done (the room clear, or the entry given up) → re-decide.
+## Entry: start the entry on the first tick (it needs the character), then run its phases (the watch stage shoots a threat in
+## sight in every one of them). Done (the room clear, or the entry given up) → re-decide.
 func _apply_entry(character, delta: float) -> void:
+	_entry.gaze_held = not _threat.is_empty()
 	if _entry_pending:
 		_entry_pending = false
 		if not _entry.begin(character, _params):
@@ -821,9 +885,6 @@ func _apply_entry(character, delta: float) -> void:
 			return
 	if _entry.step(character, delta):
 		_finish_entry()
-		return
-	if _entry.fires_at_will():
-		_fire_at_will(character)
 
 
 ## The entry is over, or could not start. As the NPC's own order (ENTER) it resolves and the NPC re-decides. As a detour
@@ -947,22 +1008,18 @@ func _apply_interact(character) -> void:
 		_resolved = true
 
 
-## Hold: stand still and watch the nearest known hostile, if any. An empty gun is reloaded meanwhile,
-## so a steady NPC (no decision to be had) isn't left unarmed.
+## Hold: stand still. Where it looks is the watch stage's (`_apply_watch`): a threat if one has its eyes, else the doors. An
+## empty gun is reloaded meanwhile, so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold(character) -> void:
 	character.move_input = Vector2.ZERO
-	if not _hostiles.is_empty():
-		character.aim_point = _hostiles[0]["pos"]
 	_combat.reload_if_dry(character)
 
 
-## Reload: stand and swap magazines, watching the nearest known hostile; when the reload ends (or can't
-## start) the task is resolved and the NPC re-decides. A reload refused while the previous leaf's run is
+## Reload: stand and swap magazines, its eyes where the watch stage puts them (a threat, else the doors); when the reload
+## ends (or can't start) the task is resolved and the NPC re-decides. A reload refused while the previous leaf's run is
 ## still winding down is retried the next tick.
 func _apply_reload(character) -> void:
 	character.move_input = Vector2.ZERO
-	if not _hostiles.is_empty():
-		character.aim_point = _hostiles[0]["pos"]
 	if character.is_reloading():
 		_reload_started = true
 		return

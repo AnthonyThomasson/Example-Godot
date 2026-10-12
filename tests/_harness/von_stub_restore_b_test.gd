@@ -17,3 +17,4 @@ func run(t: TestContext) -> void:
 	t.check(not DecisionStub.active, "the stub is off")
 	t.check(not DecisionStub.fail, "the stub is not failing")
 	t.check(DecisionStub.rules.is_empty(), "no rules left over")
+	t.expect_eq(DecisionStub.latency_frames, 0, "no answer delay left over")

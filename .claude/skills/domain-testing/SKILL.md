@@ -179,7 +179,7 @@ func run(t: TestContext) -> void:
   - Behaviour: `switch(name, on)` (table below) and `set_static(ConfigClass, prop, value)`.
   - Scripted Von: `von_script([{ pick: id, question: substring? }, …])` replaces the server with those
     picks (first rule whose id is offered; else the first offered option), so an AI test needs no server
-    and is deterministic; `von_down()` makes every decision fail (the hold-steady fallback). Read what was
+    and is deterministic (`von_script(rules, latency_frames)` holds each answer back that many physics frames, `DecisionStub.latency_frames`, to test what an NPC does while a decision is in flight); `von_down()` makes every decision fail (the hold-steady fallback). Read what was
     asked with `t.von_requests()` (`{ state, question, options, pick }`). Ids are the decision tree's node
     ids (`combat`, `flank`, `engage`, …) and option ids. Keep `requires_von` tests for judging Von itself.
   - Presentation: `show_overlays(["show_vision", …])` and `camera_follow([ids])` (default frames all

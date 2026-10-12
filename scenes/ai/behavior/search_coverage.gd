@@ -62,7 +62,7 @@ func step(character, delta: float) -> bool:
 	var self_pos: Vector2 = character.global_position
 	target = _nearest(self_pos, unseen)
 	var desired := (target - self_pos).angle()
-	_look_angle = rotate_toward(_look_angle, desired, look_rate * delta)
+	_look_angle = rotate_toward((character.facing as Vector2).angle(), desired, look_rate * delta)  # From where it looks now: a threat may have held its eyes meanwhile.
 	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
 	if self_pos.distance_to(target) > approach or not _perception.has_line_to(character, null, target):
 		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.

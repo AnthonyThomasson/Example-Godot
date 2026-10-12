@@ -11,8 +11,9 @@ back-off counters) and executes every combat action on the character. `Behavior`
 contact (node, last-known position) and the `hold_ground` flag — and passes them in each call, so combat never picks a target. It reads
 the world only through the perception (`has_line_to`, `combat_spots`, `note_engaged`) and `Locomotion` (`move_to`, `inside_house`).
 
-API (all take the `character`): `tick(delta)` (cooldown), `begin_fight()` (reset to the peek phase), `fire_at_will(character, target)`
-(shoot a known-contact dict in range on a clear line once facing settles; aims at it), `ambush(character, node, pos)`,
+API (all take the `character`): `tick(delta)` (cooldown), `begin_fight()` (reset to the peek phase), `can_fire_at(character, target)` (a
+loaded gun, the known contact in range on a clear line: a shot is on), `fire_at_will(character, target)`
+(shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due(character)`, `ambush(character, node, pos)`,
 `peek_cover(character, delta, node, pos, hold_ground)`, `melee(character, pos, hold_ground)`, `shoot(character) -> bool`,
 `punch(character)`, `continue_burst(character)`, `apply_back_off(character, delta)`, `reload_if_dry(character)`; `signal dry`
 (an empty gun was pulled on — `Behavior` flags the task resolved so the controller re-decides). Tunables (copied from the controller
@@ -22,7 +23,8 @@ exports): `shoot_range`, `punch_range`, `combat_ring_radius` / `combat_ring_coun
 **Peek-and-cover** (the `engage` primitive, style `peek_cover`): in the PEEK phase move to the nearest spot with a clear shot and
 fire on `fire_cooldown`, then duck; in the COVER phase hold behind a shielding spot for `cover_time` (reloading an empty gun
 meanwhile) before peeking again. Positions are committed for `reposition_interval`, not re-picked every frame, so the NPC steers
-smoothly. **Ambush** holds the covered spot and fires the moment a line opens. **Melee** closes to `punch_range` and swings on the
+smoothly. A peek shoots only once the facing has settled on the contact (`AIM_TOLERANCE`) and ducks only after a shot left the barrel (or on the click
+of an empty gun, where the cover phase reloads it), not after a refused one. **Ambush** holds the covered spot and fires the moment a line opens (facing settled). **Melee** closes to `punch_range` and swings on the
 cooldown (no cover cycle for fists). With `hold_ground` (a territorial NPC fighting a contact outside), spots are restricted to inside
 the house, the peek fallback holds instead of advancing, and melee won't chase out of the house.
 

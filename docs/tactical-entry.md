@@ -77,7 +77,9 @@ point, turning its gaze (not its body) to each, before it crosses. What it sees 
 outside, and it notes the share of the room seen and which corners are still hidden. Why: it is the cheapest way
 to learn the room, and the farthest the entrant ever is from a threat. Built on `visible_points` and the
 search-coverage sweep.
-Tests: `entry_pie_sees_room_from_outside`, `entry_pie_engages_from_outside`.
+It fires in every phase, the approach and the stack as much as the pie (`docs/gaze-and-fire.md` W2); a threat in sight holds the
+entrant's eyes there, and a pie step the gaze cannot settle on because of it counts as settled, so the entry still goes in.
+Tests: `entry_pie_sees_room_from_outside`, `entry_pie_engages_from_outside`, `entry_guard_fires_from_outside`.
 
 **E4. Never stop in the funnel.** Once an invader commits to crossing, it keeps moving until it is
 through the threshold and off the door axis. It does not stop to aim, reload or re-decide in the threshold unless
@@ -132,7 +134,7 @@ entry runs (E1 to E8) and the walk then carries on from where the entry left the
 into it ran to the end, when an ally radioed it clear, or when a search covered it by sight; walking through a room does
 not clear it. Exempt: a retreat; an NPC under fire (one that began an entry gives it up and radios `abort`); and a
 crossing already under way (E4). A decision made while the entry runs, such as a fight that began, replaces the walk
-paused behind it and does not tear the entry down. Why: E8's last sentence, "a room whose door is past is never passed
+paused behind it and does not tear the entry down (the entrant fires at what it sees meanwhile, `docs/gaze-and-fire.md` W2). Why: E8's last sentence, "a room whose door is past is never passed
 without being searched or secured first", and the plain walk through the funnel that skipping the entry is.
 Tests: `entry_guard_explore`, `entry_guard_search_room`, `entry_guard_advance`, `entry_guard_cleared_room_free`,
 `entry_guard_under_fire_exempt`, `entry_guard_retreat_exempt`; with `entry_fallback_aborts` (an entry is given up when

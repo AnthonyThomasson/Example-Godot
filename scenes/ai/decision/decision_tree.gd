@@ -92,7 +92,7 @@ const NODES := {
 		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"advance_positions"],
 		"primitive": &"move",
-		"params": { "aim": &"target", "fire_at_will": true, "run": true },
+		"params": { "aim": &"target", "run": true },
 	},
 	&"melee": {
 		"label": "MELEE",
@@ -116,7 +116,7 @@ const NODES := {
 		"context": [&"situation", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"retreat_positions"],
 		"primitive": &"move",
-		"params": { "aim": &"threat", "fire_at_will": true, "run": true, "entry_guard": false },
+		"params": { "aim": &"threat", "run": true, "run_through_fire": true, "entry_guard": false },
 	},
 	&"locate": {
 		"label": "LOCATE",
@@ -125,7 +125,7 @@ const NODES := {
 		"requires": [&"under_fire", &"!hostile_known"],
 		"options": [&"shooter"],
 		"primitive": &"move",
-		"params": { "aim": &"point", "fire_at_will": true },
+		"params": { "aim": &"point" },
 	},
 	&"reload_quiet": {
 		"label": "RELOAD",
@@ -142,7 +142,7 @@ const NODES := {
 		"context": [&"situation", &"current", &"contacts", &"allies", &"awareness"],
 		"options": [&"leads"],
 		"primitive": &"move",
-		"params": { "aim": &"travel", "fire_at_will": true, "run": true },
+		"params": { "aim": &"travel", "run": true },
 	},
 	&"search": {
 		"label": "SEARCH",
@@ -153,7 +153,7 @@ const NODES := {
 		"children": [&"enter"],
 		"options": [&"search_rooms", &"explore"],
 		"primitive": &"move",
-		"params": { "aim": &"travel", "fire_at_will": true },
+		"params": { "aim": &"travel" },
 	},
 	&"enter": {
 		"label": "ENTER",
