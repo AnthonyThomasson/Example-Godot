@@ -48,6 +48,8 @@ const REDRAW_ANGLE_STEP := 0.02
 const REDRAW_RAISE_STEP := 0.1
 ## How folded (0..1) a crouching body is before it is drawn from the rig's trunk (its back showing), not as shoulders.
 const FOLD_DRAW := 0.15
+## A hand gripping lower than this (body radii off the floor: relaxed 3.7, running ~4-5.8) hangs below the shoulders and is drawn under them.
+const HAND_OVER_HEIGHT := 5.0
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
 var _redraw_key := PackedInt32Array()  ## The rounded inputs the standing body was last repainted for.
 var redraws := 0  ## How many times the standing body has been drawn (tests read it).
@@ -134,6 +136,12 @@ func _draw() -> void:
 	if item:
 		item.draw_weapon(self, _character)
 		draw_order.append(&"weapon")
+	# A hand hanging at the side (below HAND_OVER_HEIGHT) is lower than the shoulders, so they cover it.
+	var hung: Array[int] = []
+	for hand in 2:
+		if pose.grip_height(hand) < HAND_OVER_HEIGHT:
+			hung.append(hand)
+			_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, placed, damage_total)
 	# Shoulders: the art through the flesh silhouette deformed by any shots (dents + darkening).
 	draw_set_transform(lunge, 0.0, Vector2.ONE)
 	Deformation.draw_shape(self, "circle", size, body_color, CharacterConfig.flesh_crack_color,
@@ -142,7 +150,8 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 	draw_order.append(&"torso")
 	for hand in 2:
-		_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, placed, damage_total)
+		if not hung.has(hand):
+			_draw_hand(hand, pose.hand_angles[hand] - PI * 0.5, placed, damage_total)
 	draw_order.append(&"hands")
 	_draw_head(pose, rig, placed, damage_total)  # The highest part: over the gun and the fists.
 	draw_order.append(&"head")

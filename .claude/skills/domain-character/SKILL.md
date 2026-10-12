@@ -24,7 +24,7 @@ its own child `Node2D`.
   solved fresh by `character.rig()`) owns the standing skeleton, the 3D joints of the arms and legs
   (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
 - **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the legs and shoes, the arms
-  (sleeve, then forearm), then `item.draw_weapon()` (under the torso, so a long gun's butt is tucked behind the shoulder), the shoulders (at the pose's lunge), then both fists (gripping the weapon), then the
+  (sleeve, then forearm), then `item.draw_weapon()` (under the torso, so a long gun's butt is tucked behind the shoulder), the shoulders (at the pose's lunge), then both fists (gripping the weapon; a hand gripping below `HAND_OVER_HEIGHT`, i.e. hanging relaxed, is drawn *before* the shoulders so they cover it — `tests/character/hanging_hands_under_shoulders_test.gd`), then the
   head last (it is the highest part, so it covers the gun and fists; its shadow falls on the shoulders), then the
   wound marks over all of it. A crouch (`_draw_lying`) keeps the same order: the head leaves the fallen-body stack and is drawn after the fists.
   `draw_order` records what the last living draw painted (`weapon`, `torso`, `hands`, `head`) for `tests/character/head_over_gun_test.gd`. Once dead it draws the fallen body instead (below).

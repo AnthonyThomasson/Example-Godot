@@ -24,7 +24,7 @@ const BAND_NAMES: Array[String] = ["light", "medium", "heavy"]
 const BAND_SHOT := { "light": "smg", "medium": "pistol", "heavy": "rifle" }
 
 ## Reloads, by gun: pitch scales every click (heavier = lower), db trims the level, seat = the pitch (Hz) of the
-## magazine seating thunk, rack = seconds from the magazine seating to the action being racked.
+## faint tick under the magazine seating click, rack = seconds from the magazine seating to the action being racked.
 const RELOADS := {
 	"pistol": { "pitch": 1.0, "db": 0.0, "seat": 190.0, "rack": 0.30 },
 	"smg": { "pitch": 1.1, "db": -1.0, "seat": 210.0, "rack": 0.30 },
@@ -87,10 +87,8 @@ const MATERIALS := {
 ## scuff = [low-pass Hz, high-pass Hz, decay s, gain] (the sole on the surface), ring = { freqs, amps, decays, gain }
 ## (a hard floor's click), again = a second, softer scuff that follows (gravel, grass).
 const FOOTSTEPS := {
-	"wood": { "db": 0.0, "thump": [102.0, 56.0, 0.052, 1.0], "scuff": [1900.0, 140.0, 0.020, 0.42],
-		"ring": { "freqs": [180.0, 380.0], "amps": [0.6, 0.35], "decays": [0.065, 0.04], "gain": 0.5 } },
-	"tile": { "db": 0.0, "thump": [112.0, 66.0, 0.042, 1.0], "scuff": [1900.0, 180.0, 0.015, 0.38],
-		"ring": { "freqs": [280.0], "amps": [1.0], "decays": [0.045], "gain": 0.35 } },
+	"wood": { "db": -3.0, "thump": [102.0, 56.0, 0.052, 1.0], "scuff": [1300.0, 140.0, 0.020, 0.34] },
+	"tile": { "db": -3.0, "thump": [112.0, 66.0, 0.042, 1.0], "scuff": [1300.0, 180.0, 0.015, 0.30] },
 	"stone": { "db": 1.0, "thump": [115.0, 72.0, 0.034, 1.0], "scuff": [2000.0, 200.0, 0.016, 0.42],
 		"ring": { "freqs": [330.0], "amps": [1.0], "decays": [0.045], "gain": 0.25 } },
 	"concrete": { "db": 0.0, "thump": [105.0, 64.0, 0.030, 1.0], "scuff": [2000.0, 220.0, 0.020, 0.45] },
@@ -353,35 +351,29 @@ static func _footstep(surface: String, running: bool) -> Dictionary:
 		"vary": 0.22, "layers": layers }
 
 
-## A reload in two beats. `out`: the release click, then the magazine sliding free and dropping into the hand.
-## `in`: the magazine rubbing in and seating with a latch click, then the action racked (a rasp, a click, a slam).
+## A reload in two beats, each kept to dry, quiet clicks. `out`: the release click and a faint tick of the magazine
+## dropping free. `in`: a seat click, then a rack click.
 static func _reload(gun: String, stage: String) -> Dictionary:
 	var g: Dictionary = RELOADS[gun]
 	var p: float = g["pitch"]
 	var layers := []
 	var length := 0.3
 	if stage == "out":
+		# One dry click as the catch lets go, and a faint tick of the magazine dropping free.
 		layers = [
-			{ "type": "noise", "gain": 1.0, "decay": 0.004, "lp": 8000.0, "hp": 2200.0, "attack": 0.0002 },
-			{ "type": "modes", "gain": 0.6, "freqs": [2300.0 * p, 3900.0 * p], "amps": [1.0, 0.6], "decays": [0.02, 0.014] },
-			{ "type": "noise", "gain": 0.28, "decay": 0.07, "lp": 3200.0, "hp": 700.0, "delay": 0.035, "attack": 0.02 },
-			{ "type": "tone", "gain": 0.35, "freq": 140.0 * p, "freq_end": 90.0 * p, "sweep": 0.012, "decay": 0.03, "delay": 0.14 },
-			{ "type": "noise", "gain": 0.3, "decay": 0.01, "lp": 2500.0, "hp": 300.0, "delay": 0.14 },
+			{ "type": "noise", "gain": 0.8, "decay": 0.004, "lp": 5000.0 * p, "hp": 1800.0, "attack": 0.0002 },
+			{ "type": "tone", "gain": 0.15, "freq": 140.0 * p, "freq_end": 90.0 * p, "sweep": 0.012, "decay": 0.025, "delay": 0.14 },
+			{ "type": "noise", "gain": 0.2, "decay": 0.008, "lp": 2500.0, "hp": 400.0, "delay": 0.14 },
 		]
+		length = 0.22
 	else:
 		var rack: float = g["rack"]
-		var seat: float = g["seat"]
+		# Two small clicks: the magazine seating, then the action racked. No rasp, ring or slam.
 		layers = [
-			{ "type": "noise", "gain": 0.25, "decay": 0.06, "lp": 3000.0, "hp": 600.0, "attack": 0.015 },
-			{ "type": "tone", "gain": 0.8, "freq": seat, "freq_end": seat * 0.5, "sweep": 0.012, "decay": 0.05, "delay": 0.09 },
-			{ "type": "noise", "gain": 0.6, "decay": 0.012, "lp": 2500.0, "hp": 300.0, "delay": 0.09 },
-			{ "type": "modes", "gain": 0.4, "freqs": [1800.0 * p, 3100.0 * p], "amps": [1.0, 0.6], "decays": [0.025, 0.018], "delay": 0.09 },
-			# Racking the action: back with a rasp, a click at the rear, then forward with a slam.
-			{ "type": "noise", "gain": 0.5, "decay": 0.05, "lp": 7000.0, "hp": 1800.0, "delay": 0.09 + rack, "attack": 0.004 },
-			{ "type": "modes", "gain": 0.5, "freqs": [2600.0 * p, 4400.0 * p], "amps": [1.0, 0.6], "decays": [0.015, 0.01], "delay": 0.14 + rack },
-			{ "type": "tone", "gain": 0.6, "freq": 170.0 * p, "freq_end": 80.0 * p, "sweep": 0.012, "decay": 0.04, "delay": 0.21 + rack },
-			{ "type": "noise", "gain": 0.7, "decay": 0.015, "lp": 4000.0, "hp": 500.0, "delay": 0.21 + rack },
-			{ "type": "modes", "gain": 0.5, "freqs": [2100.0 * p, 3600.0 * p], "amps": [1.0, 0.6], "decays": [0.03, 0.02], "delay": 0.21 + rack },
+			{ "type": "noise", "gain": 0.5, "decay": 0.007, "lp": 3800.0 * p, "hp": 1200.0, "delay": 0.09, "attack": 0.0003 },
+			{ "type": "tone", "gain": 0.12, "freq": float(g["seat"]), "freq_end": float(g["seat"]) * 0.6, "sweep": 0.01,
+				"decay": 0.02, "delay": 0.09 },
+			{ "type": "noise", "gain": 0.6, "decay": 0.009, "lp": 4000.0 * p, "hp": 900.0, "delay": 0.09 + rack, "attack": 0.0003 },
 		]
-		length = 0.21 + rack + 0.2
-	return { "length": length, "level_db": float(g["db"]) + (-2.0 if stage == "out" else 0.0), "vary": 0.06, "layers": layers }
+		length = 0.09 + rack + 0.1
+	return { "length": length, "level_db": float(g["db"]) + (-6.0 if stage == "out" else -4.0), "vary": 0.06, "layers": layers }

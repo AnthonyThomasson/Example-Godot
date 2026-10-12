@@ -34,7 +34,7 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `impact/<material>/<outcome>/<band>` | outcome `blocked` (embedded), `penetrate` (went through), `ricochet`. |
 | `impact/<material>/punch` | A fist; no band. |
 | `footstep/<surface>/<walk\|run>` | surface `wood tile stone concrete carpet outdoor`. |
-| `reload/<gun>/<out\|in>` | `out`: release click, magazine sliding free. `in`: magazine seated, then the action racked (rasp, click, slam). Unknown gun borrows its band's. |
+| `reload/<gun>/<out\|in>` | `out`: a dry release click. `in`: a seat click, then a rack click. Both quiet and short, no rings. Unknown gun borrows its band's. |
 
 - **Materials:** `wood metal glass ceramic stone plastic fabric foliage electronics flesh`, `wall` (what walls
   report as the empty material `""`) and `default` for anything unknown.
@@ -83,7 +83,7 @@ so it is regular only as far as the walking is. Test: `tests/audio/footstep_vari
 
 **Every surface is a dull thud on purpose.** High-passed noise bursts and 1.5–2.7 kHz ring tones read as tinny, so the
 heel thump leads on every surface, the scuff is a soft noise low-passed at ≤ ~2.3 kHz, and the only ring a hard floor
-keeps is one low "tock" (≤ ~400 Hz). Surfaces therefore sound alike (wood/tile/stone/concrete/outdoors all sit at
+keeps (stone) is one low "tock" (≤ ~400 Hz); wood and tile have none and sit 3 dB quieter. Surfaces therefore sound alike (wood/tile/stone/concrete/outdoors all sit at
 ~150–300 Hz RMS frequency, carpet softer and quieter via its `db`; wood and tile are the deepest of the hard floors,
 ~150–200 Hz, with a lower, longer heel thump). Keep scuff cut-offs low and give a new surface a `thump` first. Test:
 `tests/audio/footstep_tone_test.gd` (brightness ceiling 0.03 against a measured 0.010, and most energy under 300 Hz).
