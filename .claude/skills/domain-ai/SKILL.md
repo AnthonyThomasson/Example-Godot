@@ -35,7 +35,9 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
-when free (or forced), asks **Perception** for a snapshot and starts a **Decision** walk over it;
+when free (or forced) and the frame has a snapshot to spare (`DecisionBudget`: `per_frame` snapshots a physics frame, one by
+default, so NPCs deciding together spread over frames), asks **Perception** for a snapshot and starts a **Decision** walk
+over it;
 adopts the returned leaf into **Behaviour** (and radios it to allies); then has **Behaviour** `apply()`
 the running primitive.
 

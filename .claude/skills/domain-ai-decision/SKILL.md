@@ -16,6 +16,7 @@ Files:
 - `decision_planner.gd` — the walk (a `Node`): gating, entry rules, per-level state, Von calls.
 - `decision_client.gd` — the Von HTTP transport (a `Node` owning its `HTTPRequest`).
 - `decision_stub.gd` (`class_name DecisionStub`) — test seam: scripted picks that stand in for the server.
+- `decision_budget.gd` (`class_name DecisionBudget`) — how many decision snapshots may start in one frame, shared by every NPC (below).
 - `decision_server_launcher.gd` — dev-only `von serve` launcher (a node in `main.tscn`).
 
 ## `decision_tree.gd` — the tree as data
@@ -109,6 +110,17 @@ effect; `node_overrides` is baked into the tree at `setup()` and is construction
   in flight when the situation now calls for a different start (e.g. came under fire mid-search).
 - `cancel()`, `is_pending()`, `debug_state()` (per level: node, question, state, offered, Von's
   probabilities and pick, `auto`, `ms` — enough to replay offline), `walk_digest()` for the log line.
+
+## `decision_budget.gd` — snapshots spread over frames
+
+Building a snapshot (the perception's `sense()`) is the costliest thing an NPC does in a frame (2-3 ms, up to 8), and NPCs
+that spawned or came under fire together want to decide on the same frame. The controller asks `DecisionBudget.claim()`
+before `_start_decision` (in `_should_decide`, and before restarting a walk in `_maybe_interrupt`): `per_frame` (1)
+snapshots may start in one physics frame. A refused NPC keeps its wish (`_force`, its elapsed timer) and asks again next
+frame, so no NPC waits more than a frame per NPC ahead of it. The limit is a count, not a time, so when an NPC decides never
+depends on the machine's speed, and two NPCs that would claim the same flank side on one frame decide on different frames,
+each hearing the other's radio first. A test raises `per_frame` with `set_static` to see every NPC decide at once
+(`tests/ai/decisions_spread_over_frames_test.gd`).
 
 ## `decision_client.gd` — the transport
 

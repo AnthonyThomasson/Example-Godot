@@ -228,7 +228,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
 	 (baked in as a hole), so paths route around furniture.
    - `NavBuilder.rebake(region, house, rooms, agent_radius=14.0)` — re-carves the furniture holes in
-	 place at the pieces' **current** positions (driven by the Navigation domain's own `nav_updater.gd`).
+	 place at the pieces' **current** positions; `rebake_async(region, house, rooms, agent_radius, done)` does it with the
+	 bake on the NavigationServer's worker thread (what the Navigation domain's own `nav_updater.gd` drives).
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
@@ -306,7 +307,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
     controller-less character) — and `EventBus` / character signals (7, 10) for its event log.
     Behaviour switches set existing exported props and config-holder `static var`s by name
     (duck-typed, like Main's overlay flags); a test can also script the Von answers through the AI
-    decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`) so AI
+    decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`; `DecisionBudget.per_frame`, the
+    snapshots a frame may start, is set the same way) so AI
     wiring runs without a server. In the in-game runner a test can switch off user interactions that
     would change its result with `TestSetup.lock_interaction` (`camera` / `pause` / `overlays`), sending
     its own input through `TestContext.inject` so the lock lets it through; the runner also builds the

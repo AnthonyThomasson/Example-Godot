@@ -432,7 +432,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |
 | `test_switches.gd` | The switch table. |
-| (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test). |
+| (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test); `DecisionBudget.per_frame` (`decision_budget.gd`) is set with `set_static` the same way. |
 | `log_watch.gd` | The log tail (`begin(from_start)`, `poll`, `consumed`). |
 | `test_catalog.gd` | `discover(root, domains, ids)`, `describe(path)` (descriptor dicts), `matches(entry, text)`, and the CLI selection helpers `csv()` / `shard()`. |
 | `test_runner.gd` / `.tscn` | Interactive and batch modes, one `TestWorld` child per test, a lazily created `DecisionServerLauncher` kept for the session, real-time pacing for Von tests, the JSON report. |

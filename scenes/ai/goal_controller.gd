@@ -678,13 +678,14 @@ func _force_now(reason: String) -> void:
 
 ## Whether a new decision may start now: never while crossing a doorway (a forced one waits until the NPC is
 ## through); always when forced; otherwise the behaviour decides whether its current commitment still holds (a
-## fight, a move, an approach) or the decide cadence has elapsed.
+## fight, a move, an approach) or the decide cadence has elapsed. One that may must also get one of the frame's
+## snapshots (`DecisionBudget`); refused, it keeps its wish (`_force`, the elapsed timer) and asks again next frame.
 func _should_decide() -> bool:
 	if _behavior.committed():
 		return false
-	if _force:
-		return true
-	return _behavior.wants_decision(_character, _decide_timer <= 0.0)
+	if not _force and not _behavior.wants_decision(_character, _decide_timer <= 0.0):
+		return false
+	return DecisionBudget.claim()
 
 
 ## A salient event arrived while a walk is in flight: restart the walk only when the situation now
@@ -692,7 +693,8 @@ func _should_decide() -> bool:
 ## search → straight to COMBAT). Otherwise the walk in flight already fits; let it finish.
 func _maybe_interrupt(character) -> void:
 	if _planner.entry_for(_perception.quick_facts(character)) != _planner.current_entry():
-		_start_decision(character)
+		if DecisionBudget.claim():  # Else `_force` stays and the restart is tried again next frame.
+			_start_decision(character)
 	else:
 		_force = false
 
