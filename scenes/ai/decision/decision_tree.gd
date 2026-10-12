@@ -162,7 +162,6 @@ const NODES := {
 		"context": [&"situation", &"current", &"awareness"],
 		"options": [&"entries"],
 		"primitive": &"entry",
-		"params": { "run": true },
 	},
 	&"idle": {
 		"label": "IDLE",

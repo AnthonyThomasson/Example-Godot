@@ -31,7 +31,7 @@ root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_posi
       ├─ reload_quiet [reload; no threat known, gun low + spare] → reload
       ├─ investigate [leads]               → move{aim travel, fire_at_will}
       ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
-      │    └─ enter [entries]              → entry{run}   (a doorway into a room left to search)
+      │    └─ enter [entries]              → entry         (a doorway into a room left to search)
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
 ```
 

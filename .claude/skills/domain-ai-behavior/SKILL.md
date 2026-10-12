@@ -32,7 +32,7 @@ fields are read live, so only those modules need the push.)
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and swing. | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
 | `reload` | — | Equip the gun (`gun_slot()`), stand still watching the nearest hostile and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
-| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option), `run` | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. |
+| `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots on a clear line once crossing. | When the entry is over (room clear, rear watch done, or given up); never on the cadence. |
 | `hold` | — | Stand and watch the nearest known hostile. | Decide cadence. |
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -40,7 +40,7 @@ NPC's combat leaves) and a contact last seen outside, `Behavior` sets `hold_grou
 
 **Running** is a behaviour policy, not a primitive: after the primitive steers, `_should_run()` sets
 `character.run_input` only while TRAVELLING (a `move` or `engage` not yet arrived — never a `look_around`
-search, ambush/peek, interaction or hold — or a `melee` closing in), when the leaf carries `run: true` or
+search, ambush/peek, interaction, hold or tactical entry — or a `melee` closing in), when the leaf carries `run: true` or
 the NPC is under fire, the destination is farther than `run_min_distance` (straight line), and a run can
 start (`run_start_fraction` of the stamina bar, or already running). The Character spends the stamina and
 walks once dry. Exports on the controller: `run_enabled`, `run_min_distance`, `run_start_fraction`.
@@ -82,8 +82,9 @@ out for `rear_security_time`).
 - **Corners.** Point: the door-wall corner on its own side (buttonhook); alone, the door-wall corner on the side away
   from where it ended the pie. Second: the hard corner on the other side. Later members: a spot inside off the axis.
 - **Commitment.** `committed()` is true while crossing; the controller starts no decision then (a forced one waits),
-  so a hit or a hostile seen in the doorway is fought once the NPC is through. Posture stands throughout; it may run
-  only on the approach (`travel_target()`).
+  so a hit or a hostile seen in the doorway is fought once the NPC is through. Posture stands throughout, and it never
+  runs, not even under fire: a running character cannot shoot, so a sprint to the stack or through the doorway would
+  be a lowered gun at the worst moment (test `entry_never_runs`).
 - **The radio.** Steps are queued (`take_calls()`, via `Behavior.take_entry_calls()`) and the controller posts them;
   the latest is repeated every 2 s so the claim stays live. Choosing anything else `abandon()`s the entry (radios
   `abort`). Each phase change is a `GameLog` line (`--verbose` in tests).

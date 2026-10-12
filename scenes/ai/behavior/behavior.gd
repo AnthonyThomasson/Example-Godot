@@ -611,7 +611,8 @@ func _wanted_posture(character) -> StringName:
 
 ## Whether to sprint this tick, judged after the primitive has steered: only while travelling to a
 ## destination (a move or engage approach that hasn't arrived, a melee closing in; never an ambush,
-## peek, room search, interaction or hold), when the leaf asks for it (`params.run`) or the NPC is under
+## peek, room search, interaction, hold or tactical entry — a running character cannot shoot, so an entrant
+## walks with its gun up from the moment it heads for the door), when the leaf asks for it (`params.run`) or the NPC is under
 ## fire, the destination is farther than `run_min_distance`, and a run can be started (stamina
 ## `run_start_fraction`, or already running). The Character spends the stamina and runs dry on its own.
 func _should_run(character) -> bool:
@@ -627,10 +628,6 @@ func _should_run(character) -> bool:
 				return false
 		&"melee":
 			dest = _engage_pos
-		&"entry":
-			dest = _entry.travel_target()
-			if dest == Vector2.INF:
-				return false
 		_:
 			return false
 	if not _params.get("run", false) and not (_perception != null and _perception.under_fire()):

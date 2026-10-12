@@ -166,13 +166,6 @@ func fires_at_will() -> bool:
 	return phase in ["cross", "corner", "clear", "rear"]
 
 
-## Where the entrant is walking to while it may run (the approach to its slot), else Vector2.INF.
-func travel_target() -> Vector2:
-	if phase != "approach":
-		return Vector2.INF
-	return _waypoints[0] if not _waypoints.is_empty() else _stack_point()
-
-
 ## The steps queued for the radio since the last call, oldest first: { step, cleared_room? }.
 func take_calls() -> Array:
 	var out := _calls

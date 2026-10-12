@@ -83,7 +83,8 @@ Tests: `entry_pie_sees_room_from_outside`, `entry_pie_engages_from_outside`.
 through the threshold and off the door axis. It does not stop to aim, reload or re-decide in the threshold unless
 it is hit. A hit while crossing finishes the crossing, then fights from the first position inside. Why: the one
 thing every source forbids.
-Tests: `entry_no_pause_in_threshold`, `entry_hit_in_threshold_clears_it`.
+Nor does it run, there or on the way to the door: running lowers the gun.
+Tests: `entry_no_pause_in_threshold`, `entry_hit_in_threshold_clears_it`, `entry_never_runs`.
 
 **E5. Take opposite corners, hard corner first.** Entering as a team, the point turns to the near
 corner and the second crosses to the far corner, the hard corner among those still hidden after E3. They do not
@@ -160,8 +161,8 @@ the stack toward the door's axis, clear of the slots.
   (E8), rear (E8). It does not ask Von again until the entry is over, so it runs with the server down.
   While crossing, the controller holds every decision (`Behavior.committed()`); a hit or a hostile seen
   in the doorway is acted on once the NPC is through. The room is cleared by sight with
-  `search_coverage.gd`. Posture and running stay code-owned (it stands throughout and may run only on the
-  approach).
+  `search_coverage.gd`. Posture and running stay code-owned: it stands throughout and never runs, not even
+  under fire, because a running character cannot shoot (test `entry_never_runs`).
 - **The team.** Roles, readiness and progress travel on the callout radio: each step is a `callout` with
   `opening`, `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
   `cleared_room`, `rear`, `abort`), repeated every 2 s so a claim stays live. A slot is the lowest the radio
