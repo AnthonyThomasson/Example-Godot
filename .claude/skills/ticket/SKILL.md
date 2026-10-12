@@ -28,6 +28,13 @@ Interact with GitHub through the **GitHub CLI** (`gh`): read tickets with `gh is
 3. **No label, or none that matches:** field it as ordinary work — load the `architecture` skill and do what the
    ticket asks. If the ticket's kind is genuinely unclear, say so rather than guessing.
 
+## No shortcuts
+
+Take **no shortcuts and no quick fixes**, whatever the ticket kind. Fix the root cause properly, follow the
+architecture and the domain's conventions, and do the work in full — no band-aids, special-cased hacks, disabled or
+loosened tests, or "good enough for now" patches. The one exception is a ticket labelled `experiment`: there a
+quick, throwaway approach is acceptable, since the point is to try an idea out rather than to land finished work.
+
 ## Adding a new ticket kind
 
 Create `.claude/skills/ticket-<label>/SKILL.md` and add a row to the table above.
