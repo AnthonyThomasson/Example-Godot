@@ -158,6 +158,7 @@ static func shape_polygon(shape: String, size: Vector2, impacts: Array) -> Packe
 	return poly
 
 
+## The silhouette of `shape` at `size` dented by `impacts`, computed afresh (`shape_polygon` caches it).
 static func _shape_polygon(shape: String, size: Vector2, impacts: Array) -> PackedVector2Array:
 	var core := minf(size.x, size.y) * 0.5 * PhysicsConfig.deform_core_fraction
 	return deform(base_ring(shape, size), impacts, PhysicsConfig.deform_radius, core)

@@ -41,6 +41,7 @@ var see_over_coverage: float = 60.0
 var _query := _solid_query()
 
 
+## A ray query on the solid layer, for `_query` to refill on each cast.
 static func _solid_query() -> PhysicsRayQueryParameters2D:
 	var q := PhysicsRayQueryParameters2D.new()
 	q.collision_mask = QUERY_MASK

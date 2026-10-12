@@ -41,7 +41,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   offset per NPC by instance id so a squad does not look on the same frame, and again at the start of every `sense()`, so what
   it knows at a decision is what it sees at that moment. The characters it tests are found by scanning the world
   root once and keeping the list (`_other_characters`: rescanned only when a node with `current_item` enters or leaves the
-  tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes and used to run per NPC per frame).
+  tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes).
 - `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),
   with `hostile`/`reason`/`visible`/`age`. `lost_hostiles()` — hostiles last seen longer ago, within
   `lead_memory_ttl` (investigation leads).
