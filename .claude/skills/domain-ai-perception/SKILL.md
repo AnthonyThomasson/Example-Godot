@@ -145,13 +145,14 @@ named by its `object_name`, a character by its name, anything else as "wall".
 
 The behaviour asked of it is `docs/tactical-entry.md`. Given the house's openings (Main's `WorldGen.get_openings`, handed
 in by `set_house` on each observe) and rooms, `entries_from(room_key)` lists the doorways out of the NPC's area (outer
-doors from outside, a room's doors into the next room) and `geometry(id, into, map, space)` lays one out, built once on a
+doors from outside, a room's doors into the next room), `watch_doors(room_key, exclude_id, is_cleared)` those of a cleared
+room on into rooms not cleared (what the team covers after clearing it, E8; the perception's `entry_watch_doors(into, opening_id)`) and `geometry(id, into, map, space)` lays one out, built once on a
 baked nav map and cached (walls do not move): `out` (unit normal away from the room, from the room edge the door lies on)
 and `along` (the wall's axis), `wall` (wall length either side), `side` (the side with more wall, 0 when even), `slots`
 (single file against the wall on each side: `wall_standoff` off it, the first a body clear of the jamb, then every
 `stack_spacing`, snapped), `pie` (`pie_steps` points `pie_radius` from the threshold, from 55° to 25° off the axis), and the
 room's four corners inset `corner_inset`, each `near` (on the door's wall), `side` and `hard` (no sight line from 24 px
-outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step), `free_slot(team,
+outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step, covering; `abort` and `done` drop one), `free_slot(team,
 self_id, current)` (the lowest free slot; a tie goes to the lower instance id), `stack_side(g, team, self_pos)` and
 `slot_point(g, side, slot)` are shared with the snapshot's `entries` group. Tunables: the controller's `entry_*` exports.
 

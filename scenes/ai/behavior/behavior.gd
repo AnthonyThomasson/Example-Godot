@@ -67,6 +67,8 @@ var entry_follow_gap: float = 0.3
 var entry_pie_dwell: float = 0.35
 var entry_corner_dwell: float = 0.6
 var rear_security_time: float = 10.0
+var entry_cover_time: float = 8.0
+var entry_watch_dwell: float = 0.8
 var entry_approach_time: float = 20.0
 # The entry guard (E9): any walk into a room that is not cleared goes in by tactical entry (see `_entry_guard`).
 var entry_guard: bool = true
@@ -163,6 +165,8 @@ func apply_config() -> void:
 	_entry.pie_dwell = entry_pie_dwell
 	_entry.corner_dwell = entry_corner_dwell
 	_entry.rear_time = rear_security_time
+	_entry.cover_time = entry_cover_time
+	_entry.watch_dwell = entry_watch_dwell
 	_entry.approach_time = entry_approach_time
 	_entry.look_rate = search_look_rate
 
@@ -242,7 +246,8 @@ func activity_text() -> String:
 ## How each phase of a tactical entry reads in the status line.
 const ENTRY_PROGRESS := {
 	"approach": "heading for the door", "stack": "stacked at the door", "pie": "slicing the pie",
-	"cross": "going in", "corner": "taking a corner", "clear": "clearing the room", "rear": "holding the door",
+	"cross": "going in", "corner": "taking a corner", "clear": "clearing the room",
+	"cover": "covering the doors on", "rear": "holding the door",
 }
 
 
@@ -311,7 +316,7 @@ func committed() -> bool:
 	return _primitive == &"entry" and _entry.committed()
 
 
-## The entry steps to radio since the last call (`{ step, cleared_room? }`), with the doorway, slot and side they are
+## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, slot and side they are
 ## about; the controller posts them as callouts.
 func take_entry_calls() -> Array:
 	var out: Array = []

@@ -110,12 +110,19 @@ Tests: `entry_solo_pies_both_sides`, `entry_solo_commits_once`, `entry_ally_join
 `entry_solo_even_wall_goes_in` (a door with the same wall either side: crossing to the second side must not
 send it back to the start).
 
-**E8. Clear, mark, move on.** When the corners and the room's points are seen, the room is marked cleared
-(the `cleared_room` memory, which also counts as searched). One invader stays on the opening as rear security facing back
-the way it came; the others take the next opening or unsearched room. A room whose door is past is never
-passed without being searched or secured first. Why: a cleared room that is not marked is searched again; a
-doorway left unwatched is a hole in the team's rear.
-Tests: `entry_marks_room_cleared`, `entry_rear_security`.
+**E8. Clear, mark, cover, move on.** When the corners and the room's points are seen, the room is marked cleared
+(the `cleared_room` memory, which also counts as searched). Then the team holds the room it has taken, guns on what it
+has not: each member covers a different one of the room's doorways on into a room nobody has cleared (doors to outside
+and the one they came in by do not count), standing back inside the cleared room off that doorway's axis with its gun
+through it. A member left over, when there are more of them than such doorways, holds the doorway they came in by as rear
+security, facing back the way it came; a room with no doorway on leaves only the last one in on the rear. The team holds
+until one of them moves on (its next entry, or `entry_cover_time` without one), and then the rest go too. Alone, the
+invader looks through each doorway on in turn before it moves on. Then they take the next opening or unsearched room. A
+room whose door is past is never passed without being searched or secured first. Why: a cleared room that is not marked
+is searched again; the doorways on are where the next threat comes from, and a doorway left unwatched is a hole in the
+team's rear.
+Tests: `entry_marks_room_cleared`, `entry_pair_covers_remaining_doors`, `entry_solo_covers_remaining_doors`,
+`entry_cover_holds_until_team_moves`, `entry_rear_security`.
 
 **E9. No unguarded thresholds.** A walk that would cross into a room that is not cleared goes in by tactical
 entry, whatever order sent the NPC there: a search or explore, an investigation lead, closing in on or flanking a
@@ -172,7 +179,7 @@ the stack toward the door's axis, clear of the slots.
   (`GoalController.entry_enabled`, on in `npc_invader.tscn`; test switch `ai.entry`).
 - **The choreography.** The ENTER leaf runs the `entry` primitive, a phase machine in the behaviour
   sub-domain (`behavior/entry.gd`): approach (E1), stack (E2), pie (E3), cross (E4, E5), corner, clear
-  (E8), rear (E8). It does not ask Von again until the entry is over, so it runs with the server down.
+  (E8), cover (E8), rear (E8). It does not ask Von again until the entry is over, so it runs with the server down.
   While crossing, the controller holds every decision (`Behavior.committed()`); a hit or a hostile seen
   in the doorway is acted on once the NPC is through. The room is cleared by sight with
   `search_coverage.gd`. Posture and running stay code-owned: it stands throughout and never runs, not even
@@ -187,7 +194,9 @@ the stack toward the door's axis, clear of the slots.
   and `entry_guard_rearm` (test switch `ai.entry_guard`). It acts only where entry does, on invaders (`entry_enabled`).
 - **The team.** Roles, readiness and progress travel on the callout radio: each step is a `callout` with
   `opening`, `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
-  `cleared_room`, `rear`, `abort`), repeated every 2 s so a claim stays live. A slot is the lowest the radio
+  `cleared_room`, `cover` with `covering` (the doorway on it watches), `rear`, `done`, `abort`), repeated whole every
+  2 s so a claim stays live. A doorway on is claimed like a slot: the nearest one no teammate covers, and of two who
+  claim one, the lower instance id keeps it. `done` ends a hold; a teammate still holding takes it as the team moving on. A slot is the lowest the radio
   leaves free; two members who claim the same slot on the same frame settle it by instance id (the flank
   side claim pattern). A single invader is a team of one: nobody else claims the doorway, so there is no
   barrier and the pie is sliced from both sides (E7).
@@ -202,8 +211,10 @@ Interpretations and the game's own rules, where the sources leave a choice:
   the other side; a lone entrant goes to the door-wall corner on the side away from where it stands, so it
   crosses the room's front (E5, E7). Later members take a spot inside, off the axis.
 - The room is radioed clear once the member that covered it sees the rest of the stack through; a member
-  still taking its corner holds it before it accepts the call. The last of the team to go in holds the
-  doorway as rear security for `rear_security_time` (E8); a lone entrant has nobody to leave behind.
+  still taking its corner holds it before it accepts the call. The doorways on come before the rear: a pair in a
+  room with two of them covers both and leaves the way it came unwatched (E8). A hold lasts until a teammate who was
+  holding moves on, or at most `entry_cover_time` (8 s) on a doorway and `rear_security_time` (10 s) on the rear; a
+  lone entrant looks through each doorway on for `entry_watch_dwell` (0.8 s) and has nobody to leave behind.
 - A room crossed in a retreat or under fire is visited, not cleared: ENTER offers it again once the NPC is outside, and an
   entry the guard began there and gave up is not started again for `entry_guard_rearm` s. Search ranking still goes by
   `visited_room` (stood in it lately); the guard and ENTER go by `cleared_room`.

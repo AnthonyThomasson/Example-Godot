@@ -263,9 +263,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
       its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`) — and one
       per step of a tactical entry, which adds `opening`, `slot`, `side`, `entry_step` (claim / ready /
-      going_in / in / clear / rear / abort) and `cleared_room` (`docs/tactical-entry.md`). Allied AI
+      going_in / in / clear / cover / rear / done / abort), `cleared_room` (with a clear) and `covering` (with a cover:
+      the doorway on out of the cleared room it watches) (`docs/tactical-entry.md`). Allied AI
       controllers within `callout_range` consume it (which flank an ally holds, whom it fights, where to
-      support it, which stack slot is taken, when the point is through, which room is clear).
+      support it, which stack slot is taken, when the point is through, which room is clear, which doorway on is
+      covered, when the team moves on).
     Emitters and listeners never reference each other (like `Despawner`).
 
 11. **General → Interaction / AI: `PhysicsLayers.SOLID`**

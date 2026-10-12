@@ -709,7 +709,14 @@ func threshold_ahead(character, path: PackedVector2Array, from_idx: int, max_dis
 	return _entry.threshold_ahead(path, from_idx, character.global_position, is_cleared, max_dist)
 
 
-## The allies' live claims on doorway `opening_id`, off the radio: `{ id, name, slot, side, step, pos, age }`,
+## The doorways out of the cleared room `into` that lead on into a room that is not cleared, other than `opening_id` (the
+## one the NPC came in by): what the team covers once the room is clear, as `{ id, into, pos, width }` (see
+## agent_entry.gd `watch_doors`).
+func entry_watch_doors(into: String, opening_id: String) -> Array:
+	return _entry.watch_doors(into, opening_id, is_cleared)
+
+
+## The allies' live claims on doorway `opening_id`, off the radio: `{ id, name, slot, side, step, covering, pos, age }`,
 ## lowest slot first (see agent_entry.gd `claims`).
 func entry_team(opening_id: String) -> Array:
 	return AgentEntry.claims(opening_id, _callouts())

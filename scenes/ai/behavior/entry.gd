@@ -12,7 +12,10 @@ extends RefCounted
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
 ##              `in` once it is in the room and off the door's axis
 ##   corner   — holds the corner looking across the room, then clears the rest by sight (`search_coverage.gd`)
-##   rear     — once the room is clear, the last of the team holds the doorway facing back out (E8)
+##   cover    — once the room is clear, each member covers a different doorway on into a room not yet cleared, its gun
+##              through it, until a teammate moves on (E8); alone, it looks through each such doorway in turn
+##   rear     — a member left over (no such doorway free) that was the last of the team in holds the doorway it came
+##              by, facing back out (E8)
 ##
 ## Its role comes from its slot. Slots, readiness and progress travel on the team radio: the behaviour queues each
 ## step (`take_calls()`) and the controller radios it; the team is read back through the perception
@@ -24,7 +27,15 @@ extends RefCounted
 const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
 
 ## A member whose latest call is one of these is through the doorway.
-const THROUGH := ["in", "clear", "rear"]
+const THROUGH := ["in", "clear", "cover", "rear"]
+## A member whose latest call is one of these has called the room clear (`clear`, then the watch it keeps after).
+const CLEARED := ["clear", "cover", "rear"]
+## A member whose latest call is one of these is holding the cleared room (covering a doorway or the rear).
+const HOLDING := ["cover", "rear"]
+## How far (px) back from a doorway, inside the cleared room, a member stands to cover it.
+const COVER_DEPTH := 110.0
+## How far (px) a cover spot is kept off the cleared room's walls.
+const COVER_INSET := 20.0
 ## How far (px) out from the wall an entrant crosses in front of a door it must get past.
 const CROSS_DEPTH := 140.0
 ## How far (px) beyond its slot, along the wall, an entrant arrives from.
@@ -44,7 +55,9 @@ var ready_timeout: float = 6.0     ## Seconds the point waits for the stack, onc
 var follow_gap: float = 0.3        ## Seconds a follower leaves after the member ahead of it is through.
 var pie_dwell: float = 0.35        ## Seconds the point looks through the door from each pie step.
 var corner_dwell: float = 0.6      ## Seconds held in the corner looking across the room before clearing it.
-var rear_time: float = 10.0        ## Seconds the last of the team holds the doorway facing out once the room is clear.
+var rear_time: float = 10.0        ## Most seconds the last of the team holds the doorway facing out once the room is clear.
+var cover_time: float = 8.0        ## Most seconds a member covers a doorway on when no teammate moves on first.
+var watch_dwell: float = 0.8       ## Seconds a lone entrant looks through each doorway on, once its gaze has settled.
 var approach_time: float = 20.0    ## Safety cap (s) on reaching the slot; past it the claim is given up.
 var look_rate: float = 2.5         ## Gaze turn speed (rad/s).
 
@@ -57,13 +70,14 @@ var solo := true                   ## Nobody else claims the doorway: no barrier
 var seen_fraction := 0.0           ## Share of the room's sample points seen from outside during the pie.
 var pie_sides := 0                 ## How many sides of the door the pie was sliced from.
 var corner := Vector2.INF          ## The corner this NPC enters to.
+var covering := ""                 ## The doorway on (its id) this NPC covers once the room is clear ("" = none).
 
 var _loco: Node                    ## The Locomotion child (pathing, rooms).
 var _perception: Node              ## The perception sub-domain (doorway geometry, the team on the radio, sight).
 var _coverage: RefCounted          ## The room coverage by sight, reused to clear the room once inside.
 var _geo := {}                     ## The doorway's geometry (agent_entry.gd `geometry`).
 var _calls: Array = []             ## Steps to radio, oldest first: { step, cleared_room? }.
-var _last_step := ""               ## The latest step radioed (repeated on the heartbeat).
+var _last_call := {}               ## The latest step radioed, whole (repeated on the heartbeat).
 var _heartbeat := 0.0              ## Seconds until the latest step is radioed again.
 var _clock := 0.0                  ## Seconds into the phase.
 var _waypoints: Array = []         ## Points still to walk through before the current phase's spot.
@@ -82,6 +96,11 @@ var _rear_spot := Vector2.INF      ## Where the rear guard stands, just inside t
 var _dwell := 0.0                  ## Seconds held at the current spot (the corner).
 var _covered := false              ## The room has been covered by sight (waiting for the rest of the stack to be in).
 var _through := {}                 ## Allies seen through this doorway this entry: instance id -> slot (kept when they move on).
+var _watch: Array = []             ## The doorways on out of the cleared room: { id, into, pos, spot, aim }.
+var _sweep: Array = []             ## Alone: the doorways still to look through, in turn.
+var _cover_spot := Vector2.INF     ## Where this NPC stands to cover its doorway.
+var _cover_aim := Vector2.INF      ## A point through that doorway, in the room beyond: where its gun points.
+var _holders := {}                 ## Allies seen holding the cleared room (cover / rear): instance id -> true.
 
 
 ## Capture the locomotion, the perception and the room coverage. Called once by `Behavior.setup()`.
@@ -125,9 +144,10 @@ func reset() -> void:
 	seen_fraction = 0.0
 	pie_sides = 0
 	corner = Vector2.INF
+	covering = ""
 	_geo = {}
 	_calls = []
-	_last_step = ""
+	_last_call = {}
 	_heartbeat = HEARTBEAT
 	_clock = 0.0
 	_waypoints = []
@@ -145,6 +165,11 @@ func reset() -> void:
 	_dwell = 0.0
 	_covered = false
 	_through = {}
+	_watch = []
+	_sweep = []
+	_cover_spot = Vector2.INF
+	_cover_aim = Vector2.INF
+	_holders = {}
 
 
 ## Give the entry up (the NPC chose something else, e.g. a fight): radio `abort` so the stack stops counting on it.
@@ -163,7 +188,7 @@ func committed() -> bool:
 
 ## Whether the entrant may shoot on the move this tick (crossing, or in the room).
 func fires_at_will() -> bool:
-	return phase in ["cross", "corner", "clear", "rear"]
+	return phase in ["cross", "corner", "clear", "cover", "rear"]
 
 
 ## The steps queued for the radio since the last call, oldest first: { step, cleared_room? }.
@@ -186,6 +211,7 @@ func debug() -> Dictionary:
 		"opening": opening, "into": into, "slot": slot, "side": side, "solo": solo, "phase": phase,
 		"seen_fraction": seen_fraction, "pie_sides": pie_sides, "hidden_corners": hidden, "corner": corner,
 		"stack_point": _stack_point() if not _geo.is_empty() else Vector2.INF, "team": _team_size,
+		"covering": covering, "watch_doors": _watch.map(func(w): return w["id"]),
 	}
 
 
@@ -208,8 +234,8 @@ func step(character, delta: float) -> bool:
 	if phase in ["approach", "stack", "pie"]:
 		_keep_slot(character, team)
 	_heartbeat -= delta
-	if _heartbeat <= 0.0 and _last_step != "":
-		_radio(_last_step)  # Keep the claim alive on the radio.
+	if _heartbeat <= 0.0 and not _last_call.is_empty():
+		_radio(_last_call["step"], _last_call)  # Keep the claim (and what it covers) alive on the radio.
 	match phase:
 		"approach":
 			_tick_approach(character)
@@ -223,8 +249,10 @@ func step(character, delta: float) -> bool:
 			_tick_corner(character, team, delta)
 		"clear":
 			_tick_clear(character, team, delta)
+		"cover":
+			_tick_cover(character, team, delta)
 		"rear":
-			_tick_rear(character, delta)
+			_tick_rear(character, team, delta)
 	return phase == "done"
 
 
@@ -478,7 +506,7 @@ func _tick_corner(character, team: Array, delta: float) -> void:
 	character.move_input = Vector2.ZERO
 	_dwell += delta
 	if _dwell >= corner_dwell and _cleared_by_team(team):
-		_finish(character)
+		_finish(character, team)
 	elif _dwell >= corner_dwell:
 		_set_phase(character, "clear")
 		_coverage.begin(character)
@@ -488,7 +516,7 @@ func _tick_corner(character, team: Array, delta: float) -> void:
 ## it clear and move on. An ally that radioed it clear first ends this NPC's search.
 func _tick_clear(character, team: Array, delta: float) -> void:
 	if _cleared_by_team(team):
-		_finish(character)
+		_finish(character, team)
 		return
 	if not _covered:
 		_covered = _coverage.step(character, delta)
@@ -498,21 +526,44 @@ func _tick_clear(character, team: Array, delta: float) -> void:
 	var coming := team.filter(func(m): return not THROUGH.has(m["step"]) and m["step"] != "claim")
 	if coming.is_empty() or _clock >= ready_timeout + CROSS_CAP:
 		_radio("clear", { "cleared_room": into })
-		_finish(character)
+		_finish(character, team)
 
 
-## Whether an ally of this entry has radioed the room clear.
+## Whether an ally of this entry has radioed the room clear (its latest call may already be the watch it keeps after).
 func _cleared_by_team(team: Array) -> bool:
-	return team.any(func(m): return m["step"] == "clear")
+	return team.any(func(m): return CLEARED.has(m["step"]))
 
 
 ## The room is clear (by this NPC's sight or an ally's call): it is marked cleared, so nothing walks into it unprepared
-## again (the entry guard, E9), and the last of the team in holds the doorway as rear security; everyone else is done.
-func _finish(character) -> void:
+## again (the entry guard, E9). Then the room is held (E8): with a team, each member covers a different doorway on into a
+## room not yet cleared, and a member left over holds the doorway it came by, facing back out. A room with no doorway on
+## leaves only the last of the team in on the rear; everyone else is done. Alone, it looks through each doorway on in
+## turn.
+func _finish(character, team: Array) -> void:
 	_perception.mark_cleared(into)
+	_watch = _watch_doors(character)
+	if _watch.is_empty():
+		_hold_rear_or_done(character)
+		return
+	if _through.is_empty():
+		_sweep = _watch.duplicate()
+		_dwell = 0.0
+		_set_phase(character, "cover")
+		return
+	if _claim_door(character, team):
+		_set_phase(character, "cover")
+		_radio("cover", { "covering": covering })
+		return
+	_hold_rear_or_done(character, true)
+
+
+## Hold the doorway this NPC came by, facing back out (rear security): a member left over when the team covers the
+## doorways on (`spare`), or the last of the team in; anyone else is done.
+func _hold_rear_or_done(character, spare := false) -> void:
+	covering = ""
 	var last := not _through.is_empty() and _through.values().all(func(other_slot): return other_slot < slot)
-	if not last:
-		phase = "done"
+	if not (last or (spare and not _through.is_empty())):
+		_end_hold()
 		return
 	var door: Vector2 = _geo["pos"]
 	_rear_spot = _loco.reachable(door - (_geo["out"] as Vector2) * 30.0 + (_geo["along"] as Vector2) * side * (float(_geo["width"]) * 0.5 + 24.0))
@@ -521,15 +572,116 @@ func _finish(character) -> void:
 	character.move_input = Vector2.ZERO
 
 
-## Hold just inside the doorway facing back out the way the team came, for `rear_time`.
-func _tick_rear(character, delta: float) -> void:
+## The doorways on out of the cleared room, each with where to stand to cover it and where to point the gun: inside the
+## cleared room, `COVER_DEPTH` back from the doorway and off its axis on the side this NPC is on, looking through it.
+func _watch_doors(character) -> Array:
+	var out: Array = []
+	var room: Rect2 = (_geo["room"] as Rect2).grow(-COVER_INSET)
+	for d in _perception.entry_watch_doors(into, opening):
+		var g: Dictionary = _perception.entry_geometry(character, d["id"], d["into"])
+		if g.is_empty():
+			continue
+		var pos: Vector2 = g["pos"]
+		var back: Vector2 = g["out"]  # Away from the room beyond: into the cleared room.
+		var along: Vector2 = g["along"]
+		var lean := 1.0 if (character.global_position - pos).dot(along) >= 0.0 else -1.0
+		var spot := pos + back * COVER_DEPTH + along * lean * (float(g["width"]) * 0.5 + 20.0)
+		spot = _loco.reachable(spot.clamp(room.position, room.end))
+		out.append({ "id": d["id"], "into": d["into"], "pos": pos, "spot": spot,
+			"aim": pos + (pos - spot).normalized() * 300.0 })
+	return out
+
+
+## Claim the doorway on that is nearest this NPC and that no teammate covers, keeping the one it already covers while
+## that stays its own (when two claim one, the lower instance id keeps it, as with a stack slot). False when every
+## doorway on is covered.
+func _claim_door(character, team: Array) -> bool:
+	var me: int = character.get_instance_id()
+	var best := {}
+	for w in _watch:
+		var mine := team.all(func(m): return m["step"] != "cover" or m["covering"] != w["id"] or me < m["id"])
+		if not mine:
+			continue
+		if w["id"] == covering:
+			best = w
+			break
+		if best.is_empty() or character.global_position.distance_to(w["spot"]) < character.global_position.distance_to(best["spot"]):
+			best = w
+	if best.is_empty():
+		return false
+	covering = best["id"]
+	_cover_spot = best["spot"]
+	_cover_aim = best["aim"]
+	return true
+
+
+## Hold the cleared room covering a doorway on: to the cover spot with the gun through that doorway, kept there until a
+## teammate who held the room moves on, or `cover_time` runs out. A teammate that takes the same doorway with a lower
+## instance id makes this NPC take another (or the rear). Alone: look through each doorway on in turn, `watch_dwell`
+## each once the gaze has settled, then done.
+func _tick_cover(character, team: Array, delta: float) -> void:
+	if _clock >= cover_time:
+		_end_hold()
+		return
+	if not _sweep.is_empty():
+		character.move_input = Vector2.ZERO
+		var w: Dictionary = _sweep[0]
+		var at: Vector2 = w["pos"]
+		if _look_toward(character, at + (at - character.global_position).normalized() * 300.0, delta, 2.0):
+			_dwell += delta
+		else:
+			_dwell = 0.0
+		if _dwell >= watch_dwell:
+			_sweep.pop_front()
+			_dwell = 0.0
+			if _sweep.is_empty():
+				_end_hold()
+		return
+	if _team_moved(team):
+		_end_hold()
+		return
+	var was := covering
+	if not _claim_door(character, team):
+		_hold_rear_or_done(character, true)
+		return
+	if covering != was:
+		_radio("cover", { "covering": covering })
+	if not _at(character, _cover_spot):
+		_loco.move_to(character, _cover_spot)
+	else:
+		character.move_input = Vector2.ZERO
+	_look_toward(character, _cover_aim, delta, 3.0)
+
+
+## Hold just inside the doorway facing back out the way the team came, until a teammate who held the room moves on or
+## `rear_time` runs out.
+func _tick_rear(character, team: Array, delta: float) -> void:
 	if not _at(character, _rear_spot):
 		_loco.move_to(character, _rear_spot)
 	else:
 		character.move_input = Vector2.ZERO
 	_look_toward(character, (_geo["pos"] as Vector2) + (_geo["out"] as Vector2) * 300.0, delta, 3.0)
-	if _clock >= rear_time:
-		phase = "done"
+	if _clock >= rear_time or _team_moved(team):
+		_end_hold()
+
+
+## Whether a teammate who was holding the cleared room (covering a doorway or the rear) has moved on: its latest call is
+## no longer a hold on this doorway (it radioed `done` or `abort`, or claims another doorway).
+func _team_moved(team: Array) -> bool:
+	for m in team:
+		if HOLDING.has(m["step"]):
+			_holders[m["id"]] = true
+	for id in _holders:
+		if not team.any(func(m): return m["id"] == id and HOLDING.has(m["step"])):
+			return true
+	return false
+
+
+## The watch is over: radio `done` (a teammate still holding the room takes it as the team moving on) and finish.
+func _end_hold() -> void:
+	if phase in ["cover", "rear"] and not _through.is_empty():
+		_radio("done")
+	phase = "done"
 
 
 # --- Helpers ------------------------------------------------------------------------------------
@@ -552,12 +704,12 @@ func _stack_point() -> Vector2:
 	return AgentEntry.slot_point(_geo, side, slot)
 
 
-## Queue step `what` for the radio (and remember it for the heartbeat).
+## Queue step `what` for the radio (and remember it, with its extra fields, for the heartbeat).
 func _radio(what: String, extra := {}) -> void:
 	var msg := { "step": what }
 	msg.merge(extra)
 	_calls.append(msg)
-	_last_step = what
+	_last_call = msg.duplicate()
 	_heartbeat = HEARTBEAT
 
 

@@ -13,6 +13,11 @@ const BACK := { "id": "door_840_190", "pos": Maps.DOOR_BACK, "width": 90.0, "out
 const FRONT := { "id": "door_0_415", "pos": Maps.DOOR_FRONT, "width": 80.0, "out": Vector2.LEFT, "room": Maps.HOUSE_HALL, "room_key": "hall" }
 const KITCHEN_LIVING := { "id": "door_480_150", "pos": Maps.DOOR_LIVING_KITCHEN, "width": 90.0, "out": Vector2.RIGHT, "room": Maps.HOUSE_LIVING, "room_key": "living_room" }
 const HALL_LIVING := { "id": "door_150_360", "pos": Maps.DOOR_HALL_LIVING, "width": 80.0, "out": Vector2.DOWN, "room": Maps.HOUSE_LIVING, "room_key": "living_room" }
+## The doorways on out of a cleared room, framed from the side the team holds (`out` points into the cleared room): the
+## kitchen's into the hall, and the living room's into the kitchen. With `KITCHEN_LIVING` (the kitchen's into the living
+## room) they are what a team that has cleared the kitchen or the living room covers (E8).
+const KITCHEN_HALL := { "id": "door_690_360", "pos": Maps.DOOR_HALL_KITCHEN, "width": 80.0, "out": Vector2.UP, "room": Maps.HOUSE_HALL, "room_key": "hall" }
+const LIVING_KITCHEN := { "id": "door_480_150", "pos": Maps.DOOR_LIVING_KITCHEN, "width": 90.0, "out": Vector2.LEFT, "room": Maps.HOUSE_KITCHEN, "room_key": "kitchen" }
 
 ## How deep (px) the funnel reaches either side of the wall plane: the strip in the doorway where an entrant is exposed.
 const FUNNEL_DEPTH := 40.0
@@ -74,6 +79,29 @@ static func lateral(door: Dictionary, p: Vector2) -> float:
 ## Whether `p` is in the fatal funnel: inside the doorway's width and within `FUNNEL_DEPTH` of the wall plane.
 static func in_funnel(door: Dictionary, p: Vector2) -> bool:
 	return absf(lateral(door, p)) < float(door["width"]) * 0.5 and absf(outward(door, p)) < FUNNEL_DEPTH
+
+
+## Whether a body at `p` facing `facing` points its gun through `door` from the side the door is framed from: it stands
+## on the `out` side and looks within about 30° of the doorway's centre.
+static func faces_through(door: Dictionary, p: Vector2, facing: Vector2) -> bool:
+	var to_door := (door["pos"] as Vector2) - p
+	return outward(door, p) > 0.0 and to_door.length() > 1.0 and facing.normalized().dot(to_door.normalized()) > 0.85
+
+
+## How long (s) actor `id` pointed its gun through `door` (see `faces_through`) in `samples`, optionally only while
+## `where` (a Callable on its position) holds.
+static func time_facing_through(samples: Array, id: StringName, door: Dictionary, where := Callable()) -> float:
+	var total := 0.0
+	for i in range(1, samples.size()):
+		var sample: Dictionary = samples[i]
+		if not sample["pos"].has(id):
+			continue
+		var p: Vector2 = sample["pos"][id]
+		if where.is_valid() and not where.call(p):
+			continue
+		if faces_through(door, p, sample["facing"][id]):
+			total += float(sample["t"]) - float(samples[i - 1]["t"])
+	return total
 
 
 ## Whether `p` is in the room behind `door`.

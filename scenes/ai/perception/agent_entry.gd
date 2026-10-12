@@ -67,6 +67,13 @@ func entries_from(here_key: String) -> Array:
 	return out
 
 
+## The doorways out of room `room_key` (one already cleared) that lead on into another room that `is_cleared` (a Callable
+## on the room key) says is not cleared, other than doorway `exclude_id` (the one the NPC came in by). Doors to outside
+## are left out. Each `{ id, into, pos, width }`. What the team covers once it has cleared a room (E8).
+func watch_doors(room_key: String, exclude_id: String, is_cleared: Callable) -> Array:
+	return entries_from(room_key).filter(func(e): return e["id"] != exclude_id and not is_cleared.call(e["into"]))
+
+
 ## The first doorway on a walk that leads into a room the NPC has not cleared: the polyline from `from_pos` through the
 ## waypoints of `path` from `from_idx` on, as far as `max_dist` px of walking. A doorway counts when a step of the walk
 ## crosses its wall plane within the doorway's width, heading into a room that is not the one the NPC is in and that
@@ -234,18 +241,19 @@ func _snap(map: RID, p: Vector2) -> Vector2:
 # --- The team, off the radio -------------------------------------------------------------------
 
 ## The allies' live claims on opening `id`, from the callouts heard (latest per speaker, see the perception's
-## `_callouts()`): `{ id (speaker instance id), name, slot, side, step, pos, age }`, lowest slot first. A member
-## who aborted, or whose latest call is about something else, holds no claim.
+## `_callouts()`): `{ id (speaker instance id), name, slot, side, step, covering, pos, age }`, lowest slot first
+## (`covering` = the doorway a member holding the cleared room watches, with step `cover`). A member who aborted or is
+## done with the doorway, or whose latest call is about something else, holds no claim.
 static func claims(id: String, callouts: Array) -> Array:
 	var out: Array = []
 	for c in callouts:
 		if str(c.get("opening", "")) != id:
 			continue
 		var step := str(c.get("entry_step", ""))
-		if step == "" or step == "abort":
+		if step == "" or step == "abort" or step == "done":
 			continue
 		out.append({ "id": c["id"], "name": c.get("name", ""), "slot": int(c.get("slot", 0)), "side": int(c.get("side", 0)),
-			"step": step, "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0) })
+			"step": step, "covering": str(c.get("covering", "")), "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0) })
 	out.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
 	return out
 

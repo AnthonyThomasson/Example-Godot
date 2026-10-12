@@ -260,14 +260,15 @@ functional tests of their domain.
 
 `tests/ai/entry_*_test.gd` pin down `docs/tactical-entry.md` (E1 to E9; each header names its behaviour): staging and
 the approach, the stack's slots, the pie, the crossing, the corners, the ready barrier and the radio, the solo entry
-and a joining ally, clearing and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
+and a joining ally, clearing, covering the doorways on and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
 rooms so the geometry is clean), through `tests/_ai/entry_probe.gd` (`const Entry := preload(...)`): `rules(s, door)`
 (SEARCH > ENTER > that doorway, engage in a fight), `npc` (an invader that walks; `cadence` offsets its decide timer),
 `target`, `guard_rules(s, picks)` (a plain order that is not ENTER: for the E9 tests, with `asked(t, prefix)` to check the
 order was really the one scripted and `check_entered(t, samples, id, door)` for "it went in by entry"), the test's own
-doorway frame (`BACK`, `FRONT`, `HALL_LIVING`, `KITCHEN_LIVING` with `out`, `outward`, `lateral`, `in_funnel`,
-`in_room`, `beside_door`, `corners`), a per-frame sampler (`watch`, then `path_of`, `pos_at`, `first_stop_in_room`,
-`funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`) and the radio (`calls(t, step, id)`, `first_call_time`;
+doorway frame (`BACK`, `FRONT`, `HALL_LIVING`, `KITCHEN_LIVING`, and the doorways on that a team covers once it holds the
+kitchen or living room, `KITCHEN_HALL`, `LIVING_KITCHEN`, with `out`, `outward`, `lateral`, `in_funnel`, `in_room`,
+`beside_door`, `corners`, `faces_through`), a per-frame sampler (`watch`, then `path_of`, `pos_at`, `first_stop_in_room`,
+`funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`, `time_facing_through`) and the radio (`calls(t, step, id)`, `first_call_time`;
 callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
 
 - Two invaders that claim a doorway on the same frame settle their slots by instance id: the first actor declared
@@ -407,7 +408,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map answers with this world's region, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |
@@ -430,6 +431,9 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
   harmless.
 - An NPC thinks on its first tick, so the world must be live before actors enter: `TestWorld.build` waits
   two physics frames after the walls and navmesh are made (otherwise an NPC sees through room walls and
-  plans on an empty navmesh).
+  plans on an empty navmesh), then until the navigation map's closest point to a room's centre belongs to the
+  new region. The map's iteration is built on a worker thread: under load (parallel shards) its id and region list
+  update before queries do, and an NPC that snapped a point onto the empty map walked to the origin. That wait is
+  in real time, so the test clock is stopped while the world builds (`_building` in the runner).
 - The defender preset is `hostile_on_trespass`, and an arena counts as its house. Turn
   `ai.hostile_on_trespass` off to test a reaction to something else.

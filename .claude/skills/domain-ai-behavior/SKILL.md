@@ -73,8 +73,18 @@ gaze through the door until it settles plus `entry_pie_dwell`, dropping room sam
 and corners it sees: `seen_fraction`, hidden corners; alone it then crosses in front, far out, and slices the other
 side), `cross` (radios `going_in`; walks to its corner without stopping; `in` once past the wall plane and off the axis),
 `corner` (holds it `entry_corner_dwell` looking across the room), `clear` (`SearchCoverage.begin/step`; radios `clear`
-with `cleared_room` once the rest of the stack is in), `rear` (the last of the team in holds just inside the door facing
-out for `rear_security_time`).
+with `cleared_room` once the rest of the stack is in), `cover` (the room is held, guns on the doorways on, below), `rear`
+(a member left over holds just inside the door it came by, facing out).
+
+- **Holding the cleared room (E8).** `_finish` marks the room cleared, then reads the doorways on out of it into rooms not
+  cleared (`entry_watch_doors(into, opening)`, outside doors and the door it came by left out) with a cover spot each:
+  `COVER_DEPTH` back inside the cleared room, off the doorway's axis on the NPC's side, the gun aimed through it. With a
+  team, each member claims the nearest doorway no teammate's `cover` call names (kept once its own; a tie goes to the lower
+  instance id) and radios `cover` with `covering`; one left over (or, with no doorway on, the last one in) goes to `rear`,
+  anyone else is done. The hold ends when a teammate seen holding (`cover` / `rear`) is no longer (it radioed `done`,
+  `abort`, or claims another doorway), or after `entry_cover_time` (cover) / `rear_security_time` (rear); a member that
+  held radios `done`. Alone, it turns its gaze through each doorway on in turn, `entry_watch_dwell` once settled, then is
+  done. The heartbeat repeats the latest call whole, so `covering` and `cleared_room` stay on the radio.
 
 - **Barrier and order.** The point crosses when every other claimant has radioed past `claim`, or `entry_ready_timeout`
   after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
@@ -105,7 +115,7 @@ out for `rear_security_time`).
   committed to its own ENTER crossing is ignored (`set_leaf` returns) and the entry's end re-decides. `fallback()` (no decision to
   be had) abandons any entry. Tests: `tests/ai/entry_guard_*_test.gd`, `entry_fallback_aborts`,
   `entry_decision_in_flight_during_cross`.
-- **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides,
+- **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides, covering, watch_doors,
   hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`; the status line says the phase
   ("stacked at the door", "slicing the pie", "going in" ...).
 

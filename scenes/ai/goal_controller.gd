@@ -205,8 +205,14 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_corner_inset: float = 40.0
 ## Seconds an entrant holds its corner, looking across the room, before it clears the rest by sight.
 @export var entry_corner_dwell: float = 0.6
-## Seconds the last of a team holds the doorway it came in by, facing back out, once the room is clear.
+## Most seconds the last of a team holds the doorway it came in by, facing back out, once the room is clear (it leaves
+## sooner when a teammate holding the room moves on).
 @export var rear_security_time: float = 10.0
+## Most seconds a member covers a doorway on out of a room the team has cleared, gun through it, when no teammate moves
+## on first.
+@export var entry_cover_time: float = 8.0
+## Seconds a lone entrant looks through each doorway on out of a room it has cleared, once its gaze has settled.
+@export var entry_watch_dwell: float = 0.8
 ## Safety cap (s) on reaching the stack: an entrant that cannot get to its slot in this time gives up its claim.
 @export var entry_approach_time: float = 20.0
 ## The entry guard (E9): any walk that would cross into a room that is not cleared goes in by tactical entry first, whatever
@@ -432,6 +438,8 @@ func _apply_config() -> void:
 	_behavior.entry_pie_dwell = entry_pie_dwell
 	_behavior.entry_corner_dwell = entry_corner_dwell
 	_behavior.rear_security_time = rear_security_time
+	_behavior.entry_cover_time = entry_cover_time
+	_behavior.entry_watch_dwell = entry_watch_dwell
 	_behavior.entry_approach_time = entry_approach_time
 	_behavior.entry_guard = entry_guard
 	_behavior.entry_guard_range = entry_guard_range
@@ -742,7 +750,8 @@ func _post_callout(leaf: Dictionary) -> void:
 
 ## Radio one step of a tactical entry (`{ step, opening, slot, side, cleared_room? }` from the behaviour) as an
 ## `&"callout"`: the usual fields plus `opening`, `slot`, `side` and `entry_step` (claim / ready / going_in / in /
-## clear / rear / abort), and `cleared_room` with a clear. It is how the stack claims slots, waits for the team and
+## clear / cover / rear / done / abort), `cleared_room` with a clear and `covering` (the doorway on it watches) with a
+## cover. It is how the stack claims slots, waits for the team and
 ## crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
 func _post_entry_call(step: Dictionary) -> void:
 	var status := _status(false)
@@ -765,6 +774,7 @@ func _post_entry_call(step: Dictionary) -> void:
 		"side": step["side"],
 		"entry_step": step["step"],
 		"cleared_room": step.get("cleared_room", ""),
+		"covering": step.get("covering", ""),
 	})
 
 

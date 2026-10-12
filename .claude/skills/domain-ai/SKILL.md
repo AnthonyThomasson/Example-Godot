@@ -114,4 +114,4 @@ The AI's external surface is all the orchestrator's:
   (closest point, path) to judge routes.
 - **EventBus** (interface 10): the orchestrator consumes `&"hit"` and `&"callout"` and hands each to
   perception; it posts `&"callout"` when it adopts a combat or investigation decision, and at each step
-  of a tactical entry (the stack's slot claims, ready, going in, through, clear).
+  of a tactical entry (the stack's slot claims, ready, going in, through, clear, the doorway on each covers, done).
