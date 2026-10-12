@@ -9,7 +9,7 @@ class_name CharacterConfig
 ## uses, divided by the object's mass. Pushing also slows the character (heavier =
 ## slower), and a fast object sliding into the character shoves them back.
 
-# --- Postures (the body's height: stand, crouch, prone; a controller picks one with `set_posture`) ---
+# --- Postures (the body's height: stand or crouch; a controller picks one with `set_posture`) ---
 # Not to be confused with `stances` below (how a hand is held). A posture trades speed for a smaller target:
 # `speed` multiplies the walk speed; `turn` is the fastest the body swings round to the aim (rad/s, 0 = at once);
 # `coverage` is the body's height on the same 0–100 scale as an object's
@@ -19,7 +19,6 @@ class_name CharacterConfig
 static var postures: Dictionary = {
 	&"stand": { "speed": 1.0, "turn": 0.0, "coverage": 60.0, "height": 1.0 },
 	&"crouch": { "speed": 0.6, "turn": 5.0, "coverage": 35.0, "height": 0.62 },
-	&"prone": { "speed": 0.3, "turn": 2.5, "coverage": 15.0, "height": 0.2 },
 }
 ## Seconds after a posture change before the next one is allowed, so a controller can't flicker between them.
 static var posture_change_time: float = 0.25
@@ -138,8 +137,8 @@ static var body_run_hip_drop: float = 0.35
 ## A crouch pitches the spine forward about the pelvis (degrees, at the crouch's height; the neck pitches on
 ## from the shoulders), and the pelvis shifts back and the chest forward by half the lean so the body stays
 ## centred over its feet.
-static var body_crouch_pitch: float = 50.0
-static var body_crouch_neck_pitch: float = -20.0
+static var body_crouch_pitch: float = 25.0
+static var body_crouch_neck_pitch: float = -10.0
 ## A crouch narrows the stance: the hips and the feet sit this share of their standing width apart, the feet
 ## stand this far ahead of the pelvis (body radii, so the knees lead over the toes), the foot opposite the
 ## weapon hand steps back by the stagger (body radii), and the stride is this share of a standing one.
@@ -148,24 +147,9 @@ static var body_crouch_foot_gap: float = 0.5
 static var body_crouch_foot_ahead: float = 0.9
 static var body_crouch_stagger: float = 0.35
 static var body_crouch_stride: float = 0.45
-## Lying prone (the body laid flat along the way it faces, on its belly): the trunk's centre height above the
-## floor, the head's reach ahead of the chest, how much of a straight leg the ankles trail behind the hips
-## (the knees splay out, the way a crawler's do) and how far each foot lies off the spine (body radii), and
-## how far the crawl swings a foot fore and aft at a full walk.
-static var body_lying_height: float = 0.5
-static var body_lying_head_ahead: float = 0.85
-static var body_lying_leg_reach: float = 0.96
-static var body_lying_leg_splay: float = 0.45
-static var body_lying_crawl: float = 0.3
-## How far (degrees) a prone foot is turned out from pointing straight back, so the toes lie out to the side.
-static var body_lying_foot_turn: float = 65.0
 ## How far further forward (px) the hands are held crouched (about the chest's forward shift, so the arms keep
-## their reach and the gun is held out in front), and lying prone (so the arms reach out ahead of the head).
-static var body_crouch_hand_ahead: float = 14.0
-static var body_lying_hand_ahead: float = 25.0
-## How far (degrees) a prone long gun and its hands swing off the aim, to the freer side, when its barrel is
-## against a wall (a standing or crouched one raises it instead).
-static var body_lying_side_turn: float = 80.0
+## their reach and the gun is held out in front).
+static var body_crouch_hand_ahead: float = 8.0
 
 # --- Legs (they rest against walls and furniture and shove light pieces; character_legs.gd) ---
 ## Radius (px) of the circle a foot and a knee sweep with, and the shove (impulse per second of contact, divided

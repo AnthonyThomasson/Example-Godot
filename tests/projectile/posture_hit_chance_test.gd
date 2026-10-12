@@ -2,9 +2,9 @@ extends GameTest
 
 ## In the open a lower posture is a smaller target: a bullet strikes a body of coverage C when it flies below C,
 ## so at a pinned height each posture is struck or missed by the numbers alone, and over random heights the hit
-## rates follow the postures' coverage (standing most, then crouched, then prone).
+## rates follow the postures' coverage (standing most, then crouched).
 
-const LANES := { &"stand": 130.0, &"crouch": 300.0, &"prone": 470.0 }
+const LANES := { &"stand": 200.0, &"crouch": 400.0 }
 const TARGET_X := 560.0
 const SHOOT_X := 150.0
 
@@ -12,8 +12,8 @@ const SHOOT_X := 150.0
 func describe() -> Dictionary:
 	return {
 		"name": "A lower posture is hit by fewer shots",
-		"description": "Bullets pinned to a height strike the postures it is below (10: all, 20: standing and crouched, 40: standing, 70: none); random shots hit standing most, crouched less, prone least.",
-		"tags": ["projectile", "posture", "crouch", "prone", "coverage", "ballistics"],
+		"description": "Bullets pinned to a height strike the postures it is below (10 and 20: both, 40: standing, 70: none); random shots hit standing most, crouched less.",
+		"tags": ["projectile", "posture", "crouch", "coverage", "ballistics"],
 		"timeout": 20.0,
 	}
 
@@ -39,14 +39,12 @@ func run(t: TestContext) -> void:
 	await _volley(t, 20.0, 1)
 	t.expect_eq(_hits(t, &"stand"), 2, "a shot at 20 strikes the standing body")
 	t.expect_eq(_hits(t, &"crouch"), 2, "...and the crouched one")
-	t.expect_eq(_hits(t, &"prone"), 1, "...but flies over the prone one")
 	await _volley(t, 40.0, 1)
 	t.expect_eq(_hits(t, &"stand"), 3, "a shot at 40 strikes only the standing body")
 	t.expect_eq(_hits(t, &"crouch"), 2, "...over the crouched one")
 	await _volley(t, 70.0, 1)
 	t.expect_eq(_hits(t, &"stand"), 3, "a shot at 70 misses everyone")
 	t.expect_eq(_hits(t, &"crouch"), 2, "...including the crouched")
-	t.expect_eq(_hits(t, &"prone"), 1, "...and the prone")
 
 	var before := {}
 	for lane: StringName in LANES:
@@ -58,7 +56,7 @@ func run(t: TestContext) -> void:
 		rate[lane] = float(_hits(t, lane) - before[lane]) / shots
 		var want: float = float(CharacterConfig.postures[lane]["coverage"]) / 100.0
 		t.expect_near(rate[lane], want, 0.12, "a %s body is hit by about %.0f%% of random shots (%.2f)" % [lane, want * 100.0, rate[lane]])
-	t.check(rate[&"stand"] > rate[&"crouch"] and rate[&"crouch"] > rate[&"prone"], "standing is hit more than crouched, and crouched more than prone")
+	t.check(rate[&"stand"] > rate[&"crouch"], "standing is hit more than crouched")
 
 
 ## Fire `count` bullets down every lane at `height` (negative = random) and let them land.

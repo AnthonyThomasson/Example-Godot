@@ -46,8 +46,6 @@ const REDRAW_POS_STEP := 0.1
 const REDRAW_ANGLE_STEP := 0.02
 ## How far a held weapon's raise (0..1) must change to repaint: the gun's art steps through a few lengths.
 const REDRAW_RAISE_STEP := 0.1
-## How far a body must have lain down (0..1) to be drawn lying (like a fallen one) rather than standing.
-const LIE_DRAW := 0.1
 ## How folded (0..1) a crouching body is before it is drawn from the rig's trunk (its back showing), not as shoulders.
 const FOLD_DRAW := 0.15
 var _rig  ## The standing skeleton solved this frame, shared by the body's and the shadow's draw.
@@ -163,12 +161,12 @@ static func _rig_xy(rig, joint: int) -> Vector2:
 
 
 ## Whether the living body is drawn laid out from the rig (like a fallen one: a lofted trunk showing its back, the
-## limbs by height) rather than as upright shoulders: lying prone, or bent over in a crouch.
+## limbs by height) rather than as upright shoulders: bent over in a crouch.
 func draws_laid_out() -> bool:
-	return _character.posture_lie() > LIE_DRAW or _character.posture_folded() > FOLD_DRAW
+	return _character.posture_folded() > FOLD_DRAW
 
 
-## A body lying prone or crouched: its parts from the rig's 3D points seen from above, lowest first, exactly as a fallen
+## A crouched body: its parts from the rig's 3D points seen from above, lowest first, exactly as a fallen
 ## body is drawn (a lofted trunk showing its back, the limbs laid out), then what it holds and its fists on top.
 func _draw_lying(rig) -> void:
 	var pose = _character.pose

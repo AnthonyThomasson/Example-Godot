@@ -3,10 +3,10 @@ extends GameTest
 ## Coverage is a height, and a bullet flies at one height for its whole flight: it strikes cover taller than it
 ## is and clears the rest, and whatever it clears it clears for every body behind. Behind cover of 50, a standing
 ## body (60) is struck only by shots between 50 and 60 (the 10 that clear the cover but not the body); a crouched
-## body (35) and a prone one (15) are never reached by a shot that cleared the cover, and the cover (which
+## body (35) is never reached by a shot that cleared the cover, and the cover (which
 ## stops what it meets) keeps the rest from them.
 
-const LANES := { &"stand": 130.0, &"crouch": 300.0, &"prone": 470.0 }
+const LANES := { &"stand": 200.0, &"crouch": 400.0 }
 const COVER_X := 500.0
 const TARGET_X := 580.0
 const SHOOT_X := 150.0
@@ -15,7 +15,7 @@ const SHOOT_X := 150.0
 func describe() -> Dictionary:
 	return {
 		"name": "A bullet's one height meets cover and the body behind it",
-		"description": "Bullets pinned to a height strike the cover (30), only the standing body behind it (55) or nothing (70); at random heights about half meet the cover, a tenth reach the standing body, none reach the crouched or prone ones.",
+		"description": "Bullets pinned to a height strike the cover (30), only the standing body behind it (55) or nothing (70); at random heights about half meet the cover, a tenth reach the standing body, none reach the crouched one.",
 		"tags": ["projectile", "cover", "coverage", "posture", "ballistics"],
 		"timeout": 20.0,
 	}
@@ -43,7 +43,7 @@ func run(t: TestContext) -> void:
 	for lane: StringName in LANES:
 		coverage[lane] = t.actor(StringName("body_%s" % lane)).get_surface()["coverage"]
 	t.expect_near(coverage[&"stand"], 60.0, 0.01, "a standing body is 60")
-	t.check(coverage[&"crouch"] < 50.0 and coverage[&"prone"] < coverage[&"crouch"], "the lower postures stand lower than the cover")
+	t.check(coverage[&"crouch"] < 50.0, "the crouched body stands lower than the cover")
 	await t.frames(2)
 
 	# Pinned heights: each outcome is decided by the numbers alone.
@@ -56,7 +56,6 @@ func run(t: TestContext) -> void:
 	t.expect_eq(_hits(t, _cover(t, &"stand")), 1, "a shot at 55 clears the cover")
 	t.expect_eq(_hits(t, _body(t, &"stand")), 1, "...and strikes the standing body, which stands to 60")
 	t.expect_eq(_hits(t, _body(t, &"crouch")), 0, "...and passes over the crouched body")
-	t.expect_eq(_hits(t, _body(t, &"prone")), 0, "...and over the prone one")
 
 	await _volley(t, 70.0, 1)
 	t.expect_eq(_hits(t, _body(t, &"stand")), 1, "a shot at 70 clears even the standing body (no new hit)")
@@ -73,7 +72,6 @@ func run(t: TestContext) -> void:
 	t.expect_near(on_cover, 0.5, 0.12, "about half the shots meet cover of 50 (%.2f)" % on_cover)
 	t.expect_near(on_body, 0.1, 0.07, "about a tenth reach the standing body behind it alone (%.2f)" % on_body)
 	t.expect_eq(_hits(t, _body(t, &"crouch")), 0, "no random shot ever reaches the crouched body behind the cover")
-	t.expect_eq(_hits(t, _body(t, &"prone")), 0, "nor the prone one")
 
 
 ## Fire `count` bullets down every lane at `height` (negative = random) and let them land.

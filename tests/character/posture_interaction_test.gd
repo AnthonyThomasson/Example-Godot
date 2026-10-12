@@ -32,15 +32,15 @@ func run(t: TestContext) -> void:
 	if not t.require(await t.until(sitter.is_busy, 1.0), "sitting makes the character busy"):
 		return
 	t.expect_eq(sitter.posture(), &"stand", "an interaction stands the character up")
-	t.check(not sitter.set_posture(&"prone"), "no posture change while seated")
+	t.check(not sitter.set_posture(&"crouch"), "no posture change while seated")
 	t.expect_eq(sitter.posture(), &"stand", "still standing")
 	p.end_interaction()
 	await t.until(func(): return not sitter.is_busy(), 1.0, "standing up frees the character")
-	t.check(sitter.set_posture(&"prone"), "free again, it can go prone")
+	t.check(sitter.set_posture(&"crouch"), "free again, it can crouch")
 
 	# A dead character keeps no posture and takes none.
 	var victim := t.actor(&"victim")
-	t.check(victim.set_posture(&"prone"), "the victim goes prone")
+	t.check(victim.set_posture(&"crouch"), "the victim crouches")
 	victim.take_damage(victim.max_health)
 	await t.frames(2)
 	t.check(victim.is_dead, "the victim died")

@@ -605,18 +605,6 @@ func has_line_to(character, target: Node2D, point: Vector2) -> bool:
 	return not _tactics.blocked(space, character.global_position, point, exclude)
 
 
-## The height (coverage 0..100) of the first solid object between the NPC and a world `point` (the engaged
-## contact's last-known position), 0 when the line is clear: what shelters it from a shot from there. The
-## behaviour picks a posture from it (a body lower than the cover is out of reach of any shot that clears it).
-## Both the NPC and `target` (the contact's body) are excluded.
-func cover_height_to(character, target: Node2D, point: Vector2) -> float:
-	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
-	var exclude := [character.get_rid()]
-	if target != null and is_instance_valid(target):
-		exclude.append(target.get_rid())
-	return _tactics.cover_between(space, character.global_position, point, exclude)
-
-
 ## Of world `points`, the subset the NPC can SEE right now from where it stands — view cone + clear
 ## line of sight over low cover, the same sight rule used to spot characters (agent_vision.gd). The
 ## behaviour uses it to track which parts of a room a searcher has covered. Builds the sight query

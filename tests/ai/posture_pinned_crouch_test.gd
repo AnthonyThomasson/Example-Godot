@@ -1,15 +1,15 @@
 extends GameTest
 
-## A defender under fire in the open, with nothing between it and the shooter, lies prone; a hit-free defender
+## A defender under fire in the open, with nothing between it and the shooter, crouches; a hit-free defender
 ## in the same arena does not. Shot at from the side it cannot see, the defender still gets low (it knows it is
 ## being shot).
 
 
 func describe() -> Dictionary:
 	return {
-		"name": "A pinned defender lies prone",
-		"description": "Shot at in the open with the server down, the defender goes prone; its twin out of the fire stays on its feet.",
-		"tags": ["ai", "posture", "prone", "under fire"],
+		"name": "A pinned defender crouches",
+		"description": "Shot at in the open with the server down, the defender crouches; its twin out of the fire stays on its feet.",
+		"tags": ["ai", "posture", "crouch", "under fire"],
 		"timeout": 20.0,
 	}
 
@@ -37,5 +37,5 @@ func run(t: TestContext) -> void:
 	gunman.aim_at(pinned)
 	await t.seconds(0.5)
 	gunman.shoot()
-	t.check(await t.until(func(): return pinned.is_prone(), 5.0), "shot at in the open, the defender lies prone (%s)" % pinned.posture())
+	t.check(await t.until(func(): return pinned.is_crouching(), 5.0), "shot at in the open, the defender crouches (%s)" % pinned.posture())
 	t.expect_eq(bystander.posture(), &"stand", "the defender out of the fire stays on its feet")

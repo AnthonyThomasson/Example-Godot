@@ -1,13 +1,13 @@
 extends GameTest
 
 ## With the `ai.posture` switch off an NPC always stands, however hard it is pressed: the same pinned defender that
-## goes prone in `posture_pinned_prone_test` stays on its feet.
+## crouches in `posture_pinned_crouch_test` stays on its feet.
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "The posture switch keeps NPCs standing",
-		"description": "Shot at in the open with the posture switch off, the defender never crouches or goes prone.",
+		"description": "Shot at in the open with the posture switch off, the defender never crouches.",
 		"tags": ["ai", "posture", "switch", "under fire"],
 		"timeout": 15.0,
 	}

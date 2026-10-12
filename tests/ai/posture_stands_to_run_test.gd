@@ -1,7 +1,7 @@
 extends GameTest
 
 ## Only a standing body runs, so an NPC that is crouched in a fight and then sent across the arena (combat →
-## advance, a `run` leaf) stands up to do it: it is never crouched or prone while running, it does run, and
+## advance, a `run` leaf) stands up to do it: it is never crouched while running, it does run, and
 ## it keeps low again when it is back to fighting in place.
 
 
@@ -40,4 +40,4 @@ func run(t: TestContext) -> void:
 			if runner.posture() != &"stand":
 				ran_low += 1
 	t.check(ran, "the runner ran")
-	t.expect_eq(ran_low, 0, "never while crouched or prone")
+	t.expect_eq(ran_low, 0, "never while crouched")

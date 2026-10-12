@@ -78,7 +78,7 @@ func set_run(on: bool) -> void:
 	_run = on
 
 
-## Want a posture (`stand`, `crouch` or `prone`): written to the character every frame, so it is taken as
+## Want a posture (`stand` or `crouch`): written to the character every frame, so it is taken as
 ## soon as the character allows. `&""` stops asking.
 func set_posture(posture: StringName) -> void:
 	_posture = posture
@@ -88,9 +88,6 @@ func set_posture(posture: StringName) -> void:
 func toggle_crouch() -> void:
 	_pending.append(func(c): c.toggle_crouch())
 
-
-func toggle_prone() -> void:
-	_pending.append(func(c): c.toggle_prone())
 
 
 ## Stop walking.

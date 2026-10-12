@@ -188,14 +188,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
    The character reads intent from a pluggable **controller child** — any node with
    `control(character, delta)`. The controller writes `move_input` / `aim_point` / `run_input` (hold run: a
    faster pace that spends stamina while moving, dry = walk until it refills; only a standing character runs) and calls the
-   character's action API: `set_posture(p) -> bool` (`stand` / `crouch` / `prone`; idempotent, so a controller may write it every frame; the player's C / Z call
-   `toggle_crouch()` / `toggle_prone()`), `melee()` (F), `shoot() -> bool` (LMB; true = a round left the barrel; ignored while running, reloading,
+   character's action API: `set_posture(p) -> bool` (`stand` / `crouch`; idempotent, so a controller may write it every frame; the player's C calls
+   `toggle_crouch()`), `melee()` (F), `shoot() -> bool` (LMB; true = a round left the barrel; ignored while running, reloading,
    or with a long gun's barrel against a wall or object, and a gun holds back between rounds per its fire rate; a controller re-presses it
    every frame while the trigger is held when `is_automatic()`), `reload()` (R: a timed swap to
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
    dying), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing), `posture()` / `is_crouching()` / `is_prone()` / `posture_coverage(p)` (the height a posture presents to a bullet), `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
+   damage, for injury sensing), `posture()` / `is_crouching()` / `posture_coverage(p)` (the height a posture presents to a bullet), `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
    `is_automatic()`, `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` (carry only those slots, holding one, with those spare

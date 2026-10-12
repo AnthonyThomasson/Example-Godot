@@ -48,9 +48,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `quick_facts(character)` — cheap facts (under fire, engaged, hostile known) between decisions.
 - `sense(character, rooms, goal, activity) -> { facts, sections, sections_per_target, options }` — the
   BUILD pass (below). `activity` is the behaviour's current-activity line.
-- Combat geometry for the behaviour: `has_line_to`, `combat_spots`, `cover_height_to(character, target, point)` (the coverage — height, 0–100 — of the
-  first solid object between the NPC and `point`, 0 when clear: what shelters it from a shot from there; `agent_tactics.cover_between`, the
-  behaviour picks a posture from it),
+- Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
   `note_engaged` / `engaged_fresh` / `under_fire`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
@@ -114,8 +112,7 @@ compare numbers, and an encoder reads "no cover" as "cover". So:
 5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
 A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
 **Posture** words appear only when someone is not standing, so a standing body's text is byte-identical (the `tools/von_scenarios` fixtures pin it): the
-NPC's own in its situation line (" You are crouching." / " You are lying prone.") and a *visible* contact's in its contact line ("crouched low" /
-"flat on the ground"; a last-seen posture may be stale, so it is never shown for a remembered one). Facts `crouched` / `prone` are in the snapshot's
+NPC's own in its situation line (" You are crouching.") and a *visible* contact's in its contact line ("crouched low"; a last-seen posture may be stale, so it is never shown for a remembered one). Fact `crouched` is in the snapshot's
 `facts`. Test: `tests/ai/posture_in_von_state_test.gd`.
 `low_ammo_fraction` is a controller export pushed through `apply_config`. Room types are humanized ("kitchen_living" → "kitchen living").
 

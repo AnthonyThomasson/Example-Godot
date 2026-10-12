@@ -1,6 +1,6 @@
 extends GameTest
 
-## What Von is told about postures: a hostile seen lying down is "flat on the ground" in its contact line, a
+## What Von is told about postures: a hostile seen crouching is "crouched low" in its contact line, a
 ## hostile standing says nothing of the kind, and the defender's own state says "You are crouching." only once
 ## it has taken a crouch — a standing defender's text carries no posture words at all.
 
@@ -8,7 +8,7 @@ extends GameTest
 func describe() -> Dictionary:
 	return {
 		"name": "Von is told about postures only when someone is not standing",
-		"description": "A standing defender and a standing hostile leave posture words out of Von's state; once the hostile goes prone it is flat on the ground, and the fighting defender is crouching.",
+		"description": "A standing defender and a standing hostile leave posture words out of Von's state; once the hostile crouches it is crouched low, and the fighting defender is crouching.",
 		"tags": ["ai", "posture", "decision", "scripted", "snapshot"],
 		"timeout": 30.0,
 	}
@@ -32,14 +32,14 @@ func run(t: TestContext) -> void:
 	t.check(await t.until(func(): return not t.von_requests().is_empty(), 8.0), "the defender asked Von")
 	var first: String = String(t.von_requests()[0]["state"])
 	t.check(first.contains("holding a"), "the state has the usual situation line")
-	for word in ["crouch", "prone", "flat on the ground"]:
+	for word in ["crouch"]:
 		t.check(not first.contains(word), "a standing defender and a standing hostile leave '%s' out of the state" % word)
 
-	# The hostile lies down; later asks mention it.
+	# The hostile crouches; later asks mention it.
 	var asked := t.von_requests().size()
-	t.puppet(&"stranger").set_posture(&"prone")
+	t.puppet(&"stranger").set_posture(&"crouch")
 	t.check(await t.until(func(): return t.von_requests().slice(asked).any(
-		func(r): return String(r["state"]).contains("flat on the ground")), 15.0), "a hostile seen lying down is flat on the ground")
+		func(r): return String(r["state"]).contains("crouched low")), 15.0), "a hostile seen crouching is crouched low")
 	# The defender fights in place, crouched, and says so.
 	t.check(await t.until(func(): return t.von_requests().slice(asked).any(
 		func(r): return String(r["state"]).contains("You are crouching.")), 15.0), "the crouching defender tells Von it is crouching")

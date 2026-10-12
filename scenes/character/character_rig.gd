@@ -13,12 +13,11 @@ extends RefCounted
 ##   the knee is IK bent forward.
 ## - A crouch lowers the hips to the character's eased posture height and pitches the spine forward about the
 ##   pelvis (the neck pitching on, so the head sits ahead of and above the shoulders); the hips and feet come
-##   together, the feet standing a little ahead of the pelvis so the knees lead. Prone lays the whole body flat
-##   on its belly along the way it faces, blended in by how far it has lain down.
+##   together, the feet standing a little ahead of the pelvis so the knees lead.
 ## - Each ankle rests where the legs layer (character_legs.gd) stopped it against a wall or piece of furniture.
 ## Joints are read by index (the constants below, shared with the ragdoll) through `point(i)`, and
 ## each foot's direction through `toes(i)`. Index pairs are per hand side (0 = left, 1 = right). A rig also
-## answers `torso()` and `face()`, so a body lying down is drawn like a fallen one.
+## answers `torso()` and `face()`, so a crouched body is drawn like a fallen one.
 ## Tuning: CharacterConfig.body_*, CharacterConfig.stances, CharacterConfig.postures.
 
 const HEAD := 0
@@ -133,9 +132,6 @@ func _init(character, with_legs := true) -> void:
 		_points[KNEE[i]] = _bend(hip, ankle, thigh, shin, hip_fwd)
 		_toes[i] = hip_fwd
 
-	var lie: float = character.posture_lie()
-	if lie > 0.0:
-		_lie_down(character, lie)
 	if with_legs:
 		for i in 2:
 			var rested = character.foot_clamp(i)
@@ -145,72 +141,6 @@ func _init(character, with_legs := true) -> void:
 				ankle.y = (rested as Vector2).y
 				_points[ANKLE[i]] = ankle
 				_points[KNEE[i]] = knee_at(i, ankle)
-
-
-## Blend the whole skeleton `lie` (0..1) of the way into lying flat on its belly along the way the shoulders
-## face: the trunk level on the floor with the hips behind the chest, the head ahead of it, the arms reaching
-## from the shoulders to the hands the hands layer holds, and the legs trailing behind with the knees splayed
-## out. The feet crawl fore and aft with the walk.
-func _lie_down(character, lie: float) -> void:
-	var r: float = character.radius
-	var pose = character.pose
-	var up := Vector3(0.0, 0.0, 1.0)
-	var torso := Vector2.from_angle(pose.torso_angle)
-	var fwd := Vector3(torso.x, torso.y, 0.0)
-	var right := Vector3(torso.orthogonal().x, torso.orthogonal().y, 0.0)
-	var lunge := Vector3(pose.torso_offset.x, pose.torso_offset.y, 0.0)
-	var upper := CharacterConfig.body_upper_arm * r
-	var fore := CharacterConfig.body_forearm * r
-	var arm_reach := (upper + fore) * CharacterConfig.body_arm_extension
-	var thigh := CharacterConfig.body_thigh * r
-	var shin := CharacterConfig.body_shin * r
-	var spine := (CharacterConfig.body_shoulder_height - CharacterConfig.body_hip_height) * r
-	var rest := up * CharacterConfig.body_lying_height * r
-	var lying := []
-	lying.resize(17)
-	lying[CHEST] = fwd * spine * 0.5 + lunge + rest
-	lying[PELVIS] = -fwd * spine * 0.5 + rest
-	var mid: Vector3 = (lying[CHEST] + lying[PELVIS]) * 0.5
-	# Face down: the belly is the side on the floor.
-	lying[BELLY] = mid - up * CharacterConfig.ragdoll_belly * r
-	lying[SPINE] = mid + up * CharacterConfig.ragdoll_belly * r
-	lying[HEAD] = Vector3(pose.head_offset.x, pose.head_offset.y, 0.0) + fwd * (spine * 0.5 + CharacterConfig.body_lying_head_ahead * r) \
-		+ up * CharacterConfig.ragdoll_head_radius * r
-	# The feet lie turned out from straight back, toes to the side of each leg (heels together), not pointing along the spine.
-	var foot_turn := deg_to_rad(CharacterConfig.body_lying_foot_turn)
-	var toes := [
-		(-fwd * cos(foot_turn) - right * sin(foot_turn)).normalized(),
-		(-fwd * cos(foot_turn) + right * sin(foot_turn)).normalized(),
-	]
-	for i in 2:
-		var out := -1.0 if i == 0 else 1.0
-		var shoulder: Vector3 = lying[CHEST] + right * out * CharacterConfig.body_shoulder_width * r
-		var grip: Vector2 = character.hand_position(i)
-		var hand := Vector3(grip.x, grip.y, CharacterConfig.ragdoll_limb_radius * r)
-		# A fist held out past the arm's reach draws its shoulder after it (as standing does), so the arm never stretches.
-		var flat := Vector2(hand.x - shoulder.x, hand.y - shoulder.y)
-		var rise := hand.z - shoulder.z
-		var flat_reach := sqrt(maxf(arm_reach * arm_reach - rise * rise, 0.0))
-		if flat.length() > flat_reach:
-			var follow := minf(flat.length() - flat_reach, CharacterConfig.body_shoulder_reach * r)
-			shoulder += Vector3(flat.x, flat.y, 0.0).normalized() * follow
-		lying[SHOULDER[i]] = shoulder
-		lying[HAND[i]] = hand
-		lying[ELBOW[i]] = _bend(shoulder, hand, upper, fore, right * out * 0.35 + up * 0.4)
-		var hip: Vector3 = lying[PELVIS] + right * out * CharacterConfig.body_hip_width * r
-		var phase: float = pose.stride_phase() + (0.0 if i == 0 else PI)
-		var crawl: float = -sin(phase) * pose.walk_amount() * CharacterConfig.body_lying_crawl * r
-		var ankle: Vector3 = hip - fwd * (thigh + shin) * CharacterConfig.body_lying_leg_reach + fwd * crawl \
-			+ right * out * CharacterConfig.body_lying_leg_splay * r
-		ankle.z = CharacterConfig.ragdoll_limb_radius * r
-		lying[HIP[i]] = hip
-		lying[ANKLE[i]] = ankle
-		lying[KNEE[i]] = _bend(hip, ankle, thigh, shin, right * out + up * 0.5)
-		_knee_poles[i] = (_knee_poles[i] as Vector3).lerp(right * out + up * 0.5, lie)
-	for i in 17:
-		_points[i] = (_points[i] as Vector3).lerp(lying[i], lie)
-	for i in 2:
-		_toes[i] = (_toes[i] as Vector3).lerp(toes[i], lie).normalized()
 
 
 ## Where side `i`'s knee sits with its ankle at `ankle`: the middle joint of the leg's two bones, bent the way this
@@ -235,7 +165,7 @@ func face() -> Vector3:
 
 
 ## The trunk's orientation: x toward the right shoulder, y up the spine (hips to chest), z out of the chest. A
-## body lying face down has z pointing at the floor.
+## body face down has z pointing at the floor.
 func torso() -> Basis:
 	var y: Vector3 = (_points[CHEST] - _points[PELVIS]).normalized()
 	var across: Vector3 = _points[SHOULDER[1]] - _points[SHOULDER[0]]

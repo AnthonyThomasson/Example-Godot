@@ -257,38 +257,33 @@ Ordering: a parent's `_physics_process` runs before its children's, so the hands
 character's fresh `facing`, and the character pulls its controller's intent at the top of its own
 `_physics_process` (lag-free).
 
-## Postures (crouch and prone)
+## Postures (crouch)
 
-A character is **standing, crouching or lying prone** (`_posture`, a `CharacterConfig.postures` key: `stand` / `crouch` / `prone`). Spec and
+A character is **standing or crouching** (`_posture`, a `CharacterConfig.postures` key: `stand` / `crouch`). Spec and
 numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* is held; the body is a *posture*.)
 - **API** (interface 7): `set_posture(p) -> bool` (idempotent, so a controller may write it every frame; refused while dead, in an interaction or
-  within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch, prone -> crouch), `toggle_prone()` (Z: stand/crouch ->
-  prone, prone -> stand); reads `posture()`, `is_crouching()`, `is_prone()`, `posture_coverage(p)`. The player's keys come from
-  `Keybinds.CROUCH` / `PRONE` through `player_controller.gd`; the puppet has `set_posture` / `toggle_*`.
-- **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6 / 0.3); running (`_update_stamina`) needs `_posture == stand`, so a
-  refused run costs no stamina; `melee()` is refused while prone (shooting and reloading work in every posture); `get_surface().coverage` is the
-  posture's row (60 / 35 / 15: a bullet strikes what stands above its one height, see the Projectile skill); starting an interaction stands the
+  within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`, `is_crouching()`,
+  `posture_coverage(p)`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
+- **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6); running (`_update_stamina`) needs `_posture == stand`, so a
+  refused run costs no stamina; shooting, reloading and `melee()` work in every posture; `get_surface().coverage` is the
+  posture's row (60 / 35: a bullet strikes what stands above its one height, see the Projectile skill); starting an interaction stands the
   character up and locks the posture; `_die` stands it (and resets the drawn body) before the ragdoll is built, so a body falls from the standing skeleton.
   The collision circle (and `radius`) never change.
-- **Turning:** `facing` is turned toward the aim at no more than the posture's `turn` rate (`_turned_toward`; stand 0 = at once, crouch 5, prone
-  2.5 rad/s), so a low body takes longer to come round; `aim_point` is never held back, and the hands, weapon and shots follow `facing`.
-- **Look:** the drawn body eases into the posture (`_posture_height` / `_posture_lie`, `posture_ease`; read through `posture_height()` /
-  `posture_lie()`). The rig (`character_rig.gd`) scales the standing hip height (and the hands' grip heights) by the height and, as the body
-  folds, pitches the spine forward about the pelvis (`body_crouch_pitch`; the pelvis shifts back and the chest forward by half the lean so the body
+- **Turning:** `facing` is turned toward the aim at no more than the posture's `turn` rate (`_turned_toward`; stand 0 = at once, crouch 5 rad/s),
+  so a low body takes longer to come round; `aim_point` is never held back, and the hands, weapon and shots follow `facing`.
+- **Look:** the drawn body eases into the posture (`_posture_height`, `posture_ease`; read through `posture_height()` / `posture_folded()`). The rig
+  (`character_rig.gd`) scales the standing hip height (and the hands' grip heights) by the height and, as the body
+  folds, pitches the spine forward about the pelvis (`body_crouch_pitch`, 25°; the pelvis shifts back and the chest forward by half the lean so the body
   stays centred over its feet, and the neck pitches on, `body_crouch_neck_pitch`), narrows the hips and feet (`body_crouch_hip_width` /
   `body_crouch_foot_gap`), stands the feet ahead of the pelvis so the knees lead (`body_crouch_foot_ahead`), staggers the weapon hand's foot back
-  (`body_crouch_stagger`) and shortens the stride (`body_crouch_stride`); `_lie_down` blends the whole
-  skeleton by `posture_lie()` into lying flat on its belly (`body_lying_*`: trunk on the floor, head ahead, arms to the hands, legs trailing with the
-  knees splayed, the feet crawling with the walk). The rig also answers `torso()` and `face()`, so a body that has lain down past `LIE_DRAW` is drawn
-  by `_draw_lying`: `_draw_fallen(rig, false)` (a lofted trunk showing its back, the limbs by height), then the weapon and fists on top, with its
-  shadow from `_draw_fallen_shadow`. A crawler's feet drag (no footprints, `character_footsteps.gd`).
+  (`body_crouch_stagger`) and shortens the stride (`body_crouch_stride`). The rig also answers `torso()` and `face()`, so a body folded past
+  `FOLD_DRAW` is drawn by `_draw_lying`: `_draw_fallen(rig, false)` (a lofted trunk showing its back, the limbs by height), then the weapon and
+  fists on top, with its shadow from `_draw_fallen_shadow`.
   **Arms:** the shoulders sprite and head are drawn at the rig's `CHEST` / `HEAD` xy (`shoulder_centre()` / `head_centre()` on the visuals), so a
-  crouch's forward lean carries them with the sleeves. Prone, `posture_hand_ahead()` (`body_lying_hand_ahead` x `posture_lie()`) is added to every
-  hand's stance `forward` (`CharacterHands._raw_hand_position`) and to the wall-raise ray's reach, so the arms reach ahead of the head; `_lie_down`
-  lets a shoulder follow a fist past reach. **A long gun at a wall:** `_blocked` is judged in every posture, but standing or crouched it is raised
-  (`raised_stance`); prone, `_stances()` keeps the normal hold and `weapon_side_turn()` (`body_lying_side_turn` x `_raise` x `posture_lie()`, toward
-  `_side_dir`, the freer side picked by `_freer_side` as it becomes blocked) turns the hands and weapon off the aim through `pose.update`'s
-  `weapon_turn`; `weapon_raise()` is 0 prone so the barrel is not shortened. A pistol is never blocked: the wall pushes its hand back.
+  crouch's forward lean carries them with the sleeves. `posture_hand_ahead()` (`body_crouch_hand_ahead` x `posture_folded()`) is added to every
+  hand's stance `forward` (`CharacterHands._raw_hand_position`) and to the wall-raise ray's reach, so the arms keep their reach past the leaning
+  chest. **A long gun at a wall:** `_blocked` is judged in every posture and the gun is raised (`raised_stance`) whatever the posture. A pistol is
+  never blocked: the wall pushes its hand back.
 - **Legs** (`character_legs.gd`, a `RefCounted` stepped after the pose; spec P5): each ankle is swept from the body centre to where the unobstructed rig
   (`CharacterRig.new(self, false)`) would put it (a `leg_radius` circle, like `CharacterHands._resolve_hand`) and rests at the first wall, solid piece
   or character it meets, sliding the leftover; a knee that would pass through something moves the foot back (`KNEE_TRIES`); the rig reads the result
@@ -297,7 +292,7 @@ numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* 
   to go, capped at walking pace like the body's push; a foot at rest pushes nothing. Nothing is cast unless something is within `NEAR` px; cleared while
   busy in an interaction and on death.
 Tests: `tests/character/posture_speed_test.gd`, `posture_player_input_test.gd`, `posture_interaction_test.gd`, `posture_turn_speed_test.gd`,
-`crouch_rig_test.gd`, `crouch_arms_attached_test.gd`, `prone_arms_reach_ahead_test.gd`, `prone_rifle_wall_side_test.gd`, `legs_rest_on_walls_test.gd`, `legs_shove_furniture_test.gd`.
+`crouch_rig_test.gd`, `crouch_arms_attached_test.gd`, `legs_rest_on_walls_test.gd`.
 
 ## Running and stamina
 
@@ -305,7 +300,7 @@ A controller sets `run_input` (the player: `Keybinds.RUN`, Shift; an NPC: its be
 `_update_stamina(wants_run, delta)` decides `_running` (asked, moving above `run_min_input`, not
 exhausted) and spends or regains `stamina` (a 0..1 bar): a full bar lasts `run_stamina_seconds`, it refills
 at `stamina_regen_per_sec`. Running dry latches `_exhausted` — the character walks, run still held, until
-the bar refills to `run_resume_fraction`. Only a standing character runs (a crouched or prone one's run request is ignored). Running multiplies the walk speed by `run_speed_mult`
+the bar refills to `run_resume_fraction`. Only a standing character runs (a crouched one's run request is ignored). Running multiplies the walk speed by `run_speed_mult`
 (`_move_speed()`, also used for the death momentum and the push carry cap); `pose.update` still gets the
 walk `speed`, so the walk amount stays at 1 while the stride cadence rises with the speed. Being busy in
 an interaction counts as not running. `shoot()` does nothing while running (`melee()` still works).

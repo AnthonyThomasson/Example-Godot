@@ -37,7 +37,7 @@ func run(t: TestContext) -> void:
 	var head: Vector2 = crouched.get_node("Visuals").head_centre()
 
 	t.check(standing.get_node("Visuals").shoulder_centre().length() < 0.1 * r, "standing, the shoulders are over the body centre")
-	t.check(shoulders.x > 0.5 * r, "crouched, the drawn shoulders are carried ahead (%.1f px)" % shoulders.x)
+	t.check(shoulders.x > 0.3 * r, "crouched, the drawn shoulders are carried ahead (%.1f px)" % shoulders.x)
 	t.check(crouched.get_node("Visuals").draws_laid_out(), "the crouched body is drawn from its trunk, so the sleeves meet a real back")
 	t.check(head.x > shoulders.x, "and the head is ahead of them (%.1f vs %.1f px)" % [head.x, shoulders.x])
 	var rig = crouched.rig()

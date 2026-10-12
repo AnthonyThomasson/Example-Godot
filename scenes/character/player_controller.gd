@@ -22,8 +22,6 @@ func control(character, _delta: float) -> void:
 
 	if Keybinds.is_crouch_just_pressed():
 		character.toggle_crouch()
-	if Keybinds.is_prone_just_pressed():
-		character.toggle_prone()
 
 	if Keybinds.is_punch_just_pressed():
 		character.melee()

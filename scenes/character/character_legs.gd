@@ -2,7 +2,7 @@ extends RefCounted
 
 ## Character LEGS (Character domain, animate layer): the legs' contact with the world. The rig strides, folds
 ## and trails the feet wherever the pose puts them, which can be well past the body's collision circle (a
-## stride's toes, a crouch's leading knees, a prone body's trailing legs), so this layer, stepped by
+## stride's toes, a crouch's leading knees), so this layer, stepped by
 ## character.gd each physics frame after the pose, finds where each leg would stop and keeps the drawn leg there:
 ## - each ankle is swept from the body centre toward where the rig would put it (a foot-sized circle, like the
 ##   hands layer's `_resolve_hand`) and rests at the first wall or solid piece it meets, sliding the leftover

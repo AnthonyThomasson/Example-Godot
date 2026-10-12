@@ -125,7 +125,6 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
 		"in_cover": line.get("cover", "") != "",
 		"crouched": character.posture() == &"crouch",
-		"prone": character.posture() == &"prone",
 	}
 	var sections := {
 		"goal": fill_goal(goal, character),
@@ -190,24 +189,20 @@ func _situation_text(character, rooms: Array) -> String:
 		_health_band(character.damage_taken())]
 
 
-## How the NPC's own posture is worded in its situation: " You are crouching." / " You are lying prone.", and
+## How the NPC's own posture is worded in its situation: " You are crouching.", and
 ## nothing for a standing body, so the usual text is unchanged.
 func _own_posture_text(posture: StringName) -> String:
 	match posture:
 		&"crouch":
 			return " You are crouching."
-		&"prone":
-			return " You are lying prone."
 	return ""
 
 
-## How a contact seen low is worded: "crouched low" / "flat on the ground", and nothing for one standing.
+## How a contact seen low is worded: "crouched low", and nothing for one standing.
 func _contact_posture_text(posture: StringName) -> String:
 	match posture:
 		&"crouch":
 			return "crouched low"
-		&"prone":
-			return "flat on the ground"
 	return ""
 
 

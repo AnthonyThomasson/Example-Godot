@@ -39,7 +39,7 @@ static var ROWS := {
 		"actor": { "child": "GoalController", "props": ["hostile_on_attack"] },
 	},
 	&"ai.posture": {
-		"description": "NPCs crouch and go prone while fighting in place (off = they always stand).",
+		"description": "NPCs crouch while fighting in place (off = they always stand).",
 		"actor": { "child": "GoalController", "props": ["posture_enabled"] },
 	},
 	&"nav.rebake": {

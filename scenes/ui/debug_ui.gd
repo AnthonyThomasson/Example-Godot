@@ -62,13 +62,11 @@ func _ammo_line() -> String:
 	return line + "  reloading…" if _character.is_reloading() else line
 
 
-## "Standing", "Crouching" or "Prone".
+## "Standing" or "Crouching".
 func _posture_label() -> String:
 	match _character.posture():
 		&"crouch":
 			return "Crouching"
-		&"prone":
-			return "Prone"
 	return "Standing"
 
 
