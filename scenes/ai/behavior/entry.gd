@@ -6,7 +6,7 @@ extends RefCounted
 ##
 ##   approach — to its stack slot beside the door, stepping off the door's axis while still well out and
 ##              arriving along the wall (E1)
-##   stack    — in the slot, facing the door; radios `ready` (E2)
+##   stack    — in the slot, facing the door (the last of three or more faces back along the line instead, E12); radios `ready` (E2)
 ##   pie      — the point (or a lone entrant) sweeps the arc beside the door in angle steps, looking through it,
 ##              and notes the share of the room seen and the corners still hidden (E3); alone, both sides (E7)
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
@@ -375,7 +375,10 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 		_loco.move_to(character, spot)  # Shoved out of the slot: step back in.
 	else:
 		character.move_input = Vector2.ZERO
-	_look_toward(character, _geo["pos"], delta)
+	if _covers_rear(team):
+		_look_toward(character, spot + (_geo["along"] as Vector2) * side * 300.0, delta, 3.0)  # Back along the line, away from the door.
+	else:
+		_look_toward(character, _geo["pos"], delta)
 	if _topping_off(character, delta):
 		return
 	var ahead := _ahead(team)
@@ -387,6 +390,13 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 			_turn_at = _time
 		if _time - _turn_at >= follow_gap:
 			_start_cross(character, team)
+
+
+## Whether this member is the stack's rear guard (E12): the last slot of a stack of three or more, until the member ahead
+## of it is through the door and its own turn to cross is near. It faces back along the line the team came by instead of at
+## the door; the point and the second watch the door.
+func _covers_rear(team: Array) -> bool:
+	return _turn_at < 0.0 and team.size() >= 2 and team.all(func(m): return m["slot"] < slot)
 
 
 ## The tactical reload (E11): the stack is the one lull before the crossing, so a gun short of full is swapped for a full

@@ -1,11 +1,11 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 and E11 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9, E11 and E12 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. Behaviours E12 to E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
+E10 (the clear-time benchmark) is met and its test is green. Behaviours E13 to E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
 sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
 `tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
 (`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
@@ -161,12 +161,16 @@ hostile holds its eyes (it fires instead, E14), and not for more than `TOP_OFF_C
 Test: `entry_reloads_before_crossing` (7 of 12 rounds, above the band Von calls low, so only the entry has a reason to
 reload; real Von, `requires_von`).
 
-### Open gaps (E12 to E15, tests tagged `gap`)
-
 **E12. The last man covers the rear of the stack.** While the stack waits at the door, the last slot faces back the way
 the team came and holds the approach; the point and the second face the door. Why: the stack's rear is its blind side
-(the "The stack" paragraph above: the last man faces back and holds the hallway behind).
-Test: `entry_stack_last_covers_rear`.
+(the "The stack" paragraph above: the last man faces back and holds the hallway behind). In the code, the last slot of a
+stack of three or more (`Entry._covers_rear`: at least two others on the radio, all with lower slots) turns its gaze
+along the wall away from the door, the line the team came by, from `stack` until the member ahead of it is through; then
+it turns to cross in its turn (a threat in sight still takes its eyes first, `docs/gaze-and-fire.md`). A stack of two has no
+rear guard, and the last man in the room still takes the rear watch there (E8).
+Test: `entry_stack_last_covers_rear` (three invaders in the garden; real Von, `requires_von`).
+
+### Open gaps (E13 to E15, tests tagged `gap`)
 
 **E13. Short room: two go in, the rest hold outside.** A room too small for the team is entered by two, who take its
 corners; the later slots hold the stack side as security and never step into the doorway. The game's rule for "too

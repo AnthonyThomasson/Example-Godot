@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E12): while the stack waits at the door, the last man faces back the way the team came and holds the
+## E12: while the stack waits at the door, the last man faces back the way the team came and holds the
 ## approach (the point, meanwhile, is slicing the pie). Real Von: three invaders in the back garden decide for themselves
 ## to stack on the back door.
 
@@ -13,7 +13,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry stack's last man covers the rear",
 		"description": "Of three invaders stacked at the back door, the last faces back along the wall, not the door.",
-		"tags": ["ai", "entry", "gap", "von"],
+		"tags": ["ai", "entry", "von"],
 		"requires_von": true,
 		"timeout": 80.0,
 	}

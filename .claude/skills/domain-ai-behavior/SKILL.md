@@ -73,8 +73,8 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11) and `tests/ai/entry/`; the spec's E12 to E15 are open gaps
-(the last man facing the rear, short rooms, no crossing on a hostile in view,
+The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11, E12) and `tests/ai/entry/`; the spec's E13 to E15 are open gaps
+(short rooms, no crossing on a hostile in view,
 doorways passed in a corridor; E10, the clear-time benchmark, is met), specified with red `gap` tests and not implemented here. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
@@ -103,6 +103,10 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   before the point starts the pie or a follower crosses, and from `_tick_pie` before the point crosses (a pie that fired),
   standing still and waiting for the reload to end. Skipped while a hostile holds the entrant's eyes (`gaze_held`: it fires) and
   past `TOP_OFF_CAP` (8 s) per entry; never in `cross` (the watch stage's empty-gun reflex is off while committed too).
+- **The last man faces back (E12).** In `stack` a member that is the last slot of a stack of three or more (`_covers_rear`:
+  two or more others on the radio, every one with a lower slot) looks along the wall away from the door (`spot + along * side * 300`,
+  at 3x `look_rate`) instead of at it, until the member ahead of it is through (`_turn_at`); then it looks at the door as every
+  follower does. A threat in sight takes the eyes first (the watch stage).
 - **Barrier and order.** The point crosses when every other claimant has radioed past `claim`, or `entry_ready_timeout`
   after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
   it radioed `in`. A member still at `claim` once the one behind has waited the timeout is dropped from the order.
