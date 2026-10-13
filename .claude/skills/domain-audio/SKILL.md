@@ -51,7 +51,7 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | Topic | Posted by | Payload (Audio reads) |
 |---|---|---|
 | `&"shot"` | `GunItem.secondary` (Items) | `position` (muzzle), `gun`, `power` (+ `attacker`, `automatic`, `damage`) |
-| `&"hit"` | `Projectile._deal` (Projectile), `Character._on_punched` (Character) | `position`, `outcome` (`blocked`/`penetrate`/`ricochet`/`punch`), `material`, `power`, `speed_factor`, `damage`. A hit **without an `outcome`** is not a sound. A fly-over posts nothing, so it is silent. |
+| `&"hit"` | `Projectile._deal` (Projectile), `Character._post_melee_hit` (Character: a punch or a kick) | `position`, `outcome` (`blocked`/`penetrate`/`ricochet`/`punch`), `material`, `power`, `speed_factor`, `damage`. A hit **without an `outcome`** is not a sound. A fly-over posts nothing, so it is silent. |
 | `&"footfall"` | `CharacterFootsteps._report` (Character) | `position` (the sole), `foot` (0 left / 1 right), `speed`, `running` |
 | `&"reload"` | `Character._post_reload` (Character) | `position`, `gun`, `power`, `stage`: `start` → the `out` sound, `done` → the `in` sound; any other stage is silent. A cancelled reload never posts `done`. |
 

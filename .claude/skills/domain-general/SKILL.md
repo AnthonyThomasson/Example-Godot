@@ -20,7 +20,7 @@ item's glance (`items/dropped_item.gd`), the bullet (`projectile/projectile.gd`)
 All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings or
 `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`, and expose
 a typed helper. `player_controller.gd` (Character domain) is the one gameplay consumer of
-Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle, in the "Movement" group after Run — and the action keys, incl. `RELOAD`, default R, in the "Combat" group next to Punch and Fire). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
+Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle, in the "Movement" group after Run — and the action keys, incl. `RELOAD`, default R, and `KICK`, default V, in the "Combat" group next to Punch and Fire). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
 inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
 `command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
 outside. `Keybinds._ready` registers every action in the InputMap, so there is no `project.godot [input]` section: this file
@@ -72,7 +72,7 @@ control a running game with text commands. It is **off** unless the port — the
 var (per-worktree, set by `tools/editor.sh`), else `application/debug/command_port` — is >
 0 and never exists in an exported build (`_ready()` bails when `OS.has_feature("editor")` is
 false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a curated verb
-(`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`,
+(`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`, `kick`,
 `interact`, `reload`, `crouch`, `aim X Y`, `match`, `ai`, `restart [seed]`, `menu`, `eval EXPR`) or, failing that, a GDScript `Expression`
 evaluated against the node (e.g. `scene().get_node("Player").speed`). Movement and actions are
 driven by injecting `Input` action presses through `Keybinds` names — the same path a human's

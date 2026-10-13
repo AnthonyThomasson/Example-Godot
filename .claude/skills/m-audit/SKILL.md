@@ -1,6 +1,6 @@
 ---
 name: m-audit
-description: Audit everything the branch changes against main (its commits plus anything staged) — domain isolation, architecture and domain skills in sync, current-state comments, load check and tests — as a checklist of file:line fixes. Manual only — invoked as `/m-audit`.
+description: Audit everything the branch changes against main (its commits plus anything staged) — domain isolation, architecture and domain skills in sync, current-state comments, load check and tests — as a checklist of file:line fixes, run as a phased Orca orchestration (scope, parallel review wave, merged report, worktree editor). Manual only — invoked as `/m-audit`.
 disable-model-invocation: true
 model: claude-sonnet-5-5
 ---
@@ -16,8 +16,83 @@ and do not fix findings unless the user asks.
 
 Three things make a change healthy in this project, in priority order: the domains stay
 **isolated**, the architecture skills stay **true**, and the comments describe the code **as it
-is now**. Each has its own section below. Work through them in order and collect findings into the
+is now**. Each has its own brief below. The audit runs as **phases** under Orca orchestration: you are the
+coordinator, the briefs are handed to supervised workers, and you merge what they report into the
 checklist at the end.
+
+## How it runs — phases
+
+Load the `orchestration` skill and follow its coordinator loop (`orca skills get orchestration`; use the executable that
+skill resolves — plain `orca` on macOS — for every command). This audit is explicitly supervised, so you are the
+coordinator; never substitute a non-Orca subagent.
+
+| Phase | Owner | Work | Gate to the next phase |
+| --- | --- | --- | --- |
+| 0 — Scope | you | Step 0: base, commits, diff, file list, which domain skills apply; write the scope file | the diff is non-empty |
+| 1 — Review wave | 4 workers, in parallel, read-only | A isolation + extraction (Steps 1–2) · B skills in sync (Step 3) · C comments (Step 4) · D load check, lint, tests, behaviour (Step 5) | every Dispatch has settled |
+| 2 — Merge | you | read each report, drop duplicates, rank, write the checklist (Output) | — |
+| 3 — Show | you | Step 6: worktree editor, only when Phase 1 D is green | — |
+
+Phase 1 is one wave because A–D read the same frozen diff and write nothing to the tree. Only D launches Godot, so two
+engines never compete for the Von port or the CPU. Do not add a phase that fixes findings: this audit reports, and fixes
+only on the user's word.
+
+**Phase 0.** Do Step 0 yourself, then write the scope where every worker can read it (they share this worktree and its
+filesystem):
+
+```bash
+AUDIT_DIR="${TMPDIR:-/tmp}/m-audit-$(basename "$PWD")"; mkdir -p "$AUDIT_DIR"
+{ echo "BASE_REF=$BASE_REF"; echo "BASE=$BASE"; git log --oneline "$BASE"..HEAD; echo "--- staged+committed files"
+  git diff --staged --name-only --diff-filter=d "$BASE"; echo "--- unstaged"; git diff --name-only; } > "$AUDIT_DIR/scope.txt"
+git diff --staged "$BASE" > "$AUDIT_DIR/change.diff"
+```
+
+Name the `domain-*` skills the diff touches in your head now; each worker is told which ones to read.
+
+**Phase 1.** Start the whole wave before waiting on any of it:
+
+```bash
+orca status --json
+orca orchestration run-create --objective "m-audit of $(git branch --show-current) against $BASE_REF" --json
+orca orchestration worker-start --task-title "A isolation" --spec "<spec A>" --worktree current --agent claude --json
+orca orchestration worker-start --task-title "B skills"    --spec "<spec B>" --worktree current --agent claude --json
+orca orchestration worker-start --task-title "C comments"  --spec "<spec C>" --worktree current --agent claude --json
+orca orchestration worker-start --task-title "D checks"    --spec "<spec D>" --worktree current --agent claude --json
+orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
+```
+
+Every spec is self-contained and has the five parts the orchestration skill requires. Fill this template, changing only
+the bracketed parts:
+
+> **Target:** the branch change recorded in `$AUDIT_DIR/scope.txt` and `$AUDIT_DIR/change.diff` (base `<BASE>`); worktree
+> `<path>`. **Change:** produce the findings of `[Brief X — name]` in `.claude/skills/m-audit/SKILL.md`; read that brief
+> and the `architecture` skill first, plus `[the domain-*/ skills the diff touches]`. **Constraints:** read-only — do not
+> edit, stage, commit, push or stash anything, and do not post tickets; judge only the branch's change, not older code;
+> report only real issues, do not pad. **Ownership:** you own exactly one file, `$AUDIT_DIR/report-[X].md`; nothing else.
+> **Observable acceptance:** that file holds the brief's checklist — one `- [ ] file:line — problem. Fix: …` per issue,
+> `- [x] …` per clean item — ending with a one-line verdict; your `worker_done` summary gives the issue count and passes
+> the file as `--report-path`.
+
+Brief D is the exception to "read-only": it may run Godot, `tools/lint.sh` and `tools/run_tests.sh` (Bash sandbox
+disabled) but still edits no tracked file. Tell it the unstaged files from the scope file so it can say whether they
+influenced the run.
+
+Process each `worker_done` against its expected Dispatch: a `failed` outcome or a missing report is a finding in the
+final report ("brief X did not complete: …"), never a silent clean section. Release each settled worker per the
+orchestration skill once its report is read, and do not end the turn while `worker-list --run <run_id> --terminal-state
+reclaimable` returns anything.
+
+**Phase 2.** Read the four reports, merge into the Output checklist (one section per brief group, most important first),
+and keep each worker's `file:line` and fix verbatim. Two workers raising the same line is one item.
+
+**Phase 3.** Run Step 6 yourself, only when brief D reported a clean load, lint and tests. If D is red, say the editor
+was not started and why.
+
+Write literal paths into every spec (a worker has no `$AUDIT_DIR`). A worker recovers the base with
+`BASE=$(sed -n 's/^BASE=//p' <AUDIT_DIR>/scope.txt)`, and Brief C's `CHANGED_GD` and Brief D's `GAME_TEST_CHANGED_FILES` come
+from the file list in the same scope file.
+
+The briefs follow. Each is written for the worker who receives it; the coordinator uses Step 0 and Step 6 directly.
 
 The architecture docs are split across skills (`AGENTS.md` itself is just a stub that points to
 them): the **`architecture`** skill is the **map** (the domain table, the vital interfaces, the
@@ -25,7 +100,7 @@ dependency graph, the cross-cutting conventions), and each domain has a
 `.claude/skills/domain-<folder>/` skill holding that domain's **deep implementation detail**. Both
 are held to the same current-state bar as code comments — see Step 3.
 
-## Step 0 — Gather the change and the ground truth
+## Step 0 — Gather the change and the ground truth (Phase 0, coordinator)
 
 The change under audit is the **index compared with the branch's merge-base**: the committed work on
 the branch and whatever is staged, as one diff. The base is `origin/main` (falling back to `main`),
@@ -48,7 +123,8 @@ If `git diff --staged --stat "$BASE"` is empty, the branch has nothing beyond it
 stop. Do not stage files yourself. Unstaged edits are not part of the diff, but the load check, lint
 and tests in Step 5 run on the working tree and see them — if there are any, say so in the report.
 
-Then load the **`architecture`** skill. It is the source of truth for this codebase's
+Then load the **`architecture`** skill (the coordinator needs it only to pick the domain skills for the specs; every
+worker loads it itself). It is the source of truth for this codebase's
 architecture: the domain table (one folder per domain under `scenes/`) and, crucially, **"The
 vital interfaces"** — the *entire* sanctioned cross-domain surface. Everything not on that list is
 private to its domain. You are checking the branch's change against that contract, so you need it
@@ -68,7 +144,7 @@ sub-domains) goes to the parent skill (`domain-ai` overview, `domain-character`,
 parent true. A cross-sub-domain coupling that doesn't flow through the published sub-domain interfaces is an
 isolation issue, flagged the same as cross-domain coupling.
 
-## Step 1 — Domain isolation (highest priority)
+## Brief A, part 1 — Step 1: Domain isolation (highest priority)
 
 The whole design rests on domains that can each change on their own. That only holds if the
 connections between them are few, deliberate, and named in the `architecture` skill. A change
@@ -98,7 +174,7 @@ crucial, and is it one of the vital interfaces?"** Route your judgment through t
 Flag each violation with the `file:line`, name which two domains it couples, and give the concrete
 reroute. If the change is clean here, say so explicitly — it is the most important section.
 
-## Step 2 — Should a new domain be extracted?
+## Brief A, part 2 — Step 2: Should a new domain be extracted?
 
 A domain earns its own folder when **its complexity bleeds into several others** — when one
 concern forces edits or knowledge into multiple existing domains at once. That is the signal the
@@ -120,7 +196,7 @@ mirroring how the existing domains are structured. Extraction is a bigger call t
 frame it as a recommendation with the reasoning, not a mandate. If nothing warrants it, note that
 briefly and move on.
 
-## Step 3 — Keep the architecture skill and the domain skills true
+## Brief B — Step 3: Keep the architecture skill and the domain skills true
 
 The architecture skills are documentation, so they are held to the same current-state bar as code
 comments — and because they are the architecture's source of truth, a change that alters the
@@ -150,7 +226,7 @@ Flag any drift you find as a checklist item (`architecture/SKILL.md:line` or
 what to change). Both files' prose must follow the current-state rule in Step 4: state what *is*,
 never what changed.
 
-## Step 4 — Comments describe the code as it is now
+## Brief C — Step 4: Comments describe the code as it is now
 
 Comments in this project are a liability when they lie or waffle and an asset when they are short
 and true. The bar: **concise, present-tense, current-state only.**
@@ -207,7 +283,7 @@ for f in $CHANGED_GD; do
 done
 ```
 
-## Step 5 — It still loads (and, for behaviour, still works)
+## Brief D — Step 5: It still loads (and, for behaviour, still works)
 
 A change that doesn't parse fails everything above by default. Run the `godot-debug` skill for a
 headless load check (run `--import` first if the change added a `class_name` or new file). Report
@@ -243,7 +319,7 @@ read the reaction back through `mcp__godot__get_debug_output` (each command echo
 Report what you drove and what the game did. Two gotchas from that skill: launch Godot from Bash
 only with the sandbox disabled, and `mcp__godot__stop_project` orphans the Von server on port 8000.
 
-## Step 6 — Show the finished change in a worktree editor
+## Step 6 — Show the finished change in a worktree editor (Phase 3, coordinator)
 
 Once the checks above are green, leave a live copy of the change running for the user. The editor is
 named after the worktree (its directory name), so there is no name to pass:
@@ -261,7 +337,7 @@ with the worktree name at the top. Report the worktree name, port and pid; leave
 
 ## Output — the checklist
 
-Report findings as a checklist grouped by the sections above, most-important first. Each item is
+Report findings as a checklist grouped by the briefs above (the merged Phase 2 result), most-important first. Each item is
 a `file:line`, the problem in a phrase, and the concrete fix. End with a one-line verdict.
 
 ```

@@ -124,7 +124,7 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 	_loco.move_to(character, dest)
 
 
-## Melee at the known position `pos`: close to punch range and swing on the fire cooldown (no cover cycle for fists).
+## Melee at the known position `pos`: close to punch range and strike on the fire cooldown (no cover cycle for fists).
 ## While holding ground it won't chase a contact out of the house — it only swings if one is already in reach.
 func melee(character, pos: Vector2, hold_ground: bool) -> void:
 	if character.global_position.distance_to(pos) > punch_range:
@@ -135,7 +135,7 @@ func melee(character, pos: Vector2, hold_ground: bool) -> void:
 		return
 	character.move_input = Vector2.ZERO
 	if fire_timer <= 0.0:
-		punch(character)
+		strike(character)
 
 
 ## Equip the character's gun and fire it, refreshing the combat engagement so an active fight stays
@@ -166,6 +166,22 @@ func shoot(character) -> bool:
 	fire_timer = fire_cooldown
 	_burst_left = maxi(fire_burst - 1, 0) if character.is_automatic() else 0
 	return true
+
+
+## Land a blow, refreshing the combat engagement: a standing NPC with a gun in hand keeps it and kicks; otherwise (a
+## crouched NPC cannot kick) it equips the fists and punches.
+func strike(character) -> void:
+	if character.ammo_capacity() >= 0 and character.posture() == &"stand":
+		kick(character)
+	else:
+		punch(character)
+
+
+## Kick with a leg, keeping whatever is held.
+func kick(character) -> void:
+	_perception.note_engaged()
+	fire_timer = fire_cooldown
+	character.leg_kick()
 
 
 ## Equip the fists and throw a punch, refreshing the combat engagement.

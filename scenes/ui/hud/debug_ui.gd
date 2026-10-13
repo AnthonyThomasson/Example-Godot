@@ -117,15 +117,16 @@ func _process(_delta: float) -> void:
 ## Record the latest hit for display.
 func _on_hit_landed(body: Node, damage: float, hand: int) -> void:
 	_last_hit_body = body.name
-	_last_hit_hand = hand         # 0/1 for a melee punch, -1 for a gunshot.
+	_last_hit_hand = hand         # 0/1 for a melee punch, 2 for a kick, -1 for a gunshot.
 	_last_hit_damage = damage     # Amount dealt (a punch scales it by its range of motion).
 	_last_hit_time = Time.get_ticks_msec() / 1000.0
 
 
-## Readable method of damage for a hit's hand code: -1 = gunshot, 0/1 = left/right-hand punch.
+## Readable method of damage for a hit's hand code: -1 = gunshot, 0/1 = left/right-hand punch, 2 = leg kick.
 func _method_label(hand: int) -> String:
 	match hand:
 		-1: return "Gunshot"
 		0: return "Punch (left)"
 		1: return "Punch (right)"
+		2: return "Kick"
 	return "Unknown"

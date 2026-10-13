@@ -77,13 +77,14 @@ python3 tools/gcmd.py "move right off"      # … and release it (or: stop)
 python3 tools/gcmd.py "slot 3"              # select item slot 1-9 (3 = pistol)
 python3 tools/gcmd.py fire                  # LMB (pistol) — prints a Shot … line
 python3 tools/gcmd.py punch                 # F
+python3 tools/gcmd.py kick                  # V
 python3 tools/gcmd.py interact              # Space
 python3 tools/gcmd.py ai                    # every NPC's full AI state as JSON (see below)
 python3 tools/gcmd.py "aim 700 300"         # windowed runs only (needs a real cursor)
 python3 tools/gcmd.py 'player().speed'      # arbitrary GDScript; helpers: player(), scene(), node(path)
 ```
 
-Verbs: `help, pos, tp X Y, slot N, move up|down|left|right [off], stop, fire, punch, interact, reload, crouch,
+Verbs: `help, pos, tp X Y, slot N, move up|down|left|right [off], stop, fire, punch, kick, interact, reload, crouch,
 aim X Y, match, ai, restart [seed], menu, eval EXPR`. Port resolves as `--port` →
 `$GODOT_CMD_PORT` → `9080`.
 

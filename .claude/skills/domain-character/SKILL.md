@@ -80,7 +80,7 @@ numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* 
 - **API** (interface 7): `set_posture(p) -> bool` (idempotent, so a controller may write it every frame; refused while dead, in an interaction or
   within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
 - **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6); running (`_update_stamina`) needs `_posture == stand`, so a
-  refused run costs no stamina; shooting, reloading and `melee()` work in every posture; `get_surface().coverage` is the
+  refused run costs no stamina; shooting, reloading and `melee()` work in every posture (`leg_kick()` only standing); `get_surface().coverage` is the
   posture's row (60 / 35: a bullet strikes what stands above its one height, see the Projectile skill); starting an interaction stands the
   character up and locks the posture; `_die` stands it (and resets the drawn body) before the ragdoll is built, so a body falls from the standing skeleton.
   The collision circle (and `radius`) never change.
@@ -160,7 +160,7 @@ inherits it and `main.tscn`'s `Player` instances it: a composer adds any `contro
 
 Every character has an exported `faction` (`&"player"` by default; the NPC presets set
 `&"household"` / `&"invader"`), read by AI perception to tell allies from potential hostiles. A
-landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus` event with
+landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus` event with
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
 `outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
@@ -168,10 +168,10 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
 
 - **Character ↔ Controller** (interface 7): the character reads intent from a controller child
   (any node with `control(character, delta)`) that writes `move_input` / `aim_point` / `run_input` and calls
-  the action API: `melee()`, `shoot() -> bool`, `select_slot(id)`, `try_interact()` /
+  the action API: `melee()`, `leg_kick()`, `shoot() -> bool`, `select_slot(id)`, `try_interact()` /
   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
   damage, for injury sensing), `gun_slot()`, `weapon_blocked()` and `is_automatic()`. Signals: `hit_landed(body, damage, hand)`
-  (hand 0/1 = melee, −1 = shot), `died` (`is_dead`).
+  (hand 0/1 = melee punch, 2 = leg kick, −1 = shot), `died` (`is_dead`).
   Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
 - **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
   `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.
@@ -179,7 +179,7 @@ landed punch is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus`
   child (splatter spray + timed drips on a hit, stopped on death), a `BloodFootprints` child fed by
   `character_footsteps.gd` on each footfall, and the generic `Ragdoll` the fallen body is built on.
 - **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
-  `punch(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
+  `punch(hand)`, `punch_amount(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
   `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`, `weapon_raise()`, `best_magazine(gun)` / `take_magazine(gun)` /
   `stow_magazine(m)`; and reads the item's `hand_stance(hand)` / `raised_stance(hand)` (how each hand is held), `muzzle_ahead()`,
   `raises_at_contact()`, `is_automatic()` and `tick(delta)`, calling its `drop(user, velocity)` on death.

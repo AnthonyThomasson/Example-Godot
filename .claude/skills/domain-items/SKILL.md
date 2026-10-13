@@ -45,7 +45,7 @@ rifle 22 dmg / 0.11 s / auto / ×2.2 / 4400 px/s / 24 rounds. They are one table
 (the loaded magazine type's, `MagazineConfig.reload_time_of`), `secondary(user) -> bool` (refuses while reloading, empty or still cycling;
 else spends a round, rotates the aim by the spread, calls `ProjectileSpawner.spawn(muzzle_origin, dir, world, user, damage, muzzle_speed,
 penetration)`, ejects a casing, kicks the hand and posts a `&"shot"` event on `EventBus`
-(`{ position` (muzzle)`, gun, attacker, power }`, which the Audio domain voices)) and `primary` (a melee jab with the weapon hand). **Fire rate** is a cooldown: `tick(delta)`
+(`{ position` (muzzle)`, gun, attacker, power }`, which the Audio domain voices)) and `primary` (a melee jab with the weapon hand; a long gun, the SMG or rifle, **strikes with its butt**, swung in **both hands**: `strike_direction(aim, amount)` turns the barrel about the weapon hand, outward from the body, by `strike_turn()` (`STRIKE_TURN`, 105 degrees) x `strike_swing(amount)`, so it ends nearly across the body with the butt centred on the aim and a little ahead of the muzzle (`draw_weapon` draws it so; `strike_end(aim, amount)` is the butt relative to the hand); the other hand grips `strike_support_gap()` (`SUPPORT_GAP`, negative: toward the butt) along the barrel; the blow is thrown `strike_tempo()` (2x) slower than a fist and lands `strike_short()` px short of one; the hands layer shortens the hand's extension by `strike_forward()` (the butt's forward reach at the end of the turn) and queries the hit at `strike_end` once it is ahead of the hand, so the blow lands about as far out as before; a pistol just jabs). **Fire rate** is a cooldown: `tick(delta)`
 counts it down (the character ticks every item it carries, before its controller runs, so it is deterministic and independent of the
 wall clock); firing does `cooldown += fire_interval`, carrying an overshoot so 0.07 s is not rounded to 5 frames, with the idle credit
 capped at one frame so a gun never bursts to catch up.
@@ -135,7 +135,7 @@ Guns are the one place Items reach into the Projectile System
   `guard` for fists, `aim` / `support` for the pistol, `smg_*` / `rifle_*` for the long guns), `primary(user)` (F),
   `secondary(user) -> bool` (LMB), `tick(delta)`, `is_automatic()`, `weapon_hand()`, `muzzle_ahead()`, `raises_at_contact()`,
   `raised_stance(hand)`, `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate, opts)`.
-  The character API an item may call: `facing`, `punch(hand)`, `hand_position(hand)`,
+  The character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)`, `hand_position(hand)`,
   `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`,
   `weapon_raise()`, and for reloading
   `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Ammo hooks on `Item`: `rounds_loaded()`,

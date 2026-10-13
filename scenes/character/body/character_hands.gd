@@ -42,6 +42,8 @@ const Sweep = preload("res://scenes/character/body/body_sweep.gd")
 ## normalizes the swing-speed factor, so a full-speed extend counts as a full-power hit.
 const PUNCH_EXTEND_TIME := 0.07
 const PUNCH_RETRACT_TIME := 0.11
+## The held weapon's tempo (1 = a fist's) for the swing under way: it stretches both times.
+var _tempo := 1.0
 
 ## Hit-detection state for the current swing.
 var _fist_shape: CircleShape2D  ## Query shape for punch detection (fist radius).
@@ -68,7 +70,7 @@ func _physics_process(delta: float) -> void:
 	# Track the current reach from the held item.
 	var item: Item = _character.current_item()
 	if item:
-		_current_reach = item.reach
+		_current_reach = maxf(item.reach - item.strike_forward() - item.strike_short(), 0.0)  # A butt makes up the rest.
 
 	# Estimate each hand's extension speed (units/s) for the range-of-motion punch factor,
 	# then resolve each hand against walls/objects so it rests on the surface, not clipping.
@@ -125,6 +127,20 @@ func punch_amount(hand: int) -> float:
 ## in the pose's frame for that hand (its stance, which trails and swings around the aim), then the
 ## punch extension straight along `facing`, far enough to land `punch_gap + reach` beyond the body edge.
 func _raw_hand_position(hand: int) -> Vector2:
+	var raw := _stance_hand_position(hand)
+	# A long gun swung butt first is held in both hands: the other hand grips on along the barrel as it turns.
+	var item: Item = _character.current_item()
+	if item and item.strike_support_gap() != 0.0 and hand != item.weapon_hand():
+		var thrown: float = _punch[item.weapon_hand()]
+		if thrown > 0.0:
+			var barrel := item.strike_direction(Vector2.from_angle(_character.pose.weapon_angle), thrown)
+			# Gripping at once (not eased in with the swing), or the hand would cut across the weapon hand's path.
+			raw = raw.lerp(_stance_hand_position(item.weapon_hand()) + barrel * item.strike_support_gap(), smoothstep(0.0, 0.1, thrown))
+	return raw
+
+
+## The hand's place from its stance and its own punch extension alone.
+func _stance_hand_position(hand: int) -> Vector2:
 	var pose = _character.pose
 	var along := Vector2.from_angle(pose.hand_angles[hand])
 	var side := -1.0 if hand == 0 else 1.0
@@ -156,8 +172,10 @@ func punch(hand: int) -> void:
 	# _report_hits() poll in _physics_process.
 	var tween := create_tween()
 	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)
-	tween.tween_method(_set_punch.bind(hand), 0.0, 1.0, PUNCH_EXTEND_TIME)   # Extend.
-	tween.tween_method(_set_punch.bind(hand), 1.0, 0.0, PUNCH_RETRACT_TIME)  # Retract.
+	var item: Item = _character.current_item()
+	_tempo = item.strike_tempo() if item else 1.0
+	tween.tween_method(_set_punch.bind(hand), 0.0, 1.0, PUNCH_EXTEND_TIME * _tempo)   # Extend.
+	tween.tween_method(_set_punch.bind(hand), 1.0, 0.0, PUNCH_RETRACT_TIME * _tempo)  # Retract.
 	# Stay active across the whole swing: the fist reaches full extension a physics frame
 	# after get_overlapping_bodies() would see it, so a window closing at the apex would
 	# miss the hit. Per-swing dedup keeps it to one report.
@@ -180,10 +198,16 @@ func _report_hits() -> void:
 	params.shape = _fist_shape
 	params.collision_mask = HAND_MASK
 	params.exclude = [_character.get_rid()]
-	params.transform = Transform2D(0.0, _character.global_position + _raw_hand_position(_active_hand))
+	var end := Vector2.ZERO
+	var item: Item = _character.current_item()
+	if item and _active_hand == item.weapon_hand():
+		end = item.strike_end(facing, _punch[_active_hand])  # The butt, once it is ahead of the hand.
+		if end.dot(facing) <= 0.0:
+			end = Vector2.ZERO
+	params.transform = Transform2D(0.0, _character.global_position + _raw_hand_position(_active_hand) + end)
 
 	# Range of motion: how fast the fist is swinging this frame (1.0 = full-speed extend).
-	var motion := clampf(absf(_punch_speed[_active_hand]) * PUNCH_EXTEND_TIME, 0.0, 1.0)
+	var motion := clampf(absf(_punch_speed[_active_hand]) * PUNCH_EXTEND_TIME * _tempo, 0.0, 1.0)
 	for result in get_world_2d().direct_space_state.intersect_shape(params, 8):
 		var body: Node = result.collider
 		if body == _character or _hit_bodies.has(body):

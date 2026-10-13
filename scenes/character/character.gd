@@ -92,11 +92,15 @@ var _wound: BloodWound
 var _footprints: BloodFootprints
 var _footsteps := CharacterFootsteps.new()  ## Detects footfalls and feeds `_footprints`.
 var _legs := CharacterLegs.new()  ## Rests the legs against walls and furniture and shoves light pieces (see character_legs.gd).
+var _kick := CharacterKick.new()  ## The leg kick under way, if any (see character_kick.gd).
 
-## Emitted when a held item lands a hit on a body. `hand` is 0/1 for a melee punch, -1 for a
+## Emitted when a blow lands on a body. `hand` is 0/1 for a melee punch, `KICK_HAND` for a leg kick, -1 for a
 ## shot; `damage` is the amount dealt (a punch scales it by its range of motion). Melee vs shot
 ## is told apart by `hand`, not by the damage value.
 signal hit_landed(body: Node, damage: float, hand: int)
+
+## The `hit_landed` hand code of a leg kick (0/1 are the punching hands, -1 a shot).
+const KICK_HAND := 2
 
 ## Interaction component (Interaction domain): finds and runs object interactions. Composed in
 ## code like the other components; the character only forwards `try_interact()` and reads
@@ -107,6 +111,7 @@ const CharacterRig = preload("res://scenes/character/body/character_rig.gd")
 const CharacterRagdoll = preload("res://scenes/character/body/character_ragdoll.gd")
 const CharacterFootsteps = preload("res://scenes/character/character_footsteps.gd")
 const CharacterLegs = preload("res://scenes/character/body/character_legs.gd")
+const CharacterKick = preload("res://scenes/character/body/character_kick.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -129,6 +134,7 @@ func _ready() -> void:
 	_current_slot = start_slot
 	# Re-emit the hands' punch as a unified hit_landed (melee → hand 0/1, with its dealt damage).
 	_hands.punched.connect(_on_punched)
+	_kick.kicked.connect(_on_kicked)
 
 	# Compose the flesh deformation component; its impacts dent the drawn silhouette (visual
 	# only — the body keeps its circular hitbox). No carved chunks, since a chunk's reach
@@ -179,6 +185,7 @@ func _physics_process(delta: float) -> void:
 		_knockback = Vector2.ZERO  # Drop any pending shove so standing back up doesn't lurch.
 		_hands.facing = facing
 		_legs.clear()
+		_kick.clear()
 		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts())
 		return
 
@@ -196,6 +203,7 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
+	_kick.update(self, delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
 	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts())
 	_legs.update(self, delta)
@@ -555,6 +563,16 @@ func _update_stamina(wants_run: bool, delta: float) -> void:
 ## so listeners such as the AI learn who struck whom. The event is a `punch` outcome on the struck `material`
 ## (what its surface reports; "" for a wall or anything without one).
 func _on_punched(hand: int, body: Node, damage: float) -> void:
+	_post_melee_hit(hand, body, damage)
+
+
+## A kick landed: the same `hit_landed` and `&"hit"` event as a punch (hand code `KICK_HAND`, outcome `punch`).
+func _on_kicked(body: Node, damage: float) -> void:
+	_post_melee_hit(KICK_HAND, body, damage)
+
+
+## Surface a landed blow (`hand`: 0/1 punch, `KICK_HAND` kick) as `hit_landed` and the `&"hit"` event.
+func _post_melee_hit(hand: int, body: Node, damage: float) -> void:
 	hit_landed.emit(body, damage, hand)
 	var pos: Vector2 = body.global_position if body is Node2D else global_position
 	var surface_material := ""
@@ -602,6 +620,24 @@ func is_attacking() -> bool:
 	return _hands.is_attacking()
 
 
+## Kick with the right leg, whatever is held: the foot is thrown out along `facing`, shoving and hurting what it
+## reaches (character_kick.gd). False when dead, crouched, locked in an interaction or a kick is still under way.
+func leg_kick() -> bool:
+	if is_dead or is_busy() or _posture != &"stand":
+		return false
+	return _kick.start()
+
+
+## True while a kick is under way (the foot thrown out and drawn back).
+func is_kicking() -> bool:
+	return _kick.is_active()
+
+
+## How far out side `i`'s foot is thrown, 0 (not kicking with that leg) .. 1 (fully thrown). The rig draws the leg by it.
+func leg_kick_amount(i: int) -> float:
+	return _kick.amount() if i == CharacterKick.LEG else 0.0
+
+
 ## Recoil: throw `hand` back and twist the shoulders, as a fired weapon does (the item calls it);
 ## `strength` scales it (1 = a pistol's), so a light automatic's stream of rounds does not pile up.
 func kick(hand: int, strength := 1.0) -> void:
@@ -631,6 +667,11 @@ func _stances() -> Array:
 ## Throw a punch with the given hand (the item decides which).
 func punch(hand: int) -> void:
 	_hands.punch(hand)
+
+
+## How far `hand` is thrown, 0 (resting) .. 1 (fully punched); an item draws its swing by it.
+func punch_amount(hand: int) -> float:
+	return _hands.punch_amount(hand)
 
 
 ## Local-space center of a hand (0 left, 1 right).
@@ -737,6 +778,7 @@ func _die(direction: Vector2) -> void:
 	_posture = &"stand"
 	_posture_height = 1.0
 	_legs.clear()
+	_kick.clear()
 	ragdoll = CharacterRagdoll.new(self, momentum, direction)
 	_drop_item(momentum)
 	velocity = Vector2.ZERO

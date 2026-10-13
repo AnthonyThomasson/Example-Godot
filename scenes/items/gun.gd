@@ -13,6 +13,13 @@ class_name GunItem extends Item
 ## and cached.
 const RAISED_LENGTH := 0.42
 const RAISE_STEPS := 5
+## How far (px) along a long gun's barrel from the weapon hand the support hand grips through a butt strike: toward the
+## butt, so the other arm does not reach across the weapon hand.
+const SUPPORT_GAP := -8.0
+## How far (rad) a long gun turns in a butt strike: nearly across the body (105 degrees), the butt a little ahead of the muzzle.
+const STRIKE_TURN := 1.833
+## How far (px) short of a fist's reach a long gun's blow lands.
+const STRIKE_SHORT := 5.0
 
 ## The gun's id: its `GunConfig` row and the kind of magazine it takes (`Magazine.gun`). Set by the subclass.
 var gun: StringName = &""
@@ -172,7 +179,32 @@ func finish_reload(user) -> void:
 		user.stow_magazine(spent)
 
 
-## F: a melee jab with the weapon hand.
+## A long gun (the kind too long for a wall) strikes with its butt: its length behind the grip.
+func strike_ahead() -> float:
+	return grip_back() if raises_at_contact() else 0.0
+
+
+## How far (px) the other hand grips ahead of the weapon hand along the barrel: it holds the gun through a butt strike.
+func strike_support_gap() -> float:
+	return SUPPORT_GAP if raises_at_contact() else 0.0
+
+
+## A long gun swung in both hands lands a little short of a fist's reach, which keeps the support arm from overstretching.
+func strike_short() -> float:
+	return STRIKE_SHORT if raises_at_contact() else 0.0
+
+
+## A long gun turns nearly across the body in a butt strike.
+func strike_turn() -> float:
+	return STRIKE_TURN if raises_at_contact() else 0.0
+
+
+## A long gun is swung twice as slowly as a fist is thrown.
+func strike_tempo() -> float:
+	return 2.0 if raises_at_contact() else 1.0
+
+
+## F: a melee jab with the weapon hand; a long gun swings round and leads with its butt.
 func primary(user) -> void:
 	user.punch(weapon_hand())
 
@@ -209,6 +241,8 @@ func secondary(user) -> bool:
 ## step, drawn rotated to the exact angle. Raised off a wall, the barrel foreshortens about the hand.
 func draw_weapon(canvas: CanvasItem, user) -> void:
 	var facing: Vector2 = user.weapon_facing()
+	# A punch turns a long gun about its grip until the butt leads.
+	facing = strike_direction(facing, user.punch_amount(weapon_hand()))
 	var step := clampi(roundi(float(user.weapon_raise()) * RAISE_STEPS), 0, RAISE_STEPS)
 	var shrink := lerpf(1.0, RAISED_LENGTH, float(step) / RAISE_STEPS)
 	var size := Vector2(art_size().x, maxf(roundf(art_size().y * shrink), 4.0))

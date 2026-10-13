@@ -130,11 +130,26 @@ func _init(character, with_legs := true) -> void:
 		var stagger := (-0.5 if i == weapon_hand else 0.5) * CharacterConfig.body_crouch_stagger * r * folded
 		var base := hip_right * out * foot_half + hip_fwd * (foot_fwd + stagger)
 		var ankle := Vector3(base.x, base.y, foot_z + lift) + hip_fwd * step
+		var leg_pole := hip_fwd
+		var foot_dir := hip_fwd
+		var kick: float = character.leg_kick_amount(i)
+		if kick > 0.0:
+			# A kick: the foot rises first, then is thrown out along the aim, as far as the leg reaches at that height.
+			var aim := Vector3(character.facing.x, character.facing.y, 0.0)
+			var kick_z := CharacterConfig.kick_foot_height * r * height
+			var leg_rise := hip.z - kick_z
+			var reach := minf(CharacterConfig.kick_reach, sqrt(maxf((thigh + shin) * (thigh + shin) - leg_rise * leg_rise, 0.0)) * 0.98)
+			var thrown := hip + aim * reach
+			ankle.x = lerpf(ankle.x, thrown.x, kick * kick)
+			ankle.y = lerpf(ankle.y, thrown.y, kick * kick)
+			ankle.z = lerpf(ankle.z, kick_z, minf(kick * 2.0, 1.0))
+			leg_pole = aim
+			foot_dir = hip_fwd.lerp(aim, kick).normalized()
 		_points[HIP[i]] = hip
 		_points[ANKLE[i]] = ankle
-		_knee_poles[i] = hip_fwd
-		_points[KNEE[i]] = _bend(hip, ankle, thigh, shin, hip_fwd)
-		_toes[i] = hip_fwd
+		_knee_poles[i] = leg_pole
+		_points[KNEE[i]] = _bend(hip, ankle, thigh, shin, leg_pole)
+		_toes[i] = foot_dir
 
 	if with_legs:
 		for i in 2:
