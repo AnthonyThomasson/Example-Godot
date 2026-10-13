@@ -1,4 +1,4 @@
-# AGENTS.md — Example_Godot
+# AGENTS.md — Forced-Entry
 
 A small top-down Godot 4.4 demo, organized into fourteen isolated domains under `scenes/`.
 

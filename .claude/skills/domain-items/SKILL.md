@@ -100,7 +100,7 @@ loadout. `ItemRegistry.create` / `inventory_for` take an optional loaded-`magazi
 
 ## Gun art
 
-A gun's `draw_weapon` draws its painter (`pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd`; Items-private) through the Art domain:
+A gun's `draw_weapon` draws its painter (`items/art/pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd`; Items-private, the gun art folder) through the Art domain:
 `PixelArt.render_turned(painter, size, color, PixelArt.snap_angle(angle), "metal")`, drawn rotated to the exact angle of the character's
 `weapon_facing()` (which trails the aim a touch as it turns) with its butt `grip_back()` px behind the weapon hand. Painters draw in the
 canonical frame — muzzle toward +y, butt at y = 0 — and scale their parts from `c.w` / `c.h`, so the same painter renders the shortened raised
@@ -119,7 +119,7 @@ bounces, skids to a stop with a fading spin and glances off walls and solid furn
 `item.draw_dropped(canvas, at, angle, modulate, opts)` over
 a shadow that closes in as it lands, at `z_index` −1, and stops processing once at rest. Tuning is
 its exports. Visual only: nothing picks it up and the Despawner never frees it. A gun's
-`draw_dropped` paints its flat painter (`pistol_flat_painter.gd`, `smg_flat_painter.gd`, `rifle_flat_painter.gd`; Items-private): the gun's
+`draw_dropped` paints its flat painter (`items/art/pistol_flat_painter.gd`, `smg_flat_painter.gd`, `rifle_flat_painter.gd`): the gun's
 side profile lying on the floor — receiver with sights and muzzle, grip (and, on the long guns, magazine and stock) raked off one side
 (`flip` mirrors it) — at `flat_size()`.
 

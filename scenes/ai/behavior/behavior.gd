@@ -71,7 +71,7 @@ var rear_security_time: float = 10.0
 var entry_cover_time: float = 8.0
 var entry_watch_dwell: float = 0.8
 var entry_approach_time: float = 20.0
-# The entry guard (E9): any walk into a room that is not cleared goes in by tactical entry (see `_entry_guard`).
+## The entry guard: any walk into a room that is not cleared goes in by tactical entry (`_entry_guard`; `docs/tactical-entry.md` E9).
 var entry_guard: bool = true
 var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).
 var entry_guard_rearm: float = 6.0 ## Seconds a doorway whose entry was given up is left alone before the guard may start another.
@@ -369,12 +369,12 @@ func committed() -> bool:
 	return _primitive == &"entry" and _entry.committed()
 
 
-## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, slot and side they are
-## about; the controller posts them as callouts.
+## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, the room it leads into, slot and
+## side they are about; the controller posts them as callouts.
 func take_entry_calls() -> Array:
 	var out: Array = []
 	for c in _entry.take_calls():
-		c.merge({ "opening": _entry.opening, "slot": _entry.slot, "side": _entry.side })
+		c.merge({ "opening": _entry.opening, "into": _entry.into, "slot": _entry.slot, "side": _entry.side })
 		out.append(c)
 	return out
 
@@ -432,7 +432,7 @@ func debug_combat(character) -> Dictionary:
 		"interaction_dwell": interaction_dwell,
 		"watch_pos": _hostiles[0]["pos"] if _primitive == &"hold" and not _hostiles.is_empty() else null,
 		"reachable": _loco.debug_state().get("reachable", true),
-		"timers": { "commit": _commit_timer, "commit_max": max_commit_time, "tactic": _tactic_timer, "tactic_max": tactic_interval },
+		"timers": { "commit": _commit_timer, "tactic": _tactic_timer },
 	}
 
 

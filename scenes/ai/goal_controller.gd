@@ -552,6 +552,14 @@ func debug_search_coverage() -> Dictionary:
 	return _behavior.debug_coverage() if _behavior != null else {}
 
 
+## Read-only: where the NPC's sight toward world point `to` is first blocked (over low cover, the perception's own
+## sight rule), or `to` when it reaches it — for the vision overlay, so it draws the area the sense really covers.
+func debug_sight_end(to: Vector2) -> Vector2:
+	if _perception == null or _character == null:
+		return to
+	return _perception.sight_end(_character, to)
+
+
 ## Read-only: what the NPC has heard and been told (gunfire heard, under-fire direction, ally callouts,
 ## lost hostiles, checked leads, radii) — for the contacts and hearing overlays. Empty before perception exists.
 func debug_memory() -> Dictionary:
@@ -775,7 +783,7 @@ func _post_callout(leaf: Dictionary) -> void:
 
 
 ## Radio one step of a tactical entry (`{ step, opening, slot, side, cleared_room? }` from the behaviour) as an
-## `&"callout"`: the usual fields plus `opening`, `slot`, `side` and `entry_step` (claim / ready / going_in / in /
+## `&"callout"`: the usual fields plus `opening`, `into` (the room it leads into), `slot`, `side` and `entry_step` (claim / ready / going_in / in /
 ## clear / cover / rear / done / abort), `cleared_room` with a clear and `covering` (the doorway on it watches) with a
 ## cover. It is how the stack claims slots, waits for the team and
 ## crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
@@ -796,6 +804,7 @@ func _post_entry_call(step: Dictionary) -> void:
 		"target_id": 0,
 		"point": _character.global_position,
 		"opening": step["opening"],
+		"into": step.get("into", ""),
 		"slot": step["slot"],
 		"side": step["side"],
 		"entry_step": step["step"],

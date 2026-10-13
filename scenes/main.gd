@@ -75,6 +75,8 @@ const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 ## Spectator inspector (UI): Space-pause + click an NPC to show its tactical zones.
 const SPECTATOR_INSPECTOR := preload("res://scenes/ui/hud/spectator_inspector.gd")
+## The floor markers of the human's place in an AI stack (world space, under `World`).
+const STACK_MARKERS := preload("res://scenes/ui/hud/stack_markers.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
 const OVERLAY_TOGGLES := preload("res://scenes/ui/overlays/overlay_toggles.gd")
@@ -373,6 +375,7 @@ func _spawn_world() -> void:
 	if not spectator_mode and is_instance_valid(_player):
 		_join_player(rooms, rng)
 		combatants.append(_player)
+		_build_stack_markers(rooms)
 	_arm_characters(combatants)
 	_configure_debug()
 	_begin_match_hud(combatants)
@@ -459,6 +462,17 @@ func _join_player(rooms: Array, rng: RandomNumberGenerator) -> void:
 		_player.global_position = _spawner.clear_spot(rooms[rng.randi() % rooms.size()]["rect"], rng)
 	_player.reparent(_world, true)
 	_world.move_child(_player, 1)  # just above the house (child 0), below the NPCs
+
+
+## Give the human the stack radio and draw its place in an AI stack on the floor: the markers (a child of `World`, so
+## world space) watch the stack the spawner attached to the player. Only a human invader is ever reserved a slot, since
+## only the invaders' entries come over the radio.
+func _build_stack_markers(rooms: Array) -> void:
+	var stack: Node = _spawner.bind_player(_player, rooms)
+	var markers: Node2D = STACK_MARKERS.new()
+	markers.name = "StackMarkers"
+	_world.add_child(markers)
+	markers.watch(stack)
 
 
 ## The performance overlay and the toggle bar, built the first time a match starts with Debug on and

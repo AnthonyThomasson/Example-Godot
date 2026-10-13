@@ -46,7 +46,12 @@ The in-game observers: each reads only the Character public API / signals, the A
   faded), showing the NPC's own knowledge rather than the contacts' true state. The inspector pushes fresh contacts every frame
   (`set_contacts`, from the controller's `known_contacts_for_display()`), so the rings stay live and hold steady while Space-paused.
 
+- `stack_markers.gd` — the **stack markers** (`StackMarkers` Node2D, world space, built by `main.gd` under `World` for a human match). Draws the
+  slots of the doorway the human's `PlayerStack` has reserved a place at (`docs/tactical-entry.md` E16): a numbered ring on the floor for each
+  slot, the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
+  `watch(stack)` then it polls the stack's `view()` and redraws on change; `drawn()` is what is shown (what the test reads).
+
 ## Interface recap
 
-- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to `match_ended`; `SeedDisplay.show_seed(seed)`; builds `SpectatorInspector` (spectator mode only) with `setup(combatants, flags)` / `set_flag(flag, on)`. `DebugUI` attaches by exported `character_path`.
-- Tests: `tests/ui/match_hud_verdict_test.gd`.
+- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to `match_ended`; `SeedDisplay.show_seed(seed)`; builds `SpectatorInspector` (spectator mode only) with `setup(combatants, flags)` / `set_flag(flag, on)`. `DebugUI` attaches by exported `character_path`; builds `StackMarkers` and calls `watch(stack)` with the player's `PlayerStack` (human match only).
+- Tests: `tests/ui/match_hud_verdict_test.gd`, `tests/ui/stack_markers_draw_test.gd`.

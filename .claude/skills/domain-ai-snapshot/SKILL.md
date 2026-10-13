@@ -43,12 +43,11 @@ only; it writes no memory and holds no policy. Everything in this section and th
 lives in `agent_snapshot.gd`.
 
 - **facts** — named booleans a `requires` or an entry rule can gate on: `threat_known`, `hostile_known`,
-  `hostile_visible`, `has_gun`, `gun_loaded` (the gun it fights with, `Character.gun_slot()`, has rounds and is not mid-reload), `weapon_empty`,
+  `gun_loaded` (the gun it fights with, `Character.gun_slot()`, has rounds and is not mid-reload),
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
-  rounds), `under_fire`, `hit_recently`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
-  gates the `stay` child of INVESTIGATE), `hurt`, `critical`,
-  `inside`, `exposed`, `in_cover`, `crouched`. The shipped tree gates on `threat_known`, `hostile_known`, `gun_loaded`, `weapon_low`, `can_reload`,
-  `under_fire`, `engaged`, `leads` and `lead_outside`; the rest feed the brain overlay and are there for new rules.
+  rounds), `under_fire`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
+  gates the `stay` child of INVESTIGATE), `hurt`, `inside`, `exposed`. A fact is written only while something gates on it
+  (a tree `requires`, an entry rule or a test); the brain overlay shows the ones that hold.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`

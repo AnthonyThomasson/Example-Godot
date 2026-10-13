@@ -99,25 +99,18 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var ammo: int = character.ammo(gun) if gun >= 0 else -1
 	var facts := {
 		"hostile_known": not hostiles.is_empty(),
-		"hostile_visible": hostiles.any(func(c): return c["visible"]),
 		"threat_known": not hostiles.is_empty() or _under_fire(),
-		"has_gun": gun >= 0,
 		"gun_loaded": ammo > 0 and not character.is_reloading(),
-		"weapon_empty": ammo == 0,
 		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(gun) * vocab.low_ammo_fraction),
 		"can_reload": gun >= 0 and character.can_reload(gun),
 		"under_fire": _under_fire(),
-		"hit_recently": _hit_recently(),
 		"engaged": _engaged_fresh(),
 		"leads": not leads["options"].is_empty(),
 		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
 			and leads["options"].any(func(o): return not o["tags"]["inside"]),
 		"hurt": dmg >= vocab.hurt_threshold,
-		"critical": dmg >= vocab.critical_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),
 		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
-		"in_cover": line.get("cover", "") != "",
-		"crouched": character.posture() == &"crouch",
 	}
 	var sections := {
 		"goal": fill_goal(goal, character),
@@ -181,11 +174,6 @@ func fill_goal(goal: String, character) -> String:
 ## perception folds hits into. The perception owns the public `under_fire()`; this is the author's copy.
 func _under_fire() -> bool:
 	return _memory.is_fresh(&"under_fire")
-
-
-## Whether the NPC was actually hit (not just shot at) within the under-fire window.
-func _hit_recently() -> bool:
-	return _under_fire() and _memory.recall(&"under_fire").get("hit", false)
 
 
 ## Whether the NPC is still committed to a fight (an `engaged` event is fresh).

@@ -64,12 +64,14 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - Entry geometry for the behaviour: `entry_geometry(character, opening_id, into)`, `entry_team(opening_id)` and the shared
   stack rules `entry_free_slot(team, self_id, current)`, `entry_stack_side(geometry, team, self_pos)` and
   `entry_slot_point(geometry, side, slot)` (wrappers on `AgentEntry`'s statics, which the snapshot's `entries` group also uses; the
-  behaviour never reaches into `agent_entry.gd` itself) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
+  behaviour never reaches into `agent_entry.gd` itself; the one other consumer is the human's `PlayerStack` in `ai/team/`, which uses `AgentEntry` directly through its published seam: `set_house`, `geometry` and the statics `claims`, `free_slot`, `stack_side`, `slot_point`) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
 - `all_seen_characters()` (every character seen, allies included), `debug_memory()` (the event log for the brain overlay and
   gcmd) and `fill_goal(goal, character)` (the goal with `{gun}` filled in).
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).
+- `sight_end(character, to) -> Vector2` — where its sight toward `to` is first blocked (`AgentVision.sight_hit`, over
+  low cover), or `to`; the controller's `debug_sight_end` forwards it to the vision overlay.
 
 ## The snapshot and the wording rules — `domain-ai-snapshot`
 

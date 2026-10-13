@@ -40,7 +40,7 @@ every character is inside its own hole, and a walking one's would seal or split 
 and send its own path the long way round.
 
 These holes live in a **second map**, not the world's: `build` adds a child region `NavSteering` (`steering_region(region)`) on a map of
-its own (`steering_map(world_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
+its own (`steering_map(planning_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
 The world's own map stays furniture-only, because the AI plans on it (flank/fire/retreat spots, route length and exposure, tactical
 entry slots, search coverage) and a body's hole would bend every one of those. Only a `NavigationAgent2D` walks the steering map, and
 the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it; it is baked
@@ -85,7 +85,13 @@ the agent's RVO avoidance.
 
 The AI weighs points and routes against the planning map many times a decision, and every such read has to cope with
 the first frames before a bake, when the map is valid but has never synchronized. `NavBuilder.ready(map)` is that one
-rule (`map.is_valid()` and `map_get_iteration_id(map) != 0`); `snap(map, p)` returns `p` unchanged until then, else the
+rule (`map.is_valid()` and `map_get_iteration_id(map) != 0`, **and** every region `build` put on the map has been taken in).
+The last part is the start of a match: the world's map is already live with the previous navmesh (the menu's, the last
+match's) and takes a new house in only a frame later, on a worker thread, so a query in between answers from the old mesh
+(`map_force_update` does not change that) and a room's centre snaps to a corner nowhere near the house (issue #49, a room
+zone drawn outside the house). `build` therefore records each region it adds (planning and steering) with a probe point,
+and `ready` stays false until a query at the probe is answered by that region (`_awaiting`; an entry is dropped when its region
+leaves the tree). `tests/ai/room_zones_inside_their_rooms_test.gd` builds a match over a live map and pins it. `snap(map, p)` returns `p` unchanged until then, else the
 closest navmesh point (a room's geometric centre is often inside furniture); `route(map, from, to)` returns a straight
 `[from, to]` until then — and when the server finds no path — else the waypoints; `path_length(path)` sums a path.
 The AI's `Locomotion` (`reachable`, `on_navmesh`, the steering-map choice), `agent_tactics.gd`, `agent_entry.gd`,
@@ -111,7 +117,7 @@ to its current positions. The characters' holes are drawn too, in another colour
   and read `get_next_path_position()`. `NavBuilder.rebake(region, house, rooms, agent_radius)`
   re-carves the holes in place as furniture moves (driven internally by `nav_updater.gd`).
   `NavBuilder.furniture_holes(house) -> Array` is the debug read Main snapshots for the
-  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(world_map) -> RID` (invalid when the world has none),
+  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(planning_map) -> RID` (invalid when the world has none),
   `steering_region(region)` and `rebake_steering(region, house, rooms)` are the characters-at-rest side (above).
   `NavBuilder.ready(map)`, `snap(map, p)`, `route(map, from, to)` and `path_length(path)` are the map queries the AI
   reads a baked map through (above).

@@ -1,9 +1,9 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Forced-Entry) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
-# Example_Godot architecture
+# Forced-Entry architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a leg kick, a gun (pistol, SMG or
@@ -33,7 +33,7 @@ composition root is `domain-main`.
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
-| **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
+| **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Plus `ai/team/`, the human's side of the entry radio (`PlayerStack`, interface 17). Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`, or one folder deeper by topic (`tests/ai/entry/`). |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
@@ -242,15 +242,16 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
-	 living characters at rest under the region's parent), `NavBuilder.steering_map(world_map) -> RID` (a map of its own, holding
+	 living characters at rest under the region's parent), `NavBuilder.steering_map(planning_map) -> RID` (a map of its own, holding
 	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
 	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
 	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
    - **Map queries**, what the AI asks of a baked map when it weighs a point or a route: `NavBuilder.ready(map) -> bool`
-	 (valid and synchronized at least once), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),
+	 (valid, synchronized at least once and has taken in every region `build` put on it, so a map still showing the previous
+	 navmesh counts as unbaked), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),
 	 `route(map, from, to) -> PackedVector2Array` (the navigated waypoints; a straight segment before the bake or with no
 	 path) and `path_length(path) -> float`. The AI's locomotion, tactics geometry, entry geometry, snapshot options and
-	 routes overlay all go through these, so the "is the map baked yet" rule lives in one place.
+	 routes overlay, and the human's `PlayerStack` (how near a doorway it is), all go through these, so the "is the map baked yet" rule lives in one place.
    `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay and the
    `nav_updater.gd` re-baker right after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
@@ -282,9 +283,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
       profile, variant, position, volume_db, pitch }`), which is what tests assert on.
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
       its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`) — and one
-      per step of a tactical entry, which adds `opening`, `slot`, `side`, `entry_step` (claim / ready /
+      per step of a tactical entry, which adds `opening`, `into` (the room it leads into), `slot`, `side`, `entry_step` (claim / ready /
       going_in / in / clear / cover / rear / done / abort), `cleared_room` (with a clear) and `covering` (with a cover:
-      the doorway on out of the cleared room it watches) (`docs/tactical-entry.md`). Allied AI
+      the doorway on out of the cleared room it watches) (`docs/tactical-entry.md`); a human invader's `PlayerStack`
+      (interface 17) posts the same entry steps for the human. Allied AI
       controllers within `callout_range` consume it (which flank an ally holds, whom it fights, where to
       support it, which stack slot is taken, when the point is through, which room is clear, which doorway on is
       covered, when the team moves on).
@@ -293,8 +295,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 11. **General → Interaction / AI: `PhysicsLayers.SOLID`**
     - `PhysicsLayers` (`general/physics_layers.gd`, a `class_name` static holder) — `SOLID` names
 	  the physics layer bit (1) that "walls + solid furniture" live on. Interaction's reach query
-	  (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and
-	  its debug mirror (`ai/debug/vision_debug.gd`) all raycast on this one shared constant instead
+	  (`character_interaction.gd`) and AI perception's sight/line-of-fire rays (`agent_vision.gd`; the
+	  vision overlay asks the controller's `debug_sight_end` instead of casting) raycast on this one shared constant instead
 	  of each redefining the same magic number — the single point of truth for that layer id. The character's
 	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), the
 	  bullet's `collision_mask` (`projectile/projectile.gd`) and Physics' `PhysicsConfig.wall_mask` read it too.
@@ -367,6 +369,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
     Everything else Audio hears arrives as an EventBus event (interface 10): the gun, projectile and character
     domains only *post*; none of them references Audio.
 
+17. **Main → AI team: the human's place in a stack** (`scenes/ai/team/player_stack.gd`; a human invader is one of the stack)
+    - `MatchSpawner.bind_player(player, rooms) -> Node` (Main's helper, beside `bind_npc`) attaches a `PlayerStack` child to the human with
+      the house's `rooms` and `openings` (`PlayerStack.attach(character, rooms, openings)`); it returns it.
+    - `PlayerStack.view() -> Dictionary` — `{}` with no reservation, else `{ opening, door, slots: [{ n, point, mine, held }], mine, step }`:
+      the UI's `StackMarkers` (`ui/hud/stack_markers.gd`, `watch(stack)`, built by Main under `World`) draws it on the floor and reads
+      nothing else. The stack radios the human's claim as entry `&"callout"`s (interface 10) and reads the allies' off the same bus;
+      the AI's entry code treats it as any teammate (E16 in `docs/tactical-entry.md`).
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -382,6 +392,7 @@ AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Charac
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
+PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"callout": the human's claim)──▶ allied AIControllers;  StackMarkers (UI) ──(view())──▶ PlayerStack
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display)

@@ -2,15 +2,12 @@ extends Node2D
 
 ## AI domain: an optional debug overlay that draws the NPC's *actual* visible area — the portions
 ## of the forward FOV cone and the 360° near-awareness bubble that have a direct, unobstructed line
-## of sight back to the NPC. A ray fan samples the physics space each frame (same QUERY_MASK as
-## agent_vision.gd) and builds a visibility polygon so walls and TALL furniture cast proper shadows,
-## showing only the area that would trigger a detection. It mirrors agent_vision's "look over low
-## cover" rule: a ray passes through furniture whose coverage is at or below the controller's
-## `see_over_coverage`, so low pieces (tables, beds) cast no shadow. Toggle with `show_vision`. Draw-only —
+## of sight back to the NPC. A ray fan asks the controller each frame where the NPC's sight ends
+## (`debug_sight_end`, the perception's own rule: walls and TALL furniture block, low pieces are seen
+## over) and builds a visibility polygon from the answers, so the shadows are exactly the sense's and
+## show only the area that would trigger a detection. Toggle with `show_vision`. Draw-only —
 ## it senses nothing and feeds nothing back (follows the "draw on its own child Node2D" convention).
 
-## Same source as agent_vision.QUERY_MASK — walls + solid furniture that block sight.
-const QUERY_MASK := PhysicsLayers.SOLID
 ## Rays cast across the forward FOV arc (higher = smoother wall edges, more cost).
 const CONE_RAYS := 64
 ## Rays cast for the 360° awareness-bubble sweep.
@@ -29,7 +26,6 @@ var _controller: Node
 var _character: Node2D
 var _cone_poly: PackedVector2Array = PackedVector2Array()
 var _bubble_poly: PackedVector2Array = PackedVector2Array()
-var _exclude: Array = []
 
 
 func _ready() -> void:
@@ -57,31 +53,10 @@ func _draw() -> void:
 		draw_polygon(_cone_poly, [cone_color])
 
 
-## Cast a ray from `from` in `dir` up to `max_dist` on QUERY_MASK; returns the first SIGHT-blocking
-## hit position or the full-distance endpoint when the path is clear. Like agent_vision, it looks over
-## low cover: a collider whose coverage is at or below the controller's `see_over_coverage` is skipped
-## and the ray continues past it (each skip grows the exclude list, so the walk always terminates).
-func _cast(space: PhysicsDirectSpaceState2D, from: Vector2, dir: Vector2, max_dist: float) -> Vector2:
-	var to := from + dir * max_dist
-	var see_over: float = _controller.see_over_coverage
-	var ex := _exclude
-	while true:
-		var p := PhysicsRayQueryParameters2D.create(from, to)
-		p.collision_mask = QUERY_MASK
-		p.exclude = ex
-		var result := space.intersect_ray(p)
-		if result.is_empty():
-			return to
-		var collider = result.get("collider")
-		var cov := 100.0
-		if collider != null and collider.has_method("get_surface"):
-			cov = float(collider.get_surface().get("coverage", 100.0))
-		if cov > see_over:
-			return result["position"]
-		if ex == _exclude:
-			ex = _exclude.duplicate()
-		ex.append(result.get("rid"))
-	return to  # unreachable; satisfies the parser
+## Where the NPC's sight from `from` in `dir` ends: the first sight-blocking hit within `max_dist`, or the
+## full-distance endpoint when the path is clear (the controller's `debug_sight_end`).
+func _cast(from: Vector2, dir: Vector2, max_dist: float) -> Vector2:
+	return _controller.debug_sight_end(from + dir * max_dist)
 
 
 ## Rebuild the LoS-masked visibility polygons for both the cone and the bubble.
@@ -102,20 +77,14 @@ func _rebuild_visibility() -> void:
 			_bubble_poly.append(Vector2.from_angle((float(i) / float(BUBBLE_RAYS)) * TAU) * awareness)
 		return
 
-	# Build exclude list once per rebuild so raycasts don't hit the NPC's own body.
-	_exclude.clear()
-	if _character.has_method("get_rid"):
-		_exclude.append(_character.get_rid())
-
-	var space: PhysicsDirectSpaceState2D = _character.get_world_2d().direct_space_state
-	if space == null:
+	if not _controller.has_method("debug_sight_end"):
 		return
 	var from_pos: Vector2 = _character.global_position
 
 	# Awareness bubble: 360° ray sweep clipped by LoS — walls reduce the radius in each direction.
 	for i in range(BUBBLE_RAYS):
 		var angle := (float(i) / float(BUBBLE_RAYS)) * TAU
-		_bubble_poly.append(to_local(_cast(space, from_pos, Vector2.from_angle(angle), awareness)))
+		_bubble_poly.append(to_local(_cast(from_pos, Vector2.from_angle(angle), awareness)))
 
 	# FOV cone: ray fan from left edge to right edge, each ray clipped at the first wall it hits.
 	if facing == Vector2.ZERO:
@@ -127,4 +96,4 @@ func _rebuild_visibility() -> void:
 	for i in range(CONE_RAYS + 1):
 		var t := float(i) / float(CONE_RAYS)
 		var ray_angle := base - half_fov + t * deg_to_rad(_controller.fov_degrees)
-		_cone_poly.append(to_local(_cast(space, from_pos, Vector2.from_angle(ray_angle), dist)))
+		_cone_poly.append(to_local(_cast(from_pos, Vector2.from_angle(ray_angle), dist)))

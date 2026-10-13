@@ -1,16 +1,15 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 and E11 to E15 are enforced; each has its tests
-in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
+that rule is modelled on. Behaviours E1 to E9 and E11 to E16 are enforced; each has its tests
+in `tests/ai/entry/` (`tools/run_tests.sh entry`; E16's in `tests/ai/stack_*`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are tests on the Terrace house of
 `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests. E10 to E15 are tests that run
+E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests. E10 to E16 are tests that run
 the whole pipeline with the real Von server (`requires_von`, `--include-von --require-von`): the world gives the AI the situation
-and the test judges what the shipped AI does with it; E15 also has a scripted test of its mechanism,
-`entry_guard_secures_passed_doorway`. A rule the AI does not follow yet is written the same way before it is built: the
-behaviour here, and a test that is red on purpose and tagged `gap` (`tools/run_tests.sh --include-von --require-von gap`
-lists them; none is open).
+and the test judges what the shipped AI does with it; E15 also has scripted tests of its mechanism. A rule the AI does not
+follow yet is written the same way before it is built: the behaviour here, and a test that is red on purpose and tagged `gap`
+(`tools/run_tests.sh --include-von --require-von gap` lists them; none is open).
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
@@ -216,6 +215,24 @@ doors covered from beside the jamb, neither entered, nothing claimed on the radi
 (an ENTER order for room C: each door secured once, then C stacked and entered) and
 `entry_guard_enter_walk_with_team_keeps_together` (an ally has claimed C's stack: nothing secured on the way).
 
+**E16. The human stacks up with the team.** A human invader near the doorway an AI team is stacking at is one of the
+team. Its place is reserved over the radio like an NPC's claim: the first free slot, on the side the team stacks on, kept
+for as long as the human stays near (`player_stack_range`, 300 px of walking, as the entry guard; dropped beyond 1.5 times
+that); an AI that claims the doorway later takes a slot behind it. The human is never ordered: its radio step is read from
+where it stands (`claim` away from the slot, `ready` in it, `going_in` in the doorway, `in` once through). The AI's own
+rules then do the rest: the point waits for the human at the ready barrier (E6, up to `entry_ready_timeout`), a lone AI
+with a human near is a team of two and slices only its own side (E7), and an AI behind the human crosses after the human's
+`in` (the follow gap). A human who does not follow is not waited for for ever: once the AI ahead is through and the human
+has not crossed within `player_go_timeout` (6 s), its claim is withdrawn (`abort`), the marker goes and the AI behind goes
+in. After the entry the AI's corner, clear and cover roles ignore the human. The floor shows it: every slot of the doorway
+numbered, the human's own highlighted, the AI's dimmer (`scenes/ui/hud/stack_markers.gd`). Only invaders enter, so only a
+human invader is ever offered a slot. Why: a stack is a formation the human can only join if it can see where it forms and the
+team can count on it to be there; the number says how many go in ahead.
+Tests: `stack_player_reserved_slot`, `stack_player_keeps_slot_late_ai_behind`, `stack_far_player_ignored`,
+`stack_point_waits_for_player`, `stack_point_goes_when_player_ready`, `stack_follower_waits_for_player`,
+`stack_player_idle_withdrawn`, `stack_player_leaving_withdraws`, `stack_defender_player_none`, `stack_player_slot_von` (the real
+Von server; `tools/run_tests.sh stack --include-von`), `ui/stack_markers_draw`, `general/stack_player_wiring`.
+
 ## Situations
 
 The two common room shapes, `#` wall, `D` opening, `S` stack slots outside (1 is the point), `p` the pie
@@ -283,7 +300,7 @@ the stack toward the door's axis, clear of the slots.
   carry `entry_guard: false` (RETREAT) and an NPC under fire. `GoalController` exports `entry_guard`, `entry_guard_range`
   and `entry_guard_rearm` (test switch `ai.entry_guard`). It acts only where entry does, on invaders (`entry_enabled`).
 - **The team.** Roles, readiness and progress travel on the callout radio: each step is a `callout` with
-  `opening`, `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
+  `opening`, `into` (the room it leads into), `slot`, `side` and `entry_step` (`claim`, `ready`, `going_in`, `in`, `clear` with
   `cleared_room`, `cover` with `covering` (the doorway on it watches), `rear`, `done`, `abort`), repeated whole every
   2 s so a claim stays live. A doorway on is claimed like a slot: the nearest one no teammate covers, and of two who
   claim one, the lower instance id keeps it. `done` ends a hold; a teammate still holding takes it as the team moving on. A slot is the lowest the radio
@@ -313,6 +330,12 @@ Interpretations and the game's own rules, where the sources leave a choice:
 - A room crossed in a retreat or under fire is visited, not cleared: ENTER offers it again once the NPC is outside, and an
   entry the guard began there and gave up is not started again for `entry_guard_rearm` s. Search ranking still goes by
   `visited_room` (stood in it lately); the guard and ENTER go by `cleared_room`.
+
+- **The human (E16).** `PlayerStack` (`scenes/ai/team/player_stack.gd`) is a child of the human's character, attached by Main
+  (`MatchSpawner.bind_player`). It hears the same callouts the NPCs do, and when an allied claim on a doorway is live and the
+  human is within range it radios the human's own claim as a `callout` with the human as speaker, repeated every 2 s. The AI's
+  entry code (`claims`, `free_slot`, the barrier, the follow rule) reads it like any teammate's, so `entry.gd` has no case for a
+  human. `view()` gives the markers the doorway, the slots and which is the human's.
 
 ## Sources
 

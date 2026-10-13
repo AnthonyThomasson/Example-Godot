@@ -4,8 +4,8 @@ class_name PistolItem extends GunItem
 ## other hand cupping the grip. Everything a gun does lives in `GunItem`, tuned by the pistol's `GunConfig` row;
 ## this supplies its look and its hold.
 
-const PistolPainter = preload("res://scenes/items/pistol_painter.gd")
-const PistolFlatPainter = preload("res://scenes/items/pistol_flat_painter.gd")
+const PistolPainter = preload("res://scenes/items/art/pistol_painter.gd")
+const PistolFlatPainter = preload("res://scenes/items/art/pistol_flat_painter.gd")
 ## The pistol's footprint lying flat on its side (px): its profile across, its length along.
 const FLAT_SIZE := Vector2(9.0, 14.0)
 ## Pistol sprite footprint (px): width across, length from grip to muzzle.
