@@ -28,6 +28,10 @@ Sound="*res://scenes/audio/sound.gd"
 
 file_logging/enable_file_logging=true
 
+[dotnet]
+
+project/assembly_name="Example_Godot"
+
 [editor_plugins]
 
 enabled=PackedStringArray("res://addons/ticket_autorun/plugin.cfg")
