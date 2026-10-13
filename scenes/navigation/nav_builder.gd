@@ -36,6 +36,10 @@ const STEERING_NAME := "NavSteering"
 ## steering regions stand on it. The map is freed with its last region.
 static var _steering_maps: Dictionary = {}
 static var _steering_regions: Dictionary = {}
+## The regions a map has been given but may not have taken in yet (map RID -> Array of `{ region: RID, probe: Vector2 }`).
+## A map synchronizes on a worker thread, a frame or more after a region joins it; until the region answers a query,
+## `ready` is false (see there). An entry leaves when its region answers, or when the region leaves the tree.
+static var _awaiting: Dictionary = {}
 ## Baked polygons smaller than this (px^2) are slivers and are dropped (see `_drop_slivers`).
 const MIN_POLYGON_AREA := 0.5
 ## Segment count approximating a circular furniture footprint as an obstruction polygon.
@@ -62,6 +66,11 @@ static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float
 	parent.add_child(region)
 	if region.is_inside_tree():
 		_add_steering_region(region, house, rooms, agent_radius, nav_poly)
+		var probe: Vector2 = (rooms[0]["rect"] as Rect2).get_center()
+		_await_region(region.get_world_2d().navigation_map, region, probe)
+		var steering := steering_region(region)
+		if steering != null:
+			_await_region(steering.get_navigation_map(), steering, probe)
 	return region
 
 
@@ -522,9 +531,40 @@ static func _rect_outline(rect: Rect2) -> PackedVector2Array:
 # What the AI asks of a baked map (interface 9) when it weighs a point or a route: one home for the
 # "is the map baked yet" guard, so every caller treats the first frames before the bake the same way.
 
-## Whether `map` is a baked map: valid, and synchronized at least once. Before that a query would return nothing useful.
+## Whether `map` is a baked map: valid, synchronized at least once, and has taken in every region `build` put on it.
+## The last part matters at the start of a match: the world's map is already live with the previous navmesh (the menu's,
+## the last match's), and it takes the new house in only a frame or so later. Until then a query still answers from the
+## old mesh (a point snapped onto it lies nowhere near the house), so the callers treat the map as unbaked, the way they
+## do before the first bake, and read the plain point and a straight route instead.
 static func ready(map: RID) -> bool:
-	return map.is_valid() and NavigationServer2D.map_get_iteration_id(map) != 0
+	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
+		return false
+	var waiting: Array = _awaiting.get(map, [])
+	for entry in waiting.duplicate():
+		# Asked only after the map's first sync: before it the query is an engine error.
+		if NavigationServer2D.map_get_closest_point_owner(map, entry["probe"]) == entry["region"]:
+			waiting.erase(entry)
+	if waiting.is_empty():
+		_awaiting.erase(map)
+		return true
+	return false
+
+
+## Note that `region`, just added to `map`, is not in the map's queries until one at `probe` (a world point on the region)
+## is answered by it. Forgotten when the region leaves the tree.
+static func _await_region(map: RID, region: NavigationRegion2D, probe: Vector2) -> void:
+	var entry := { "region": region.get_rid(), "probe": probe }
+	var waiting: Array = _awaiting.get(map, [])
+	waiting.append(entry)
+	_awaiting[map] = waiting
+	region.tree_exited.connect(_forget_region.bind(map, entry), CONNECT_ONE_SHOT)
+
+
+static func _forget_region(map: RID, entry: Dictionary) -> void:
+	var waiting: Array = _awaiting.get(map, [])
+	waiting.erase(entry)
+	if waiting.is_empty():
+		_awaiting.erase(map)
 
 
 ## `p` snapped onto the navmesh (a room's geometric centre is often inside furniture); unchanged before the map is baked.

@@ -247,7 +247,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
 	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
    - **Map queries**, what the AI asks of a baked map when it weighs a point or a route: `NavBuilder.ready(map) -> bool`
-	 (valid and synchronized at least once), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),
+	 (valid, synchronized at least once and has taken in every region `build` put on it, so a map still showing the previous
+	 navmesh counts as unbaked), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),
 	 `route(map, from, to) -> PackedVector2Array` (the navigated waypoints; a straight segment before the bake or with no
 	 path) and `path_length(path) -> float`. The AI's locomotion, tactics geometry, entry geometry, snapshot options and
 	 routes overlay, and the human's `PlayerStack` (how near a doorway it is), all go through these, so the "is the map baked yet" rule lives in one place.

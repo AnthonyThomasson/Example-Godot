@@ -85,7 +85,13 @@ the agent's RVO avoidance.
 
 The AI weighs points and routes against the planning map many times a decision, and every such read has to cope with
 the first frames before a bake, when the map is valid but has never synchronized. `NavBuilder.ready(map)` is that one
-rule (`map.is_valid()` and `map_get_iteration_id(map) != 0`); `snap(map, p)` returns `p` unchanged until then, else the
+rule (`map.is_valid()` and `map_get_iteration_id(map) != 0`, **and** every region `build` put on the map has been taken in).
+The last part is the start of a match: the world's map is already live with the previous navmesh (the menu's, the last
+match's) and takes a new house in only a frame later, on a worker thread, so a query in between answers from the old mesh
+(`map_force_update` does not change that) and a room's centre snaps to a corner nowhere near the house (issue #49, a room
+zone drawn outside the house). `build` therefore records each region it adds (planning and steering) with a probe point,
+and `ready` stays false until a query at the probe is answered by that region (`_awaiting`; an entry is dropped when its region
+leaves the tree). `tests/ai/room_zones_inside_their_rooms_test.gd` builds a match over a live map and pins it. `snap(map, p)` returns `p` unchanged until then, else the
 closest navmesh point (a room's geometric centre is often inside furniture); `route(map, from, to)` returns a straight
 `[from, to]` until then — and when the server finds no path — else the waypoints; `path_length(path)` sums a path.
 The AI's `Locomotion` (`reachable`, `on_navmesh`, the steering-map choice), `agent_tactics.gd`, `agent_entry.gd`,
