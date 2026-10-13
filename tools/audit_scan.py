@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """Whole-codebase detectors for the `m-audit-everything` skill (advisory lists, always exits 0).
 
-  python3 tools/audit_scan.py [deps|dead|signals|facts|all]
+  python3 tools/audit_scan.py [deps|dead|signals|facts|events|all]
 
   deps     unit -> unit edge matrix by class_name use in code (comments and string literals are ignored;
-           scenes/ai/<sub>/ is its own unit; main.gd is the composition root and skipped). Every edge
-           must be a vital interface in the `architecture` skill.
+           scenes/ai/<sub>/ is its own unit; main.gd is the composition root and skipped), then the same
+           matrix for `preload` / `load` paths and scene `ext_resource` paths. Every edge must be a vital
+           interface in the `architecture` skill.
   dead     functions nothing references and declarations (const/var/signal/enum) nothing reads —
-           any non-comment token anywhere in scenes/ tests/ tools/ addons/ counts as a reference.
+           any non-comment token anywhere in scenes/ tests/ tools/ addons/ counts as a reference; then the
+           scene symbols referenced only from tests/ or tools/, and the test and tool declarations nothing
+           references. Matching is by token, so a same-named member of another class hides a dead one.
   signals  every signal with its emit sites and its listeners (connect / await / .tscn wiring).
   facts    keys the decision snapshot writes into `facts` that no tree node, entry rule, test or tool
            gates on (and whether the skills/docs describe them as available vocabulary).
+  events   every EventBus topic posted, how many listeners handle it, and each payload key it writes with
+           how many reads it has outside the posting files (production vs. tests/tools).
 
 Reads files only (no Godot needed). A hit is a lead: dynamic dispatch (duck-typed controllers,
 gcmd `Expression` eval, scene-wired signals) can hide a real use, so confirm by hand.
@@ -116,6 +121,24 @@ def deps() -> None:
     ai_edges = [k for k in edges if k[0].startswith("ai/") and k[1].startswith("ai/")]
     print(f"\n  ai sub-domain -> sub-domain class_name edges: {len(ai_edges)}"
           f"{'  <-- check isolation' if ai_edges else '  (the orchestrator wires them by preload)'}")
+    print("\n== Cross-unit dependencies by path (preload / load / scene ext_resource; main skipped) ==")
+    by_path = collections.defaultdict(collections.Counter)
+    for f in source_files():
+        if not f.startswith("scenes") or not f.endswith((".gd", ".tscn")):
+            continue
+        u = unit_of(f)
+        if u == "main":
+            continue
+        body = read(f) if f.endswith(".gd") else Path(f).read_text(errors="ignore")
+        for m in re.finditer(r"res://(scenes/[\w/]+\.(?:gd|tscn))", body):
+            t = unit_of(m.group(1))
+            if t != u:
+                by_path[(u, t)][os.path.basename(m.group(1))] += 1
+    if not by_path:
+        print("  (none)")
+    for (u, t), files in sorted(by_path.items()):
+        top = ", ".join(f"{k}x{n}" for k, n in files.most_common(10))
+        print(f"  {u:14s} -> {t:14s} {sum(files.values()):4d}  {top}")
 
 
 def dead() -> None:
@@ -123,6 +146,8 @@ def dead() -> None:
     text = {p: read(p) for p in files}
     alltext = "\n".join(text.values())
     tokens = collections.Counter(re.findall(r"[A-Za-z_]\w*", alltext))
+    # Declarations are counted once per name: a regex per symbol over the whole corpus takes a minute.
+    func_declared = collections.Counter(re.findall(r"^[ \t]*(?:static )?func ([A-Za-z_]\w*)", alltext, re.M))
     print("== Functions nothing references ==")
     found = False
     for p in scene_scripts():
@@ -130,20 +155,53 @@ def dead() -> None:
             fn = m.group(1)
             if fn in LIFECYCLE:
                 continue
-            decls = len(re.findall(r"^[ \t]*(?:static )?func " + fn + r"\b", alltext, re.M))
-            if tokens[fn] <= decls:
+            if tokens[fn] <= func_declared[fn]:
                 print(f"  {p}:{text[p][:m.start()].count(chr(10)) + 1}  {fn}")
                 found = True
     if not found:
         print("  (none)")
     print("\n== Declarations nothing reads ==")
     decl = r"^[ \t]*(?:@export\w*(?:\([^)]*\))?[ \t]+)?(?:const|var|signal|enum)[ \t]+"
+    var_declared = collections.Counter(re.findall(decl + r"([A-Za-z_]\w*)", alltext, re.M))
     found = False
     for p in scene_scripts():
         for m in re.finditer("(" + decl + r")([A-Za-z_]\w*)", text[p], re.M):
             name = m.group(2)
-            decls = len(re.findall(decl + name + r"\b", alltext, re.M))
-            if tokens[name] <= decls:
+            if tokens[name] <= var_declared[name]:
+                print(f"  {p}:{text[p][:m.start()].count(chr(10)) + 1}  {name}")
+                found = True
+    if not found:
+        print("  (none)")
+    # The two passes below look at class members only (column 0: a local is always read by its own function), with
+    # the declarations counted once per corpus (a regex per symbol over the whole corpus is too slow).
+    sym = r"^(?:(?:static )?func[ \t]+|(?:@export\w*(?:\([^)]*\))?[ \t]+)?(?:const|var|signal|enum)[ \t]+)([A-Za-z_]\w*)"
+    prod_text = "\n".join(t for q, t in text.items() if not q.startswith(("tests", "tools")))
+    prod = collections.Counter(re.findall(r"[A-Za-z_]\w*", prod_text))
+    declared_prod = collections.Counter(re.findall(sym, prod_text, re.M))
+    declared = collections.Counter(re.findall(sym, alltext, re.M))
+    print("\n== Scene symbols referenced only from tests/ or tools/ (scenes/testing/ serves them, so it is skipped) ==")
+    found = False
+    for p in scene_scripts():
+        if p.startswith("scenes/testing/"):
+            continue
+        for m in re.finditer(sym, text[p], re.M):
+            name = m.group(1)
+            if name in LIFECYCLE or name.startswith("_"):
+                continue
+            if prod[name] <= declared_prod[name] < tokens[name]:
+                print(f"  {p}:{text[p][:m.start()].count(chr(10)) + 1}  {name}  (test/tool refs: {tokens[name] - declared_prod[name]})")
+                found = True
+    if not found:
+        print("  (none)")
+    print("\n== Test and tool declarations nothing references ==")
+    hooks = LIFECYCLE | {"describe", "configure", "run", "_initialize"}
+    found = False
+    for p in files:
+        if not p.endswith(".gd") or not p.startswith(("tests", "tools")):
+            continue
+        for m in re.finditer(sym, text[p], re.M):
+            name = m.group(1)
+            if name not in hooks and tokens[name] <= declared[name]:
                 print(f"  {p}:{text[p][:m.start()].count(chr(10)) + 1}  {name}")
                 found = True
     if not found:
@@ -185,7 +243,29 @@ def facts() -> None:
     print(f"  ({len(keys)} facts written by {snap}; 'gated' = a tree `requires`, entry rule, test or tool names it)")
 
 
-COMMANDS = {"deps": deps, "dead": dead, "signals": signals, "facts": facts}
+def events() -> None:
+    print("== EventBus topics: listeners, and each payload key's readers outside the posting files ==")
+    text = {p: read(p) for p in source_files() if p.endswith(".gd")}
+    prod = {p: t for p, t in text.items() if p.startswith("scenes")}
+    posts = collections.defaultdict(dict)  # topic -> key -> the files that post it
+    for p, t in prod.items():
+        for m in re.finditer(r"EventBus\.post\(\s*&\"(\w+)\"\s*,\s*\{(.*?)\}\s*\)", t, re.S):
+            for k in re.findall(r"\"(\w+)\"\s*:", m.group(2)):
+                posts[m.group(1)].setdefault(k, set()).add(p)
+    listeners = [p for p, t in prod.items() if "EventBus.posted" in t]
+    for topic in sorted(posts):
+        handled = sum(1 for p in listeners if re.search(r"&\"" + topic + r"\"", prod[p]))
+        print(f"  &\"{topic}\"  listeners={handled}" + ("  <-- no listener" if handled == 0 else ""))
+        for k, writers in sorted(posts[topic].items()):
+            pat = re.compile(r"(?:\.get\(\s*|\[\s*)&?\"" + k + r"\"")
+            reads = sum(len(pat.findall(t)) for p, t in text.items() if p not in writers and p.startswith("scenes"))
+            tests = sum(len(pat.findall(t)) for p, t in text.items() if p not in writers and not p.startswith("scenes"))
+            flag = "" if reads else ("  <-- read only by tests/tools" if tests else "  <-- nothing reads it")
+            print(f"      {k:<14} reads={reads} tests={tests}{flag}")
+    print("  (a generic key such as `position` is counted wherever that name is read; judge each)")
+
+
+COMMANDS = {"deps": deps, "dead": dead, "signals": signals, "facts": facts, "events": events}
 
 if __name__ == "__main__":
     which = sys.argv[1] if len(sys.argv) > 1 else "all"
