@@ -1,9 +1,9 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 are enforced (E1 to E8 from issue #32, spike #18; E9 closes the gap that left); each has its tests
-in `tests/ai/entry_*_test.gd` (`tools/run_tests.sh entry`), named under the behaviour, which were written
-first as red `gap` tests following the convention of `docs/flanking-behavior.md`. They are scripted-Von
+that rule is modelled on. Behaviours E1 to E9 are enforced; each has its tests
+in `tests/ai/entry_*_test.gd` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
+`docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
@@ -72,8 +72,8 @@ invaders never take the same one. Why: a stack is the formation every technique 
 makes a target and blocks the point man.
 Tests: `entry_stack_orders_slots`, `entry_stack_no_double_claim`.
 
-**E3. Slice the pie.** The first in the stack looks across the opening in angle steps from the stack
-point, turning its gaze (not its body) to each, before it crosses. What it sees from outside it engages from
+**E3. Slice the pie.** The first in the stack walks a short arc outside the opening (`entry_pie_steps` points, 100 px from
+the threshold, from 55° to 25° off the door's axis), turning its gaze through the doorway at each, before it crosses. What it sees from outside it engages from
 outside, and it notes the share of the room seen and which corners are still hidden. Why: it is the cheapest way
 to learn the room, and the farthest the entrant ever is from a threat. Built on `visible_points` and the
 search-coverage sweep.
@@ -89,21 +89,21 @@ Nor does it run, there or on the way to the door: running lowers the gun.
 Tests: `entry_no_pause_in_threshold`, `entry_hit_in_threshold_clears_it`, `entry_never_runs`.
 
 **E5. Take opposite corners, hard corner first.** Entering as a team, the point turns to the near
-corner and the second crosses to the far corner, the hard corner among those still hidden after E3. They do not
+corner on its own side and the second crosses to the door-wall corner on the other side, the hard corner. They do not
 take the same corner, and each turns its gaze across the room as it goes so the sectors interlock. Why: two
-interlocking sectors cover the whole room and each other. Rooms where E3 saw every corner skip the hard-corner
-step and the pair spreads to the two near ones.
+interlocking sectors cover the whole room and each other.
 Tests: `entry_pair_take_opposite_corners`, `entry_pair_hard_corner_first`.
 
 **E6. Ready barrier and "going in".** The point does not cross until every invader in range holds its
 slot (or a ready timeout runs out), and it radios that it is going in. Followers cross after it, one at a
-time, not together. A member killed or without a path is dropped from the barrier at once. Why: a team that
+time, not together. A member killed is dropped from the barrier at once; one that never arrives is dropped by the ready timeout (or gives
+its own approach up after `entry_approach_time`). Why: a team that
 trickles through the funnel is a series of solo entries; the radio is the team's only signal. The barrier is a
 hold-until-ready, not a fixed delay.
 Tests: `entry_waits_for_stack`, `entry_ready_timeout`, `entry_going_in_callout`.
 
-**E7. Solo entry.** An invader with no ally in radio range runs the same sequence without a barrier or a
-claimed slot: stage (E1), slice the pie from one side then the other (E3), and, if nothing is hostile in
+**E7. Solo entry.** An invader with no ally in radio range runs the same sequence without a barrier (it still
+claims slot 1 on the radio, so an ally that turns up joins its stack): stage (E1), slice the pie from one side then the other (E3), and, if nothing is hostile in
 view, one committed entry (E4) that goes directly to the hard corner (E5, alone) and clears the rest by sight.
 It is slower than a team and takes more of the doorway's angle, but is never in the funnel longer than a team
 member. Why: the same principles with nobody to cover it. An ally that comes into range mid-sequence is joined
@@ -113,7 +113,7 @@ Tests: `entry_solo_pies_both_sides`, `entry_solo_commits_once`, `entry_ally_join
 send it back to the start).
 
 **E8. Clear, mark, cover, move on.** When the corners and the room's points are seen, the room is marked cleared
-(the `cleared_room` memory, which also counts as searched). Then the team holds the room it has taken, guns on what it
+(the `cleared_room` memory; the room's `visited_room` entry comes from standing in it). Then the team holds the room it has taken, guns on what it
 has not: each member covers a different one of the room's doorways on into a room nobody has cleared (doors to outside
 and the one they came in by do not count), standing back inside the cleared room off that doorway's axis with its gun
 through it. A member left over, when there are more of them than such doorways, holds the doorway they came in by as rear
@@ -181,7 +181,8 @@ the stack toward the door's axis, clear of the slots.
   (`GoalController.entry_enabled`, on in `npc_invader.tscn`; test switch `ai.entry`).
 - **The choreography.** The ENTER leaf runs the `entry` primitive, a phase machine in the behaviour
   sub-domain (`behavior/entry.gd`): approach (E1), stack (E2), pie (E3), cross (E4, E5), corner, clear
-  (E8), cover (E8), rear (E8). It does not ask Von again until the entry is over, so it runs with the server down.
+  (E8), cover (E8), rear (E8). It does not ask Von again on the cadence until the entry is over, so it runs with the server down (a forced decision
+  still replaces it, or aborts it when Von is down).
   While crossing, the controller holds every decision (`Behavior.committed()`); a hit or a hostile seen
   in the doorway is acted on once the NPC is through. The room is cleared by sight with
   `search_coverage.gd`. Posture and running stay code-owned: it stands throughout and never runs, not even

@@ -16,7 +16,7 @@ extends Node
 ##     option groups). The NPC is NOT omniscient — it acts on last-KNOWN positions and forgets what decays.
 ##   • DECISION (decision/) — THINK. The decision TREE and its planner: Von picks top-down, one `choice`
 ##     request per level — a broad mode (combat / investigate / search / idle), the hostile, a tactic
-##     (engage / flank / push / retreat …), then a concrete option — ending in one behaviour primitive.
+##     (engage / flank / advance / retreat / reload …), then a concrete option — ending in one behaviour primitive.
 ##   • BEHAVIOUR (behavior/) — ACT. Runs the chosen primitive (move / engage / melee / interact / hold) as
 ##     movement + actions, and holds the System-Two state Von lacks: the engaged contact,
 ##     peek-and-cover, the interaction in progress, and the commitment that keeps a choice running.

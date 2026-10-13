@@ -9,7 +9,7 @@ Stateless helpers + reusable Node components, sharing no imports with other doma
 Objects *compose* these components; Physics imports nothing outward.
 
 - `HitInfo` — the one data packet a striker fills in (`position, normal, direction, damage,
-  speed_factor, penetrated, source`).
+  speed_factor, penetrated, has_exit, exit_position, exit_normal, blood, source`).
 - `Physics.impact_impulse(hit)` / `Physics.spawn_debris(world, hit, surface)`.
 - `Knockback` — RigidBody2D adapter: configures its parent furniture body (no gravity, mass,
   `PhysicsConfig.body_*` damping, origin-pinned center of mass, contact reporting) and feeds it

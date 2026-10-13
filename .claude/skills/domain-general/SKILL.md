@@ -7,7 +7,7 @@ description: Deep implementation detail for the General domain (scenes/general/)
 
 Infrastructure: input (Keybinds), saved settings (Settings), despawner, event bus, camera, dev command
 server, shared physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the General autoloads (`project.godot`; the Audio domain adds a fourth, `Sound`).
-HUDs and menus have moved to the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
+HUDs and menus are the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
 
 `physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
 `class_name` static holders) names physics-layer bits so they aren't redefined as magic numbers
@@ -24,9 +24,9 @@ a typed helper. `player_controller.gd` (Character domain) is the one gameplay co
 Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle, in the "Movement" group after Run — and the action keys, incl. `RELOAD`, default R, in the "Combat" group next to Punch and Fire). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
 inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
 `command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
-outside. `Keybinds._ready` registers every action in the InputMap, so `project.godot [input]` (which lists
-only some of them) is a convenience for the editor's Input Map panel, not the source of truth. `PAUSE`
-(default Space) is read only by the spectator inspector (UI domain); it shares Space with `INTERACT`,
+outside. `Keybinds._ready` registers every action in the InputMap, so there is no `project.godot [input]` section: this file
+is the source of truth. `PAUSE`
+(default Space) is read by the spectator inspector (UI domain) and the test runner; it shares Space with `INTERACT`,
 harmless because the spectator match has no player to interact.
 
 Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button. Keyboard
@@ -35,7 +35,7 @@ defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-c
 `FIRE` is read two ways, both by the player controller: `is_fire_just_pressed()` (a click: one round) and `is_fire_pressed()`
 (held: an automatic gun keeps firing, `Character.is_automatic()`); no new action, so rebinding `FIRE` moves both.
 `CAMERA_LEFT/RIGHT/UP/DOWN` (default WASD, read through `get_camera_vector()`) and `ZOOM_IN/OUT` are read
-only by the camera; the camera keys share WASD with `MOVE_*`, harmless because the spectator match has no
+by the camera and the test runner; the camera keys share WASD with `MOVE_*`, harmless because the spectator match has no
 player to move. `LABELS` (settings-page order + names) and `GROUPS` must cover every action (a test
 enforces it). Runtime API: `bind(action, event)` (key or mouse button incl. wheel up/down; refuses the
 horizontal wheel and anything else), `reset(action)` / `reset_all()`, `default_event`, `event_of`, `text_of` ("W", "Space",
@@ -50,7 +50,7 @@ defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skippe
 `settings.gd` (`class_name Settings`, a static holder like the config holders — no instance, no autoload)
 keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays) and the key-binding
 overrides in one JSON file, `Settings.path` (`user://settings.json`):
-`{ "debug": bool, "setup": { side, seed, defenders, invaders }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
+`{ "debug": bool, "setup": { side, seed, defenders, invaders }, "overlays": { show_<x>: bool }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
 the defaults are stored, so a changed default still reaches an action the player never touched.
 - **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`; a
   missing file keeps the defaults, an unreadable one `push_warning`s and does the same, and a file that
@@ -59,7 +59,8 @@ the defaults are stored, so a changed default still reaches an action the player
   export), so the headless test runner — which never loads `main.tscn` — never reads a developer's file.
 - **`Settings.setup`** holds the match-setup window's last choices (`set_setup(config)` saves them, dropping the
   start `mode`); Main feeds it back into the window so it reopens as it was left.
-- **Mutators save at once:** `set_debug(on)`, `rebind(action, event) -> bool`, `reset(action)`,
+- **`Settings.overlays`** holds the toggle bar's switches (`set_overlay(flag, on)` saves one); Main seeds the overlays from it.
+- **Mutators save at once:** `set_debug(on)`, `set_setup(config)`, `set_overlay(flag, on)`, `rebind(action, event) -> bool`, `reset(action)`,
   `reset_all()` (leaves `debug`). `binding_rows()` reshapes the bindings into the plain dicts the settings
   page draws: `{ action, label, group, text, conflicts: [labels], changed }`.
 - Tests point `Settings.path` at a scratch file with `set_static` (`tests/general/settings_file_test.gd`);
@@ -73,11 +74,11 @@ var (per-worktree, set by `tools/editor.sh`), else `application/debug/command_po
 0 and never exists in an exported build (`_ready()` bails when `OS.has_feature("editor")` is
 false). It listens on 127.0.0.1 with a line-delimited protocol: each line is a curated verb
 (`help`, `pos`, `tp X Y`, `slot N`, `move up|down|left|right [off]`, `stop`, `fire`, `punch`,
-`interact`, `aim X Y`, `match`, `ai`, `restart [seed]`) or, failing that, a GDScript `Expression`
+`interact`, `reload`, `crouch`, `aim X Y`, `match`, `ai`, `restart [seed]`, `menu`, `eval EXPR`) or, failing that, a GDScript `Expression`
 evaluated against the node (e.g. `scene().get_node("Player").speed`). Movement and actions are
 driven by injecting `Input` action presses through `Keybinds` names — the same path a human's
 keyboard/mouse uses — so no game domain is coupled to it. Combatants and the player are discovered under the scene root **or a node in the `match_world` group** (Main's container for everything a match builds). `match` prints a one-line, parseable
-status of both spectator combatants (`Defender`/`Invader`): each one's health, current act and
+status of every AI combatant it finds: each one's health, current act and
 alive flag, plus the verdict and elapsed time — reading only the characters' public API and their
 controller's `current_act()`. `ai` is the diagnostic counterpart: it dumps every AI combatant's
 `debug_state()` as JSON (every level of its last decision walk — the state and question Von saw,
@@ -135,7 +136,7 @@ consumed by allied AIs.
 - `despawner.gd` (autoload) — global cap for transient bodies (flying debris chips, casings, blood splatters and pools);
   domains register spawns with it. The Physics domain's `DebrisLayer` reads `max_scene_objects` as the cap on landed chips too.
 
-HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) have moved to
+HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) belong to
 `scenes/ui/` — see the `domain-ui` skill for their implementation detail.
 
 ## Spectator match mode

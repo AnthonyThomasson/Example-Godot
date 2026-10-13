@@ -18,7 +18,7 @@ Two full-screen, code-built windows that take **plain data** and only emit signa
   lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
   muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed,
   defenders: { count, weapon, magazine, spares }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
-  Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; separator 28pt;
+  Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; column headings 36pt; the Tests and Settings buttons 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
 the test browser. `current_config() -> Dictionary` returns the same
   `{ side, seed, defenders, invaders }` as the window stands (empty before `open`); Main saves it through

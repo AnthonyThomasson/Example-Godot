@@ -65,8 +65,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 same `rooms` / `openings` metadata a generated house carries (a door on one room's wall only is the front entrance), so
 	 `get_rooms`, `get_openings` and `NavBuilder` read them unchanged. No other caller writes those keys.
    `main.gd` positions the front entrance, fixes draw order and builds the nav map from the rooms (interface 9); its
-   `match_spawner.gd` drops each defender at a clear spot in a random room (its centre unless solid furniture or another
-   combatant is within `spawn_clearance` — read off `NavBuilder.furniture_holes` — else a random clear point) and each invader
+   `match_spawner.gd` drops each defender at a clear spot in a random room (its centre unless solid furniture is within `spawn_clearance` or another
+   combatant within twice that — read off `NavBuilder.furniture_holes` — else a random clear point) and each invader
    just outside the house (all via `get_rooms`), and hands every NPC the house's `get_openings` (for tactical
    entry); it never touches world-gen internals.
 
@@ -94,8 +94,10 @@ interface(s) and describes how they're implemented; this list is authoritative f
    surface). The projectile decides the ballistic outcome, then hands
    the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
    (interface 4), the character bleeds instead (its `BloodWound` component, interface 4). The
-   projectile is the only striker that uses this; a melee punch shoves through the "pushable"
-   contract below and does **not** deform.
+   projectile is the only striker that calls `take_hit`; a melee punch shoves through the "pushable"
+   contract below, deals its damage through `take_damage(amount)` (the character's plain damage entry, no HitInfo;
+   tests wound a character with it too) and does **not** deform, and reads `get_surface()` only for the struck
+   `material` it posts. An object also carries `object_name` (its display name), which the AI's wording reads.
 
 4. **Objects/Character → Physics** (objects and the character compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
@@ -196,23 +198,24 @@ interface(s) and describes how they're implemented; this list is authoritative f
    (aim, visible wounds, a reload in progress and the posture are things it perceives). A node is a character if it exposes `current_item()`:
    that is the one probe the AI uses to find characters in the world, so it is part of this interface and is not renamed lightly.
    `player_controller.gd` is the human one and
-   is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main / the test runner `MENU`,
-   the spectator inspector `PAUSE`, the camera its pan and zoom actions). Signals:
+   is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main `MENU`; the test runner `MENU`, `PAUSE` and the camera actions;
+   the spectator inspector `PAUSE`; the camera its pan and zoom actions). Signals:
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
-   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Every NPC is the same generic goal-driven agent
+   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry`;
+   Main, the spectator inspector and the Testing world set those flags by that name, so an overlay's export is part of this surface. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`ai/npc_defender.tscn`) and the invader
    (`ai/npc_invader.tscn`), both inherited from `ai/npc.tscn` (itself an inherited scene of the controller-less
    `character/character_base.tscn`), differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
    decision-tree config. Main injects only `rooms` and `openings` (and `entry_point`); the AI finds and categorizes
    the characters it perceives by sight. Von walks a data-driven DECISION TREE ranked against the
-   goal — a broad mode (combat / investigate / search / idle), then a tactic (engage / flank / push /
-   retreat / locate …), then a concrete option (a place, a firing spot, an object) — one `choice`
+   goal — a broad mode (combat / investigate / search / idle), then a tactic (engage / flank / advance /
+   retreat / reload / locate …), then a concrete option (a place, a firing spot, an object) — one `choice`
    request per level, ending in a behaviour primitive (move / engage / melee / interact / hold / reload / entry) — no
    per-goal or per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split
    across four isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai`
@@ -313,7 +316,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
     controller-less character) — and `EventBus` / character signals (7, 10) for its event log.
     Behaviour switches set existing exported props and config-holder `static var`s by name
     (duck-typed, like Main's overlay flags); a test can also script the Von answers through the AI
-    decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`; `DecisionBudget.per_frame`, the
+    decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`; the runner also drives the
+    `DecisionServerLauncher` for the tests that need the real server; `DecisionBudget.per_frame`, the
     snapshots a frame may start, is set the same way) so AI
     wiring runs without a server. In the in-game runner a test can switch off user interactions that
     would change its result with `TestSetup.lock_interaction` (`camera` / `pause` / `overlays`), sending
@@ -328,9 +332,13 @@ interface(s) and describes how they're implemented; this list is authoritative f
 14. **Main → General settings, UI settings page** (the composition root wires them; they never meet)
     - `Settings` (`general/settings.gd`, a `class_name` static holder): `load_file()` (Main calls it once in
       `_ready`, after seeding `Settings.debug` from its own export — not `Keybinds._ready`, so tests never
-      read a developer's file), the saving mutators `set_debug(on)`, `rebind(action, event) -> bool`,
+      read a developer's file), the saving mutators `set_debug(on)`, `set_setup(config)`, `set_overlay(flag, on)`, `rebind(action, event) -> bool`,
       `reset(action)`, `reset_all()`, and `binding_rows() -> Array` (plain dicts for the page). It persists
-      the Debug switch and the `Keybinds` bindings that differ from the defaults to `user://settings.json`.
+      the Debug switch, the setup window's last choices (`setup`), the overlay toggles (`overlays`) and the `Keybinds`
+      bindings that differ from the defaults to `user://settings.json`.
+    - Main ↔ the dev command server (General, `general/command_server.gd`): it finds the match's nodes through the
+      `match_world` group, restarts through `Main.return_to_setup()`, hands a seed over through the Engine metas
+      `skip_setup` / `match_seed`, and drives the node named `Player`; those names are the whole contract.
     - `SettingsMenu` (`ui/menus/settings_menu.gd`): `open({ debug, rows })`, `set_rows(rows)`; signals
       `debug_changed`, `rebind_requested(action, event)`, `reset_requested`, `reset_all_requested`,
       `back_requested`. It takes plain dicts and knows nothing of `Keybinds`/`Settings`; Main opens it from the
@@ -369,7 +377,7 @@ Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)─
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing)
-UI (DebugUI / MatchHUD) / Camera ──(exported path + signals)──▶ Character  (MatchHUD also reads AIController.debug_status)
+UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)

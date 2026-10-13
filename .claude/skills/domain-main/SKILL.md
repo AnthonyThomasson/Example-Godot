@@ -9,7 +9,8 @@ description: Deep implementation detail for the composition root (scenes/main.gd
 gameplay of its own: it asks World-Gen for a house, places NPCs, arms characters, and attaches the HUDs and overlays. The exports on
 the `Main` node are the authoring surface for a run (`house_seed`, `force_plan`, `entrance_distance`, `defender_count`, `invader_count`,
 `invader_margin`, `spawn_clearance`, `spectator_mode`, `player_side`, `defender_loadout` / `invader_loadout`, `endless_delay`,
-`endless_time_limit`, `debug_overlays`, and one `show_<x>` per overlay).
+`endless_time_limit`, `debug_overlays`, and `show_agent_labels` / `show_agent_paths` / `show_vision` / `show_tactics` /
+`show_room_zones` / `show_search` / `show_nav_holes`: seven of the overlays, the rest start at the registry's default).
 
 ## Setup flow
 

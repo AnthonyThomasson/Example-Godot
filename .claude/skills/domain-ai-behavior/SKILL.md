@@ -20,7 +20,7 @@ Files:
 - `locomotion.gd` — the pathing layer (a `Node` child of behaviour); owns the NavigationAgent2D and answers `room_key_at(p)` / `inside_house(p)`.
 
 The controller sets the behaviour's config fields from its exports, calls `setup(perception, nav_agent)`
-once to build its `Locomotion`, `SearchCoverage` and `Combat` children, then `apply_config()` to push the tunables they hold
+once to build its `Locomotion`, `SearchCoverage`, `Combat`, `Watch` and `Entry` modules, then `apply_config()` to push the tunables they hold
 in — re-calling `apply_config()` each decision so a runtime retune takes effect. (The behaviour's own
 fields are read live, so only those modules need the push.)
 
@@ -126,7 +126,7 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   be had) abandons any entry. Tests: `tests/ai/entry_guard_*_test.gd`, `entry_fallback_aborts`,
   `entry_decision_in_flight_during_cross`.
 - **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides, covering, watch_doors,
-  hidden_corners, corner, stack_point, team, covering, watch_doors), also under `entry` in `debug_state()`;
+  hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`;
   `Behavior.debug_entry_view(character)` (world-space: entry.gd `debug_view` — doorway frame, slots, pie arc and queue,
   corners with what the pie saw, role, waypoints, gaze, timers, the team off the radio, the doorways covered — plus the
   entry guard's detour, rearm list, look-ahead and the cleared rooms) for the entry debug overlays; the status line says the phase
@@ -134,7 +134,7 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
 
 ## Public interface (what the orchestrator calls)
 
-- `setup(perception, nav_agent)` (build the Locomotion, coverage and combat modules), `apply_config()` (push their tunables
+- `setup(perception, nav_agent)` (build the Locomotion, coverage, combat, watch and entry modules), `apply_config()` (push their tunables
   in; re-callable each decision); config fields; `rooms` (set each tick; forwarded to Locomotion).
 - `set_leaf(leaf)` — adopt: snap the point onto the navmesh, capture the target (a fight whose target
   is no longer known drops to hold and forces a re-decision), commit.
@@ -143,7 +143,8 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
 - `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()`,
   `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
   `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
-  start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `path_label()`.
+  start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view(character)`,
+  `debug_combat(character)`, `debug_coverage()`, `debug_progress()`, `intent()`, `path_label()`.
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.
 - `ongoing()` — the running choice is still in progress (en route, fighting, using an object): only
@@ -167,6 +168,6 @@ avoidance and no straight-at-the-destination fallback. `reachable(p)` snaps a po
 straight-line steering with no agent. **Bodies at rest:** the Navigation domain also keeps a *steering map* with each character at
 rest carved out. `_choose_map` (called by `move_to` / `reached`) puts the agent on it only for a walk that goes round such a body
 (a route at most `DETOUR_RATIO` x the plain one + `DETOUR_SLACK` px, ending where the plain one does, with neither the NPC nor `dest`
-standing in a hole); every other walk, including one a body seals, stays on the plain map and shoves through as before.
+standing in a hole); every other walk, including one a body seals, stays on the plain map and shoves through.
 `reachable` / `on_navmesh` always use the plain map. `debug_state()["around_bodies"]` says which map the last walk took. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
 `inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules.

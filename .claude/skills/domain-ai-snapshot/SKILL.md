@@ -18,12 +18,14 @@ Files:
   `investigate_distance`, `extrapolate_cap`, `max_options_per_level`, `hurt_threshold`, `critical_threshold`, `low_ammo_fraction`,
   `max_contacts_in_state`, `search_memory_ttl`), the house `rooms` of the decision being built, and the band / wording helpers
   (`dist_band, recency, route_band, route_text, move_text, coming_text, aim_text, where, room_suffix, room_name, health_band,
-  wound_band, compass, own_posture_text, contact_posture_text, gun_noun, side_status, is_inside, house_centre`, static `room_at`).
-  One owner for the tuning means no field is set twice; add a new tunable here and set it in `agent_perception.apply_config()`.
+  wound_band, compass, place, own_posture_text, contact_posture_text, gun_noun, side_status, is_inside, house_centre`, static `room_at`).
+  The snapshot reads its tuning here only; the same fields are declared on the controller (the exports) and on the perception
+  (which copies them in), so adding a tunable is three declarations and one line in `agent_perception.apply_config()`.
 - `snapshot/snapshot_sections.gd` — the state text: `situation_text, loadout_text, odds_text, contacts_text, exposure_text,
   unseen_fire_text, allies_text, flanks_text, awareness_text, threat_summary`.
 - `snapshot/snapshot_options.gd` — the option groups: `hostile_group, reload_group, fire_group, flank_group, melee_group,
-  advance_group, retreat_group, lead_group, shooter_group, search_group, explore_group, interaction_group, room_group` and their
+  advance_group, retreat_group, lead_group, shooter_group, entry_group` (with the static `entry_rooms`)`, search_group, explore_group,
+  interaction_group, room_group` and their
   helpers. Reads the per-decision knowledge from `know` (set by `build()`).
 
 Add a **fact** in the `facts` literal of `build()`; a **section** as a `*_text` function in `snapshot_sections.gd` plus a key in
@@ -45,7 +47,7 @@ lives in `agent_snapshot.gd`.
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
   rounds), `under_fire`, `hit_recently`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
   gates the `stay` child of INVESTIGATE), `hurt`, `critical`,
-  `inside`, `exposed`, `in_cover`. The shipped tree gates on `threat_known`, `hostile_known`, `gun_loaded`, `weapon_low`, `can_reload`,
+  `inside`, `exposed`, `in_cover`, `crouched`. The shipped tree gates on `threat_known`, `hostile_known`, `gun_loaded`, `weapon_low`, `can_reload`,
   `under_fire`, `engaged`, `leads` and `lead_outside`; the rest feed the brain overlay and are there for new rules.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
@@ -74,7 +76,8 @@ lives in `agent_snapshot.gd`.
   `side`; the summary is the nearest one's desc), `search_rooms` (+ front entrance / approach the house while outside;
   with entries, the rooms they lead into and the entrance are left to ENTER), `explore` (unknown rooms by direction
   only, minus those an entry leads into),
-  `interactions` (deduped by label, uncapped), `rooms`. Groups are capped at `max_options_per_level`.
+  `interactions` (deduped by label, uncapped), `rooms` (uncapped). The other groups are capped at `max_options_per_level`
+  (`explore` at two).
   Options are places and things, never verbs; `tags.inside` drives the territorial filter.
 
 

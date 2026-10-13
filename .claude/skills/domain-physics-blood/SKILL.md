@@ -94,7 +94,7 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   **Blending into the puddle:** a finger lays a ribbon even over blood already there, but the ribbon is
   see-through where the floor is wet (`smear_absorb_lo..hi` on `BloodField` wetness), eases in over its first
   `smear_fade_in` px, and its opacity may only rise `smear_alpha_rise` per sample, so the streak swells out of a
-  splatter's crisp edge or a pool's soft rim with no start line (`thick_blood` now gates footprints only).
+  splatter's crisp edge or a pool's soft rim with no start line (`thick_blood` gates footprints only).
   **Pulled out of a pool:** a finger carrying >= `smear_trail_min` load within `smear_trail_reach` px of a pool calls
   `BloodPool.drag_out(pos, load x smear_trail_gain)`, which adds `BloodFlow.trail` cells (3x3, max-merged, capped at
   `pool_trail_max`, level tapering to 0 at `pool_trail_length` px (50) from the flooded cells = how far a pool can be dragged; `fill(c)` = max(flood, trail), `covers(c)`). The pool's own visuals draw the trail, so the pool's

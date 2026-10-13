@@ -28,7 +28,7 @@ const GOAL_BOTTOM := 356.0
 const ContactMarkers := preload("res://scenes/ui/hud/contact_markers.gd")
 
 var _combatants: Array = []  ## The NPCs to pick from (public nodes), handed in by Main.
-var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from the setup menu).
+var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from Main).
 var _selected: Node = null   ## The NPC whose overlays are shown, or null.
 var _selected_ctrl: Node = null ## The selected NPC's controller, cached for live marker refreshes.
 var _detail: Label           ## The clicked tactical point's detail text (hidden when none).

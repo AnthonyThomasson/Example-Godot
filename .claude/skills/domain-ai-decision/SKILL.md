@@ -57,9 +57,8 @@ fact `lead_outside`) is Von's way to decline. Its desc states the situation in t
 outside the house: hold your ground, do not chase anyone outside"). Measured with `tools/von_probe.py` (`investigate_outside_lead*`,
 `investigate_outside_leads_*`): it wins for a goal that says it, also when shots are landing near the NPC (0.54) and with three leads on offer
 (0.44, the leads split the rest), and loses to the lead for an invader's goal (0.57 to 0.69 for the lead; thin, so re-run the invader probe
-after any rewording). The plain "Hold your ground inside the house; do not chase anyone outside" lost to the lead as soon as the NPC was
-under fire (0.35), which let defenders walk out in real matches; a wording that did not name the situation made invaders hold too; and with
-no decline option Von chose the outside lead (0.66) whatever the state said. Nothing in the tree or the code knows who the NPC is; reword the desc and re-run
+after any rewording). A wording that does not name the situation ("Hold your ground inside the house; do not chase anyone outside")
+loses to the lead under fire (0.35) and makes invaders hold too, and without a decline option Von takes the outside lead (0.66) whatever the state says. Nothing in the tree or the code knows who the NPC is; reword the desc and re-run
 the probe and the Von tests (`defender_stays_in_house_von`, `defender_investigates_gunfire_inside_von`,
 `invader_investigates_gunfire_outside_von`) together. `defend_territory` still confines COMBAT only.
 A node may mix `children` and `options`. `engage` and `flank` require `gun_loaded` (an empty gun is never offered "a clear shot"); `advance`, `melee` and
@@ -72,9 +71,9 @@ mode or tactic = adding a node (+ a perception option group if it needs new plac
 **ENTER** (`enter`, a child of `search`): the doorways into rooms the NPC has not seen or not searched lately
 (`entries`, an invader's only, `entry_enabled`); the desc names the nearest ("A doorway leads into a room left to
 search (the doorway to the west — unexplored — short route)") and the question asks for "the shortest route"
-(measured: it beat "the nearest one into an unsearched or unexplored room", which let "unexplored" outweigh a
-short route). Von chooses only whether and which doorway; the stack, pie, crossing and corners are the
-behaviour's `entry` primitive (`domain-ai-behavior`), which asks Von nothing until the entry is over.
+(measured: "the nearest one into an unsearched or unexplored room" lets "unexplored" outweigh a short route). Von chooses only whether and which doorway; the stack, pie, crossing and corners are the
+behaviour's `entry` primitive (`domain-ai-behavior`), which asks Von nothing on the cadence until the entry is over
+(a forced decision — a hit, a hostile belief change — still starts, and replaces the entry or, with Von down, aborts it).
 
 **How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
 state (`criteria` in its API are classification criteria). A branch's desc therefore states the
@@ -104,7 +103,7 @@ effect; `node_overrides` is baked into the tree at `setup()` and is construction
   nothing to bind (under fire, shooter unseen) falls through to the node's unbound children (RETREAT
   / LOCATE). An empty entry node falls back to `root`; an empty root fails.
 - `signal decided(leaf)` — `{ path (ids), labels, primitive, params (node params ⊕ option params +
-  target_id + confine_inside), desc, entry }`. `signal failed()` — transport failure or nothing to
+  target_id + confine_inside) }`. `signal failed()` — transport failure or nothing to
   choose; the controller wires it to the behaviour's `fallback()`.
 - `entry_for(facts)` / `current_entry()` — the cheap check the controller uses to interrupt a walk
   in flight when the situation now calls for a different start (e.g. came under fire mid-search).
@@ -168,7 +167,7 @@ things keep that head start honest:
 **`resolved(live)` + `is_resolved()`** is the gate contract (the live/not-live answer rides the
 `resolved` signal). It fires EXACTLY once when
 the question settles, and every terminal path reaches `_resolve()` — server answered (`true`), or
-none is coming (`false`: exported build, blank `von_path`, failed spawn, `ready_timeout` elapsed).
+none is coming (`false`: exported build, blank `von_path`, failed spawn, `ready_timeout` elapsed, or a server up that cannot decide).
 `main.gd` awaits it before `_spawn_world()` so no NPC ever makes its first decision against a cold
 server; a run with no server still starts (with a warning), just with NPCs that hold steady. Main
 checks `is_resolved()` *before* awaiting, because the exported-build path resolves synchronously in

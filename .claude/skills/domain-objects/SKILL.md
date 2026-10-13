@@ -17,7 +17,7 @@ Every world object (furniture **and** walls) implements:
   see `docs/cover-and-stance.md`)
 - `take_hit(hit: HitInfo) -> void`
 
-`HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage, speed_factor,
+`HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage, speed_factor, has_exit, exit_position, exit_normal, blood,
 penetrated, source`. The projectile decides the ballistic outcome, then hands the object a
 HitInfo; the object decides what a hit *does to it* (shove + deform + debris). The projectile is
 the only striker that uses this; a melee punch shoves through the "pushable" contract below and
@@ -77,7 +77,7 @@ which asks `FloorPainter.groove(local, opts, half)` — analytic, mirroring the 
 slab grid lines, plank row seams, parquet borders + strips; butt joints and cracks aren't modelled) — and
 `FloorPainter.porous(opts)` (carpet), so blood follows the texture and soaks into carpet. A non-solid piece (a rug, mat
 or runner) registers its rect the same way as a porous surface and unregisters on exit, and draws at
-`ObjectArtConfig.rug_z_index` (-3, above floors, below blood) so a pool shows on it. It also registers its rect, `floor_material` and
+`ObjectArtConfig.rug_z_index` (-3, above floors, below blood) so a pool shows on it. A floor also registers its rect, `floor_material` and
 `art_opts.pattern` with the Audio domain's `SoundSurface` (interface 16) so footsteps sound like
 the floor (planks and parquet wood, ceramic tile, slate stone, concrete, carpet; no floor = outdoors).
 

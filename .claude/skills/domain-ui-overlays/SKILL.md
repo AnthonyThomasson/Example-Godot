@@ -9,7 +9,7 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
 
 - `overlay_registry.gd` — the ONE table of debug overlays (`ENTRIES`: `flag`, `label`, `group`, `default`;
   `defaults()`; `NAV_HOLES` (labelled "Navigation holes": furniture and characters at rest) and `PERF`, the global non-per-NPC flags, listed in `GLOBAL` / `is_global(flag)`).
-  `flag` is the overlay node's `show_<x>` property name. The setup window, the toggle bar and Main all read it, so a new overlay is one row here
+  `flag` is the overlay node's `show_<x>` property name. The toggle bar, Main, the test runner and the Testing world all read it, so a new overlay is one row here
   plus its draw script (`scenes/ai/debug/`) and a node in `ai/npc.tscn`.
 
 - `overlay_toggles.gd` — the **in-game overlay toggle bar** (`OverlayToggles` CanvasLayer, built by

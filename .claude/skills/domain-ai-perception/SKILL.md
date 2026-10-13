@@ -7,7 +7,7 @@ description: Deep implementation detail for the AI PERCEPTION sub-domain (scenes
 
 The SENSE half of the NPC brain: it turns the world into what the NPC *knows*, and turns that into the
 snapshot the decision planner walks. It holds no policy — it never decides, picks or gates by goal. It
-owns five internal modules and presents one public face, `agent_perception.gd` (a `Node`).
+owns six internal modules and presents one public face, `agent_perception.gd` (a `Node`).
 
 Files:
 - `agent_perception.gd` — the public face: SEE (observe), the contacts view, event intake, and the
@@ -35,7 +35,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   for a character that stays in the view cone: the range/cone test runs every frame, so one that enters the cone is tested at once
   and one that leaves it is dropped at once, and what the NPC holds of a character it sees is at most 3 frames old;
   `tests/ai/sight_follows_a_moving_target_test.gd`) carrying `pos`, a smoothed velocity track (`vel`; `track_smoothing` is the share taken per physics frame, so a sighting several frames after the last takes the share they add up to),
-  `facing`, a visible wound band, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
+  `facing`, the visible wound damage (`wound_dmg`, banded by the snapshot), `reloading`, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
   remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
   before testing sight, and reads each known set once per pass). That look runs every `LEARN_EVERY_FRAMES` (6) physics frames,
   offset per NPC by instance id so a squad does not look on the same frame, and again at the start of every `sense()`, so what
@@ -65,6 +65,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   stack rules `entry_free_slot(team, self_id, current)`, `entry_stack_side(geometry, team, self_pos)` and
   `entry_slot_point(geometry, side, slot)` (wrappers on `AgentEntry`'s statics, which the snapshot's `entries` group also uses; the
   behaviour never reaches into `agent_entry.gd` itself) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
+- `all_seen_characters()` (every character seen, allies included), `debug_memory()` (the event log for the brain overlay and
+  gcmd) and `fill_goal(goal, character)` (the goal with `{gun}` filled in).
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).

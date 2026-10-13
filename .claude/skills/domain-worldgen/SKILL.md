@@ -26,8 +26,8 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
   through it, keeps opening clearances free of furniture, and mirrors the plan L/R 50% of the time.
   Openings are plain archways — there are no physical door objects. Exactly one opening is `front`
   (the house is positioned by it, always on the south wall); a plan may add `"exit": true` openings
-  (an exterior back/side/garage door on exactly one room's wall). Houses have an exit; the flats keep
-  only the front door. `get_openings` reports `{ pos, width, front, exit, rooms }`.
+  (an exterior back/side/garage door on exactly one room's wall). The houses have an exit; the flats and the
+  office loft keep only the front door. `get_openings` reports `{ pos, width, front, exit, rooms }`.
 - **Layout rules** (`layout_rules.gd`, `LayoutRules`): the tunable table of what makes a plan logical.
   `ROOMS[type]` = `front` (may carry the front door: studio, living room, great room, entry hall,
   hallway — never a bedroom, bathroom, dining room …), `exit`, `through` (may be the only route between
@@ -38,7 +38,8 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
   violation; `HouseSpawner._validate` warns with them and `tests/worldgen/house_doorways_connected_test.gd`
   fails on any plan (`layout_rules_test.gd` pins the validator itself against illogical layouts). A new room type needs its `ROOMS`/`LINKS` entries before a plan can use it. Bedrooms
   and bathrooms open off a **hallway** (type `hallway`, ≥120 px deep: `family_home`, `luxury_home`) or a
-  living space, never off each other.
+  living space; the one bedroom-to-bathroom door is a private en-suite (`LayoutRules.LINKS` allows it, for a
+  kids' room too).
 - **Catalogues** (`worldgen/categories/*.gd`, one `<Name>Catalog` per room type; `general.gd`
   holds shared entries + the `WOOD`/`FABRIC` palettes + the `FLOORS` and the house `WALL` style +
   combined recipes). Hold `OBJECTS`,

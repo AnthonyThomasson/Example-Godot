@@ -25,7 +25,7 @@ through). Handling every shape (not just the primitives) is what keeps a dented 
 vanishing on a re-bake. A body's footprint is the **convex hull** of all its collider shapes: a dent's
 notches are far smaller than the agent, and baked in they leave sub-pixel navmesh edges the
 NavigationServer cannot merge ("navigation map synchronization error"). Overlapping footprints are
-then fused (`_union_outlines`, which skips the polygon merge for two outlines whose bounding boxes are apart: the union would keep them as two; `tests/navigation/furniture_union_fast_path_test.gd` pins it to the every-pair merge, and it was most of a re-bake's cost) and every outline is snapped to the 1 px grid with repeated points dropped (`_on_grid`). The bake runs in the
+then fused (`_union_outlines`, which skips the polygon merge for two outlines whose bounding boxes are apart: the union would keep them as two; `tests/navigation/furniture_union_fast_path_test.gd` pins it to the every-pair merge) and every outline is snapped to the 1 px grid with repeated points dropped (`_on_grid`). The bake runs in the
 house's local frame and the region is offset by `house.position`, so the map lands in world space.
 `main.gd` calls it once after `WorldGen.generate`. `build` and every re-bake share one private
 `_bake_polygon` helper, so both carve furniture holes identically.
@@ -86,8 +86,8 @@ the agent's RVO avoidance.
 `nav_debug.gd` is an optional, draw-only overlay (a single world-space `Node2D`, since the map is
 global — not per-NPC) that draws the furniture HOLES carved out of the navmesh as filled polygons +
 outlines. `main.gd` builds it once right after the bake: `nav_debug.setup(house)` snapshots the holes
-via `NavBuilder.furniture_holes(house)`, and `show_holes` toggles it (wired from the setup window's
-"Navigation holes" checkbox / toggle-bar button, whose starting state is `main.gd`'s `show_nav_holes` export — off).
+via `NavBuilder.furniture_holes(house)`, and `show_holes` toggles it (wired from the toggle bar's
+"Navigation holes" button; it starts from `main.gd`'s `show_nav_holes` export — off — unless a saved toggle in `Settings.overlays` overrides it).
 `furniture_holes(house) -> Array` returns each solid piece's grown footprint as a closed WORLD-space
 polygon, using the exact same selection and footprint helpers the bake feeds the obstruction baker
 (`_add_furniture_holes` calls it), so the overlay cannot drift from what was carved. `nav_updater.gd`

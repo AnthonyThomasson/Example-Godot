@@ -7,7 +7,7 @@ description: Overview of the UI domain (scenes/ui/) — all HUDs and menus, spli
 
 `CanvasLayer` / `Node` widgets, all built entirely in code (no scene-side layout), all decoupled observers
 that read only published contracts — Character public API/signals, the AI controller's
-`debug_status()` / `current_act()` and `goal_text()`, and the EventBus `&"hit"` topic. They know nothing of
+`goal_text()`, `debug_zones()` and `known_contacts_for_display()`, and the EventBus `&"hit"` topic. They know nothing of
 the domains.
 
 ## Sub-domains (one folder, one skill each)

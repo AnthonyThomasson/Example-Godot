@@ -47,7 +47,7 @@ bulletproof though a rifle shoots through them.
 is empty or reloading, and `Combat.shoot()` on an empty gun is a dry click that does not note engagement or call `shoot()`; it spends
 `fire_cooldown` and emits `dry` (the behaviour flags the task resolved), so the NPC re-decides (the snapshot now says the gun is empty) at most once per
 cooldown. `auto_reload` (controller export, default on) is `Combat.reload_if_dry`, a reflex in `hold` (the server-down fallback, and after a
-reload) and in the cover phase of peek-and-cover: an EMPTY gun with a spare magazine is reloaded without a decision. A reload
+reload), in the cover phase of peek-and-cover and from the watch stage whenever a threat is in view outside a crossing (W3): an EMPTY gun with a spare magazine is reloaded without a decision. A reload
 runs only while standing (running cancels it, so the `reload` primitive never sets `run_input`). `debug_state()` / `debug_combat()`
 carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/scripted_reload_decision_test.gd`,
 `dry_pistol_fallback_test.gd`, `empty_pistol_no_spares_test.gd`.

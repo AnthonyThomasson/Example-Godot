@@ -42,6 +42,7 @@ func _ready() -> void:
 	get_tree().quit()
 
 
+## Gather every .gd under `dir` (recursively) into `out`.
 func _collect(dir: String, out: Array) -> void:
 	for f in DirAccess.get_files_at(dir):
 		var path := dir.path_join(f)
@@ -52,6 +53,7 @@ func _collect(dir: String, out: Array) -> void:
 			_collect(dir.path_join(d), out)
 
 
+## Load `path` so the analyzer reports its warnings once, and probe its integer divisions.
 func _probe_divisions(path: String) -> void:
 	ResourceLoader.load(path)  # compiles (and caches) what the script depends on, so its warnings are not repeated
 	print("LINT-PASS2")
@@ -82,6 +84,7 @@ func _probe_divisions(path: String) -> void:
 	print("LINT-DONE")
 
 
+## Compile `lines` as a throwaway script named `label`, so its analyzer warnings are logged.
 func _compile(lines: PackedStringArray, label: String) -> void:
 	var script := GDScript.new()
 	script.source_code = "\n".join(lines)

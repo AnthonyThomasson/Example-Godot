@@ -22,7 +22,7 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
 1. **Fly over** — the bullet's `height` is at or above `clamp(100 − (100 − C) × cover_flyover_scale, 0, 100)`; no damage, excluded, flies on.
    **Coverage is a height (0–100) and a bullet flies at one height for its whole flight**: `height` is drawn uniformly 0–100 when it is fired
    (`BallisticsConfig.bullet_height` pins it for tests; negative = random) and kept through ricochets and penetrations. It strikes every collider
-   whose coverage is above it and clears the rest, so a collider of coverage C is cleared with chance (100 − C)/100 (the old rate) but the same
+   whose coverage is above it and clears the rest, so a collider of coverage C is cleared with chance (100 − C)/100 but the same
    height serves everything along the path: behind cover of 50, a body of 60 is struck only by the shots between 50 and 60 (or those that punch
    through the cover), and a body of 35 (a crouch) by none that cleared it. A character's coverage is its posture's. Spec: `docs/cover-and-stance.md`.
    Tests: `tests/projectile/cover_shared_bullet_height_test.gd`, `posture_hit_chance_test.gd`.
@@ -35,7 +35,7 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
 **Two kinds of penetration.** `P` is a property of the *target's surface* (flesh 15, a wardrobe 55, a wall 100); `p` is the *bullet's* power, set
 per gun by `ProjectileSpawner.spawn(..., muzzle_speed, penetration)` from `GunConfig` (pistol 1.0, SMG 0.8, rifle 2.2). A higher `p` loses less speed to
 the same surface and needs less speed to get through, so a pistol round (3200 px/s) dies in a wall (it leaves at ~320 px/s) while a rifle round
-(4400 px/s, `p` 2.2) leaves it at ~55% speed and can wound someone behind it, with its damage scaled down by the speed it has left. `muzzle_speed` also sets
+(4400 px/s, `p` 2.2) leaves it at ~59% speed and can wound someone behind it, with its damage scaled down by the speed it has left. `muzzle_speed` also sets
 `v`'s reference, so the pistol (3200 = `BallisticsConfig.projectile_speed`) is unchanged. Tests: `tests/projectile/gun_penetration_test.gd`,
 `gun_damage_test.gd`.
 
