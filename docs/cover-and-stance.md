@@ -85,7 +85,7 @@ Tests: `posture_stands_to_run`, `posture_crouches_in_fight`.
 
 **A3. What Von is told.** Von's state mentions a posture only when someone is not standing: the NPC's own
 ("You are crouching.") and a contact it can see ("crouched low"). A standing body adds nothing, so the
-existing wording is unchanged. The fact `crouched` is available to the decision tree.
+existing wording is unchanged.
 Tests: `posture_in_von_state`.
 
 ## Not modelled
