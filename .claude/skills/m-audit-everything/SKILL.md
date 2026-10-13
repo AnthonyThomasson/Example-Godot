@@ -59,7 +59,7 @@ sub-domain (`ai/*`, `physics/blood/`, `character/body/`, `ui/*`, `perception/sna
 the top-level ones.
 
 `tools/audit_scan.py` holds the mechanical detectors used below (`deps`, `dead`, `signals`,
-`facts`; `all` runs them together). It reads files only — no Godot needed.
+`facts`, `events`; `all` runs them together). It reads files only — no Godot needed.
 
 ## Step 1 — Dead code
 
@@ -72,7 +72,9 @@ python3 -I tools/audit_scan.py dead
 ```
 
 Lists functions with no reference anywhere and `const` / `var` / `signal` / `enum` declarations
-nothing reads. A reference is any non-comment token in `scenes/ tests/ tools/ addons/` or a `.tscn`,
+nothing reads, then the scene symbols only `tests/` or `tools/` reference (a test seam or a leftover) and the
+test and tool declarations nothing references. It matches by token, so a same-named member of another class
+hides a dead one; grep the qualified name when a hit looks wrong. A reference is any non-comment token in `scenes/ tests/ tools/ addons/` or a `.tscn`,
 so a handler connected by bare name (`.connect(_on_x)`) counts as used.
 
 Also worth a look: scripts no scene or `preload` references, and `.gd` files with a missing or
@@ -118,6 +120,7 @@ so only end-to-end tracing catches it:
 ```bash
 python3 -I tools/audit_scan.py signals   # emit sites vs. listeners for every signal
 python3 -I tools/audit_scan.py facts     # decision-snapshot facts no tree node gates on
+python3 -I tools/audit_scan.py events    # each EventBus topic's listeners and payload keys with their readers
 ```
 
 `signals` flags a signal with no listener (`test_context._never` is a deliberate never-emitted
@@ -178,7 +181,8 @@ python3 -I tools/audit_scan.py deps
 
 It prints every `unit -> unit` edge with the symbols crossing it, counting class names used in code
 (comments and string literals are ignored; `scenes/ai/<sub>/` counts as its own unit; `scenes/main.gd`
-is the composition root and is *allowed* to know every domain, so it is skipped). Then check:
+is the composition root and is *allowed* to know every domain, so it is skipped), then the same matrix for
+`preload` / `load` paths and scene `ext_resource` paths, which `class_name` counting cannot see. Then check:
 
 1. **Every edge is published.** Each row must correspond to a vital interface or the dependency graph
    in the `architecture` skill. An edge that isn't is the smell; fix by rerouting through the existing
