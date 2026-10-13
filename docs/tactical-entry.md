@@ -1,11 +1,11 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9 and E11 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. Behaviours E11 to E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
+E10 (the clear-time benchmark) is met and its test is green. Behaviours E12 to E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
 sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
 `tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
 (`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
@@ -150,14 +150,18 @@ at most, the 5 to 6 second training target for an average room. Why: speed is th
 that lingers in a half-cleared room is a team in the open.
 Test: `entry_clear_within_benchmark` (a pair, the furnished kitchen; real Von, `requires_von`).
 
-### Open gaps (E11 to E15, tests tagged `gap`)
-
 **E11. Reload at the stack, never in the funnel.** An entrant crosses with a topped-off gun: a magazine part spent is
 swapped for a full one while it is stacked, the one lull before the crossing, and never in the threshold or the room
 just taken. Why: doctrine starts an entry with a full magazine, and a reload in the fatal funnel is a stopped, unarmed
-body in the one place it must not stop (E4).
+body in the one place it must not stop (E4). In the code, a stack member short of a full magazine with a spare to swap in
+(`Combat.top_off`, a tactical reload) stands still and reloads from `stack`, before the point starts the pie or a follower
+crosses, and again after the pie before the point crosses (a pie that fired); it waits for the reload to end. Not while a
+hostile holds its eyes (it fires instead, E14), and not for more than `TOP_OFF_CAP` (8 s) in one entry. Nothing reloads in
+`cross`. A gun that is already full costs no time.
 Test: `entry_reloads_before_crossing` (7 of 12 rounds, above the band Von calls low, so only the entry has a reason to
-reload).
+reload; real Von, `requires_von`).
+
+### Open gaps (E12 to E15, tests tagged `gap`)
 
 **E12. The last man covers the rear of the stack.** While the stack waits at the door, the last slot faces back the way
 the team came and holds the approach; the point and the second face the door. Why: the stack's rear is its blind side

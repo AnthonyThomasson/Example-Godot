@@ -50,6 +50,8 @@ const WAYPOINT_REACH := 20.0
 const CROSS_CAP := 6.0
 ## Gaze (rad) within which the look through the door has settled at a pie step.
 const GAZE_SETTLED := 0.12
+## Most seconds one entry spends topping its gun off before the crossing (a reload that will not start is not waited on forever).
+const TOP_OFF_CAP := 8.0
 
 var ready_timeout: float = 6.0     ## Seconds the point waits for the stack, once ready, before going in without it.
 var follow_gap: float = 0.3        ## Seconds a follower leaves after the member ahead of it is through.
@@ -102,19 +104,22 @@ var _cover_spot := Vector2.INF     ## Where this NPC stands to cover its doorway
 var _cover_aim := Vector2.INF      ## A point through that doorway, in the room beyond: where its gun points.
 var _holders := {}                 ## Allies seen holding the cleared room (cover / rear): instance id -> true.
 var _eyes: RefCounted              ## The watch module: where a walking entrant looks (`Watch.travel_point`).
+var _combat: RefCounted            ## The combat module: the tactical reload at the stack (`Combat.top_off`).
+var _top_off_spent := 0.0          ## Seconds this entry has spent topping its gun off.
 ## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
 ## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
 ## for a gaze the hostile will not let go of.
 var gaze_held := false
 
 
-## Capture the locomotion, the perception, the room coverage and the watch module (where a walker looks). Called once by
-## `Behavior.setup()`.
-func setup(loco: Node, perception: Node, coverage: RefCounted, eyes: RefCounted) -> void:
+## Capture the locomotion, the perception, the room coverage, the watch module (where a walker looks) and the combat module
+## (the tactical reload). Called once by `Behavior.setup()`.
+func setup(loco: Node, perception: Node, coverage: RefCounted, eyes: RefCounted, combat: RefCounted) -> void:
 	_loco = loco
 	_perception = perception
 	_coverage = coverage
 	_eyes = eyes
+	_combat = combat
 
 
 ## Start an entry from an ENTER leaf's params (`opening`, `into`, `slot`). False when the doorway is unknown
@@ -177,6 +182,7 @@ func reset() -> void:
 	_cover_spot = Vector2.INF
 	_cover_aim = Vector2.INF
 	_holders = {}
+	_top_off_spent = 0.0
 
 
 ## Give the entry up (the NPC chose something else, e.g. a fight): radio `abort` so the stack stops counting on it.
@@ -370,6 +376,8 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 	else:
 		character.move_input = Vector2.ZERO
 	_look_toward(character, _geo["pos"], delta)
+	if _topping_off(character, delta):
+		return
 	var ahead := _ahead(team)
 	if ahead.is_empty():
 		_start_pie(character, team)
@@ -379,6 +387,20 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 			_turn_at = _time
 		if _time - _turn_at >= follow_gap:
 			_start_cross(character, team)
+
+
+## The tactical reload (E11): the stack is the one lull before the crossing, so a gun short of full is swapped for a full
+## magazine here, standing still, and never in the threshold or the room just taken. True while that is under way: the
+## caller does not move on armed with a part-spent gun. Not with a hostile holding the entrant's eyes (it fires, and an empty
+## gun is the watch stage's reload) and not for longer than `TOP_OFF_CAP` s.
+func _topping_off(character, delta: float) -> bool:
+	if gaze_held or _top_off_spent >= TOP_OFF_CAP:
+		return false
+	if not _combat.top_off(character):
+		return false
+	character.move_input = Vector2.ZERO
+	_top_off_spent += delta
+	return true
 
 
 ## The members of the stack still ahead of this one (lower slots), lowest first. One that never reached its slot is

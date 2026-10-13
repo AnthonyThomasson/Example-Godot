@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E11): an entrant crosses with a topped-off gun. Its magazine is part spent (7 of 12, above the band Von
+## E11: an entrant crosses with a topped-off gun. Its magazine is part spent (7 of 12, above the band Von
 ## calls low, so nothing but the entry itself has a reason to reload): the swap happens while it is stacked, the one
 ## lull, and never in the threshold. Real Von: the invader stands in the back garden and decides for itself how to get
 ## into the kitchen.
@@ -13,7 +13,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry reloads at the stack, never in the funnel",
 		"description": "An invader with a part-spent magazine tops it off while stacked at the back door and crosses with a full gun.",
-		"tags": ["ai", "entry", "gap", "von"],
+		"tags": ["ai", "entry", "von"],
 		"requires_von": true,
 		"timeout": 80.0,
 	}

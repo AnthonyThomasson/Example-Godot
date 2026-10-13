@@ -145,7 +145,7 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_watch = Watch.new()
 	_watch.setup(_loco, perception)
 	_entry = Entry.new()
-	_entry.setup(_loco, perception, _coverage, _watch)
+	_entry.setup(_loco, perception, _coverage, _watch, _combat)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own

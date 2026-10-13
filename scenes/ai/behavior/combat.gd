@@ -224,6 +224,22 @@ func reload_if_dry(character) -> void:
 	character.reload()
 
 
+## A tactical reload (docs/tactical-entry.md E11): swap a part-spent magazine for a full one in a lull, the way a stack tops its
+## gun off before it crosses. Starts the reload when the held gun is short of full with a magazine to add; true while it is
+## under way or wanted, so a caller that must not move on armed waits for false. The caller stands still (a run cancels it).
+func top_off(character) -> bool:
+	var gun: int = character.gun_slot()
+	if gun < 0:
+		return false
+	if character.is_reloading():
+		return true
+	if character.ammo(gun) >= character.ammo_capacity(gun) or not character.can_reload(gun):
+		return false
+	character.select_slot(gun)
+	character.reload()
+	return true
+
+
 ## Whether the reload reflex is due: `auto_reload` is on and the gun is empty with a spare magazine to put in it. (A reload runs
 ## only while standing, so a run is dropped for it.)
 func reload_due(character) -> bool:

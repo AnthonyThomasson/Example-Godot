@@ -73,8 +73,8 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E9) and `tests/ai/entry/`; the spec's E11 to E15 are open gaps
-(reload at the stack, the last man facing the rear, short rooms, no crossing on a hostile in view,
+The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11) and `tests/ai/entry/`; the spec's E12 to E15 are open gaps
+(the last man facing the rear, short rooms, no crossing on a hostile in view,
 doorways passed in a corridor; E10, the clear-time benchmark, is met), specified with red `gap` tests and not implemented here. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
@@ -98,6 +98,11 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   held radios `done`. Alone, it turns its gaze through each doorway on in turn, `entry_watch_dwell` once settled, then is
   done. The heartbeat repeats the latest call whole, so `covering` and `cleared_room` stay on the radio.
 
+- **Top off at the stack (E11).** A member short of a full magazine with a spare swaps it in while `stack`ed, the one lull:
+  `_topping_off` (entry.gd) calls `Combat.top_off` (a tactical reload: `select_slot(gun_slot())`, `reload()`) from `_tick_stack`
+  before the point starts the pie or a follower crosses, and from `_tick_pie` before the point crosses (a pie that fired),
+  standing still and waiting for the reload to end. Skipped while a hostile holds the entrant's eyes (`gaze_held`: it fires) and
+  past `TOP_OFF_CAP` (8 s) per entry; never in `cross` (the watch stage's empty-gun reflex is off while committed too).
 - **Barrier and order.** The point crosses when every other claimant has radioed past `claim`, or `entry_ready_timeout`
   after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
   it radioed `in`. A member still at `claim` once the one behind has waited the timeout is dropped from the order.
