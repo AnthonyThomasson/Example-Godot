@@ -115,7 +115,7 @@ func setup(loco: Node, perception: Node, coverage: RefCounted, eyes: RefCounted)
 	_eyes = eyes
 
 
-## Start an entry from an ENTER leaf's params (`opening`, `into`, `slot`, `side`). False when the doorway is unknown
+## Start an entry from an ENTER leaf's params (`opening`, `into`, `slot`). False when the doorway is unknown
 ## (the leaf is then dropped and the NPC re-decides).
 func begin(character, params: Dictionary) -> bool:
 	reset()

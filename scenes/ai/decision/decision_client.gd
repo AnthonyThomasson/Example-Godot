@@ -42,11 +42,6 @@ func set_npc_name(npc_name: String) -> void:
 	_npc_name = npc_name
 
 
-## Whether a request is in flight.
-func is_pending() -> bool:
-	return _pending
-
-
 ## POST `state_text` with one `choice` question: `instructions` over `options` (id → description).
 ## Returns whether the request started; on failure to start it also emits `failed()`.
 func ask(state_text: String, instructions: String, options: Dictionary) -> bool:

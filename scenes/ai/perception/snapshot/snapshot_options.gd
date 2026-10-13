@@ -376,7 +376,7 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 		var slot := AgentEntry.free_slot(team, ctx["self_id"])
 		var side := AgentEntry.stack_side(g, team, self_pos)
 		var point := AgentEntry.slot_point(g, side, slot)
-		picks.append({ "e": e, "status": status, "point": point, "slot": slot, "side": side, "len": _route_len(ctx, point) })
+		picks.append({ "e": e, "status": status, "point": point, "slot": slot, "len": _route_len(ctx, point) })
 	picks.sort_custom(func(x, y): return x["len"] < y["len"])
 	var options: Array = []
 	for p in picks.slice(0, _v.max_options_per_level):
@@ -386,7 +386,7 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 			else "the doorway to the %s" % _v.compass((e["pos"] as Vector2) - self_pos)
 		options.append({ "id": e["id"], "label": place,
 			"desc": "%s — %s — %s route" % [place, p["status"], _v.route_band(p["len"])],
-			"params": { "opening": e["id"], "into": e["into"], "point": p["point"], "slot": p["slot"], "side": p["side"] },
+			"params": { "opening": e["id"], "into": e["into"], "point": p["point"], "slot": p["slot"] },
 			"tags": { "inside": not here.is_empty() } })
 	return { "summary": options[0]["desc"] if not options.is_empty() else "", "options": options }
 
@@ -476,11 +476,11 @@ func room_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary
 
 
 ## `tags` plus the spot's geometry, kept for the routes debug overlay (`clear_shot`, `route_exposed`,
-## `cover`, `route_len`, `exposed_to`, and the flank `ally_lane` / `held_by` / `crosses` names). Planner
+## `cover`, and the flank `ally_lane` / `held_by` / `crosses` names). Planner
 ## filters read only the boolean tags (`inside` / `hidden`, and on a flank side `held` / `crosses` /
 ## `no_shot` / `heading` / `lane`), so the extra keys are inert to decisions.
 func _geo_tags(s: Dictionary, tags: Dictionary) -> Dictionary:
-	for key in ["clear_shot", "route_exposed", "cover", "route_len", "exposed_to", "ally_lane", "held_by"]:
+	for key in ["clear_shot", "route_exposed", "cover", "ally_lane", "held_by"]:
 		if s.has(key):
 			tags[key] = s[key]
 	if s.has("crosses"):

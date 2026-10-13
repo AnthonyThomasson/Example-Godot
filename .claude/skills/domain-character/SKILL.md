@@ -78,7 +78,7 @@ holds: `tests/character/long_gun_hold_test.gd`.
 A character is **standing or crouching** (`_posture`, a `CharacterConfig.postures` key: `stand` / `crouch`). Spec and
 numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* is held; the body is a *posture*.)
 - **API** (interface 7): `set_posture(p) -> bool` (idempotent, so a controller may write it every frame; refused while dead, in an interaction or
-  within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`, `is_crouching()`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
+  within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
 - **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6); running (`_update_stamina`) needs `_posture == stand`, so a
   refused run costs no stamina; shooting, reloading and `melee()` work in every posture; `get_surface().coverage` is the
   posture's row (60 / 35: a bullet strikes what stands above its one height, see the Projectile skill); starting an interaction stands the

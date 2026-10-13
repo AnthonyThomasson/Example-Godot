@@ -17,8 +17,6 @@ var retaliate: bool = true
 var ttl: float = 0.0
 ## This NPC's own faction (read from its character).
 var faction: StringName = &""
-## Further factions this NPC treats as allies.
-var allies: Array[StringName] = []
 
 
 ## Classify one sighting (`{ id, faction, inside, … }` from the perception) and remember a hostility
@@ -47,7 +45,7 @@ func on_attacked(attacker: Node, memory: RefCounted) -> void:
 
 ## Whether `f` is this NPC's faction or one of its allies.
 func is_ally(f: StringName) -> bool:
-	return f != &"" and (f == faction or allies.has(f))
+	return f != &"" and f == faction
 
 
 ## Whether character `id` is currently remembered as hostile.

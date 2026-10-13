@@ -113,7 +113,6 @@ static var prop_colors: Dictionary = {
 	"coffee": Color(0.32, 0.2, 0.12),
 	"wood_light": Color(0.82, 0.66, 0.44),
 	"leaf": Color(0.3, 0.58, 0.3),
-	"shade": Color(0.96, 0.92, 0.78),
 	"accent": Color(0.9, 0.75, 0.2),
 	"books": [Color(0.62, 0.18, 0.16), Color(0.18, 0.32, 0.55), Color(0.2, 0.45, 0.28), Color(0.78, 0.62, 0.25),
 			Color(0.45, 0.25, 0.45), Color(0.25, 0.25, 0.28), Color(0.85, 0.82, 0.74), Color(0.7, 0.38, 0.2)],

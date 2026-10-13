@@ -22,6 +22,6 @@ static func create(type_id: StringName, loaded := -1) -> Magazine:
 	mag.type = type_id
 	mag.display_name = row.get("name", "Magazine")
 	mag.gun = row.get("gun", &"pistol")
-	mag.capacity = int(row.get("capacity", 0))
+	mag.capacity = MagazineConfig.capacity_of(type_id)
 	mag.rounds = mag.capacity if loaded < 0 else mini(loaded, mag.capacity)
 	return mag

@@ -46,9 +46,7 @@ func run(t: TestContext) -> void:
 			t.check(heard[0]["position"].distance_to(man.global_position) < 80.0, "it came from where the %s stood" % pair[1])
 	var event: Dictionary = t.events_of(&"shot", func(d): return d["gun"] == &"rifle")[0]
 	t.expect_eq(event["attacker"], t.actor(&"rifle_man"), "the shot event names the shooter")
-	t.check(event["automatic"], "and says the rifle is automatic")
 	t.check(event["power"] > 2.0, "and how hard-hitting its round is (%.1f)" % event["power"])
-	t.check(not t.events_of(&"shot", func(d): return d["gun"] == &"pistol")[0]["automatic"], "while the pistol is not")
 	t.check(not t.happened(&"shot", func(d): return d["attacker"] == t.actor(&"empty_man")), "the empty gun posted no shot event")
 
 	# A held trigger: every round sounds.

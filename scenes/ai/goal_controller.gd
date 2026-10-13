@@ -167,8 +167,6 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export_group("Memory")
 ## Hard cap on remembered events (oldest expirable evicted past it); <= 0 = unlimited.
 @export var memory_capacity: int = 128
-## Fallback lifetime (s) for remembered events given no explicit ttl; <= 0 = no age expiry.
-@export var memory_default_ttl: float = 0.0
 ## Seconds a lost hostile's last sighting stays an investigation lead.
 @export var lead_memory_ttl: float = 20.0
 ## Seconds a visited room counts as recently searched.
@@ -261,8 +259,6 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var hostile_on_attack: bool = true
 ## Lifetime (s) of a hostility verdict; <= 0 = permanent (a grudge never fades).
 @export var hostility_ttl: float = 0.0
-## Factions treated as allies besides the NPC's own (its character's `faction`); never hostile.
-@export var allied_factions: Array[StringName] = []
 
 @export_group("")
 ## How close (px) counts as "arrived" when steering straight-line (no nav agent).
@@ -362,9 +358,7 @@ func _apply_config() -> void:
 	_perception.hostile_on_trespass = hostile_on_trespass
 	_perception.hostile_on_attack = hostile_on_attack
 	_perception.hostility_ttl = hostility_ttl
-	_perception.allied_factions = allied_factions
 	_perception.memory_capacity = memory_capacity
-	_perception.memory_default_ttl = memory_default_ttl
 	_perception.lead_memory_ttl = lead_memory_ttl
 	_perception.search_memory_ttl = search_memory_ttl
 	_perception.hit_awareness_radius = hit_awareness_radius
@@ -528,7 +522,8 @@ func debug_room_zones() -> Array:
 
 ## Read-only: the running tactical entry — the doorway (`opening`, `into`), the NPC's stack `slot` and `side`,
 ## whether it is going `solo`, its `phase`, what the pie saw (`seen_fraction`, `pie_sides`, `hidden_corners`), its
-## `corner` and `stack_point`. Empty when the NPC isn't entering a room.
+## `corner` and `stack_point`, as the behaviour reports it (typed values; `debug_state()["entry"]` is the JSON-safe
+## copy). Empty when the NPC isn't entering a room.
 func debug_entry() -> Dictionary:
 	return _behavior.debug_entry() if _behavior != null else {}
 
@@ -684,7 +679,7 @@ func _force_now(reason: String) -> void:
 func _should_decide() -> bool:
 	if _behavior.committed():
 		return false
-	if not _force and not _behavior.wants_decision(_character, _decide_timer <= 0.0):
+	if not _force and not _behavior.wants_decision(_decide_timer <= 0.0):
 		return false
 	return Budget.claim()
 

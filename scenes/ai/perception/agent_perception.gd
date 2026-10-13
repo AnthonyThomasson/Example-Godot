@@ -62,10 +62,8 @@ var hostile_on_sight: bool = false
 var hostile_on_trespass: bool = false
 var hostile_on_attack: bool = true
 var hostility_ttl: float = 0.0
-var allied_factions: Array[StringName] = []
 # Memory (the event log) and how long each kind of knowledge lasts.
 var memory_capacity: int = 128
-var memory_default_ttl: float = 0.0
 var lead_memory_ttl: float = 20.0
 var search_memory_ttl: float = 60.0
 # Combat awareness (how hits and gunfire are remembered — see process_hit()).
@@ -161,9 +159,7 @@ func apply_config() -> void:
 	_hostility.trespass = hostile_on_trespass
 	_hostility.retaliate = hostile_on_attack
 	_hostility.ttl = hostility_ttl
-	_hostility.allies = allied_factions
 	_memory.capacity = memory_capacity
-	_memory.default_ttl = memory_default_ttl
 	_tactics.cover_min = cover_min
 	_tactics.flank_distance = flank_distance
 	_tactics.flank_arc = flank_arc
@@ -676,7 +672,7 @@ func _other_characters(character) -> Array:
 		tree.node_removed.connect(_on_tree_node_changed)
 	if _characters_stale or _characters_root != root:
 		_characters.clear()
-		_collect_characters(root, null, _characters)
+		_collect_characters(root, _characters)
 		_characters_root = root
 		_characters_stale = false
 	var out: Array = []
@@ -692,12 +688,12 @@ func _on_tree_node_changed(node: Node) -> void:
 		_characters_stale = true
 
 
-## Recursively gather descendants that expose current_item() (characters), excluding `self_char`.
-func _collect_characters(node: Node, self_char, out: Array) -> void:
+## Recursively gather descendants that expose current_item() (characters).
+func _collect_characters(node: Node, out: Array) -> void:
 	for child in node.get_children():
-		if child != self_char and child.has_method("current_item"):
+		if child.has_method("current_item"):
 			out.append(child)
-		_collect_characters(child, self_char, out)
+		_collect_characters(child, out)
 
 
 # --- Combat geometry for the behaviour -------------------------------------------------------

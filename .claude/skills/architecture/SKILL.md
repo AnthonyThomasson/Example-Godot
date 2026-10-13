@@ -187,7 +187,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
    dying), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing), `posture()` / `is_crouching()`, `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
+   damage, for injury sensing), `posture()`, `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `current_item()` / `current_slot()` / `item_reach()` / `has_item(id)` (the held item, its slot and reach, and whether a slot is carried — what the AI's wording, the debug panel and `requires_item` interactions read), `is_attacking()` (a punch swing is under way), `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
    `is_automatic()`, `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` (carry only those slots, holding one, with those spare
@@ -261,13 +261,12 @@ interface(s) and describes how they're implemented; this list is authoritative f
       me") and gunfire heard farther off; the match HUD for its combat feed. It also says *how* the
       hit met the surface, for the Audio domain: `outcome` (`&"blocked"` / `&"penetrate"` /
       `&"ricochet"` for a bullet, `&"punch"` for a fist), `material` (the struck surface's, `""` for a
-      wall), and for bullets `normal`, `speed_factor`, `gun` and `power` (its penetration power). A shot
+      wall), and for bullets `speed_factor` and `power` (its penetration power). A shot
       that flies over cover posts nothing.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
-      muzzle)`, gun, attacker, automatic, damage, power }`).
+      muzzle)`, gun, attacker, power }`).
     - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
       foot` (0 left / 1 right)`, speed, running }`).
-    - `&"casing"`: a spent casing posts one when its toss ends (`{ position, gun, power }`). Nothing consumes it.
     - `&"reload"`: `Character` posts one when a reload starts (`stage = &"start"`) and one when it finishes
       (`&"done"`, never after a cancelled one): `{ position` (weapon hand)`, gun, stage, power, character }`.
     - `&"sound"`: the Audio domain's `Sound` service posts one for every sound it accepts (`{ kind,

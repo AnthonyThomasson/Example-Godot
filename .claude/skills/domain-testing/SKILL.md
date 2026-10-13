@@ -414,7 +414,6 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `physics.smear` | `BloodConfig.smear_enabled`. |
 | `physics.debris` | `PhysicsConfig.debris_enabled`. |
 | `physics.hit_particles` | `PhysicsConfig.hit_particles_enabled`. |
-| `physics.wall_collider_deform` | `PhysicsConfig.deform_update_collider`. |
 | `projectile.flyover` | `BallisticsConfig.cover_flyover_scale`, 0 when off. A test that needs a chosen outcome instead pins `BallisticsConfig.bullet_height` (0–100) with `set_static`. |
 
 To add a switch, add a row. When the behaviour has no knob yet, add a master `static var` to that

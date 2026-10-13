@@ -195,13 +195,12 @@ func secondary(user) -> bool:
 		direction = direction.rotated(randf_range(-spread, spread))
 	var power := round_power()
 	var proj := ProjectileSpawner.spawn(muzzle, direction, user.world_root(), user, damage(),
-		float(stat("muzzle_speed", -1.0)), power, gun)
+		float(stat("muzzle_speed", -1.0)), power)
 	proj.hit.connect(func(body: Node, dmg: float) -> void: user.report_shot(body, dmg))
-	CasingSpawner.spawn(user.hand_world(hand), user.facing, user.world_root(), gun, power)
+	CasingSpawner.spawn(user.hand_world(hand), user.facing, user.world_root())
 	user.kick(hand, float(stat("recoil", 1.0)))
 	# The report of the shot, for whoever listens (the Audio domain); the round itself is already on its way.
-	EventBus.post(&"shot", { "position": muzzle, "gun": gun, "attacker": user, "automatic": is_automatic(),
-		"damage": damage(), "power": power })
+	EventBus.post(&"shot", { "position": muzzle, "gun": gun, "attacker": user, "power": power })
 	return true
 
 

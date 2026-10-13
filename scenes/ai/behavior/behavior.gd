@@ -621,7 +621,7 @@ func reached_lead() -> String:
 ## its safety cap; once in position it re-asks its tactic every `tactic_interval` or when the
 ## engagement lapses; a move or approach holds until it completes (which forces a decision) or its
 ## safety cap runs out; a hold follows the decide cadence.
-func wants_decision(_character, decide_timer_elapsed: bool) -> bool:
+func wants_decision(decide_timer_elapsed: bool) -> bool:
 	match _primitive:
 		&"engage":
 			if not _arrived:

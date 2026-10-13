@@ -141,7 +141,7 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
 - `update_known(known, delta) -> bool` — adopt the perception's hostiles; retarget a lost engaged
   contact to the nearest other; with none left, a leaf that needs a target ends → true (re-decide).
 - `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()`,
-  `wants_decision(character, decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
+  `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
   `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
   start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `path_label()`.
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
