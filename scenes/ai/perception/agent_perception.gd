@@ -106,6 +106,7 @@ var entry_wall_standoff: float = 28.0
 var entry_pie_radius: float = 100.0
 var entry_pie_steps: int = 5
 var entry_corner_inset: float = 40.0
+var entry_short_room: float = 150.0
 
 var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
 var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
@@ -176,6 +177,7 @@ func apply_config() -> void:
 	_entry.pie_radius = entry_pie_radius
 	_entry.pie_steps = entry_pie_steps
 	_entry.corner_inset = entry_corner_inset
+	_entry.short_room = entry_short_room
 	_snapshot.vocab.shoot_range = shoot_range
 	_snapshot.vocab.punch_range = punch_range
 	_snapshot.vocab.recency_bands = recency_bands

@@ -17,6 +17,8 @@ const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_voc
 const ENTRY_POINT_DEPTH := 24.0
 ## Slots worked out per side: a fuller team queues in the last one.
 const MAX_SLOTS := 6
+## How many bodies go into a room too small for the team (`short_room`): the point and the second, who take its corners.
+const SHORT_ROOM_CAPACITY := 2
 ## How far (px) `threshold_ahead` extends the end of a walk, so a destination in the doorway itself crosses it.
 const THRESHOLD_EXTEND := 30.0
 ## How far (px) past the doorway's width a step may cross the wall plane and still count as through it.
@@ -28,6 +30,7 @@ var wall_standoff: float = 28.0       ## Distance (px) of a stack slot off the w
 var pie_radius: float = 100.0         ## Distance (px) from the threshold of the pie arc a point man sweeps from.
 var pie_steps: int = 5                ## Points on the pie arc (angle steps).
 var corner_inset: float = 40.0        ## Inset (px) of a corner point from the room's two walls.
+var short_room: float = 150.0         ## A room with a side under this (px) is too small for the team: two go in (E13).
 
 var _openings: Array = []             ## The house's doorways (`{ pos, width, front, exit, rooms }`), as injected.
 var _rooms: Array = []                ## The house's rooms (`{ key, type, rect }`).
@@ -144,7 +147,7 @@ func _room_rect(key: String) -> Rect2:
 ## axis along the wall), wall: { 1: px, -1: px } (the room's wall either side of the door), side (the side with
 ## more wall to stack against, 0 when even), slots: { 1: [..], -1: [..] } (stack slots, nearest the door first),
 ## pie: { 1: [..], -1: [..] } (pie arc points, from the wall toward the axis), corners: [{ pos, near, side, hard }],
-## room (the room's rect) }.
+## room (the room's rect), capacity (how many may go in: 2 for a short room, else MAX_SLOTS) }.
 func geometry(id: String, into: String, map: RID, space) -> Dictionary:
 	var key := "%s>%s" % [id, into]
 	if _cache.has(key):
@@ -209,7 +212,8 @@ func _build(opening: Dictionary, room: Dictionary, map: RID, space) -> Dictionar
 			"hard": not _sees(space, entry_point, p),
 		})
 	return { "id": opening_id(opening), "into": str(room["key"]), "pos": pos, "width": width, "out": out,
-		"along": along, "wall": wall, "side": side, "slots": slots, "pie": pie, "corners": corners, "room": rect }
+		"along": along, "wall": wall, "side": side, "slots": slots, "pie": pie, "corners": corners, "room": rect,
+		"capacity": SHORT_ROOM_CAPACITY if minf(rect.size.x, rect.size.y) < short_room else MAX_SLOTS }
 
 
 ## The unit normal pointing into `rect` from the edge door `pos` lies on (the nearest edge).

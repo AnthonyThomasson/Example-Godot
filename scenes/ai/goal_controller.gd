@@ -202,6 +202,8 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_pie_dwell: float = 0.35
 ## Inset (px) of a corner point from the room's walls: where an entrant stops in a corner.
 @export var entry_corner_inset: float = 40.0
+## A room with a side under this (px) is too small for the team (about three bodies): two go in, the rest hold the stack side.
+@export var entry_short_room: float = 150.0
 ## Seconds an entrant holds its corner, looking across the room, before it clears the rest by sight.
 @export var entry_corner_dwell: float = 0.6
 ## Most seconds the last of a team holds the doorway it came in by, facing back out, once the room is clear (it leaves
@@ -396,6 +398,7 @@ func _apply_config() -> void:
 	_perception.entry_pie_radius = entry_pie_radius
 	_perception.entry_pie_steps = entry_pie_steps
 	_perception.entry_corner_inset = entry_corner_inset
+	_perception.entry_short_room = entry_short_room
 	_perception.apply_config()
 	# The pursuit/territory primitives become planner config: pursuit disables IDLE and starts a walk at
 	# COMBAT once a hostile is known; territory confines combat options inside the house.

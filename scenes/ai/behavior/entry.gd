@@ -6,7 +6,7 @@ extends RefCounted
 ##
 ##   approach — to its stack slot beside the door, stepping off the door's axis while still well out and
 ##              arriving along the wall (E1)
-##   stack    — in the slot, facing the door (the last of three or more faces back along the line instead, E12); radios `ready` (E2)
+##   stack    — in the slot, facing the door (a member past a short room's two holds here as security, E13) (the last of three or more faces back along the line instead, E12); radios `ready` (E2)
 ##   pie      — the point (or a lone entrant) sweeps the arc beside the door in angle steps, looking through it,
 ##              and notes the share of the room seen and the corners still hidden (E3); alone, both sides (E7)
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
@@ -50,6 +50,8 @@ const WAYPOINT_REACH := 20.0
 const CROSS_CAP := 6.0
 ## Gaze (rad) within which the look through the door has settled at a pie step.
 const GAZE_SETTLED := 0.12
+## Most seconds a member that holds outside a short room waits for the room to be called clear before it gives up.
+const SECURITY_CAP := 30.0
 ## Most seconds one entry spends topping its gun off before the crossing (a reload that will not start is not waited on forever).
 const TOP_OFF_CAP := 8.0
 
@@ -106,6 +108,8 @@ var _holders := {}                 ## Allies seen holding the cleared room (cove
 var _eyes: RefCounted              ## The watch module: where a walking entrant looks (`Watch.travel_point`).
 var _combat: RefCounted            ## The combat module: the tactical reload at the stack (`Combat.top_off`).
 var _top_off_spent := 0.0          ## Seconds this entry has spent topping its gun off.
+var _security_clock := 0.0         ## Seconds spent holding the stack outside a short room (E13).
+var _security_held_at := -1.0      ## `_security_clock` the room was first called clear (-1 = not yet).
 ## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
 ## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
 ## for a gaze the hostile will not let go of.
@@ -183,6 +187,8 @@ func reset() -> void:
 	_cover_aim = Vector2.INF
 	_holders = {}
 	_top_off_spent = 0.0
+	_security_clock = 0.0
+	_security_held_at = -1.0
 
 
 ## Give the entry up (the NPC chose something else, e.g. a fight): radio `abort` so the stack stops counting on it.
@@ -381,6 +387,9 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 		_look_toward(character, _geo["pos"], delta)
 	if _topping_off(character, delta):
 		return
+	if _holds_outside(team):
+		_tick_security(character, team, delta)
+		return
 	var ahead := _ahead(team)
 	if ahead.is_empty():
 		_start_pie(character, team)
@@ -411,6 +420,33 @@ func _topping_off(character, delta: float) -> bool:
 	character.move_input = Vector2.ZERO
 	_top_off_spent += delta
 	return true
+
+
+## Whether this member holds the stack outside instead of going in (E13): a room too small for the team takes two
+## (`geometry.capacity`), so every slot past them stays on the stack side. It does while the two ahead are still on the
+## radio, and keeps holding once the room has been called clear. With nobody ahead and the room not cleared (they died or
+## gave it up) it is not held back, and takes the lead.
+func _holds_outside(team: Array) -> bool:
+	if slot <= int(_geo.get("capacity", 99)):
+		return false
+	return _security_held_at >= 0.0 or not _ahead(team).is_empty()
+
+
+## Hold the stack side as security while the two in the short room clear it (facing back along the line, `_covers_rear`):
+## until the room is called clear and a teammate that held it moves on (or `rear_time` runs out after that), then done. It
+## never steps into the doorway. Gives up after `SECURITY_CAP` s with the room never called clear.
+func _tick_security(character, team: Array, delta: float) -> void:
+	_security_clock += delta
+	character.move_input = Vector2.ZERO
+	if _security_held_at < 0.0 and _cleared_by_team(team):
+		_security_held_at = _security_clock
+	if _security_held_at >= 0.0:
+		if _team_moved(team) or _security_clock - _security_held_at >= rear_time:
+			_radio("done")
+			phase = "done"
+	elif _security_clock >= SECURITY_CAP:
+		_radio("abort")
+		phase = "done"
 
 
 ## The members of the stack still ahead of this one (lower slots), lowest first. One that never reached its slot is

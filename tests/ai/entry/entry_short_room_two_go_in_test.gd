@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E13): a room too small for the team is entered by two; the rest hold outside. Three invaders in a corridor
+## E13: a room too small for the team is entered by two; the rest hold outside. Three invaders in a corridor
 ## with one small room off it (140 px square, barely three bodies across): two go in and take its corners, the third
 ## stays on the stack side as security and never steps into the doorway. Real Von: the three decide for themselves to
 ## enter the one room their corridor leads to.
@@ -14,7 +14,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry into a short room takes two, the rest hold outside",
 		"description": "Three invaders at a small room's door: only two enter, the third holds the corridor side.",
-		"tags": ["ai", "entry", "gap", "von"],
+		"tags": ["ai", "entry", "von"],
 		"requires_von": true,
 		"timeout": 90.0,
 	}

@@ -283,8 +283,8 @@ kitchen or living room, `KITCHEN_HALL`, `LIVING_KITCHEN`, with `out`, `outward`,
 `funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`, `time_facing_through`, `share_facing`) and the radio (`calls(t, step, id)`, `first_call_time`;
 callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
 
-The **open gaps E13 to E15** (`tools/run_tests.sh --include-von --require-von gap`: `entry_short_room_two_go_in`, `entry_hostile_in_view_holds_outside`,
-`entry_corridor_doors_not_passed`; `entry_clear_within_benchmark`, E10, `entry_reloads_before_crossing`, E11, and `entry_stack_last_covers_rear`, E12, are green and real-Von too) are tagged `gap` and red on purpose (reported as GAP). They
+The **open gaps E14 and E15** (`tools/run_tests.sh --include-von --require-von gap`: `entry_hostile_in_view_holds_outside`,
+`entry_corridor_doors_not_passed`; `entry_clear_within_benchmark`, E10, `entry_reloads_before_crossing`, E11, and `entry_stack_last_covers_rear`, E12, and `entry_short_room_two_go_in`, E13, are green and real-Von too) are tagged `gap` and red on purpose (reported as GAP). They
 run the whole pipeline with the **real Von server** (`requires_von`, paced in real time, so their timeouts are wall-clock):
 the actors are plain `invader`s with match defaults (no switch, no timer override, only a premise such as a part-spent magazine), the world is placed so the doorway under test is the natural pick,
 and each test first `require`s that the AI claimed that doorway, so a different Von choice reads in the bundle as a set-up

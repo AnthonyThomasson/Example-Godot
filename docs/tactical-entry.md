@@ -1,11 +1,11 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9, E11 and E12 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9 and E11 to E13 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. Behaviours E13 to E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
+E10 (the clear-time benchmark) is met and its test is green. Behaviours E14 and E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
 sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
 `tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
 (`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
@@ -170,13 +170,20 @@ it turns to cross in its turn (a threat in sight still takes its eyes first, `do
 rear guard, and the last man in the room still takes the rear watch there (E8).
 Test: `entry_stack_last_covers_rear` (three invaders in the garden; real Von, `requires_von`).
 
-### Open gaps (E13 to E15, tests tagged `gap`)
-
 **E13. Short room: two go in, the rest hold outside.** A room too small for the team is entered by two, who take its
 corners; the later slots hold the stack side as security and never step into the doorway. The game's rule for "too
 small": a room under 150 px on either side (three bodies), whose door wall cannot hold a third corner. Why: a third
-body in a box room has no point of domination to take and blocks the two who do.
-Test: `entry_short_room_two_go_in` (the box room of `flank_maps.gd`).
+body in a box room has no point of domination to take and blocks the two who do. In the code, the doorway's geometry
+carries a `capacity` (`AgentEntry.geometry`: 2 for a room with a side under `short_room`, the controller's
+`entry_short_room`; else every slot). A member whose slot is past it stays in `stack` (`Entry._holds_outside`,
+`_tick_security`), facing back along the line (E12), while the two ahead are still on the radio and after the room is
+called clear, and radios `done` once a teammate that held the room has moved on (or `rear_security_time` after the call).
+It does not stand in for the two: with nobody ahead and the room not called clear (they died or gave up) it takes the lead,
+and it gives up after 30 s with the room never called clear.
+Test: `entry_short_room_two_go_in` (the box room of `flank_maps.gd`; three invaders in its corridor, real Von,
+`requires_von`).
+
+### Open gaps (E14 and E15, tests tagged `gap`)
 
 **E14. Engage from outside; no crossing on a hostile in view.** A hostile seen through the door is fought from outside,
 and nobody crosses while it stands in view, whatever tactic is chosen for the fight. Why: what is visible is engaged
