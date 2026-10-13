@@ -18,7 +18,7 @@ const HALL_LIVING := { "id": "door_150_360", "pos": Maps.DOOR_HALL_LIVING, "widt
 ## room) they are what a team that has cleared the kitchen or the living room covers (E8).
 const KITCHEN_HALL := { "id": "door_690_360", "pos": Maps.DOOR_HALL_KITCHEN, "width": 80.0, "out": Vector2.UP, "room": Maps.HOUSE_HALL, "room_key": "hall" }
 const LIVING_KITCHEN := { "id": "door_480_150", "pos": Maps.DOOR_LIVING_KITCHEN, "width": 90.0, "out": Vector2.LEFT, "room": Maps.HOUSE_KITCHEN, "room_key": "kitchen" }
-## The corridor spine's room doors, framed from the corridor (E16), and the box room's door, framed from its corridor (E13).
+## The corridor spine's room doors, framed from the corridor (E15), and the box room's door, framed from its corridor (E13).
 const SPINE_A := { "id": "door_150_200", "pos": Maps.DOOR_A, "width": 80.0, "out": Vector2.DOWN, "room": Maps.SPINE_ROOM_A, "room_key": "room_a" }
 const SPINE_B := { "id": "door_450_200", "pos": Maps.DOOR_B, "width": 80.0, "out": Vector2.DOWN, "room": Maps.SPINE_ROOM_B, "room_key": "room_b" }
 const SPINE_C := { "id": "door_750_200", "pos": Maps.DOOR_C, "width": 80.0, "out": Vector2.DOWN, "room": Maps.SPINE_ROOM_C, "room_key": "room_c" }
@@ -120,30 +120,6 @@ static func share_facing(samples: Array, id: StringName, holds: Callable) -> flo
 		if holds.call(s["pos"][id], s["facing"][id]):
 			held += 1
 	return float(held) / float(seen) if seen > 0 else 0.0
-
-
-## The share of `samples` in which actor `id` flags a teammate: its gun line (the ray along its facing) passes within
-## `radius` px of another of `ids` that stands ahead of it and nearer than `reach` px (E11).
-static func flagged_share(samples: Array, id: StringName, ids: Array, radius := 16.0, reach := 120.0) -> float:
-	var seen := 0
-	var flagged := 0
-	for s in samples:
-		if not s["pos"].has(id):
-			continue
-		seen += 1
-		var p: Vector2 = s["pos"][id]
-		var facing: Vector2 = (s["facing"][id] as Vector2).normalized()
-		for other in ids:
-			if other == id or not s["pos"].has(other):
-				continue
-			var d: Vector2 = (s["pos"][other] as Vector2) - p
-			var ahead := d.dot(facing)
-			if ahead <= 0.0 or d.length() > reach:
-				continue
-			if absf(d.cross(facing)) <= radius:
-				flagged += 1
-				break
-	return float(flagged) / float(seen) if seen > 0 else 0.0
 
 
 ## Whether `p` is in the room behind `door`.

@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E16): a doorway passed in a corridor is searched or secured before the NPC is abreast of it. Gunfire is
+## Desired (E15): a doorway passed in a corridor is searched or secured before the NPC is abreast of it. Gunfire is
 ## heard from the far room of the corridor spine; whatever Von sends the invader there for, the way runs past the open
 ## doors of rooms A and B, and each is entered, or at least covered from beside its jamb, before the invader walks
 ## past it. Real Von: the invader hears the shots and decides for itself.

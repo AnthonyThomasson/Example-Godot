@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E14): a room too small for the team is entered by two; the rest hold outside. Three invaders in a corridor
+## Desired (E13): a room too small for the team is entered by two; the rest hold outside. Three invaders in a corridor
 ## with one small room off it (140 px square, barely three bodies across): two go in and take its corners, the third
 ## stays on the stack side as security and never steps into the doorway. Real Von: the three decide for themselves to
 ## enter the one room their corridor leads to.

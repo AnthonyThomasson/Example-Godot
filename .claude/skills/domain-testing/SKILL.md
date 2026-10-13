@@ -280,11 +280,11 @@ order was really the one scripted and `check_entered(t, samples, id, door)` for 
 doorway frame (`BACK`, `FRONT`, `HALL_LIVING`, `KITCHEN_LIVING`, and the doorways on that a team covers once it holds the
 kitchen or living room, `KITCHEN_HALL`, `LIVING_KITCHEN`, with `out`, `outward`, `lateral`, `in_funnel`, `in_room`,
 `beside_door`, `corners`, `faces_through`), a per-frame sampler (`watch`, then `path_of`, `pos_at`, `first_stop_in_room`,
-`funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`, `time_facing_through`, `share_facing`, `flagged_share`) and the radio (`calls(t, step, id)`, `first_call_time`;
+`funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`, `time_facing_through`, `share_facing`) and the radio (`calls(t, step, id)`, `first_call_time`;
 callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
 
-The **open gaps E11 to E16** (`tools/run_tests.sh --include-von --require-von gap`: `entry_reloads_before_crossing`,
-`entry_stack_no_flagging`, `entry_stack_last_covers_rear`, `entry_short_room_two_go_in`, `entry_hostile_in_view_holds_outside`,
+The **open gaps E11 to E15** (`tools/run_tests.sh --include-von --require-von gap`: `entry_reloads_before_crossing`,
+`entry_stack_last_covers_rear`, `entry_short_room_two_go_in`, `entry_hostile_in_view_holds_outside`,
 `entry_corridor_doors_not_passed`; `entry_clear_within_benchmark`, E10, is green) are tagged `gap` and red on purpose (reported as GAP). They
 run the whole pipeline with the **real Von server** (`requires_von`, paced in real time, so their timeouts are wall-clock):
 the actors are plain `invader`s with match defaults (no switch, no timer override, only a premise such as a part-spent magazine), the world is placed so the doorway under test is the natural pick,

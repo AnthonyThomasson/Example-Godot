@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E13): while the stack waits at the door, the last man faces back the way the team came and holds the
+## Desired (E12): while the stack waits at the door, the last man faces back the way the team came and holds the
 ## approach (the point, meanwhile, is slicing the pie). Real Von: three invaders in the back garden decide for themselves
 ## to stack on the back door.
 
