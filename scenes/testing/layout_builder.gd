@@ -1,9 +1,8 @@
 extends RefCounted
 
 ## Testing domain: a hand-laid building — walled, floored rooms joined by doorways — made through the
-## Objects factories (interface 2) in the house's own wall style. Returns a Node2D carrying the same
-## `rooms` and `openings` meta a generated house has, so NavBuilder and WorldGen.get_rooms work on it
-## unchanged.
+## Objects factories (interface 2) in the house's own wall style. Returns a Node2D annotated through
+## `WorldGen.annotate_layout`, so NavBuilder and WorldGen.get_rooms / get_openings work on it like on a house.
 
 
 ## Build the layout described by `world` (`{ rooms, doors, thickness }`, world-space) under `parent` and
@@ -23,19 +22,5 @@ static func build(world: Dictionary, parent: Node) -> Node2D:
 			FloorFactory.spawn(rect, floor_def, key.capitalize() + " Floor", root)
 		WallFactory.spawn(rect, thickness, WallFactory.openings_for(rect, doors), key.capitalize(), root, WorldGen.wall_style())
 		rooms.append({ "key": room["key"], "type": room.get("type", room["key"]), "rect": rect })
-	root.set_meta("rooms", rooms)
-	root.set_meta("openings", _openings(rooms, doors))
+	WorldGen.annotate_layout(root, rooms, doors)
 	return root
-
-
-## Each door as `{ pos, width, front, rooms }` (the WorldGen.get_openings shape): `rooms` are the keys of
-## the rooms whose wall it cuts; a door on one room's outer edge only is the front entrance.
-static func _openings(rooms: Array, doors: Array) -> Array:
-	var out: Array = []
-	for door in doors:
-		var keys: Array = []
-		for room in rooms:
-			if not WallFactory.openings_for(room["rect"], [door]).is_empty():
-				keys.append(room["key"])
-		out.append({ "pos": door["pos"], "width": door["width"], "front": keys.size() == 1, "rooms": keys })
-	return out

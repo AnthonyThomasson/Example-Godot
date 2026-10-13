@@ -12,7 +12,7 @@ extends Node2D
 ## Base damage, before the firing item's damage and the per-hit squareness/speed scaling.
 @export var damage: float = 10.0
 ## Physics layers the bullet can hit.
-@export_flags_2d_physics var collision_mask: int = 1
+@export_flags_2d_physics var collision_mask: int = PhysicsLayers.SOLID
 ## Streak color.
 @export var color: Color = Color(1.0, 0.9, 0.4)
 ## Streak length in px.

@@ -20,6 +20,18 @@ static func generate(rng_seed: int, force_plan: String, front_entrance_world: Ve
 	return HouseSpawner.spawn(plan_key, front_entrance_world, rng, parent)
 
 
+## Describe a hand-laid layout `root` the way a generated house describes itself, so `get_rooms`, `get_openings` and the
+## nav builder read it unchanged. `rooms` are `{ key, type, rect }` in WORLD space; `doors` are `{ pos, width }` in world
+## space, and a door on one room's wall only is the front entrance. For the Testing domain's arenas and room layouts.
+static func annotate_layout(root: Node2D, rooms: Array, doors: Array = []) -> void:
+	root.set_meta("rooms", rooms)
+	var openings: Array = []
+	for door in doors:
+		var keys := HouseSpawner.room_keys_on(rooms, door)
+		openings.append({ "pos": door["pos"], "width": door["width"], "front": keys.size() == 1, "exit": false, "rooms": keys })
+	root.set_meta("openings", openings)
+
+
 ## The generated house's rooms as an Array of { key, type, rect } with `rect` in WORLD
 ## space. For callers (Main) that place entities into rooms; empty for a null house.
 static func get_rooms(house: Node2D) -> Array:

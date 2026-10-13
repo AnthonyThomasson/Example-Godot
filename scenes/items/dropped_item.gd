@@ -6,7 +6,7 @@ class_name DroppedItem extends Node2D
 ## lands. Visual only: nothing picks it up, and it is never despawned.
 
 ## Physics layers it glances off (walls + solid furniture).
-const WALL_MASK := 1
+const WALL_MASK := PhysicsLayers.SOLID
 
 @export var gravity: float = 610.0          ## Fall acceleration (px/s²), as a falling body's.
 @export var start_height: float = 50.0      ## Height it is let go from (px): about hand height.

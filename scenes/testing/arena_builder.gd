@@ -1,8 +1,8 @@
 extends RefCounted
 
 ## Testing domain: a hand-built arena — one walled, floored room — made through the Objects factories
-## (interface 2) in the house's own wall style. Returns a Node2D carrying the same `rooms` meta a
-## generated house has, so NavBuilder and WorldGen.get_rooms work on it unchanged.
+## (interface 2) in the house's own wall style. Returns a Node2D annotated through `WorldGen.annotate_layout`,
+## so NavBuilder and WorldGen.get_rooms work on it like on a house.
 
 
 ## Build the arena described by `world` (`{ rect, floor, walls, thickness }`, world-space) under
@@ -17,5 +17,5 @@ static func build(world: Dictionary, parent: Node) -> Node2D:
 		FloorFactory.spawn(rect, floor_def, "Arena Floor", root)
 	if world.get("walls", true):
 		WallFactory.spawn(rect, float(world.get("thickness", 12.0)), [], "Arena Walls", root, WorldGen.wall_style())
-	root.set_meta("rooms", [{ "key": "arena", "type": "arena", "rect": rect }])
+	WorldGen.annotate_layout(root, [{ "key": "arena", "type": "arena", "rect": rect }])
 	return root

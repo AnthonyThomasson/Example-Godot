@@ -150,11 +150,11 @@ frame doesn't snap speed. Test: `tests/character/walk_into_furniture_speed_test.
 
 ## Scenes
 
-`character/npc.tscn` (the house defender) is a generic goal-driven agent driven by
-`ai/goal_controller.gd` (see the `domain-ai` skill); `character/npc_invader.tscn` is an inherited
-scene of it that only overrides data (faction, goal, hostility exports, colour). The player uses
-`player_controller.gd`. `character/character_base.tscn` is the bare character (body, shape, Hands,
-Visuals) with **no controller**: a composer adds any `control()` child before it enters the tree
+The NPCs are the AI domain's scenes (`ai/npc.tscn`, a generic goal-driven agent driven by `ai/goal_controller.gd`;
+see the `domain-ai` skill; `ai/npc_defender.tscn` and `ai/npc_invader.tscn` inherit it and only override data: faction, goal,
+hostility exports, colour). The player uses `player_controller.gd`. `character/character_base.tscn` is the bare
+character (body, shape, Hands, Visuals) with **no controller**, and the one place that composition is declared: `npc.tscn`
+inherits it and `main.tscn`'s `Player` instances it: a composer adds any `control()` child before it enters the tree
 (`_find_controller()` runs at `_ready`) — the Testing domain adds its puppet `ScriptedController` or
 `player_controller.gd`.
 

@@ -422,12 +422,12 @@ func observe(character, rooms: Array) -> void:
 			"pos": pos,
 			"vel": _track(id, pos, now, frame),
 			"facing": other.get("facing") if other.get("facing") is Vector2 else Vector2.ZERO,
-			"wound_dmg": other.damage_taken() if other.has_method("damage_taken") else 0.0,
+			"wound_dmg": other.damage_taken(),
 			"inside": not room.is_empty(),
 			"room_type": room.get("type", "") if not room.is_empty() else "",
 			"item": item.display_name if item != null else "nothing",
-			"reloading": other.has_method("is_reloading") and other.is_reloading(),
-			"posture": other.posture() if other.has_method("posture") else &"stand",
+			"reloading": other.is_reloading(),
+			"posture": other.posture(),
 		}
 		_visible_now[id] = true
 		_memory.remember(&"saw_character", sighting, maxf(contact_memory_ttl, lead_memory_ttl), str(id))
@@ -773,6 +773,22 @@ func room_doorways(room_key: String) -> Array:
 ## lowest slot first (see agent_entry.gd `claims`).
 func entry_team(opening_id: String) -> Array:
 	return AgentEntry.claims(opening_id, _callouts())
+
+
+## The lowest stack slot (1 = the point) no ally in `team` has claimed, for the NPC with instance id `self_id` that
+## holds `current` (see agent_entry.gd `free_slot`).
+func entry_free_slot(team: Array, self_id: int, current := 0) -> int:
+	return AgentEntry.free_slot(team, self_id, current)
+
+
+## The side of a doorway (`geometry` from `entry_geometry`) the team stacks on (see agent_entry.gd `stack_side`).
+func entry_stack_side(geometry: Dictionary, team: Array, self_pos: Vector2) -> int:
+	return AgentEntry.stack_side(geometry, team, self_pos)
+
+
+## Where stack slot `slot` stands on side `side` of a doorway (see agent_entry.gd `slot_point`).
+func entry_slot_point(geometry: Dictionary, side: int, slot: int) -> Vector2:
+	return AgentEntry.slot_point(geometry, side, slot)
 
 
 ## Candidate standing points on a ring around the NPC, classified for peek-and-cover against the
