@@ -22,6 +22,7 @@ var _http: HTTPRequest             ## Client for decision requests.
 var _pending := false             ## True while a request is in flight.
 var _options := {}                ## Option ids → descriptions of the in-flight question (to validate the pick).
 var _npc_name := "NPC"            ## Name of the driven NPC, for log lines.
+var _ask_serial := 0              ## Numbers the stubbed asks, so a delayed answer to a cancelled one is dropped.
 var _last_error := ""             ## Last failure reported, so a persistent one isn't logged every tick.
 
 
@@ -52,6 +53,7 @@ func ask(state_text: String, instructions: String, options: Dictionary) -> bool:
 	_options = options
 	if DecisionStub.active:
 		_pending = true
+		_ask_serial += 1
 		_answer_from_stub.call_deferred(state_text, instructions, options)
 		return true
 	var body := {
@@ -72,6 +74,11 @@ func ask(state_text: String, instructions: String, options: Dictionary) -> bool:
 func _answer_from_stub(state_text: String, instructions: String, options: Dictionary) -> void:
 	if not _pending:
 		return
+	if DecisionStub.latency > 0.0:
+		var serial := _ask_serial
+		await get_tree().create_timer(DecisionStub.latency).timeout
+		if not _pending or serial != _ask_serial:
+			return  # Cancelled, or replaced by a newer question, while the answer was on its way.
 	_pending = false
 	var pick := DecisionStub.answer(state_text, instructions, options)
 	if pick == "":
@@ -85,6 +92,7 @@ func cancel() -> void:
 	if _pending:
 		_http.cancel_request()
 		_pending = false
+		_ask_serial += 1
 
 
 ## Read the answer and emit Von's top pick; emit `failed()` on transport or parse error.

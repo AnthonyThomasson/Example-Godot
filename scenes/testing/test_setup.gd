@@ -115,6 +115,13 @@ func von_script(rules: Array) -> TestSetup:
 	return self
 
 
+## Delay every scripted Von answer by `seconds`, like a real server's reply time (the first ones at the start of a match
+## are the slowest). Call after `von_script`. The NPC carries on with its old order meanwhile.
+func von_latency(seconds: float) -> TestSetup:
+	statics.append([DecisionStub, &"latency", seconds])
+	return self
+
+
 ## Like `von_script`, but every decision fails, as with the server down (NPCs hold steady).
 func von_down() -> TestSetup:
 	von_script([])

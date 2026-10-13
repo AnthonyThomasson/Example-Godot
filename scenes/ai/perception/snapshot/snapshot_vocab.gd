@@ -112,6 +112,11 @@ func where(c: Dictionary) -> String:
 	var room := room_name(c.get("room_type", ""))
 	return ("in the %s" % room) if room != "" else "inside the house"
 
+## Where a point is, in the words of `where`: "in the kitchen" inside a room, "outside the house" otherwise.
+func place(p: Vector2) -> String:
+	var room := room_at(p, rooms)
+	return ("in the %s" % room_name(room["type"])) if not room.is_empty() else "outside the house"
+
 ## " (in the kitchen)" for a point inside a room, " (outside)" otherwise.
 func room_suffix(p: Vector2) -> String:
 	var room := room_at(p, rooms)

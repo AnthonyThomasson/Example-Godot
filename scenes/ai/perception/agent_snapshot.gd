@@ -110,6 +110,8 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"hit_recently": _hit_recently(),
 		"engaged": _engaged_fresh(),
 		"leads": not leads["options"].is_empty(),
+		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
+			and leads["options"].any(func(o): return not o["tags"]["inside"]),
 		"hurt": dmg >= vocab.hurt_threshold,
 		"critical": dmg >= vocab.critical_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),

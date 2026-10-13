@@ -29,7 +29,8 @@ root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_posi
       │                                         ├─ retreat [retreat_positions]         → move{aim threat, fire_at_will}
       │                                         └─ locate  [shooter]                   → move{aim point, fire_at_will}
       ├─ reload_quiet [reload; no threat known, gun low + spare] → reload
-      ├─ investigate [leads]               → move{aim travel, fire_at_will}
+      ├─ investigate [leads] (ask)         → move{aim travel, fire_at_will}
+      │    └─ stay [lead_outside]          → hold          (decline a lead outside the house)
       ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
       │    └─ enter [entries]              → entry         (a doorway into a room left to search)
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
@@ -47,6 +48,19 @@ name counts as true), `confine` (combat subtree: a territorial NPC drops options
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
 route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
 whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
+`ask` (INVESTIGATE: the planner never takes the node, or the level that offers it as its lone option, without asking Von — whether a
+lead is worth going to is Von's call). **Staying in the house is Von's call too, guided by the prompt, not a rule:** a territorial
+goal ("hold your ground inside the house; do not chase anyone outside") is in every state, the state and the leads say where the gunfire
+or hostile is ("outside the house"), and the `stay` child of INVESTIGATE (offered while a lead lies outside the house and the NPC is inside:
+fact `lead_outside`) is Von's way to decline. Its desc states the situation in the state's own words and echoes the goal's sentence ("You are inside the house and the gunfire is
+outside the house: hold your ground, do not chase anyone outside"). Measured with `tools/von_probe.py` (`investigate_outside_lead*`,
+`investigate_outside_leads_*`): it wins for a goal that says it, also when shots are landing near the NPC (0.54) and with three leads on offer
+(0.44, the leads split the rest), and loses to the lead for an invader's goal (0.57 to 0.69 for the lead; thin, so re-run the invader probe
+after any rewording). The plain "Hold your ground inside the house; do not chase anyone outside" lost to the lead as soon as the NPC was
+under fire (0.35), which let defenders walk out in real matches; a wording that did not name the situation made invaders hold too; and with
+no decline option Von chose the outside lead (0.66) whatever the state said. Nothing in the tree or the code knows who the NPC is; reword the desc and re-run
+the probe and the Von tests (`defender_stays_in_house_von`, `defender_investigates_gunfire_inside_von`,
+`invader_investigates_gunfire_outside_von`) together. `defend_territory` still confines COMBAT only.
 A node may mix `children` and `options`. `engage` and `flank` require `gun_loaded` (an empty gun is never offered "a clear shot"); `advance`, `melee` and
 `retreat` stay available so an empty NPC can still close in, punch or fall back. The `reload` nodes require `weapon_low` +
 `can_reload` (the quiet one also `!threat_known`) and have a lone option, so the planner takes them without a Von request when
@@ -106,7 +120,8 @@ question (`pick`) to `/v1/systemone`; `cancel()`; `is_pending()`.
 - **Test seam:** while `DecisionStub.active`, `ask()` answers from `decision_stub.gd` a frame later, with no
   HTTP request. `DecisionStub.rules` is an ordered `[{ pick, question? }]` (first rule whose id is offered,
   and whose `question` text occurs in the level's question, wins; else the first offered id), `fail` makes
-  every ask fail (server down), `requests` logs `{ state, question, options, pick }` per ask. Only the
+  every ask fail (server down), `latency` (seconds before a scripted answer arrives, like a real server's reply time; the NPC
+  carries on with its old order meanwhile; `TestSetup.von_latency`) and `requests` logs `{ state, question, options, pick }` per ask. Only the
   Testing domain sets these (`TestSetup.von_script` / `von_down`; statics restored after each test).
 - `signal failed()` — request couldn't start, transport failure, non-200, malformed or no offered id.
   **A transport failure and an HTTP error answer are reported as different faults**: a 4xx/5xx prints

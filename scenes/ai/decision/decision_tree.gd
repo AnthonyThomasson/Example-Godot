@@ -33,6 +33,9 @@ extends RefCounted
 ##               Skipped when there is only one.
 ##   requires  — fact names that must be true ("!" negates); a binding name counts as a true fact.
 ##   confine   — this subtree is combat: a territorial NPC drops options outside the house.
+##   ask       — Von is always asked about this node, and about the level that offers it: the planner never
+##               takes it without asking, even as the lone option (INVESTIGATE: whether a lead is worth
+##               going to is Von's call, read against the goal and where the lead is).
 ##   drop_tags — options carrying any of these tags are never offered (e.g. a flank side an ally
 ##               already holds: Von can't weigh "taken by Invader2" — the name matches the state; one
 ##               whose route passes a known hostile; one with no shot at the target, one the target is
@@ -138,11 +141,25 @@ const NODES := {
 		"label": "INVESTIGATE",
 		"desc": "You heard gunfire or lost sight of a hostile recently and know where to look ({summary})",
 		"requires": [&"leads"],
+		"ask": true,
 		"question": "What should you check first? Prefer the freshest lead that matters most to your goal.",
 		"context": [&"situation", &"current", &"contacts", &"allies", &"awareness"],
+		"children": [&"stay"],
 		"options": [&"leads"],
 		"primitive": &"move",
 		"params": { "aim": &"travel", "fire_at_will": true, "run": true },
+	},
+	&"stay": {
+		"label": "STAY",
+		# Von's way to decline a lead outside the house. It states the situation in the state's own words (inside the
+		# house, the gunfire outside it) and echoes a goal that tells the NPC to hold a house ("hold your ground inside the
+		# house; do not chase anyone outside"), so it wins for that goal and not for one that sends the NPC after
+		# intruders, also when shots are landing near it and when several leads are outside (measured with
+		# tools/von_probe.py: the plain "Hold your ground ..." lost to the lead once the NPC was under fire).
+		# Nothing here knows who the NPC is; the goal decides.
+		"desc": "You are inside the house and the gunfire is outside the house: hold your ground, do not chase anyone outside",
+		"requires": [&"lead_outside"],
+		"primitive": &"hold",
 	},
 	&"search": {
 		"label": "SEARCH",

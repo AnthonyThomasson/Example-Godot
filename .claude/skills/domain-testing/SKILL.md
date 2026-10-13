@@ -205,6 +205,7 @@ func run(t: TestContext) -> void:
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.
+- `s.von_latency(seconds)` (after `von_script`) delays each scripted answer like a real server's reply time; the NPC carries on with its old order while it waits.
 - Make randomness deterministic where the assertion depends on it (e.g. `projectile.flyover` off,
   since a character is partial cover).
 
@@ -277,6 +278,22 @@ callouts carry `entry_step`). The brain is read through `debug_entry()` and `deb
   geometry, not a rule: assert that hidden corners are on the door's wall, not that both are.
 - A defender meant to be unseen from outside has to be behind the jamb from every spot the entrant visits (stack,
   arc, the walk there), e.g. tucked against the door's wall well along from it.
+
+## Investigation tests (tag `investigate`)
+
+`tests/ai/*investigate*` and `defender_stays_in_house_von` pin down how gunfire heard outside or inside the house is worded for Von
+and answered (issue #40: defenders leaving the house). The shared helper is `tests/_ai/investigate_probe.gd` (`const Probe :=
+preload(...)`): `world(s, kind)` (the terrace house, one NPC in the hall, radio and trespass hostility off, Von left to the caller),
+`gunfire(at)` (a hit event nobody known fired, heard from `Probe.OUTSIDE` / `Probe.INSIDE`), `levels` / `asked_about_investigating`.
+Scripted ones (`investigate_outside_lead_offers_stay`, `investigate_lone_lead_is_asked`) check the wiring. The three `*_von` tests
+(`requires_von`, `--include-von --require-von`) check what a real Von decides: the defender stays in, still investigates gunfire inside,
+and an invader still investigates the same gunfire outside. After rewording any of what Von reads about leads, run them with
+`tools/von_probe.py` (its `investigate_outside_lead_*` scenarios).
+
+`defenders_stay_in_house_quiet` (scripted) and `defenders_stay_in_house_quiet_von` (real Von, invaders outside as at the start of a match)
+watch every defender of a generated house (`tests/_ai/house_probe.gd`: `spawn`, `watch`, whose failure message carries each
+defender's trail and what Von was last asked) and sweep with `--seed=N`. `move_stops_on_arrival` uses `s.von_latency(seconds)` to give
+the scripted Von a real server's reply time (set to 0 in `configure`, raised in `run`, restored after the test).
 
 ## Flanking tests (tag `flank`)
 

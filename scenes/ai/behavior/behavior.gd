@@ -744,6 +744,8 @@ func _apply_move(character, delta: float) -> void:
 			if covered != "":
 				_perception.mark_cleared(covered)  # Seen all of it: cleared, as by an entry.
 		return
+	else:
+		character.move_input = Vector2.ZERO  # Arrived: stand still, not on in the last heading, while the next decision is on its way.
 	_aim_move(character)
 	if _params.get("fire_at_will", false):
 		_fire_at_will(character)

@@ -48,7 +48,8 @@ root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spo
       │                             ├─ MELEE   → punch, only when point-blank   (melee)
       │                             ├─ RETREAT → a hidden / farther spot        (move)
       │                             └─ LOCATE  → toward an unseen shooter       (move)
-      ├─ INVESTIGATE → a lead (last seen, heading, gunfire, ally's call)        (move)
+      ├─ INVESTIGATE ─┬─ a lead (last seen, heading, gunfire, ally's call)      (move)  [always asked of Von]
+      │               └─ STAY → hold, when a lead is outside the house          (hold)
       ├─ SEARCH ─┬─ ENTER → a doorway into a room left to search              (entry)
       │          └─ a room / unexplored area / the entrance                     (move)
       └─ IDLE ─┬─ USE → an object · GO → a room · WAIT                           (interact / move / hold)

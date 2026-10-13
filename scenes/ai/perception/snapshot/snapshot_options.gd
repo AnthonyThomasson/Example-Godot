@@ -248,21 +248,21 @@ func lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 	for c in know["lost"]:
 		var moving: bool = (c["vel"] as Vector2).length() >= _v.still_speed
 		leads.append({ "age": c["age"], "id": "lead_seen_%d" % c["id"], "label": "where you last saw %s" % c["name"],
-			"desc": "where you last saw %s — %s, %s — %s route%s" % [c["name"], _v.recency(c["age"]), _v.where(c),
+			"desc": "where you last saw %s, %s — %s — %s route%s" % [c["name"], _v.where(c), _v.recency(c["age"]),
 				_v.route_band(_route_len(ctx, c["pos"])), ("; they were moving %s" % _v.compass(c["vel"])) if moving else ""],
 			"point": c["pos"] })
 		if moving:
 			var ahead: Vector2 = _tactics.snap(ctx["map"], c["pos"] + c["vel"] * minf(c["age"], _v.extrapolate_cap))
 			leads.append({ "age": c["age"] + 0.01, "id": "lead_heading_%d" % c["id"], "label": "where %s was heading" % c["name"],
-				"desc": "where %s was heading — %s of where you last saw them%s — %s route" % [c["name"], _v.compass(c["vel"]),
-					_v.room_suffix(ahead), _v.route_band(_route_len(ctx, ahead))],
+				"desc": "where %s was heading, %s — %s of where you last saw them — %s route" % [c["name"], _v.place(ahead),
+					_v.compass(c["vel"]), _v.route_band(_route_len(ctx, ahead))],
 				"point": ahead })
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		var pos: Vector2 = rec["data"]["pos"]
 		leads.append({ "age": rec["age"], "id": "lead_gunfire_%d_%d" % [floori(pos.x / 200.0), floori(pos.y / 200.0)],
 			"label": "gunfire to the %s" % _v.compass(pos - self_pos),
-			"desc": "gunfire heard to the %s — %s%s — %s route" % [_v.compass(pos - self_pos), _v.recency(rec["age"]),
-				_v.room_suffix(pos), _v.route_band(_route_len(ctx, pos))],
+			"desc": "gunfire heard to the %s, %s — %s — %s route" % [_v.compass(pos - self_pos), _v.place(pos),
+				_v.recency(rec["age"]), _v.route_band(_route_len(ctx, pos))],
 			"point": _tactics.snap(ctx["map"], pos) })
 	if _under_fire() and hostiles.is_empty():
 		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
@@ -275,8 +275,8 @@ func lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 		var at: Vector2 = c.get("position", self_pos)
 		var status: String = c.get("status", "")
 		leads.append({ "age": c["age"], "id": "lead_ally_%d" % c["id"], "label": "support %s" % c["name"],
-			"desc": "support %s — %s, %s of you%s — radio %s%s" % [c["name"], c.get("label", "fighting"), _v.compass(at - self_pos),
-				_v.room_suffix(at), _v.recency(c["age"]), ("; " + status) if status != "" else ""],
+			"desc": "support %s, %s — %s, %s of you — radio %s%s" % [c["name"], _v.place(at), c.get("label", "fighting"),
+				_v.compass(at - self_pos), _v.recency(c["age"]), ("; " + status) if status != "" else ""],
 			"point": _tactics.snap(ctx["map"], at) })
 	# A lead checked more recently than the event behind it is spent (fresh news there is offered again).
 	leads = leads.filter(func(l): return not _memory.age_of(&"checked_lead", "id", l["id"]) < l["age"])

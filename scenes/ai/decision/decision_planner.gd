@@ -175,7 +175,7 @@ func _step() -> void:
 			_fail_walk()
 		return
 	_mark_current_plan()
-	if _offered.size() == 1 and skip_single_option:
+	if _offered.size() == 1 and skip_single_option and not _must_ask(node):
 		_levels.append({ "node": String(_node), "offered": _criteria(), "auto": true, "ms": 0 })
 		_choose(_offered.keys()[0])
 		return
@@ -184,6 +184,15 @@ func _step() -> void:
 	_levels.append({ "node": String(_node), "question": question, "state": state, "offered": _criteria(), "auto": false })
 	_asked_ms = Time.get_ticks_msec()
 	_client.ask(state, question, _criteria())
+
+
+## Whether Von is asked at this level even with one option: the node is an `ask` node, or the lone option
+## is a child node that is.
+func _must_ask(node: Dictionary) -> bool:
+	if node.get("ask", false):
+		return true
+	var only: Dictionary = _offered[_offered.keys()[0]]
+	return only["kind"] == "node" and _nodes[only["node"]].get("ask", false)
 
 
 ## Von answered the in-flight level: record it and follow the pick.

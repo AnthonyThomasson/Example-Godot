@@ -160,7 +160,7 @@ func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 		out.append(("You are being hit, from the %s!" if uf.get("hit", false) else "You are under fire: shots are landing near you, from the %s!") % dir)
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		if not fighting and rec["age"] <= _v.recency_bands.y:
-			out.append("Gunfire heard to the %s, %s." % [_v.compass(rec["data"]["pos"] - self_pos), _v.recency(rec["age"])])
+			out.append("Gunfire heard to the %s, %s, %s." % [_v.compass(rec["data"]["pos"] - self_pos), _v.place(rec["data"]["pos"]), _v.recency(rec["age"])])
 			break
 	var seen := { &"under_fire": true }
 	for entry in _memory.fresh():

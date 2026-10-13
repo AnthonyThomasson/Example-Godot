@@ -1,0 +1,16 @@
+{
+  "name": "investigate: a lead outside the house, goal says hold the house -> STAY",
+  "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the living room, inside the house, holding a Pistol. You are unhurt.\nCurrent activity: SEARCH - the living room (reached it, for 5s).\nThere is trouble nearby, out of your sight. Allies near you: none.\nNobody else is in sight or known.\nGunfire heard to the south-west, outside the house, recently.\nDecided so far: INVESTIGATE.",
+  "question": "What should you check first? Prefer the freshest lead that matters most to your goal.",
+  "options": {
+    "lead_gunfire_-1_2": "gunfire heard to the south-west, outside the house \u2014 recently \u2014 medium route",
+    "stay": "You are inside the house and the gunfire is outside the house: hold your ground, do not chase anyone outside"
+  },
+  "expect": [
+    "stay"
+  ],
+  "ablate": [
+    "Gunfire heard to the south-west, outside the house, recently.",
+    "hold your ground inside the house; do not chase anyone outside"
+  ]
+}
