@@ -1,8 +1,8 @@
 extends Node2D
 
 ## A small chip knocked off an object when it is hit: colliderless world-space debris that
-## tweens out, spins, and rests. Styled by DebrisSpawner, Despawner-tracked. Drawing lives
-## in debris_visuals.gd.
+## tweens out, spins, and rests. Styled by DebrisSpawner, Despawner-tracked while it flies. Drawing lives
+## in debris_visuals.gd; once at rest the chip hands its drawing to the parent's `DebrisLayer` and frees itself.
 
 ## Chip fill color.
 @export var color: Color = Color(0.6, 0.6, 0.6)
@@ -27,3 +27,12 @@ func start(eject_dir: Vector2) -> void:
 	tween.set_parallel(true)
 	tween.tween_property(self, "position", target, eject_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "rotation", rotation + spin, eject_time).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+	tween.finished.connect(_rest)
+
+
+## The chip has come to rest: it is drawn by the parent's `DebrisLayer` from here on, and this node goes.
+func _rest() -> void:
+	var parent := get_parent()
+	if parent != null:
+		DebrisLayer.layer(parent).rest(global_position, global_rotation, color, chip_size, chip_shape)
+	queue_free()

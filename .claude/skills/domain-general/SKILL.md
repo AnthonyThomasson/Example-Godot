@@ -132,8 +132,8 @@ consumed by allied AIs.
 - `game_log.gd` (`GameLog`, a `class_name` static holder) — the one way any domain logs what is happening:
   `GameLog.say(message)` prints while `GameLog.enabled` (default true). The batch test runner turns it off
   unless `--verbose`; never route errors/warnings through it.
-- `despawner.gd` (autoload) — global cap for transient bodies (debris, casings, blood splatters and pools);
-  domains register spawns with it.
+- `despawner.gd` (autoload) — global cap for transient bodies (flying debris chips, casings, blood splatters and pools);
+  domains register spawns with it. The Physics domain's `DebrisLayer` reads `max_scene_objects` as the cap on landed chips too.
 
 HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) have moved to
 `scenes/ui/` — see the `domain-ui` skill for their implementation detail.

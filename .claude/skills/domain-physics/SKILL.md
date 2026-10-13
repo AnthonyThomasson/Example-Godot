@@ -34,8 +34,12 @@ Objects *compose* these components; Physics imports nothing outward.
   layered on top.
   `draw_wall` takes an optional repeating `texture` + `tile_length`: UVs run in the segment's own
   frame (u along the wall per tile, v across its thickness), so the tile follows every wall.
-- `DebrisSpawner` / `Debris` — material-styled chips (`STYLES` table). The global cap lives on
-  `Despawner`.
+- `DebrisSpawner` / `Debris` / `DebrisLayer` — material-styled chips (`STYLES` table). A chip is a node only while it
+  flies (Despawner-tracked); as it lands it hands its place, turn, colour, size and shape to the parent's `DebrisLayer`
+  (`DebrisLayer.layer(parent)`, the `BloodDecals` pattern: chips grouped in 128 px chunks, only the chunk that gained or lost
+  one redraws) and frees itself, so a floor strewn with a thousand chips costs a few draw calls and no nodes. The layer
+  keeps at most `Despawner.max_scene_objects` chips, dropping the oldest; it draws under whatever joins its node after it.
+  Test: `tests/physics/debris_rests_in_a_layer_test.gd`.
 
 ## Hit particles (entry and exit bursts)
 
@@ -98,5 +102,5 @@ documented in `domain-physics-blood`. Both are `class_name` static holders — t
 
 - **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
   call `Physics.impact_impulse` / `Physics.spawn_debris`. The character composes a `BloodWound` (see `domain-physics-blood`), and its death builds its fallen body on a `Ragdoll` and, once it rests,
-  calls `Physics.bleed_out`. Debris / casings
-  despawn via the Despawner.
+  calls `Physics.bleed_out`. Casings and flying chips
+  despawn via the Despawner; a landed chip lives in the `DebrisLayer`, capped the same.
