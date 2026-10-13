@@ -34,6 +34,7 @@ fields are read live, so only those modules need the push.)
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
 | `reload` | — | Equip the gun (`gun_slot()`), stand still (its eyes where the watch stage puts them) and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
 | `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, below): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots a threat in sight in every phase (the watch stage). | When the entry is over (room clear, rear watch done, or given up); never on the cadence. The entry guard (below) also runs it, as a detour in the middle of another order. |
+| `throw` | `point` (the spot), `kind` (`frag` / `stun`), `radius`, `slot`, `target_id` | The GRENADE tactic (`docs/grenades.md` G17; `combat.gd` does the throwing, `domain-ai-combat`): take the grenade in hand, turn to the spot (closing the last px if it drifted out of range since the offer), throw (the line is re-checked until the wind-up begins and the throw dropped if it is blocked; from the wind-up on it is committed), radio `frag_out` / `bang_out` as it leaves the hand (`take_throw_calls`), gun back in hand, then stand out the fuse (the watch stage shoots from there). An evade plan (the thrower in its own burst's zone) replaces the order at the release tick; `poll_throw` runs before it so the call is radioed first. Committed (no re-decision) during the wind-up. | When the grenade has gone off (or the throw could not be made, or the fuse plus a second ran out). |
 | `hold` | — | Stand; the watch stage looks at the threat (and shoots it) or turns among the room's doorways. | Decide cadence. |
 
 **Gaze and fire** are a policy too, the **watch stage** (`Behavior._apply_watch`, `watch.gd`; the `domain-ai-watch` skill, spec `docs/gaze-and-fire.md`):
@@ -71,6 +72,20 @@ Exports on the controller: `posture_enabled` (the `ai.posture` switch), `posture
 **Combat** — the gunnery, the peek-and-cover cycle, bursts, backing off a blocked barrel, the reload reflex, melee and the
 no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `Behavior` passes it the engaged contact and `hold_ground`.
 
+## The evade reflex (G16) and the blind NPC (G15)
+
+**Evade (`Behavior.set_evade(plan)`, called every tick by the orchestrator with the perception's `evade_plan`; `docs/grenades.md` G16).** Outside Von and over every primitive, like the
+auto-reload: while a live grenade threatens the NPC it is carried out instead of the running order, an entry (committed or not) and an interaction included. The first
+tick of a plan drops the detour, abandons the entry (the stack is told), and replaces the order with `evade` (path `["evade"]`, labels `EVADE - a live frag grenade`);
+no decision is started or adopted while it runs (the controller's `_should_decide` / `_on_decided`, `set_leaf`). `_apply_evade` runs to `plan.spot` (`Locomotion.move_to`, looking where it
+goes, running when `run_enabled` and stamina allow), then holds it facing away from the grenade, **crouched when the spot is cover** (`plan.crouch`); the watch stage does not run (no
+turning to a threat, no shot). With no spot in time it stays, facing away (a stun then blinds it for the back-turned share only), crouched for a frag. When the plan ends (the burst) `_resolved` forces
+a new decision. Read-outs: `evading()`, `evade_spot()` (the controller's `debug_grenades().escape`), `debug_state()["evade"]`. Tests: `tests/ai/grenade/evade_*`.
+
+**A blinded NPC** (`Character.is_blind()`): the orchestrator starts no new decision (`_should_decide`) and re-decides the tick its sight returns; the order it was carrying out goes on
+(it stumbles: the character is slowed and drifts); the perception keeps its contacts (so the watch stage's engaged-contact pick, or the arrived peek-and-cover, fires at the hostile's last-known
+spot with the character's aim sway, G13) and sees no new one. A deafened NPC hears no gunfire, no hit elsewhere and no callout (the orchestrator drops them).
+
 ## Tactical entry (`entry.gd`)
 
 The spec and the tests are `docs/tactical-entry.md` (E1 to E15) and `tests/ai/entry/`. `Behavior` adopts an
@@ -96,6 +111,15 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   held radios `done`. Alone, it turns its gaze through each doorway on in turn, `entry_watch_dwell` once settled, then is
   done. The heartbeat repeats the latest call whole, so `covering` and `cleared_room` stay on the radio.
 
+- **The bang (E17, `docs/grenades.md` G18).** An ENTER or STUN ENTRY leaf with `bang: true` (and a stack that follows the first claimer's mode: every claim carries `bang` and the `stuns` the member carries; one
+  `bang: false` makes the whole stack quiet) adds the `bang` phase between `stack` and `cross`. `_thrower(team)` picks the second of the stack if it carries a stun, else the lowest slot that does, from the claims, the same on every member;
+  `_bang_due` (in `stack`, or in `approach` once the rest are ready) has the thrower plan the throw (`_plan_bang`: a target `BANG_DEPTHS` of the way into the room, on the doorway's axis first, and a spot, its own slot or
+  `BANG_STEP_ALONG` in front of the door, `BANG_STEP_OUT` out from the wall, from which the lob is clear of the jamb with its hand `BANG_HAND_REACH` to its right and `BANG_EDGE_MARGIN` to spare: none = the bang is given up and the stack
+  goes in quietly), radio `bang`, and every member that sees the call enters `bang`. In `bang`, the thrower walks out from its slot (clear of the member ahead of it) to the spot, throws through `Combat.begin_throw` / `throw_step` /
+  `throw_released`, and walks back; everyone holds its slot turned away from the door (`_look_toward` away along the door's normal; the watch stage does not turn it to a threat in `bang`). On the stun's burst in the room (`AgentPerception.last_burst`)
+  the stack is over the bang (`_bang_over`): the point crosses at once, no pie, and E14's hold on a hostile in view does not apply for `BANG_WINDOW` s; no top-off is waited for. A call not answered by a burst within `BANG_BURST_CAP`
+  or never made within `BANG_CALL_CAP` gives the bang up, and so does a teammate's claim that says quiet (`bang` false: its thrower had no lob or lost its stun): a member in `stack` or in `bang`
+  follows it at once, its own claims saying quiet too. Tests: `tests/ai/grenade/bang_fallback_*`. `Entry.expects_burst(kind)` makes `Behavior.set_evade` leave the stack to this hold while a stun is in the air; `committed()` is also true during the thrower's wind-up.
 - **Top off at the stack (E11).** A member short of a full magazine with a spare swaps it in while `stack`ed, the one lull:
   `_topping_off` (entry.gd) calls `Combat.top_off` (a tactical reload: `select_slot(gun_slot())`, `reload()`) from `_tick_stack`
   before the point starts the pie or a follower crosses, and from `_tick_pie` before the point crosses (a pie that fired),

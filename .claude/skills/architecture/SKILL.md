@@ -26,10 +26,10 @@ composition root is `domain-main`.
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform. |
 | **Character** | `character/` | `domain-character` (+ `domain-character-body` for `character/body/`) | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
-| **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet. |
+| **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), damage, cover, ricochet; and a grenade's burst (`Explosion`: the frag's blast and fragments, the stun's flash and bang). |
 | **Physics System** | `physics/` | `domain-physics` (+ `domain-physics-blood` for `physics/blood/`) | Physical reactions: forces, knockback, deformation, debris, ragdoll, and blood (its own sub-folder, `physics/blood/`). |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
-| **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads) and played by the `Sound` autoload through a capped pool of positional voices. |
+| **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads, a grenade's throw, bounce, burst) and played by the `Sound` autoload through a capped pool of positional voices; a deafened `Sound.focus` (the human) gets a muffle and a tinnitus whine. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
@@ -94,10 +94,13 @@ interface(s) and describes how they're implemented; this list is authoritative f
    surface). The projectile decides the ballistic outcome, then hands
    the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
    (interface 4), the character bleeds instead (its `BloodWound` component, interface 4). The
-   projectile is the only striker that calls `take_hit`; a melee punch shoves through the "pushable"
+   projectile and the grenade's `Explosion` (Projectile System: the frag's blast, `Explosion.frag`) are the strikers that call `take_hit`
+   (a blast hit carries `speed_factor` 0: its shove is the grenade's own `blast_impulse`, applied through the pushable contract below, a
+   character's through `blast_push`); a melee punch shoves through the "pushable"
    contract below, deals its damage through `take_damage(amount)` (the character's plain damage entry, no HitInfo;
    tests wound a character with it too) and does **not** deform, and reads `get_surface()` only for the struck
-   `material` it posts. An object also carries `object_name` (its display name), which the AI's wording reads.
+   `material` it posts. `Explosion` reaches the characters by the one probe of interface 7 (`current_item()`), reads their `is_dead`, `facing`, `get_surface()`, and calls
+   `take_stun` / `take_damage` / `blast_push` / `take_hit` on them, and `apply_impulse` on a pushable (capped by `get_mass()`): the sanctioned surface. An object also carries `object_name` (its display name), which the AI's wording reads.
 
 4. **Objects/Character → Physics** (objects and the character compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
@@ -135,6 +138,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 hinge), seeded with `push(i, v)`, stepped with `step(delta, space, origin)` until `asleep`; read
 	 with `point(i)` / `point_count()` / `frame_basis(f)`; `exclude` lists colliders its wall sweep
 	 ignores. The Character domain owns the humanoid skeleton built on it.
+   - `Physics.spawn_explosion(world, at, kind)` (`kind` `&"frag"` / `&"stun"`; called by the Projectile System's `Explosion`): the look of a
+     grenade's burst, `ExplosionFx` nodes `ExplosionFlash`, `ExplosionFireball` (frag only) and `ExplosionSmoke`, which draw themselves in stepped
+     pixel rows and free themselves (Despawner-tracked), and a frag's scorch mark in the world's `ScorchDecals` layer (batched like `BloodDecals`,
+     capped by `Despawner.max_scene_objects`). Looks and timings are `PhysicsConfig.explosion_looks`; `PhysicsConfig.explosion_fx_enabled` off
+     spawns none of it. `Ragdoll.wake()` restarts a sleeping body's clocks so an explosion's push is simulated (the character's `blast_push`).
    - `PhysicsConfig` (`class_name` static holder, see below) — the deformation tuning
 	 (`deform_depth_per_damage`, `deform_max_depth`, `deform_chunk_damage`, `deform_max_impacts`,
 	 `deform_update_collider`) that Objects reads directly when recording damage, and the ragdoll
@@ -159,15 +167,18 @@ interface(s) and describes how they're implemented; this list is authoritative f
    as its user dies: a gun leaves a skidding `DroppedItem` in the world, the default leaves
    nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
    is which side landed up). The character
-   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` / the slot ids `UNARMED_SLOT`, `FISTS_SLOT` and `KEY_SLOT` (the AI selects its fists with `ItemRegistry.FISTS_SLOT`; an interaction's `requires_item` is a slot id, the key's) /
-   `default_inventory()` / `inventory_for(slots, rounds, magazine)` (an optional `magazine` type the gun starts loaded with) /
-   `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. `LoadoutConfig` (static holder) is what Main
+   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` / the slot ids `UNARMED_SLOT`, `FISTS_SLOT` and `KEY_SLOT` (the AI selects its fists with `ItemRegistry.FISTS_SLOT`, and names its grenades by `STUN_SLOT` / `FRAG_SLOT` (`AgentThrow.SLOTS`, the bang entry's stun); the debug panel lists the grenade rows through `LoadoutConfig.grenade_options()`; an interaction's `requires_item` is a slot id, the key's) /
+   `default_inventory()` / `inventory_for(slots, rounds, magazine, grenades)` (an optional `magazine` type the gun starts loaded with; `grenades` = slot -> count) /
+   `random_gun_slot(rng)` / `loadout_for(gun_slot, stuns, frags)` / `spares_for(gun_slot)`. The grenades (`docs/grenades.md`) are `Item`s too: slots `ItemRegistry.STUN_SLOT` 7 / `FRAG_SLOT` 8, a *count*
+   carried (`Item.uses_left()`, -1 = unlimited for every other item; `Item.is_throwable()`; `Item.throw_stats() -> Dictionary` (`{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }` for a grenade, from its `GrenadeConfig` row via `GrenadeConfig.stats_of`; `{}` default; `ThrownGrenade.throw_stats()` answers the same for a live one); `ItemRegistry.create(slot, count)`), thrown by `secondary` after a `windup` in the `throw` stance as a `ThrownGrenade`
+   (a world node in the group `live_grenades`: `kind`, `fuse_left()`, `danger_radius()`, `throw_stats()`, `thrower`) that posts `&"throw"` / `&"grenade"` events and, when its fuse ends, calls the Projectile System's `Explosion.frag` / `Explosion.stun` (`(at, world, source, row)`, `row` = its `GrenadeConfig` row). `LoadoutConfig` (static holder) is what Main
    hands a character: `options()` (plain dicts for the setup window: `RANDOM`, then every `GunConfig` gun with its magazines),
+   `grenade_options()` (the Stun and Frag rows: `{ id, label, slot, max }`; a loadout names their counts `stuns` / `frags`, 0..3), `grenade_counts(loadout)`,
    `normalize(loadout)`, `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout`) and `random(rng)`. The
    character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)` (0..1, how far that hand is thrown: a long gun swings round by it),
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
    `world_root()` (also read by the AI to find the world's characters), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
-   `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`) and `weapon_raise()` (0..1, how far
+   `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`), `aim_target()` (the aim point a grenade is thrown to) / `aim_sway()` (rad, the stun's wandering turn of every shot and throw; 0 unstunned) and `weapon_raise()` (0..1, how far
    a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
    `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
    `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their look and hold. **Ammo:** `Item` has inert hooks
@@ -190,11 +201,12 @@ interface(s) and describes how they're implemented; this list is authoritative f
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
    dying), `select_slot(id)`, `try_interact()` /
    `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-   damage, for injury sensing), `posture()`, `is_running()` / `stamina_fraction()`, the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
+   damage, for injury sensing), `posture()`, `is_running()` / `stamina_fraction()`, `run_speed()` (px/s standing and running, slower while stunned: how an AI works out whether it gets somewhere in time) / `posture_coverage(posture)` (the body's height on the coverage scale in `stand` / `crouch`, what furniture must stand above to shield it), the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `current_item()` / `current_slot()` / `item_reach()` / `has_item(id)` (the held item, its slot and reach, and whether a slot is carried — what the AI's wording, the debug panel and `requires_item` interactions read), `is_attacking()` (a punch swing is under way), `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
-   `is_automatic()`, `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` (carry only those slots, holding one, with those spare
-   magazines, the gun loaded with that type when it fits: how Main arms a spawn with its side's loadout) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   `is_automatic()`, `item_count(slot := -1)` (a grenade slot's count, 1 for any other item, 0 for none), `throw_stats(slot := -1)` (what a grenade carried in the slot tells its holder, `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot: how the AI reads a grenade's numbers, instead of keeping a copy), `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` (carry only those slots, holding one, with those spare
+   magazines, the gun loaded with that type when it fits, a grenade slot with `grenades[slot]` of them: how Main arms a spawn with its side's loadout);
+   the stun (a grenade's flash and bang): `take_stun(blind, deaf, from)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
    (aim, visible wounds, a reload in progress and the posture are things it perceives). A node is a character if it exposes `current_item()`:
    that is the one probe the AI uses to find characters in the world, so it is part of this interface and is not renamed lightly.
@@ -207,7 +219,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
-   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry`;
+   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry` (`show_grenades` reads `debug_grenades()`: `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: none), throw: {} }`);
    Main, the spectator inspector and the Testing world set those flags by that name, so an overlay's export is part of this surface. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`ai/npc_defender.tscn`) and the invader
    (`ai/npc_invader.tscn`), both inherited from `ai/npc.tscn` (itself an inherited scene of the controller-less
@@ -270,9 +282,16 @@ interface(s) and describes how they're implemented; this list is authoritative f
       character or null). The AI controller consumes it for combat awareness, hostility ("attacked
       me") and gunfire heard farther off; the match HUD for its combat feed. It also says *how* the
       hit met the surface, for the Audio domain: `outcome` (`&"blocked"` / `&"penetrate"` /
-      `&"ricochet"` for a bullet, `&"punch"` for a fist or a kick), `material` (the struck surface's, `""` for a
+      `&"ricochet"` for a bullet, `&"punch"` for a fist or a kick, `&"blast"` for a frag's blast: posted by the Projectile System's
+      `Explosion` with the thrower as `attacker` and `speed_factor` 0, which Audio does not voice as an impact: the burst has its own sound), `material` (the struck surface's, `""` for a
       wall), and for bullets `speed_factor` and `power` (its penetration power). A shot
       that flies over cover posts nothing.
+    - `&"explosion"`: `Explosion.frag` / `Explosion.stun` (Projectile System) post one when a grenade goes off (`{ position, kind` (`&"frag"` / `&"stun"`)`,
+      attacker` (the thrower, or null)`, radius` (the blast radius of a frag, the flash radius of a stun)` }`), before the burst's hits and stuns, for
+      Audio (`explosion/<kind>`), the camera (General: `Camera2D.offset` shake by distance and kind) and the AI (`docs/grenades.md`). The grenade's other topics: `&"throw"` and `&"grenade"` (Items, `ThrownGrenade`: `{ position, kind, attacker }`,
+      `{ position, kind, stage }` with stage `bounce` / `rest`) and `&"stun"` (Character, `take_stun`: `{ character, position, blind, deaf, from }`). Audio voices the
+      `throw` (`throw/<kind>`), a `grenade` `bounce` (`grenade/<kind>/<floor>`, the floor from `SoundSurface.at`; a `rest` is silent) and the `explosion`; of the `stun` it
+      voices only a deafening of its `focus` (interface 18), and the UI's `StunScreen` reads the human's own `stun` event to freeze the frame of the flash.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
       muzzle)`, gun, attacker, power }`).
     - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
@@ -283,13 +302,17 @@ interface(s) and describes how they're implemented; this list is authoritative f
       profile, variant, position, volume_db, pitch }`), which is what tests assert on.
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
       its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`) — and one
-      per step of a tactical entry, which adds `opening`, `into` (the room it leads into), `slot`, `side`, `entry_step` (claim / ready /
-      going_in / in / clear / cover / rear / done / abort), `cleared_room` (with a clear) and `covering` (with a cover:
+      per step of a tactical entry, which adds `opening`, `into` (the room it leads into), `slot`, `side`, `entry_step` (claim / ready / bang /
+      going_in / in / clear / cover / rear / done / abort), `bang` (this member goes in with a stun thrown first) and `stuns` (how many it carries), `cleared_room` (with a clear) and `covering` (with a cover:
       the doorway on out of the cleared room it watches) (`docs/tactical-entry.md`); a human invader's `PlayerStack`
-      (interface 17) posts the same entry steps for the human. Allied AI
+      (interface 17) posts the same entry steps for the human. A live grenade has its own statuses, which an ally in range reads as "a
+      grenade is down there" and not as what the speaker is doing: `status = "grenade"` (an NPC that saw or heard a grenade come down and
+      is in its danger zone: `point` the spot it landed, `kind` `&"frag"` / `&"stun"`; the NPC repeats it once if the grenade then comes to rest
+      30 px or more away), `"frag_out"` / `"bang_out"` (the thrower of a frag or a stun, `point` the landing; the GRENADE tactic's call, G17), all
+      from `docs/grenades.md` G16. Allied AI
       controllers within `callout_range` consume it (which flank an ally holds, whom it fights, where to
       support it, which stack slot is taken, when the point is through, which room is clear, which doorway on is
-      covered, when the team moves on).
+      covered, when the team moves on, which grenade to get clear of).
     Emitters and listeners never reference each other (like `Despawner`).
 
 11. **General → Interaction / AI: `PhysicsLayers.SOLID`**
@@ -377,6 +400,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
       nothing else. The stack radios the human's claim as entry `&"callout"`s (interface 10) and reads the allies' off the same bus;
       the AI's entry code treats it as any teammate (E16 in `docs/tactical-entry.md`).
 
+18. **Main → Audio: `Sound.focus`** (whose ears the player has; Audio stays a leaf)
+    - `Sound.focus: Node` (a plain var on the `Sound` autoload): the character a bang deafens *for the player*. Main sets it to the human when there is
+      one (`_build_stun_screen`) and clears it at teardown; null = nobody (a spectator match, a test). Audio reads only the focus's `stun_view()` (interface 7)
+      duck-typed: while `stun_view().deaf` > 0, `Sound.muffled()` is true, the game audio goes through a low-pass and one `tinnitus/whine` sound
+      (kind `&"tinnitus"`) plays per stun, following the deafness (`docs/grenades.md` G14). A blind-only stun, or the stun of any other character, changes nothing.
+    - The sight half of the same stun is the UI's `StunScreen` (`ui/hud/stun_screen.gd`, `watch(character)`, `drawn()`), built by Main for the human and reading
+      `stun_view()` (`blind`, `blind_total`) and the `&"stun"` event; it knows nothing of Audio, nor Audio of it.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -393,8 +424,11 @@ Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"callout": the human's claim)──▶ allied AIControllers;  StackMarkers (UI) ──(view())──▶ PlayerStack
+ThrownGrenade (Items) ──(Explosion.frag / .stun)──▶ Explosion (Projectile) ──(take_hit / blast_push / take_stun, ProjectileSpawner fragments, Physics.spawn_explosion)──▶ Objects / Character / Physics
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
+main ──(Sound.focus = the human)──▶ Sound   /   Character (&"stun") ──▶ EventBus ──▶ Sound (tinnitus + muffle for the focus), StunScreen (UI)
+Explosion (&"explosion") ──▶ EventBus ──▶ Sound (the burst) / Camera (shake)
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
@@ -404,15 +438,15 @@ TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-ba
 Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
 `Despawner`, `PhysicsLayers`), which every domain may use (World-Gen's only outward code dep is
 the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into ten `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into eleven `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
-push + punch + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
+push + punch + being stunned + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
-types, capacities and reload times) and `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
-muzzle speed, spread, recoil, magazine, whether it raises at a wall) and `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands). World-Gen's `LayoutRules` (which rooms may
+types, capacities and reload times), `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
+muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers) and `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands). World-Gen's `LayoutRules` (which rooms may
 hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
-tuning. There is no `Config` autoload. An eleventh static holder, `PhysicsLayers`
+tuning. There is no `Config` autoload. A twelfth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
 plays for doorway sides.
 

@@ -23,7 +23,7 @@ Files:
   (which copies them in), so adding a tunable is three declarations and one line in `agent_perception.apply_config()`.
 - `snapshot/snapshot_sections.gd` — the state text: `situation_text, loadout_text, odds_text, contacts_text, exposure_text,
   unseen_fire_text, allies_text, flanks_text, awareness_text, threat_summary`.
-- `snapshot/snapshot_options.gd` — the option groups: `hostile_group, reload_group, fire_group, flank_group, melee_group,
+- `snapshot/snapshot_options.gd` — the option groups: `hostile_group, reload_group, fire_group, flank_group, grenade_group, melee_group,
   advance_group, retreat_group, lead_group, shooter_group, entry_group` (with the static `entry_rooms`)`, search_group, explore_group,
   interaction_group, room_group` and their
   helpers. Reads the per-decision knowledge from `know` (set by `build()`).
@@ -46,14 +46,15 @@ lives in `agent_snapshot.gd`.
   `gun_loaded` (the gun it fights with, `Character.gun_slot()`, has rounds and is not mid-reload),
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
   rounds), `under_fire`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
-  gates the `stay` child of INVESTIGATE), `hurt`, `inside`, `exposed`. A fact is written only while something gates on it
+  gates the `stay` child of INVESTIGATE), `hurt`, `inside`, `exposed`, and the grenade ones: `has_frag`, `has_stun` (carried, `Character.item_count`), `grenade_ready` (some known hostile has a `grenade_throws` option),
+  `stack_has_stun` (it carries a stun, or a teammate's entry callout says `stuns` > 0: gates STUN ENTRY). A fact is written only while something gates on it
   (a tree `requires`, an entry rule or a test); the brain overlay shows the ones that hold.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
   (clear shot / exposed to their fire / behind cover / line blocked, plus other hostiles that can see
   you), `allies` (each ally's side of the target + their radio callouts), `flanks` (one-line digest),
-  `loadout` (the gun in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
+  `loadout` (then "You carry a frag grenade and a stun grenade." for the grenades carried; the gun in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
   once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
   empty without a gun; the noun is the gun's display name lower-cased, `gun_noun` ("pistol", "assault rifle", an acronym like "SMG" kept), so a
   pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
@@ -97,6 +98,15 @@ compare numbers, and an encoder reads "no cover" as "cover". So:
    and the contacts section on a bind level blur the match.
 5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
 A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
+**Grenades** (`docs/grenades.md`): per target the group `grenade_throws` (`grenade_group`): one option `frag` / `stun` per kind carried, only against a hostile whose last-known spot is hidden from the NPC's line of fire
+(`line.clear` false), within that kind's throw range (`AgentThrow.range_of`, off the grenade carried) with a clear lob (`AgentThrow.can_lob`), judged per kind; `params` `point` (the spot), `kind`, `radius`, `slot`, `target_id`; `tags` `ally_in_blast` (a known ally, seen or on the radio, in the
+grenade's danger zone at the spot: `AgentThrow.in_zone`), `no_safe_spot` (the NPC itself is in the zone standing and `AgentThrow.escape` finds no spot or cover within the fuse) which the tree's `grenade` node drops by, and `inside`.
+The exposure section says "You can throw a frag grenade onto their spot." for the options not dropped, and "X is blinded by a flash and cannot see you." for a hostile it caught in a stun's flash (`blind` on the contact, from
+`AgentPerception.process_explosion`); the contact line, the `hostiles` option and the ADVANCE summary say "blinded by a flash", a blinded hostile has no `aim_text`, and the `hostiles` bind carries `blinded` (the clause
+the ADVANCE desc's `{blinded}` is filled with). The `entries` options say what makes a room suspect instead of "unexplored"/"unsearched": "gunfire heard there" (a `heard_gunfire` position inside the room), "a hostile seen going in"
+(a lost hostile last seen in it), listed first. With a stun in the stack (`stack_has_stun`) a gunfire or lost-hostile lead inside a room an entry doorway leads into is no longer a `leads` option (INVESTIGATE would move there and the entry
+guard would turn it into a quiet entry: the bang is the entry's to weigh). Without one the leads are as before.
+
 **Posture** words appear only when someone is not standing, so a standing body's text is byte-identical (the `tools/von_scenarios` fixtures pin it): the
 NPC's own in its situation line (" You are crouching.") and a *visible* contact's in its contact line ("crouched low"; a last-seen posture may be stale, so it is never shown for a remembered one). Fact `crouched` is in the snapshot's
 `facts`. Test: `tests/ai/posture/posture_in_von_state_test.gd`.

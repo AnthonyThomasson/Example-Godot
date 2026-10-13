@@ -1,7 +1,6 @@
 ---
-name: m-finish
-description: Commit this worktree's work, merge it into main, push main, then close its ticket and remove the Orca workspace. Manual only — invoked as `/m-finish`.
-disable-model-invocation: true
+name: finish
+description: Commit this worktree's work, merge it into main, push main, then close its ticket and remove the Orca workspace. Use it at the end of a ticket once the user has answered "finish" to the ticket workflow's feedback-or-finish question (`ticket-story` phase 7, `ticket-bug` phase 4), or when the user asks to finish (`/finish`). Never run it without that answer.
 model: haiku
 ---
 
@@ -9,6 +8,9 @@ model: haiku
 
 Commit the work in this worktree, land it on `main`, push `main`, close the ticket and remove the
 Orca workspace. Run from the worktree root. Push `main` only: do not push the branch.
+
+It pushes `main` and deletes the workspace, so it runs only on the user's say-so: their "finish" answer at the end of
+a ticket workflow, or `/finish`. Release every settled orchestration worker before step 1.
 
 1. **Preconditions.** Get the branch (`git branch --show-current`) and the directory where `main`
    is checked out (the `worktree` entry with `branch refs/heads/main` in
@@ -31,7 +33,7 @@ Orca workspace. Run from the worktree root. Push `main` only: do not push the br
    a worktree with any untracked file that is not gitignored, and a running Godot editor keeps
    writing new ones (`.uid` files) into it. Do this before closing anything, so a failure leaves
    the ticket open.
-   - Stop any editor or game opened on this worktree (`/m-show-me` leaves one running):
+   - Stop any editor or game opened on this worktree (`show-me` leaves one running):
      `pgrep -f -- "--path $PWD( |\$)"`, then plain `kill <pid>` on each, and wait for them to exit.
    - `git status --short`. Anything left is untracked or modified and must go:
      a `.uid` with no `.gd` beside it, an `.import`, or other generated cruft: delete it.

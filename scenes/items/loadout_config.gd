@@ -1,10 +1,11 @@
 class_name LoadoutConfig
 
 ## Items domain: the weapon loadouts a match can hand a character — which gun it carries, which magazine
-## the gun starts loaded with and how many spares it carries. There is no table of its own: the choices are
-## the guns in `GunConfig.guns` and their magazines in `MagazineConfig.types`, so a gun added there is
-## offered everywhere automatically. The setup window never sees this class: Main passes it the plain
-## `options()` list and gets plain `{ weapon, magazine, spares }` dicts back.
+## the gun starts loaded with, how many spares it carries and how many stun and frag grenades. There is no table of
+## its own: the choices are the guns in `GunConfig.guns` and their magazines in `MagazineConfig.types`, and the grenades
+## in `GrenadeConfig.grenades`, so one added there is offered everywhere automatically. The setup window never sees this
+## class: Main passes it the plain `options()` and `grenade_options()` lists and gets plain
+## `{ weapon, magazine, spares, stuns, frags }` dicts back.
 
 ## The weapon id meaning "a gun drawn at random" (the default: how every character spawned before loadouts
 ## could be chosen). It has no magazine choices; it takes the drawn gun's own magazine and spares.
@@ -12,6 +13,8 @@ const RANDOM := &"random"
 
 ## Upper bound of the spare-magazine choice.
 static var max_spares: int = 4
+## Upper bound of each grenade count (stuns, frags).
+static var max_grenades: int = 3
 
 
 ## The choices for a UI: `[{ id, label, magazines: [{ id, label }] }]` — Random first, then every gun by
@@ -25,9 +28,20 @@ static func options() -> Array:
 	return out
 
 
-## `loadout` ({ weapon, magazine, spares }, anything blank/unknown = the default) made valid: `random` or a
-## known gun, one of that gun's magazine types (blank for random), spares within `0..max_spares` (-1 when
-## unset: the gun's own spare count).
+## The grenade rows for a UI: `[{ id, label, slot, max }]`, in slot order (the stun, then the frag). A loadout names
+## a row's count under the key `<id>s` (`stuns`, `frags`).
+static func grenade_options() -> Array:
+	var out: Array = []
+	for slot: int in GrenadeConfig.slots():
+		var kind := GrenadeConfig.kind_in_slot(slot)
+		out.append({ "id": kind, "label": str(GrenadeConfig.row(kind).get("name", kind)).trim_suffix(" grenade"),
+			"slot": slot, "max": max_grenades })
+	return out
+
+
+## `loadout` ({ weapon, magazine, spares, stuns, frags }, anything blank/unknown = the default) made valid: `random`
+## or a known gun, one of that gun's magazine types (blank for random), spares within `0..max_spares` (-1 when
+## unset: the gun's own spare count) and each grenade count within `0..max_grenades` (0 when unset).
 static func normalize(loadout: Dictionary) -> Dictionary:
 	var weapon := StringName(loadout.get("weapon", RANDOM))
 	if weapon != RANDOM and GunConfig.row(weapon).is_empty():
@@ -42,12 +56,24 @@ static func normalize(loadout: Dictionary) -> Dictionary:
 	var spares := -1
 	if loadout.has("spares") and weapon != RANDOM:
 		spares = clampi(int(loadout["spares"]), 0, max_spares)
-	return { "weapon": weapon, "magazine": magazine, "spares": spares }
+	var out := { "weapon": weapon, "magazine": magazine, "spares": spares }
+	out.merge(grenade_counts(loadout))
+	return out
+
+
+## The grenade counts of `loadout`, each within `0..max_grenades` (0 when unset): `{ stuns, frags }`.
+static func grenade_counts(loadout: Dictionary) -> Dictionary:
+	var out := {}
+	for option: Dictionary in grenade_options():
+		var key := "%ss" % option["id"]
+		out[key] = clampi(int(loadout.get(key, 0)), 0, int(option["max"]))
+	return out
 
 
 ## Arm `character` with the loadout (via `Character.set_loadout`): bare hands, fists, the key and one gun —
 ## the chosen one, or for `random` one drawn from `rng` — loaded with the chosen magazine and carrying the
-## chosen number of spares of it. Returns the gun id it was armed with.
+## chosen number of spares of it, and the chosen number of stun and frag grenades (the gun stays what is held).
+## Returns the gun id it was armed with.
 static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerator) -> StringName:
 	var l := normalize(loadout)
 	var gun: StringName = l["weapon"]
@@ -65,7 +91,11 @@ static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerat
 		spare_types = []
 		spare_types.resize(l["spares"] if l["spares"] >= 0 else int(GunConfig.row(gun).get("spare_magazines", 0)))
 		spare_types.fill(magazine)
-	character.set_loadout(ItemRegistry.loadout_for(slot), slot, spare_types, magazine)
+	var counts := {}  # Slot -> how many.
+	for option: Dictionary in grenade_options():
+		counts[int(option["slot"])] = l["%ss" % option["id"]]
+	var slots := ItemRegistry.loadout_for(slot, counts.get(ItemRegistry.STUN_SLOT, 0), counts.get(ItemRegistry.FRAG_SLOT, 0))
+	character.set_loadout(slots, slot, spare_types, magazine, counts)
 	return gun
 
 

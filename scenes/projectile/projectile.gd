@@ -5,9 +5,13 @@ extends Node2D
 ## that object's surface, so it may fly over cover, ricochet, penetrate, or embed. It frees
 ## itself once spent or past `max_distance`. Drawing lives in projectile_visuals.gd.
 
+## Within this many px of `max_distance` a bullet counts as having reached it (float slack on the clamped last step).
+const SPENT_SLACK := 0.01
+
 ## Travel speed in px/s.
 @export var speed: float = 1600.0
-## Distance the bullet may travel before freeing itself (px).
+## Distance the bullet may travel before it is spent and frees itself (px); it stops exactly there. A grenade's fragments
+## are given a short one (`ProjectileSpawner.spawn`'s `max_range`).
 @export var max_distance: float = 2000.0
 ## Base damage, before the firing item's damage and the per-hit squareness/speed scaling.
 @export var damage: float = 10.0
@@ -32,8 +36,10 @@ var height := 0.0
 
 ## Unit travel vector; reassigned on ricochet / penetration deflection.
 var direction := Vector2.RIGHT
-## Body to skip in the sweep (the shooter).
+## Body to skip in the sweep (the shooter), and the `attacker` of the hits it posts.
 var ignore: Node
+## True when the shooter is struck like anyone else (a grenade's fragments hurt its thrower: `docs/grenades.md` G9).
+var strikes_shooter := false
 ## Distance travelled so far.
 var _traveled := 0.0
 ## Colliders excluded from further sweeps (flown over or penetrated), so the bullet does not
@@ -50,14 +56,17 @@ signal hit(body: Node, damage: float)
 func _ready() -> void:
 	rotation = direction.angle()
 	height = BallisticsConfig.bullet_height if BallisticsConfig.bullet_height >= 0.0 else randf() * 100.0
-	if ignore is CollisionObject2D:
+	if ignore is CollisionObject2D and not strikes_shooter:
 		_exclude.append(ignore.get_rid())
 
 
 ## Advance one frame's travel, resolving each collider crossed. Loops rather than casting
 ## once because a hit can change direction/speed mid-frame; the guard caps a bounce loop.
 func _physics_process(delta: float) -> void:
-	var remaining := speed * delta
+	if _traveled >= max_distance - SPENT_SLACK:
+		queue_free()
+		return
+	var remaining := minf(speed * delta, max_distance - _traveled)
 	var guard := 0
 	while remaining > 0.0:
 		guard += 1
@@ -83,7 +92,7 @@ func _physics_process(delta: float) -> void:
 				queue_free()
 				return
 
-		if _traveled >= max_distance:
+		if _traveled >= max_distance - SPENT_SLACK:
 			queue_free()
 			return
 

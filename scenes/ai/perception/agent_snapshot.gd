@@ -29,14 +29,14 @@ var _memory: RefCounted   ## The agent's event memory (read-only here); see agen
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
 
 
-## Capture the collaborators the author reads: the event memory, the combat geometry and the doorway geometry.
+## Capture the collaborators the author reads: the event memory, the combat geometry, the doorway geometry and the grenade geometry.
 ## Called once by the perception in its setup(), after it has built them. The config fields are set directly by
 ## the perception's apply_config() (like the other modules), so there is no separate configure step.
-func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted) -> void:
+func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: RefCounted) -> void:
 	_memory = memory
 	_tactics = tactics
 	_sections.setup(vocab, memory, tactics)
-	_options.setup(vocab, memory, tactics, entry)
+	_options.setup(vocab, memory, tactics, entry, throw)
 
 
 ## BUILD pass — run at the start of each decision. Assemble the snapshot the decision planner walks,
@@ -56,6 +56,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"map": character.get_world_2d().navigation_map,
 		"self_pos": self_pos,
 		"self_id": character.get_instance_id(),
+		"character": character,
 		"exclude": [character.get_rid()],
 		"hostiles": hostiles,
 		"allies": allies,
@@ -81,18 +82,24 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 			"flank_sides": _options.flank_group(t, a, rooms),
 			"advance_positions": _options.advance_group(ctx, t, a),
 			"melee": _options.melee_group(self_pos, t),
+			"grenade_throws": _options.grenade_group(ctx, t, a),
 		}
+		var throws: Array = per_target[t["id"]]["grenade_throws"]["options"].filter(
+			func(o): return not o["tags"]["ally_in_blast"] and not o["tags"]["no_safe_spot"]).map(func(o): return o["id"])
 		per_sections[t["id"]] = {
-			"exposure": _sections.exposure_text(ctx, t, a),
+			"exposure": _sections.exposure_text(ctx, t, a, throws),
 			"flanks": _sections.flanks_text(t, a),
 			"allies": _sections.allies_text(ctx, t, a),
 		}
 
 	var primary: Dictionary = hostiles[0] if not hostiles.is_empty() else {}
 	var line: Dictionary = analyses[primary["id"]]["line"] if not primary.is_empty() else {}
-	var leads := _options.lead_group(ctx, hostiles)
 	var entries := _options.entry_group(ctx, rooms)
 	var entered := SnapshotOptions.entry_rooms(entries)
+	var carried: Array = knowledge["carried_grenades"]
+	var stun_stack: bool = carried.has(&"stun") or callouts.any(func(c): return int(c.get("stuns", 0)) > 0)
+	# With a stun to throw, gunfire or a hostile in a room a doorway of ENTER leads into is the entry's to weigh (quiet or with a bang).
+	var leads := _options.lead_group(ctx, hostiles, entered if stun_stack else {})
 	var dmg: float = character.damage_taken()
 	# Rounds in the gun it fights with (-1 without one): the AI shoots, reloads and plans around it.
 	var gun: int = character.gun_slot()
@@ -108,6 +115,10 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"leads": not leads["options"].is_empty(),
 		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
 			and leads["options"].any(func(o): return not o["tags"]["inside"]),
+		"has_frag": carried.has(&"frag"),
+		"has_stun": carried.has(&"stun"),
+		"grenade_ready": per_target.values().any(func(g): return not g["grenade_throws"]["options"].is_empty()),
+		"stack_has_stun": stun_stack,
 		"hurt": dmg >= vocab.hurt_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),
 		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
@@ -115,7 +126,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var sections := {
 		"goal": fill_goal(goal, character),
 		"situation": _sections.situation_text(character, rooms),
-		"loadout": _sections.loadout_text(character, gun, ammo),
+		"loadout": _sections.loadout_text(character, gun, ammo, carried),
 		"current": ("Current activity: %s." % activity) if activity != "" else "",
 		"odds": _sections.odds_text(hostiles, allies, ctx["callouts"], not leads["options"].is_empty()),
 		"contacts": _sections.contacts_text(self_pos, known),

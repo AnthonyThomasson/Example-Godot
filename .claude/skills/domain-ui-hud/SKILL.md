@@ -5,11 +5,11 @@ description: Deep implementation detail for the UI hud sub-domain (scenes/ui/hud
 
 # UI · HUD sub-domain (`scenes/ui/hud/`)
 
-The in-game observers: each reads only the Character public API / signals, the AI controller's `goal_text()` / `debug_zones()` / `known_contacts_for_display()` and the EventBus `&"hit"` topic. See `domain-ui` for what all UI scripts share.
+The in-game observers: each reads only the Character public API / signals, the AI controller's `goal_text()` / `debug_zones()` / `known_contacts_for_display()` and the EventBus `&"hit"` (and, for the stun screen, `&"stun"`) topic. See `domain-ui` for what all UI scripts share.
 
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
   item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
-  `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
+  `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), a grenades line (`Grenades: 1 stun, 2 frag`, "—" with none, read through `item_count(slot)` for the slots of `LoadoutConfig.grenade_options()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
   (punch left/right or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Listens to `hit_landed` on the character;
   freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
 
@@ -51,7 +51,15 @@ The in-game observers: each reads only the Character public API / signals, the A
   slot, the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
   `watch(stack)` then it polls the stack's `view()` and redraws on change; `drawn()` is what is shown (what the test reads).
 
+- `stun_screen.gd` — the **stun screen** (`StunScreen` CanvasLayer, layer 90, built by `main.gd` under `World` for a human match; G14 of
+  `docs/grenades.md`). `watch(character)`, then it reads the character's `stun_view()` each frame (`blind`, `blind_total`): the screen is
+  **white** by `blind / blind_total` (1 at the burst, falling steadily to 0 as the blindness ends), over a **frozen afterimage** of the frame on screen
+  when the flash landed (`get_viewport().get_texture().get_image()`, taken on the character's `&"stun"` event with `blind` > 0 and held solid until the
+  white is half gone, then faded out to the live view; none on a headless display, where `afterimage` is still true). A new flash while still white
+  (≥ 0.2) keeps the old frame. A deaf-only stun, another character's flash and a dead/freed character draw nothing. `drawn()` is `{ white, afterimage,
+  remaining }` (what the test reads). A decoupled observer; the white is drawn on an inner full-rect `Control` (mouse-ignoring).
+
 ## Interface recap
 
-- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to `match_ended`; `SeedDisplay.show_seed(seed)`; builds `SpectatorInspector` (spectator mode only) with `setup(combatants, flags)` / `set_flag(flag, on)`. `DebugUI` attaches by exported `character_path`; builds `StackMarkers` and calls `watch(stack)` with the player's `PlayerStack` (human match only).
-- Tests: `tests/ui/match_hud_verdict_test.gd`, `tests/ui/stack_markers_draw_test.gd`.
+- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to `match_ended`; `SeedDisplay.show_seed(seed)`; builds `SpectatorInspector` (spectator mode only) with `setup(combatants, flags)` / `set_flag(flag, on)`. `DebugUI` attaches by exported `character_path`; builds `StackMarkers` and calls `watch(stack)` with the player's `PlayerStack` (human match only), and a `StunScreen` that `watch`es the player (human match only).
+- Tests: `tests/ui/match_hud_verdict_test.gd`, `tests/ui/stack_markers_draw_test.gd`, `tests/ui/stun_screen_whiteout_test.gd`.

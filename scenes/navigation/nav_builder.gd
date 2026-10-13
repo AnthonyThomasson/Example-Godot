@@ -91,7 +91,7 @@ static func rebake_steering(region: NavigationRegion2D, house: Node2D, rooms: Ar
 	var steering := steering_region(region)
 	if steering == null:
 		return
-	var nav_poly := _bake_polygon(house, rooms, agent_radius, character_holes(house.get_parent()), true)
+	var nav_poly := _bake_polygon(house, rooms, agent_radius, character_holes(house.get_parent()))
 	if nav_poly != null:
 		steering.navigation_polygon = nav_poly
 
@@ -119,7 +119,7 @@ static func steering_map(planning_map: RID) -> RID:
 static func _add_steering_region(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float, planning_poly: NavigationPolygon) -> void:
 	var map := _steering_map_for(region.get_world_2d().navigation_map)
 	var characters := character_holes(house.get_parent())
-	var nav_poly := planning_poly if characters.is_empty() else _bake_polygon(house, rooms, agent_radius, characters, true)
+	var nav_poly := planning_poly if characters.is_empty() else _bake_polygon(house, rooms, agent_radius, characters)
 	var steering := NavigationRegion2D.new()
 	steering.name = STEERING_NAME
 	steering.navigation_polygon = nav_poly
@@ -172,7 +172,9 @@ static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array
 			done.call()
 		return
 	var nav_poly: NavigationPolygon = job["poly"]
+	var origin := house.position
 	NavigationServer2D.bake_from_source_geometry_data_async(nav_poly, job["source"], func() -> void:
+		_weld_vertices(nav_poly, origin)
 		_drop_slivers(nav_poly)
 		if is_instance_valid(region):
 			region.navigation_polygon = nav_poly
@@ -184,16 +186,15 @@ static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array
 ## static wall colliders (doorways stay open) minus each solid furniture footprint (carved as a hole)
 ## and minus each of `characters` (footprints from `character_holes`; none = the planning bake). Returns
 ## null if there are no rooms. In the house's LOCAL frame — the region offsets it into world space.
-## Shared by the initial `build` and every `rebake`, so both carve furniture holes identically. `weld` snaps the
-## result to the 1 px grid (`_weld_vertices`), which a bake with characters needs.
-static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float, characters: Array = [], weld := false) -> NavigationPolygon:
+## Shared by the initial `build` and every `rebake`, so both carve furniture holes identically. The result is welded
+## to the 1 px grid (`_weld_vertices`): every hole that meets a wall, a character's and a piece of furniture's, needs it.
+static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float, characters: Array = []) -> NavigationPolygon:
 	var job := _source_for(house, rooms, agent_radius, characters)
 	if job.is_empty():
 		return null
 	var nav_poly: NavigationPolygon = job["poly"]
 	NavigationServer2D.bake_from_source_geometry_data(nav_poly, job["source"])
-	if weld:
-		_weld_vertices(nav_poly, house.position)
+	_weld_vertices(nav_poly, house.position)
 	_drop_slivers(nav_poly)
 	return nav_poly
 

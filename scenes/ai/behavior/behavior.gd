@@ -15,7 +15,12 @@ extends Node
 ##   reload   — stand and swap in a fresh magazine (`Character.reload()`), then re-decide.
 ##   entry    — go through doorway `opening` into room `into` as a team member or alone: stack, slice the pie,
 ##              cross without stopping, take a corner, clear the room (`entry.gd`).
+##   throw    — take a grenade in hand, aim at `point`, throw it, radio it and wait out the fuse with the gun back in hand
+##              (`combat.gd`; the GRENADE tactic, `docs/grenades.md` G17).
 ##   hold     — stay and watch.
+## Outside the primitives, **the evade reflex** (`set_evade`, `docs/grenades.md` G16) takes over the NPC whatever it is doing, an
+## entry included, while a live grenade threatens it: it runs to the safe spot the perception found, crouches there if it is
+## behind cover, holds facing away until the burst, and re-decides.
 ## Whatever the primitive, a final WATCH stage (`watch.gd`, `docs/gaze-and-fire.md`) puts a threat in sight under the NPC's eyes and
 ## gun and, with none, makes it look down its path or at its doors. It never chooses WHAT to do — the planner does — and applies no
 ## policy beyond the params it is handed (`confine_inside` keeps a territorial NPC from chasing out of the house). It owns a
@@ -30,6 +35,9 @@ const Combat := preload("res://scenes/ai/behavior/combat.gd")
 const SearchCoverage := preload("res://scenes/ai/behavior/search_coverage.gd")
 const Entry := preload("res://scenes/ai/behavior/entry.gd")
 const Watch := preload("res://scenes/ai/behavior/watch.gd")
+
+## Seconds past a grenade's fuse that the thrower waits for the burst before it gives up waiting.
+const THROW_WAIT_MARGIN := 1.0
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
@@ -128,6 +136,13 @@ var _in_interaction := false      ## Committed to an active object interaction.
 var _interaction_timer := 0.0     ## Seconds left before ending the current interaction.
 var _commit_timer := 0.0          ## Seconds left on the current move/approach commitment (safety cap).
 var _resolved := false            ## A task just finished (arrived / interaction ended / target lost) → re-decide.
+var _evade := {}                  ## The plan to get clear of a live grenade being carried out ({} = none); see `set_evade`.
+var _evade_arrived := false       ## The evade reached its safe spot.
+var _throw_kind: StringName = &"" ## The grenade being thrown (`throw` leaf): &"frag" / &"stun".
+var _throw_spot := Vector2.ZERO   ## Where it is thrown to.
+var _throw_calls: Array = []      ## Throws to radio since the last `take_throw_calls()`: { kind, point }.
+var _throw_wait := -1.0           ## Seconds left waiting out the grenade's fuse once it has left the hand (-1: not thrown yet).
+var _throw_seen := false          ## The grenade thrown has been seen in the world (it is its own, always known): the wait ends when it is gone.
 
 
 ## Build the Locomotion child and capture the perception sub-domain. The controller calls this once in
@@ -222,6 +237,8 @@ func ongoing() -> bool:
 			return _reloading
 		&"entry":
 			return _entry_pending or _entry.phase not in ["", "done"]
+		&"throw":
+			return true
 	return false
 
 
@@ -260,7 +277,7 @@ func activity_text() -> String:
 ## How each phase of a tactical entry reads in the status line.
 const ENTRY_PROGRESS := {
 	"approach": "heading for the door", "stack": "stacked at the door", "pie": "slicing the pie",
-	"cross": "going in", "corner": "taking a corner", "clear": "clearing the room",
+	"bang": "throwing a stun in", "cross": "going in", "corner": "taking a corner", "clear": "clearing the room",
 	"cover": "covering the doors on", "rear": "holding the door",
 }
 
@@ -284,6 +301,8 @@ func _progress() -> String:
 			return "reloading"
 		&"entry":
 			return ENTRY_PROGRESS.get(_entry.phase, "heading for the door")
+		&"throw":
+			return "throwing it" if _throw_wait < 0.0 else "waiting for it to go off"
 	return "waiting" if not _labels.is_empty() else ""
 
 
@@ -307,6 +326,7 @@ func debug_state() -> Dictionary:
 		"hostiles_known": _hostiles.size(),
 		"gaze": { "mode": _gaze, "threat": str(_threat["node"].name) if not _threat.is_empty() and is_instance_valid(_threat["node"]) else "" },
 		"in_interaction": _in_interaction,
+		"evade": _json_safe(_evade) if not _evade.is_empty() else {},
 		"timers": {
 			"commit": _commit_timer,
 			"tactic": _tactic_timer,
@@ -364,9 +384,10 @@ func debug_entry_view(character) -> Dictionary:
 	return { "entry": _entry.debug_view() if _primitive == &"entry" else {}, "guard": guard }
 
 
-## Whether the NPC is committed to crossing a doorway: the controller holds every re-decision until it is through.
+## Whether the NPC is committed: crossing a doorway, or with its arm drawn back to throw (a grenade cannot be called back).
+## The controller holds every re-decision until it is through.
 func committed() -> bool:
-	return _primitive == &"entry" and _entry.committed()
+	return (_primitive == &"entry" and _entry.committed()) or (_primitive == &"throw" and _combat.throw_stage == "windup")
 
 
 ## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, the room it leads into, slot and
@@ -460,8 +481,10 @@ func _json_safe(d: Dictionary) -> Dictionary:
 ## Adopt the planner's leaf `{ path, labels, primitive, params }`: capture its destination (snapped
 ## onto the navmesh), its target and its object, and commit to it.
 func set_leaf(leaf: Dictionary) -> void:
+	if not _evade.is_empty():
+		return  # Running from a grenade: a decision that was in flight is stale by the burst, which ends in a new one.
 	if committed() and _resume.is_empty():
-		return  # Crossing a doorway on its own ENTER: a decision that was in flight waits (the entry ends in a re-decision).
+		return  # Crossing a doorway on its own ENTER, or winding up a throw: a decision that was in flight waits (it ends in a re-decision).
 	var carry := {}
 	if _primitive == &"entry" and not _resume.is_empty() and (committed() or _guards(leaf)):
 		# A detour's entry carries on: the new order replaces the one paused behind it (a fight that began, the same order
@@ -502,6 +525,8 @@ func _adopt(leaf: Dictionary) -> void:
 	_watch.reset()
 	_point = _loco.reachable(_params["point"]) if _params.has("point") else Vector2.ZERO
 	_target_obj = null
+	_combat.end_throw()
+	_throw_wait = -1.0
 	_engage_id = 0
 	var target_id: int = _params.get("target_id", 0)
 	if target_id != 0:
@@ -522,6 +547,11 @@ func _adopt(leaf: Dictionary) -> void:
 			_reload_started = false
 		&"entry":
 			_entry_pending = true
+		&"throw":
+			_throw_kind = _params.get("kind", &"")
+			_throw_spot = _params.get("point", Vector2.ZERO)
+			_throw_seen = false
+			_combat.begin_throw(int(_params.get("slot", -1)), _throw_spot, _perception.grenade_range(_throw_kind))
 
 
 ## Fight known contact `id`: capture its body and last-known position (no-op when it isn't known).
@@ -596,7 +626,7 @@ func service_interaction(character, delta: float, force: bool) -> bool:
 	if not _in_interaction:
 		return false
 	_interaction_timer -= delta
-	if force or not character.is_busy() or _interaction_timer <= 0.0:
+	if force or not character.is_busy() or _interaction_timer <= 0.0 or not _evade.is_empty():
 		character.end_interaction()
 		_in_interaction = false
 		_resolved = true  # Pick the next step right away rather than wait out the cadence.
@@ -634,7 +664,7 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 			if _look_around and _arrived and not _resolved:
 				return false  # Hold through room coverage; it ends itself (all seen, or the budget runs out).
 			return _commit_timer <= 0.0
-		&"interact", &"reload":
+		&"interact", &"reload", &"throw":
 			return _commit_timer <= 0.0
 		&"entry":
 			return false  # It ends itself: the room clear, or the entry given up.
@@ -647,6 +677,9 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 func apply(character, delta: float) -> void:
 	_combat.tick(delta)
 	_loco.sample(character, delta)  # Observation only (stuck overlay); never alters the tick.
+	if not _evade.is_empty():
+		_apply_evade(character, delta)
+		return
 	match _primitive:
 		&"move":
 			_apply_move(character, delta)
@@ -660,6 +693,8 @@ func apply(character, delta: float) -> void:
 			_apply_reload(character)
 		&"entry":
 			_apply_entry(character, delta)
+		&"throw":
+			_apply_throw(character, delta)
 		_:
 			_apply_hold(character)
 	_apply_watch(character, delta)
@@ -691,6 +726,12 @@ func _apply_watch(character, delta: float) -> void:
 		&"engage":
 			if _arrived:
 				return
+		&"throw":
+			if _combat.throw_stage != "away":
+				return  # Taking the grenade in hand and throwing it: aimed at the spot, not shot at the threat.
+		&"entry":
+			if _entry.phase == "bang":
+				return  # Turned away from the door for the stun: not at a threat in it.
 	var t: Dictionary = _watch.threat(_hostiles, _engage_id)
 	if not t.is_empty() and not t["visible"] and not _perception.has_line_to(character, t["node"], t["pos"]):
 		t = {}  # Remembered behind a wall: not worth staring at the wall for.
@@ -715,6 +756,8 @@ func _resting() -> bool:
 			return true
 		&"move":
 			return _arrived and not _look_around
+		&"throw":
+			return _combat.throw_stage == "away"
 	return false
 
 
@@ -740,6 +783,8 @@ func _apply_posture(character, delta: float) -> void:
 ## everything outside a fight. Fighting in place (an engaged NPC in position, or one holding / reloading while a hostile is known or
 ## shots are landing) it crouches: a smaller target, and it hides behind cover as high as a crouch.
 func _wanted_posture(character) -> StringName:
+	if not _evade.is_empty():
+		return &"crouch" if _evade_crouches() else &"stand"
 	if not posture_enabled or character.run_input:
 		return &"stand"
 	var under_fire: bool = _perception != null and _perception.under_fire()
@@ -1059,6 +1104,61 @@ func _apply_interact(character) -> void:
 		_resolved = true
 
 
+## Throw (docs/grenades.md G17): take the grenade in hand, aim at the spot and throw it (`Combat.throw_step`), radio it as it leaves the
+## hand, then stand with the gun back in hand until the grenade has gone off. The evade reflex carries the thrower off if the burst
+## reaches it (it replaces this order); one the burst does not reach has nothing more to do. Then the NPC re-decides. A throw
+## that cannot be made (the lob is blocked now, none left, the hand never free) is given up at once and the NPC re-decides. A thrower
+## that has drifted a few px out of range since the spot was offered closes in on it (`Combat.throw_step`) instead; once the wind-up
+## has begun the throw is committed, standing where it is.
+func _apply_throw(character, delta: float) -> void:
+	if _combat.throw_stage != "away":
+		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(character, character.global_position, _throw_spot)
+		if blocked or _combat.throw_step(character, delta) == &"failed":
+			_end_throw()
+		return
+	character.move_input = Vector2.ZERO
+	if _throw_wait < 0.0:
+		_end_throw()
+		return
+	_throw_wait -= delta
+	var live: bool = _perception.known_grenades().any(func(g): return g["source"] == &"own")
+	_throw_seen = _throw_seen or live
+	if (_throw_seen and not live) or _throw_wait <= 0.0:
+		_end_throw()
+
+
+## Called every tick before the evade reflex is handed its plan: whether the grenade being thrown has left the hand (the end of the
+## wind-up). Then it is radioed, and the wait for the burst begins. This has to come first: a grenade just thrown is a live one the
+## thrower may be inside the zone of, and the evade replaces the throw order the same tick.
+func poll_throw(character) -> void:
+	if _primitive == &"throw" and _combat.throw_released(character):
+		_throw_calls.append({ "kind": _throw_kind, "point": _throw_spot })
+		_throw_wait = _perception.grenade_fuse(_throw_kind) + THROW_WAIT_MARGIN
+
+
+## The throw is over (the burst, or it could not be made): the NPC re-decides.
+func _end_throw() -> void:
+	_combat.end_throw()
+	_primitive = &"hold"
+	_throw_wait = -1.0
+	_resolved = true
+
+
+## The throws to radio since the last call, `{ kind, point }`: the controller posts each as a `frag_out` / `bang_out` callout.
+func take_throw_calls() -> Array:
+	var out := _throw_calls
+	_throw_calls = []
+	return out
+
+
+## Read-only: the throw the NPC is about to make, `{ from, to, kind, radius }` (empty once it has left the hand, or when the NPC is
+## not throwing), for the grenade overlay.
+func throw_plan(character) -> Dictionary:
+	if _primitive != &"throw" or _combat.throw_stage == "away":
+		return {}
+	return { "from": character.global_position, "to": _throw_spot, "kind": _throw_kind, "radius": float(_params.get("radius", 0.0)) }
+
+
 ## Hold: stand still. Where it looks is the watch stage's (`_apply_watch`): a threat if one has its eyes, else the doors. An
 ## empty gun is reloaded meanwhile, so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold(character) -> void:
@@ -1086,6 +1186,84 @@ func _apply_reload(character) -> void:
 			return
 	_primitive = &"hold"
 	_resolved = true
+
+
+# --- The evade reflex (G16) -------------------------------------------------------------------
+
+## Whether the NPC is running from, or holding out of the way of, a live grenade.
+func evading() -> bool:
+	return not _evade.is_empty()
+
+
+## The safe spot the evade runs to (`Vector2.INF` when none: not evading, or no spot to reach in time).
+func evade_spot() -> Vector2:
+	return _evade.get("spot", Vector2.INF)
+
+
+## Take the perception's plan to get clear of a live grenade (`{}`: nothing threatens the NPC), every tick. It takes priority over
+## every primitive, committed or not: the order running is given up (an entry in progress too, the stack is told) and the NPC
+## runs for the plan's spot. The plan stands while the grenade lives, so the NPC holds its spot to the burst; when the plan ends
+## the NPC re-decides.
+func set_evade(plan: Dictionary) -> void:
+	if plan.is_empty():
+		if not _evade.is_empty():
+			_evade = {}
+			_resolved = true
+		return
+	if _evade.is_empty() and _primitive == &"entry" and _entry.expects_burst(plan["kind"]):
+		return  # The stun a bang entry threw into its room: the stack holds turned away from the door for it already.
+	if _evade.is_empty():
+		_drop_detour()
+		_entry_pending = false
+		_entry.abandon()
+		_evade_arrived = false
+		_primitive = &"hold"
+		_params = {}
+		_path = ["evade"]
+		_labels = ["EVADE", "a live %s grenade" % plan.get("kind", "")]
+		_leaf_ms = Time.get_ticks_msec()
+		_target_obj = null
+	elif (plan["spot"] as Vector2) != (_evade["spot"] as Vector2):
+		_evade_arrived = false  # A new spot (the grenade moved): run to that one.
+	_evade = plan
+
+
+## Whether the evade crouches the NPC: it is behind cover that shields a crouched body only, or it is caught in the open by a
+## frag with no way out (a smaller target, at least).
+func _evade_crouches() -> bool:
+	if evade_spot() == Vector2.INF:
+		return _evade.get("kind") == &"frag"
+	return _evade_arrived and bool(_evade.get("crouch", false))
+
+
+## Carry the evade out: run to the spot (its back to the grenade, looking away from it all the way), then hold it, crouched when the spot is
+## cover. With no spot to reach in time it stays and turns its back (a stun's flash then blinds it for the back-turned share only).
+func _apply_evade(character, delta: float) -> void:
+	if character.is_busy():
+		character.end_interaction()  # Up off the chair: a grenade outranks what it was doing, whoever started it.
+		_in_interaction = false
+	_threat = {}
+	_gaze = "evade"
+	var spot: Vector2 = evade_spot()
+	var here: Vector2 = character.global_position
+	var away: Vector2 = here - (_evade["point"] as Vector2)
+	away = away.normalized() if away.length() > 1.0 else -(character.facing as Vector2)
+	var running := false
+	if spot != Vector2.INF:
+		if not _evade_arrived:
+			_evade_arrived = _loco.reached(character, spot)
+		if not _evade_arrived:
+			_loco.move_to(character, spot)
+			running = run_enabled and (character.is_running() or character.stamina_fraction() >= run_start_fraction)
+	if spot == Vector2.INF or _evade_arrived:
+		character.move_input = Vector2.ZERO
+	character.aim_point = here + away * 100.0  # Its back to the burst all the way, running or holding: a flash blinds the face.
+	character.run_input = running
+	_guard_clock += delta
+	_apply_posture(character, delta)
+	_running = character.is_running()
+	_posture = character.posture()
+	_reloading = character.is_reloading()
 
 
 # --- Helpers ---------------------------------------------------------------------------------

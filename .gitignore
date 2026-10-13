@@ -13,3 +13,6 @@ mono_crash.*.json
 
 # System / editor cruft
 .DS_Store
+
+# Python bytecode (tools/*.py)
+__pycache__/

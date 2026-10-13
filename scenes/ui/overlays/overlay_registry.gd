@@ -27,6 +27,7 @@ const ENTRIES := [
 	{ "flag": "show_routes", "label": "Routes & exposure", "group": "Combat", "default": false },
 	{ "flag": "show_combat", "label": "Combat state", "group": "Combat", "default": false },
 	{ "flag": "show_territory", "label": "Territory", "group": "Combat", "default": false },
+	{ "flag": "show_grenades", "label": "Grenades", "group": "Combat", "default": false },
 	{ "flag": "show_actions", "label": "Agent labels", "group": "Movement", "default": false },
 	{ "flag": "show_path", "label": "Agent paths", "group": "Movement", "default": false },
 	{ "flag": "show_targets", "label": "Move & use targets", "group": "Movement", "default": false },

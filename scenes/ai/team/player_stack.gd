@@ -16,6 +16,7 @@ extends Node
 ## `view()` is what the UI's stack markers draw. Observation and radio only: it never moves or steers the character.
 
 const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
+const AgentGrenades := preload("res://scenes/ai/perception/agent_grenades.gd")
 
 ## Entry steps that mean a member is still on its way into the room (it holds a place in the stack).
 const STACKING := ["claim", "ready", "going_in"]
@@ -105,8 +106,8 @@ func view() -> Dictionary:
 
 ## Keep the latest callout of each allied speaker within range (`_heard`).
 func _on_posted(topic: StringName, data: Dictionary) -> void:
-	if topic != &"callout" or _char == null:
-		return
+	if topic != &"callout" or _char == null or AgentGrenades.is_call(data.get("status")):
+		return  # (A call about a live grenade is not the speaker's place in a stack: it must not replace its claim.)
 	var speaker = data.get("speaker")
 	if speaker == _char or not speaker is Node or not is_instance_valid(speaker):
 		return

@@ -26,7 +26,7 @@ func _ready() -> void:
 	_label.anchor_right = 1.0
 	_label.anchor_bottom = 1.0
 	_label.offset_left = -440.0
-	_label.offset_top = -280.0
+	_label.offset_top = -320.0
 	_label.offset_right = -10.0
 	_label.offset_bottom = -10.0
 	_label.text = ""
@@ -62,6 +62,16 @@ func _ammo_line() -> String:
 	return line + "  reloading…" if _character.is_reloading() else line
 
 
+## "Grenades: 1 stun, 2 frag" for what is carried (the kinds and slots `LoadoutConfig.grenade_options()` lists); "—" with none.
+func _grenade_line() -> String:
+	var carried := []
+	for option: Dictionary in LoadoutConfig.grenade_options():
+		var count: int = _character.item_count(option["slot"])
+		if count > 0:
+			carried.append("%d %s" % [count, option["id"]])
+	return "Grenades: %s" % (", ".join(carried) if not carried.is_empty() else "—")
+
+
 ## "Standing" or "Crouching".
 func _posture_label() -> String:
 	match _character.posture():
@@ -81,6 +91,7 @@ func _process(_delta: float) -> void:
 		"=== DEBUG ===",
 		"Item: %d (%s)" % [_character.current_slot(), item_name],
 		_ammo_line(),
+		_grenade_line(),
 		"Punch Active: %s" % ("YES" if attack_active else "NO"),
 		"Interaction: %s" % (interaction if interaction != "" else "—"),
 		"Reach: %.1f" % reach,

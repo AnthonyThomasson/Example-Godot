@@ -123,6 +123,19 @@ its exports. Visual only: nothing picks it up and the Despawner never frees it. 
 side profile lying on the floor — receiver with sights and muzzle, grip (and, on the long guns, magazine and stock) raked off one side
 (`flip` mirrors it) — at `flat_size()`.
 
+## Grenades (`grenade.gd`, `thrown_grenade.gd`, `grenade_config.gd`; spec `docs/grenades.md` G1 to G6, G10)
+
+Two throwables, slots `ItemRegistry.STUN_SLOT` 7 and `FRAG_SLOT` 8, each a *count* (`uses_left()`; every other item answers -1, `is_throwable()` false).
+`GrenadeConfig` (static holder, a row per kind: `fuse`, `windup`, `max_range`, `throw_speed`, `arc_height`, `restitution`, `friction` and the effect numbers
+`Explosion` reads, a stun's including `flash_cover_reach`: furniture shields from the flash only within that many px of the body); the stun's effect on the body (`stun_speed`, `stun_sway`, `recover_tail`, `stun_drift`) is `CharacterConfig`'s. `GrenadeItem` (`StunGrenadeItem` / `FragGrenadeItem` supply look and kind) tells what it is through `throw_stats()` (`Item` default {}): `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, made by `GrenadeConfig.stats_of(kind, row)` (`flash_cover_reach` INF for a frag), which `Character.throw_stats(slot)` forwards and a live `ThrownGrenade.throw_stats()` answers from the row it was thrown with: the one read the AI throws by (interface 6/7), tested by `items/grenade_throw_stats` and `ai/grenade/grenade_range_follows_the_item`:
+`secondary` starts a throw (`throw` stance for `windup` s, counted in `tick`; a death or a switch of slot during it throws nothing), `_release` spends one, hands a `ThrownGrenade` the hand's
+position and `user.aim_target()`, pops a `GrenadeSpoon` (a tracked `DroppedItem`) and posts `&"throw"`. `Character` empties a slot whose count reached 0 and takes up the gun (else the fists).
+`ThrownGrenade` (a world `Node2D`, group `live_grenades`) flies a lob **planned** at the throw (`plan`: flight time and gravity solved so it comes to *rest* at the aim, simulated with the
+very `Motion` integrator the node then runs; first touchdown capped at `max_range`, then the skid), skips furniture whose `coverage` is below its height and bounces off the rest (and
+the living) with `restitution`, posts `&"grenade"` (`bounce` / `rest`) and on the fuse's end calls `Explosion.frag` / `Explosion.stun`. A grenade is never dropped on death.
+`LoadoutConfig` carries `stuns` / `frags` (0..3, `grenade_options()`, `grenade_counts()`); `ItemRegistry.create(slot, count)` (negative = one) and `inventory_for(..., grenades)` build them.
+Art: `art/stun_grenade_painter.gd`, `frag_grenade_painter.gd` (option `spoon`: the lever held down, in the hand) and `spoon_painter.gd`, through `PixelArt.render_turned`.
+
 ## Link into the Projectile System
 
 Guns are the one place Items reach into the Projectile System

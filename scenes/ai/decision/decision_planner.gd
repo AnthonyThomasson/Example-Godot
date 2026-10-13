@@ -383,7 +383,7 @@ func _group(group_name) -> Dictionary:
 
 # --- What Von reads --------------------------------------------------------------------------
 
-## Fill a node's template: {target} = the bound target's name, {gun} = what the NPC calls its gun ("pistol",
+## Fill a node's template: {target} = the bound target's name, {blinded} = what the bound target's option says of its being blinded, {gun} = what the NPC calls its gun ("pistol",
 ## "assault rifle"), {summary} = its summary group's summary (its `summary_inside` within a confined subtree,
 ## so it never advertises a filtered-out place).
 func _fill(template: String, id: StringName) -> String:
@@ -394,7 +394,7 @@ func _fill(template: String, id: StringName) -> String:
 		var group := _group(summary_group)
 		var confined: bool = _confine or (inside_only and node.get("confine", false))
 		summary = group.get("summary_inside", group.get("summary", "")) if confined else group.get("summary", "")
-	var text := template.format({ "target": _binding.get("target", "the hostile"),
+	var text := template.format({ "target": _binding.get("target", "the hostile"), "blinded": _binding.get("blinded", ""),
 		"gun": _snap.get("gun", "gun"), "summary": summary })
 	return text.trim_suffix(" — ").trim_suffix(" ()").strip_edges()
 

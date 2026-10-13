@@ -8,10 +8,18 @@ extends Node
 ##   &"footfall"  a foot landed      { position, foot, speed, running }
 ##   &"reload"    a reload began (stage &"start": the magazine comes out) or finished (stage &"done": the new one is
 ##                seated and the action racked)   { position, gun, stage, power }
+##   &"throw"     a grenade left a hand           { position, kind }
+##   &"grenade"   a thrown grenade bounced (stage &"bounce"; &"rest" is silent)   { position, kind, stage }
+##   &"explosion" a grenade went off              { position, kind }
+##   &"stun"      a character was flashed / banged; only a deafening of `focus` is voiced   { character, deaf }
 ## Each becomes a *profile* (SoundBank), a rendered variant of it, and a voice: a pooled AudioStreamPlayer2D, capped
 ## per category with the oldest cut off first. The surface under a footfall comes from SoundSurface.
 ## Everything accepted is announced back on the bus as &"sound" { kind, profile, variant, position, volume_db,
 ## pitch } — what tests assert on and what a debug view could show.
+##
+## `focus` is the character whose ears this is (Main sets the human; nothing hears for an AI). While it is deafened
+## (`stun_view().deaf`) `muffled()` is true: game audio goes through a low-pass on its own bus, closing at once and lifting
+## slowly, and a tinnitus whine (a looping voice that follows the deafness and is cut when it ends) plays once per stun.
 ##
 ## Randomness (which variant, pitch and volume jitter) comes from this node's own RNG, never the gameplay one.
 ## Voice lifetimes are counted in simulated time (`_now`), not read from the players, so a fixed-FPS test run
@@ -21,9 +29,24 @@ const SHOT := &"shot"
 const IMPACT := &"impact"
 const FOOTSTEP := &"footstep"
 const RELOAD := &"reload"
+const THROW := &"throw"
+const GRENADE := &"grenade"
+const EXPLOSION := &"explosion"
+const TINNITUS := &"tinnitus"
+## The bus every game voice plays on, with the muffling low-pass on it; the tinnitus plays on the master bus, above the muffle.
+const GAME_BUS := &"GameSound"
 ## Real milliseconds to give the audio mixer at shutdown (see `_exit_tree`).
 const MIXER_DRAIN_MS := 80
 
+## The character whose hearing the player has (a deafened `focus` muffles the game and hears tinnitus); null = nobody's.
+var focus: Node = null
+## The tinnitus voice while it plays ({} when none) and the level it started at.
+var _tinnitus: Dictionary = {}
+var _tinnitus_db := 0.0
+## How far the muffle is closed (0 open .. 1 shut) and the game bus's index (-1: none).
+var _muffle := 0.0
+var _bus := -1
+var _bus_made := false
 ## Picks variants and jitter (seeded from `SoundConfig.rng_seed`; never the gameplay RNG).
 var _rng := RandomNumberGenerator.new()
 ## Simulated seconds since the service started (advances with the tree, so it stops when the game pauses).
@@ -38,6 +61,7 @@ var _warm: Array = []
 
 func _ready() -> void:
 	_rng.seed = SoundConfig.rng_seed
+	_make_bus()
 	EventBus.posted.connect(_on_posted)
 	if SoundConfig.prewarm and DisplayServer.get_name() != "headless":
 		_warm = library()
@@ -46,6 +70,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_now += delta
 	_prewarm()
+	_hear_stun(delta)
 
 
 ## On quit, stop and free every voice. The engine's mixer thread only lets go of a stopped playback on its next
@@ -60,6 +85,8 @@ func _exit_tree() -> void:
 	if not _voices.is_empty():
 		OS.delay_msec(MIXER_DRAIN_MS)
 	_voices.clear()
+	if _bus_made and _bus >= 0 and _bus < AudioServer.bus_count and AudioServer.get_bus_name(_bus) == GAME_BUS:
+		AudioServer.remove_bus(_bus)
 
 
 ## Voices of `category` (all categories when empty) still sounding.
@@ -71,12 +98,18 @@ func active(category: StringName = &"") -> int:
 	return n
 
 
+## True while `focus` is deafened: the game audio is muffled.
+func muffled() -> bool:
+	return _deaf_left() > 0.0
+
+
 ## Cut every voice off and forget what was played (a fresh start for the next match or test).
 func reset() -> void:
 	for v: Dictionary in _voices:
 		(v["player"] as AudioStreamPlayer2D).stop()
 		v["until"] = 0.0
 	_last_variant.clear()
+	_tinnitus = {}
 	_rng.seed = SoundConfig.rng_seed
 
 
@@ -105,6 +138,23 @@ func _on_posted(topic: StringName, data: Dictionary) -> void:
 			var profile := SoundBank.reload_profile(data.get("gun", &""), stage, float(data.get("power", 1.0)))
 			if profile != &"":
 				_play(RELOAD, profile, data)
+		&"throw":
+			var profile := SoundBank.throw_profile(data.get("kind", &""))
+			if profile != &"":
+				_play(THROW, profile, data)
+		&"grenade":
+			# A bounce clatters, voiced by the floor it lands on; the rest that follows it is silent.
+			if data.get("stage", &"") == &"bounce":
+				var profile := SoundBank.grenade_profile(data.get("kind", &""), SoundSurface.at(data.get("position", Vector2.ZERO)))
+				if profile != &"":
+					_play(GRENADE, profile, data)
+		&"explosion":
+			var profile := SoundBank.explosion_profile(data.get("kind", &""))
+			if profile != &"":
+				_play(EXPLOSION, profile, data)
+		&"stun":
+			if data.get("character") == focus and focus != null and float(data.get("deaf", 0.0)) > 0.0:
+				_start_tinnitus(data)
 
 
 ## How loud a hit is beyond its profile's own level: a faster bullet hits harder, a punch by its damage.
@@ -114,16 +164,18 @@ func _impact_db(outcome: StringName, data: Dictionary) -> float:
 	return linear_to_db(clampf(float(data.get("speed_factor", 1.0)), 0.25, 1.3))
 
 
-## Play one sound of `profile` for the category at `data.position`: pick a variant, find a voice, post the event.
-func _play(category: StringName, profile: StringName, data: Dictionary, extra_db: float = 0.0, pitch_scale: float = 1.0) -> void:
+## Play one sound of `profile` for the category at `data.position` on `bus`: pick a variant, find a voice, post the event.
+## Returns the voice, or {} when nothing played.
+func _play(category: StringName, profile: StringName, data: Dictionary, extra_db: float = 0.0, pitch_scale: float = 1.0,
+		bus: StringName = GAME_BUS) -> Dictionary:
 	var at: Vector2 = data.get("position", Vector2.ZERO)
 	var reach := _reach(category, at)
 	if reach <= 0.0:
-		return  # out of earshot
+		return {}  # out of earshot
 	var variant := _pick_variant(category, profile)
 	var entry := SoundBank.sound(profile, variant)
 	if entry.is_empty():
-		return
+		return {}
 	var stream: AudioStreamWAV = entry["stream"]
 	var swing := float(SoundConfig.category_jitter_scale.get(category, 1.0))
 	var pitch := pitch_scale * (1.0 + _rng.randf_range(-SoundConfig.pitch_jitter, SoundConfig.pitch_jitter) * swing)
@@ -135,12 +187,75 @@ func _play(category: StringName, profile: StringName, data: Dictionary, extra_db
 	player.volume_db = volume
 	player.pitch_scale = pitch
 	player.max_distance = reach
+	player.bus = bus
 	player.global_position = at
 	player.play()
 	voice["started"] = _now
 	voice["until"] = _now + stream.get_length() / pitch + 0.02
 	EventBus.post(&"sound", { "kind": category, "profile": profile, "variant": variant, "position": at,
 		"volume_db": volume, "pitch": pitch })
+	return voice
+
+
+## The focus's ears ring: a looping whine at its position that lasts as long as it is deaf (`_hear_stun` keeps it to that).
+func _start_tinnitus(data: Dictionary) -> void:
+	var deaf := _deaf_left()
+	if deaf <= 0.0:
+		return
+	var loudness := linear_to_db(clampf(deaf / SoundConfig.tinnitus_full_s, 0.3, 1.0))
+	var at: Vector2 = (focus as Node2D).global_position if focus is Node2D else data.get("position", Vector2.ZERO)
+	var voice := _play(TINNITUS, SoundBank.tinnitus_profile(), { "position": at }, loudness, 1.0, &"Master")
+	if voice.is_empty():
+		return
+	voice["until"] = _now + deaf
+	_tinnitus = voice
+	_tinnitus_db = (voice["player"] as AudioStreamPlayer2D).volume_db
+
+
+## Seconds `focus` stays deaf (0 with no focus, a dead or freed one, or one that cannot be stunned).
+func _deaf_left() -> float:
+	if focus == null or not is_instance_valid(focus) or not focus.has_method("stun_view"):
+		return 0.0
+	return float(focus.call("stun_view").get("deaf", 0.0))
+
+
+## Every frame: the muffle closes while `focus` is deaf and lifts when it is not, and the tinnitus voice fades with the
+## deafness and is cut when it ends.
+func _hear_stun(delta: float) -> void:
+	var deaf := _deaf_left()
+	var target := 1.0 if deaf > 0.0 else 0.0
+	var rate := SoundConfig.muffle_attack if target > _muffle else SoundConfig.muffle_release
+	_muffle = move_toward(_muffle, target, rate * delta)
+	if _bus >= 0:
+		var filter := AudioServer.get_bus_effect(_bus, 0) as AudioEffectLowPassFilter
+		AudioServer.set_bus_effect_enabled(_bus, 0, _muffle > 0.0)
+		filter.cutoff_hz = exp(lerpf(log(SoundConfig.muffle_open_hz), log(SoundConfig.muffle_cutoff_hz), _muffle))
+	if _tinnitus.is_empty():
+		return
+	var player: AudioStreamPlayer2D = _tinnitus["player"]
+	if deaf <= 0.0:
+		player.stop()
+		_tinnitus["until"] = 0.0
+		_tinnitus = {}
+		return
+	_tinnitus["until"] = _now + deaf
+	player.volume_db = _tinnitus_db + linear_to_db(clampf(deaf / SoundConfig.tinnitus_tail, 0.001, 1.0))
+	if focus is Node2D:
+		player.global_position = (focus as Node2D).global_position
+
+
+## The bus the game's voices play on: a low-pass the muffle closes (left open at its start).
+func _make_bus() -> void:
+	_bus = AudioServer.get_bus_index(GAME_BUS)
+	if _bus >= 0:
+		return
+	AudioServer.add_bus()
+	_bus = AudioServer.bus_count - 1
+	_bus_made = true
+	AudioServer.set_bus_name(_bus, GAME_BUS)
+	AudioServer.set_bus_send(_bus, &"Master")
+	AudioServer.add_bus_effect(_bus, AudioEffectLowPassFilter.new())
+	AudioServer.set_bus_effect_enabled(_bus, 0, false)
 
 
 ## How far from `at` the category can still be heard by whoever is looking (the current camera): its range, or 0

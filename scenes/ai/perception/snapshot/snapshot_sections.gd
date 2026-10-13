@@ -34,10 +34,19 @@ func situation_text(character, rooms: Array) -> String:
 
 
 ## The gun's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
-## reloaded; once it runs low, whether spare magazines are carried. Empty without a gun.
-func loadout_text(character, gun: int, ammo: int) -> String:
-	if ammo < 0:
-		return ""
+## reloaded; once it runs low, whether spare magazines are carried. Then the grenades carried (`grenades`: the kinds, a frag
+## first): "You carry a frag grenade and a stun grenade." Empty without a gun or a grenade.
+func loadout_text(character, gun: int, ammo: int, grenades: Array = []) -> String:
+	var lines: Array = []
+	if ammo >= 0:
+		lines.append(_gun_text(character, gun, ammo))
+	if not grenades.is_empty():
+		lines.append("You carry %s." % " and ".join(grenades.map(func(k): return "a %s grenade" % k)))
+	return " ".join(lines)
+
+
+## The gun's state, as `loadout_text` words it.
+func _gun_text(character, gun: int, ammo: int) -> String:
 	var noun := _v.gun_noun(character, gun)
 	if character.is_reloading():
 		return "You are reloading your %s." % noun
@@ -81,8 +90,9 @@ func contacts_text(self_pos: Vector2, known: Array) -> String:
 
 
 ## The line between the NPC and hostile `t`: whether each can shoot the other, what blocks it, and
-## which other hostiles can see the NPC here.
-func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary) -> String:
+## which other hostiles can see the NPC here. `throws` are the kinds of grenade it can throw onto their spot ("You can throw a frag
+## grenade onto their spot.").
+func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array = []) -> String:
 	var line: Dictionary = a["line"]
 	var text := ""
 	if line["clear"] and line["in_range"]:
@@ -93,6 +103,10 @@ func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary) -> String:
 		text = "You are behind cover from %s (the %s): your line to them is blocked." % [t["name"], line["cover"]]
 	else:
 		text = "A %s is between you and %s: your line to them is blocked." % [line["blocker"], t["name"]]
+	if not throws.is_empty():
+		text += " You can throw %s onto their spot." % " or ".join(throws.map(func(k): return "a %s grenade" % k))
+	if t.get("blind", false):
+		text += " %s is blinded by a flash and cannot see you." % t["name"]
 	if t["visible"] and _v.aim_text(t, ctx["self_pos"], []) == "aiming at you":
 		text += " They are aiming at you."
 	var others: Array = _tactics.exposed_to(ctx["space"], ctx["self_pos"], ctx["hostiles"], t["id"], ctx["exclude"])
@@ -197,6 +211,8 @@ func _contact_line(c: Dictionary, self_pos: Vector2, everyone: Array) -> String:
 	var low := _v.contact_posture_text(c.get("posture", &"stand")) if c["visible"] else ""
 	if low != "":
 		parts.append(low)
+	if _v.blind_text(c) != "":
+		parts.append(_v.blind_text(c))
 	parts.append("holding a %s" % c.get("item", "nothing"))
 	if c.get("reloading", false):
 		parts.append("reloading")

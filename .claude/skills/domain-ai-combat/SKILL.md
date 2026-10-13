@@ -44,6 +44,12 @@ Tests: `tests/ai/combat/blocked_gun_steps_back_test.gd` (a rifle with a chair ag
 Not modelled: a rifleman cornered with a wall behind it can still stall (bounded by the back-off timer and re-decisions); cover logic treats walls as
 bulletproof though a rifle shoots through them.
 
+**Throwing a grenade** (`begin_throw(slot, spot, max_range)`, `throw_reach(max_range)`, `throw_step(character, delta)`, `throw_released(character)`, `end_throw()`; `throw_stage` `""` / `"aim"` / `"windup"` / `"away"`): the `throw` primitive's hands (`docs/grenades.md` G17), also used by the
+bang entry's thrower. Standing still (but for the last few px: a thrower farther than `throw_reach(max_range)` = `max_range - THROW_RANGE_SLACK` 15 px from the spot, because it moved on since the spot was offered, walks toward it first, within the same `THROW_START_CAP`; the bang's thrower plans a spot already within the reach), it selects the grenade's slot (`select_slot`), aims at the spot (`aim_point`; the item throws to `Character.aim_target()`) and clicks `shoot()` once the facing has settled (`_faces`); `shoot()` answers true when the
+throw STARTS (`GrenadeItem.secondary`), not for a round leaving a barrel. It gives up after `THROW_START_CAP` (2 s) without a start or `THROW_RELEASE_CAP` (1.5 s) without the grenade leaving the hand (`throw_step` returns `&"failed"`).
+`throw_released` is true once, on the tick the carried count has dropped (the wind-up is over); it takes the gun back in hand (`select_slot(gun_slot())`, a last grenade empties its slot by itself). It is polled by `Behavior.poll_throw`
+before the evade reflex gets its plan, since the grenade just thrown is a live one the thrower may be inside the zone of.
+
 **Ammo.** An empty gun cannot fire, so the behaviour never "fights" with one: `Combat.fire_at_will` returns early when the gun
 is empty or reloading, and `Combat.shoot()` on an empty gun is a dry click that does not note engagement or call `shoot()`; it spends
 `fire_cooldown` and emits `dry` (the behaviour flags the task resolved), so the NPC re-decides (the snapshot now says the gun is empty) at most once per

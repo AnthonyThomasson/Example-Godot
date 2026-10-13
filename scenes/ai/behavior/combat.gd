@@ -2,8 +2,9 @@ extends RefCounted
 
 ## AI BEHAVIOUR sub-domain — COMBAT. Everything a fight does with the character's hands: taking a shot, throwing a punch,
 ## keeping an automatic gun's trigger down for a burst, stepping back when a barrel is against a wall, the reload reflex,
-## and the peek-and-cover cycle (step out, shoot, duck) with its committed firing / cover spot. Owns the fire cooldown
-## and that cycle's phase and timers. `Behavior` decides WHICH fight is on (it holds the engaged contact and the hold-ground
+## and the peek-and-cover cycle (step out, shoot, duck) with its committed firing / cover spot, and throwing a grenade
+## (`docs/grenades.md` G17: take it in hand, aim at the spot, throw, put the gun back). Owns the fire cooldown, that cycle's
+## phase and timers and the throw's stage. `Behavior` decides WHICH fight is on (it holds the engaged contact and the hold-ground
 ## flag) and passes the target in each call; this class never chooses a target and reads the world only through the
 ## perception (`has_line_to`, `combat_spots`, `note_engaged`) and the character's public contract. It knows no gun from
 ## another: the gun it fights with is `Character.gun_slot()`.
@@ -13,6 +14,13 @@ signal dry
 
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
+## Seconds a throw may take to start (the grenade in hand, the facing settled, the hand free) before it is given up, and to
+## leave the hand once started.
+const THROW_START_CAP := 2.0
+const THROW_RELEASE_CAP := 1.5
+## How far (px) inside a grenade's throw range the thrower stands when it lets go, so that one a step past it closes in and the grenade comes
+## down on the spot and not short at the cap.
+const THROW_RANGE_SLACK := 15.0
 
 # --- Config fields `Behavior.apply_config()` copies in. ---
 var shoot_range: float = 500.0
@@ -33,7 +41,15 @@ var cover_timer := 0.0         ## Seconds left ducking behind cover before peeki
 var fire_timer := 0.0          ## Seconds left before the next shot/punch may be thrown.
 var dest := Vector2.ZERO       ## Committed fire/cover position the NPC is steering toward.
 var dest_timer := 0.0          ## Seconds left before a new combat position may be chosen.
+## The throw in hand (`begin_throw`): "" none, "aim" taking the grenade and turning to the spot, "windup" the hand drawn back,
+## "away" it has left the hand (or never will).
+var throw_stage := ""
 
+var _throw_slot := -1          ## The inventory slot of the grenade being thrown.
+var _throw_spot := Vector2.ZERO  ## Where it is thrown to.
+var _throw_range := 0.0        ## How far (px) that grenade first comes down.
+var _throw_before := 0         ## How many of that grenade were carried when the throw started.
+var _throw_clock := 0.0        ## Seconds in the current stage of the throw.
 var _burst_left := 0           ## Rounds still to fire in the automatic gun's current burst.
 var _back_off_timer := 0.0     ## Seconds left stepping back from whatever the gun's barrel is against.
 var _loco: Node                ## The Locomotion child (pathing, rooms).
@@ -129,6 +145,67 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 		dest = _choose_dest(character, "peek", node, pos, hold_ground)
 		dest_timer = reposition_interval
 	_loco.move_to(character, dest)
+
+
+## Start a throw of the grenade in `slot` (it comes down `max_range` px away at most) at world point `spot` (the GRENADE tactic's `throw`
+## primitive).
+func begin_throw(slot: int, spot: Vector2, max_range: float) -> void:
+	throw_stage = "aim"
+	_throw_slot = slot
+	_throw_spot = spot
+	_throw_range = max_range
+	_throw_clock = 0.0
+
+
+## How far (px) from its spot a thrower stands to let go a grenade that first comes down `max_range` px away at most.
+func throw_reach(max_range: float) -> float:
+	return max_range - THROW_RANGE_SLACK
+
+
+## Forget a throw (a new order replaced it).
+func end_throw() -> void:
+	throw_stage = ""
+
+
+## Carry the throw out one tick, standing still: take the grenade in hand, aim at the spot and, once the facing has settled,
+## click the trigger (`Character.shoot()`: the wind-up starts, the grenade leaves the hand `windup` seconds later). A thrower that
+## stands past `THROW_RANGE_SLACK` short of the grenade's range (it moved on since the spot was offered) walks the last few px toward the
+## spot first, within the same `THROW_START_CAP`. Returns `&"failed"` when it never could (none left, the hand busy, the wind-up cut
+## short), else `&""`.
+func throw_step(character, delta: float) -> StringName:
+	_throw_clock += delta
+	character.move_input = Vector2.ZERO
+	match throw_stage:
+		"aim":
+			if character.item_count(_throw_slot) <= 0 or _throw_clock > THROW_START_CAP:
+				throw_stage = "away"
+				return &"failed"
+			character.select_slot(_throw_slot)
+			character.aim_point = _throw_spot
+			if character.global_position.distance_to(_throw_spot) > throw_reach(_throw_range):
+				_loco.move_to(character, _throw_spot)
+				return &""
+			if character.current_slot() == _throw_slot and _faces(character, _throw_spot):
+				_throw_before = character.item_count(_throw_slot)
+				if character.shoot():
+					throw_stage = "windup"
+					_throw_clock = 0.0
+		"windup":
+			character.aim_point = _throw_spot
+			if _throw_clock > THROW_RELEASE_CAP:
+				throw_stage = "away"
+				return &"failed"  # The wind-up was cut short (it died, or put the grenade away).
+	return &""
+
+
+## Whether the grenade being thrown has left the hand since the last call (true once): the end of the wind-up. The gun is taken
+## back in hand then (a last grenade empties its slot by itself).
+func throw_released(character) -> bool:
+	if throw_stage != "windup" or character.item_count(_throw_slot) >= _throw_before:
+		return false
+	throw_stage = "away"
+	character.select_slot(character.gun_slot())
+	return true
 
 
 ## Melee at the known position `pos`: close to punch range and strike on the fire cooldown (no cover cycle for fists).

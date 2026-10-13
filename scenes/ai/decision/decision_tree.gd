@@ -15,7 +15,8 @@ extends RefCounted
 ##               into the state ("You are badly wounded and being hit"), never an action label, and
 ##               no negated attributes (an encoder reads "no cover" as "cover"). The wording is
 ##               measured, not guessed: tools/von_probe.py checks it against clear-cut scenarios.
-##               Template fields: {target} (the bound target's name), {gun} (what the NPC calls its
+##               Template fields: {target} (the bound target's name), {blinded} (the bound target's "X is
+##               blinded by a flash and cannot see you, or " when it is, else nothing), {gun} (what the NPC calls its
 ##               gun: "pistol", "assault rifle") and {summary} (the summary of
 ##               the node's `summary` option group, else its first `options` group — specifics
 ##               written by perception, kept in parentheses after the situation).
@@ -41,7 +42,7 @@ extends RefCounted
 ##               whose route passes a known hostile; one with no shot at the target, one the target is
 ##               walking toward, or one whose point or route lies in an ally's line of fire). A node
 ##               whose options are all dropped is not offered at all.
-##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload). FLANK
+##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload / entry / throw). FLANK
 ##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
 ##               `move`: it only closes the distance, then the NPC re-decides how to fight.
 ##   params    — default primitive params, merged under each option's own params. `run: true` lets the
@@ -65,7 +66,7 @@ const NODES := {
 		"bind_context": [&"situation", &"odds", &"awareness"],
 		"question": "How should you fight {target}? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your {gun} is nearly empty or empty.",
 		"context": [&"situation", &"loadout", &"current", &"odds", &"exposure", &"contacts", &"allies", &"flanks", &"awareness"],
-		"children": [&"engage", &"flank", &"advance", &"melee", &"reload", &"retreat", &"locate"],
+		"children": [&"engage", &"flank", &"grenade", &"advance", &"melee", &"reload", &"retreat", &"locate"],
 	},
 	&"engage": {
 		"label": "ENGAGE",
@@ -87,9 +88,19 @@ const NODES := {
 		"primitive": &"engage",
 		"params": { "style": &"peek_cover", "run": true },
 	},
+	&"grenade": {
+		"label": "GRENADE",
+		"desc": "Your line to {target} is blocked and you can throw a grenade onto their spot ({summary})",
+		"requires": [&"target", &"grenade_ready"],
+		"question": "Which grenade should you throw at {target}? A frag to kill them behind their cover, a stun to blind and deafen them so you can close in.",
+		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
+		"options": [&"grenade_throws"],
+		"drop_tags": [&"ally_in_blast", &"no_safe_spot"],
+		"primitive": &"throw",
+	},
 	&"advance": {
 		"label": "ADVANCE",
-		"desc": "{target} looks badly wounded, is unarmed, or is moving away from you ({summary})",
+		"desc": "{blinded}{target} looks badly wounded, is unarmed, or is moving away from you ({summary})",
 		"requires": [&"target"],
 		"question": "How should you close in on {target}? Prefer cover close to them and a hidden route; rush only when they are weak, fleeing or unarmed.",
 		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
@@ -167,7 +178,7 @@ const NODES := {
 		"question": "Where should you search next? Prefer unsearched rooms and unexplored areas, nearest first.",
 		"context": [&"situation", &"current", &"awareness"],
 		"summary": &"search_rooms",
-		"children": [&"enter"],
+		"children": [&"enter", &"stun_entry"],
 		"options": [&"search_rooms", &"explore"],
 		"primitive": &"move",
 		"params": { "aim": &"travel" },
@@ -179,6 +190,16 @@ const NODES := {
 		"context": [&"situation", &"current", &"awareness"],
 		"options": [&"entries"],
 		"primitive": &"entry",
+	},
+	&"stun_entry": {
+		"label": "STUN ENTRY",
+		"desc": "A doorway leads into a room where gunfire was heard or a hostile was seen going in ({summary})",
+		"requires": [&"stack_has_stun"],
+		"question": "Which doorway should you go through? Prefer the shortest route.",
+		"context": [&"situation", &"current", &"awareness"],
+		"options": [&"entries"],
+		"primitive": &"entry",
+		"params": { "bang": true },
 	},
 	&"idle": {
 		"label": "IDLE",

@@ -14,7 +14,7 @@ extends CanvasLayer
 
 ## Emitted when a start button is pressed, carrying the chosen parameters:
 ## `{ mode: "play"|"watch"|"endless", side: "defender"|"invader", seed: int,
-##    defenders: { count, weapon, magazine, spares }, invaders: { count, weapon, magazine, spares } }`.
+##    defenders: { count, weapon, magazine, spares, stuns, frags }, invaders: { ... } }`.
 ## Main applies these and builds the world.
 signal start_requested(config: Dictionary)
 ## Emitted when the Tests button is pressed: Main opens the test browser instead of a match.
@@ -24,11 +24,15 @@ signal settings_requested
 
 const _MAX_COUNT := 8  ## Upper bound per side in the spinboxes; spawn spread handles any count in range.
 const _SIDES := ["defender", "invader"]  ## The sides the human can play, in dropdown order.
+## The grenade rows when Main gives none (`open`'s `grenades`): a Stun and a Frag count. They name no cap of their own; a row without a `max`
+## counts up to `_MAX_COUNT` (Main's rows carry `LoadoutConfig.max_grenades`).
+const _GRENADES := [{ "id": "stun", "label": "Stun" }, { "id": "frag", "label": "Frag" }]
 
 var _side_option: OptionButton      ## Which side a human plays (for Start).
 var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
 var _side_rows := {}                ## "defenders"/"invaders" -> { count, weapon, magazine, spares, magazine_row } controls.
 var _weapons: Array = []            ## Weapon choices `[{ id, label, magazines: [{ id, label }] }]` handed in by Main.
+var _grenades: Array = _GRENADES    ## Grenade count rows `[{ id, label, max }]` (`max` optional): a side's count of each is reported as `<id>s`.
 var _start_buttons: Array[Button] = []  ## Start / Watch / Endless: all disabled on press, so a start can't be triggered twice.
 var _scroll: ScrollContainer        ## Holds the controls; sized to fit the window.
 var _content: Control               ## The controls' margin box, whose height the scroll area tries to show whole.
@@ -36,11 +40,13 @@ var _status: Label                  ## Status line Main shows while it holds the
 
 
 ## Build the window seeded from `defaults` and show it. Keys (all optional): `side` ("defender" /
-## "invader"), `seed`, `defenders` / `invaders` (each `{ count, weapon, magazine, spares }`, or a bare
-## count), `weapons` (the choices described at `_weapons`; empty = no weapon rows) and `ticket` (a
-## non-blank one is shown above the title). Called by Main before the world is spawned.
+## "invader"), `seed`, `defenders` / `invaders` (each `{ count, weapon, magazine, spares, stuns, frags }`, or a bare
+## count), `weapons` (the choices described at `_weapons`; empty = no weapon rows, nor grenade rows), `grenades` (the
+## grenade rows described at `_grenades`) and `ticket` (a non-blank one is shown above the title). Called by Main
+## before the world is spawned.
 func open(defaults: Dictionary) -> void:
 	_weapons = defaults.get("weapons", [])
+	_grenades = defaults.get("grenades", _GRENADES)
 	_build_ui(defaults)
 	get_viewport().size_changed.connect(_fit_scroll)
 	_fit_scroll.call_deferred()
@@ -151,8 +157,8 @@ func _build_ui(defaults: Dictionary) -> void:
 	box.add_child(settings_button)
 
 
-## One side's controls — count, weapon, magazine, spare magazines — in a titled column added to `parent`.
-## `seed_values` is `{ count, weapon, magazine, spares }` or a bare count. Returns the controls by name.
+## One side's controls — count, weapon, magazine, spare magazines, grenade counts — in a titled column added to
+## `parent`. `seed_values` is `{ count, weapon, magazine, spares, stuns, frags }` or a bare count. Returns the controls by name.
 func _side_column(parent: Control, title: String, seed_values: Variant) -> Dictionary:
 	var values: Dictionary = seed_values if seed_values is Dictionary else { "count": seed_values }
 	var column := VBoxContainer.new()
@@ -178,7 +184,15 @@ func _side_column(parent: Control, title: String, seed_values: Variant) -> Dicti
 		rows["spares"] = _spin_row(column, "Spares", int(values.get("spares", 2)), 8)
 		rows["weapon"].item_selected.connect(func(_i): _refresh_magazines(rows, StringName()))
 		_refresh_magazines(rows, StringName(values.get("magazine", &"")))
+		for grenade: Dictionary in _grenades:
+			var key := _grenade_key(grenade)
+			rows[key] = _spin_row(column, str(grenade["label"]), int(values.get(key, 0)), int(grenade.get("max", _MAX_COUNT)))
 	return rows
+
+
+## The key a grenade row's count is reported under: `stuns`, `frags`.
+func _grenade_key(grenade: Dictionary) -> String:
+	return "%ss" % grenade["id"]
 
 
 ## Index of weapon `id` in `_weapons` (0, the first listed, when blank or unknown).
@@ -279,7 +293,7 @@ func set_status(text: String) -> void:
 
 
 ## One side's chosen parameters as a plain dict: `{ count }` plus, when weapon choices were given,
-## `weapon`, `magazine` (blank when the weapon takes none) and `spares`.
+## `weapon`, `magazine` (blank when the weapon takes none), `spares` and the grenade counts.
 func _side_config(rows: Dictionary) -> Dictionary:
 	var config := { "count": int(rows["count"].value) }
 	if rows.has("weapon"):
@@ -287,6 +301,8 @@ func _side_config(rows: Dictionary) -> Dictionary:
 		config["weapon"] = str(_weapons[rows["weapon"].selected]["id"])
 		config["magazine"] = str(option.get_item_metadata(option.selected)) if option.item_count > 0 else ""
 		config["spares"] = int(rows["spares"].value)
+		for grenade: Dictionary in _grenades:
+			config[_grenade_key(grenade)] = int(rows[_grenade_key(grenade)].value)
 	return config
 
 

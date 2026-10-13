@@ -101,7 +101,8 @@ by the Character for each landed punch (`{ position, victim, source, direction, 
 and consumed by the AI for combat awareness, hostility and gunfire heard, and by Audio for impacts;
 `&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
-Items and Character and consumed only by Audio; `&"sound"`, which Audio posts for every sound it
+Items and Character and consumed only by Audio; the grenades' `&"throw"`, `&"grenade"` (a bounce or rest), `&"explosion"` (consumed by Audio and the camera shake, and
+by the AI) and `&"stun"` (Audio's tinnitus, the stun screen, the AI); `&"sound"`, which Audio posts for every sound it
 makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
 consumed by allied AIs.
@@ -129,6 +130,11 @@ consumed by allied AIs.
     cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
     never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the
     test runner turns it off for a world with a human-driven player, where WASD walks.
+- **Explosion shake** (`&"explosion"` on the EventBus, both modes): a burst adds trauma (0..1) = `shake_frag` (1.0) / `shake_stun` (0.5) times
+  `near²`, `near` = 1 − distance / the kind's range (`shake_frag_range` 1500, `shake_stun_range` 900; beyond it nothing), capped at 1, and the view
+  is thrown about through `Camera2D.offset` by `shake_max_offset` (28 px) × trauma² / zoom (two out-of-step wobbles per axis at `shake_speed`),
+  the trauma draining at `shake_decay` (1.2 /s) so it settles back to a zero offset. The offset never touches `global_position`, so following and
+  framing are unchanged. Test: `tests/general/camera_shakes_on_explosion_test.gd`.
 - `game_log.gd` (`GameLog`, a `class_name` static holder) — the one way any domain logs what is happening:
   `GameLog.say(message)` prints while `GameLog.enabled` (default true). The batch test runner turns it off
   unless `--verbose`; never route errors/warnings through it.

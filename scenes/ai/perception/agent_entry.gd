@@ -320,7 +320,8 @@ func _sees(space, from: Vector2, to: Vector2) -> bool:
 
 ## The allies' live claims on opening `id`, from the callouts heard (latest per speaker, see the perception's
 ## `_callouts()`): `{ id (speaker instance id), name, slot, side, step, covering, pos, age }`, lowest slot first
-## (`covering` = the doorway a member holding the cleared room watches, with step `cover`). A member who aborted or is
+## (`covering` = the doorway a member holding the cleared room watches, with step `cover`; `bang` = it goes in with a stun thrown first, true
+## for a member that says nothing of it, such as the human; `stuns` = how many stun grenades it carries). A member who aborted or is
 ## done with the doorway, or whose latest call is about something else, holds no claim.
 static func claims(id: String, callouts: Array) -> Array:
 	var out: Array = []
@@ -331,7 +332,8 @@ static func claims(id: String, callouts: Array) -> Array:
 		if step == "" or step == "abort" or step == "done":
 			continue
 		out.append({ "id": c["id"], "name": c.get("name", ""), "slot": int(c.get("slot", 0)), "side": int(c.get("side", 0)),
-			"step": step, "covering": str(c.get("covering", "")), "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0) })
+			"step": step, "covering": str(c.get("covering", "")), "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0),
+			"bang": bool(c.get("bang", true)), "stuns": int(c.get("stuns", 0)) })
 	out.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
 	return out
 

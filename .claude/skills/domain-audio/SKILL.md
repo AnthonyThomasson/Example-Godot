@@ -10,19 +10,20 @@ the `Sound` service (an autoload) listens and plays. There are no audio files: e
 `SoundSynth` from a recipe, so a new material or gun is a row in a table, not an asset.
 
 ```
-gun.gd / projectile.gd / character*.gd ──EventBus──▶ Sound ─▶ SoundBank ─▶ SoundSynth ─▶ AudioStreamWAV
-floor.gd ──SoundSurface.register──▶ SoundSurface ◀── Sound (floor under a footfall)
+gun.gd / projectile.gd / character*.gd / thrown_grenade.gd / explosion.gd ──EventBus──▶ Sound ─▶ SoundBank ─▶ SoundSynth ─▶ AudioStreamWAV
+floor.gd ──SoundSurface.register──▶ SoundSurface ◀── Sound (floor under a footfall or a grenade's bounce)
+main.gd ──Sound.focus = the human──▶ Sound (the muffle + tinnitus of a bang)
 ```
 
 ## Files
 
 | File | Role |
 |---|---|
-| `sound_config.gd` (`SoundConfig`) | Static tuning: `enabled` master switch, `master_db`, `category_db`, `category_voices`, `category_range`, `range_follows_zoom`, `pitch_jitter`, `volume_jitter_db`, `sample_rate` (22050), `peak`, `variants`, the `light_power_max` / `heavy_power_min` weight bands, `rng_seed`, `prewarm`. Categories are `shot`, `impact`, `footstep`, `reload`; per-category tables (`category_db`, `_voices`, `_range`, `_jitter_scale`, `_variants`). |
-| `sound_synth.gd` (`SoundSynth`) | `render(recipe, seed) -> AudioStreamWAV`. Layers: `noise` (envelope, 2-pole low-pass, 1-pole high-pass), `tone` (gliding sine), `modes` (damped resonators = how a material rings). Optional `vary` makes each seed its own take (every layer's gain, decay, cut-offs, delay and partials are nudged). Mix → optional `drive` (tanh) → normalize to `peak` → 4 ms fade → 16-bit mono. Same recipe + seed ⇒ same bytes. |
-| `sound_bank.gd` (`SoundBank`) | The library. `*_profile(...)` name a sound without rendering it; `sound(profile, variant) -> { stream, level_db }` renders once and caches; `recipe_for`, `profiles()`, `clear_cache()`, `cached_count()`. Holds the `SHOTS`, `MATERIALS`, `FOOTSTEPS`, `RELOADS` tables. |
+| `sound_config.gd` (`SoundConfig`) | Static tuning: `enabled` master switch, `master_db`, `category_db`, `category_voices`, `category_range`, `range_follows_zoom`, `pitch_jitter`, `volume_jitter_db`, `sample_rate` (22050), `peak`, `variants`, the `light_power_max` / `heavy_power_min` weight bands, `rng_seed`, `prewarm`, and the deafness tuning `muffle_cutoff_hz` / `muffle_open_hz` / `muffle_attack` / `muffle_release`, `tinnitus_tail` / `tinnitus_full_s`. Categories are `shot`, `impact`, `footstep`, `reload` and the grenades' `throw`, `grenade`, `explosion`, `tinnitus`; per-category tables (`category_db`, `_voices`, `_range`, `_jitter_scale`, `_variants`). |
+| `sound_synth.gd` (`SoundSynth`) | `render(recipe, seed) -> AudioStreamWAV`. Layers: `noise` (envelope, 2-pole low-pass, 1-pole high-pass), `tone` (gliding sine), `modes` (damped resonators = how a material rings). Optional `vary` makes each seed its own take (every layer's gain, decay, cut-offs, delay and partials are nudged). Mix → optional `drive` (tanh) → normalize to `peak` → 4 ms fade → 16-bit mono. A `loop` recipe skips the fade and its stream loops over the whole clip (its layers must be whole cycles of the length, or it clicks at the seam). Same recipe + seed ⇒ same bytes. |
+| `sound_bank.gd` (`SoundBank`) | The library. `*_profile(...)` name a sound without rendering it; `sound(profile, variant) -> { stream, level_db }` renders once and caches; `recipe_for`, `profiles()`, `clear_cache()`, `cached_count()`. Holds the `SHOTS`, `MATERIALS`, `FOOTSTEPS`, `RELOADS` tables and the grenades' `THROWS`, `GRENADE_BODIES`, `GRENADE_SURFACES`, `EXPLOSIONS`. |
 | `sound_surface.gd` (`SoundSurface`) | Static floor registry (the `BloodSurface` pattern): `register(rect, material, pattern) -> id`, `unregister(id)`, `at(pos) -> StringName` (newest floor wins; none = `outdoor`), `surface_for(material, pattern)`. |
-| `sound.gd` (autoload `Sound`) | The service: EventBus listener, variant/pitch/volume choice, range cull, voice pool, `&"sound"` announcements. `active(category)`, `reset()`, static `reach_from(...)`. |
+| `sound.gd` (autoload `Sound`) | The service: EventBus listener, variant/pitch/volume choice, range cull, voice pool, `&"sound"` announcements. `active(category)`, `reset()`, static `reach_from(...)`; `focus` (a character node, Main sets the human) and `muffled()` (see "Deafness"). |
 
 ## Profiles
 
@@ -35,6 +36,11 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `impact/<material>/punch` | A fist; no band. |
 | `footstep/<surface>/<walk\|run>` | surface `wood tile stone concrete carpet outdoor`. |
 | `reload/<gun>/<out\|in>` | `out`: a dry release click. `in`: a seat click, then a rack click. Both quiet and short, no rings. Unknown gun borrows its band's. |
+| `throw/<kind>` | `stun` / `frag`: the lever's metal ping and a rising whoosh (the frag's ping is higher and louder). |
+| `grenade/<kind>/<surface>` | A bounce: the floor's thud and the crack of contact, the shell's ring as much as the floor leaves (tile, stone ring; carpet, outdoor swallow it), a smaller second tick. `<surface>` is the `SoundSurface.at` of the landing, the open ground for an unknown one. |
+| `explosion/frag` | Big and low: a crack, the boom and a sub-bass, a roar and a rumble, debris pattering down; 0.97 s (a profile may not run past 1 s, `audio/bank`). |
+| `explosion/stun` | Sharp, very loud (+3 dB trim, then the category's +3), bright (a ring of high partials) and over in 0.42 s. |
+| `tinnitus/whine` | A seamless 0.8 s loop of three thin tones (4.3 kHz twice, 5 Hz apart so they beat, and 6.85 kHz). |
 
 - **Materials:** `wood metal glass ceramic stone plastic fabric foliage electronics flesh`, `wall` (what walls
   report as the empty material `""`) and `default` for anything unknown.
@@ -54,6 +60,10 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `&"hit"` | `Projectile._deal` (Projectile), `Character._post_melee_hit` (Character: a punch or a kick) | `position`, `outcome` (`blocked`/`penetrate`/`ricochet`/`punch`), `material`, `power`, `speed_factor`, `damage`. A hit **without an `outcome`** is not a sound. A fly-over posts nothing, so it is silent. |
 | `&"footfall"` | `CharacterFootsteps._report` (Character) | `position` (the sole), `foot` (0 left / 1 right), `speed`, `running` |
 | `&"reload"` | `Character._post_reload` (Character) | `position`, `gun`, `power`, `stage`: `start` → the `out` sound, `done` → the `in` sound; any other stage is silent. A cancelled reload never posts `done`. |
+| `&"throw"` | `GrenadeItem.secondary` (Items) as the grenade leaves the hand | `position`, `kind` → `throw/<kind>` |
+| `&"grenade"` | `ThrownGrenade._post` (Items) | `position`, `kind`, `stage`: `bounce` → `grenade/<kind>/<floor under it>`; `rest` is silent. |
+| `&"explosion"` | `Explosion.frag` / `.stun` (Projectile) | `position`, `kind` → `explosion/<kind>`. The same event shakes the camera (General). |
+| `&"stun"` | `Character.take_stun` (Character) | `character`, `deaf`, `position`: voiced only for the `focus` character and a `deaf` > 0 (the tinnitus). A blind-only stun, or another character's, is silent. |
 
 It posts `&"sound"` `{ kind, profile, variant, position, volume_db, pitch }` for every sound it accepts. That is
 what tests assert on (the runner records every bus event); nothing else listens.
@@ -100,6 +110,22 @@ medium impact keeps ≥ 40 % of its energy under 250 Hz; low-end weight, includi
 ≥ 1.8× medium→heavy). To measure, `tools/dump_sounds.gd` then analyse the `.wav`s (the test's helpers are in
 `tests/_audio/sound_probe.gd`: `brightness`, `low_share`, `low_weight`).
 
+## Deafness: `Sound.focus`, `muffled()` and the tinnitus (G14)
+
+`Sound.focus` is a character node (Main sets the human when there is one and clears it at teardown; null = nobody's ears, so an
+AI's stun is silent). Audio reads only its `stun_view()` (`deaf`), duck-typed, so it stays a leaf.
+
+- **`muffled()`** is true while the focus's `stun_view().deaf` is above 0 (false for a null, freed or non-stunnable focus), so it
+  lifts exactly when the character's deafness ends, a longer second stun included.
+- **The muffle:** every game voice plays on the `GameSound` bus (made in `Sound._ready`, sent to Master, an
+  `AudioEffectLowPassFilter` on it); while muffled the filter closes toward `muffle_cutoff_hz` at `muffle_attack` a second (so the bang
+  that deafens is still heard, then goes dull) and lifts at `muffle_release` (the hearing comes back slowly). Headless, the Dummy
+  driver accepts the bus and its effect and nothing is heard, so a test asserts `muffled()`.
+- **The tinnitus:** a `&"stun"` event for the focus with `deaf` > 0 starts one `tinnitus/whine` voice on the Master bus (so the muffle
+  does not dull it), once per stun (the category's one voice is replaced by a second stun). The voice loops and **follows the
+  deafness**: each frame its `until` and volume come from `stun_view().deaf`, fading over `tinnitus_tail` (1.5 s) and cut when the
+  deafness ends; a stun shorter than `tinnitus_full_s` starts it quieter. Its range is `1e6` (it is in the listener's own head).
+
 ## Gotchas
 
 - `play()` outside the scene tree logs an engine error (which fails a test); voices are only ever added as
@@ -131,4 +157,6 @@ medium impact keeps ≥ 40 % of its energy under 250 Hz; low-end weight, includi
 renders, cache, distinctness, library time budget), `profile_choice`, `surface`, `event_mapping` (synthetic bus
 events → profiles), `sound_service` (caps, freeing, variety, reset, RNG isolation, range), `sound_switch_off`, and
 the real-emitter tests `gun_shot_sound`, `impact_material_sound`, `impact_outcome_sound`, `impact_blocked_sound`,
-`footstep_surface_sound`, `footstep_variety`, `footstep_tone`, `impact_weight`, `reload_sound`. Switch `audio.sound` (`SoundConfig.enabled`) turns it all off.
+`footstep_surface_sound`, `footstep_variety`, `footstep_tone`, `impact_weight`, `reload_sound`, `grenade_sounds` (throw, floor-voiced bounce,
+`explosion/frag` against `explosion/stun`, the tinnitus and the muffle for the focus only; its range table adds the new categories, `Probe.everywhere`
+in `tests/_ai/grenade_probe.gd`). Switch `audio.sound` (`SoundConfig.enabled`) turns it all off.

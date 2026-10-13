@@ -5,6 +5,7 @@ extends Camera2D
 ## (the spectator view) the viewer can also take the camera by hand — pan with the camera keys or by
 ## pushing the mouse to a screen edge — and after `manual_hold` seconds without panning the
 ## automatic framing eases back in.
+## An explosion on the EventBus shakes the view (through `Camera2D.offset`, so the follow and the framing are untouched).
 ## This file owns all camera tuning and follows the input pattern.
 
 ## Higher = slower, smoother follow (the camera lerps by 1/follow_speed each frame).
@@ -49,12 +50,26 @@ var _zoom_bias: float = 1.0      ## The wheel's lasting scale on `_base_zoom`.
 var _mouse_pos := Vector2.ZERO   ## Last mouse position seen over the window.
 var _mouse_in_window: bool = false  ## Edge panning needs a live pointer: not yet seen, or left, = off.
 
+## Explosion shake (`&"explosion"` events). A burst adds trauma (0..1) by its kind and how far it is from the camera, and the
+## view is thrown about by `shake_max_offset * trauma^2` screen px, trauma draining at `shake_decay` a second.
+## A frag at the camera is trauma 1 (`shake_frag`); a burst farther off than its range does not shake it at all.
+@export var shake_frag: float = 1.0           ## Trauma of a frag's blast beside the camera.
+@export var shake_stun: float = 0.5           ## Trauma of a stun's bang beside the camera.
+@export var shake_frag_range: float = 1500.0  ## World px beyond which a frag does not shake the camera.
+@export var shake_stun_range: float = 900.0   ## The same for a stun.
+@export var shake_max_offset: float = 28.0    ## Screen px of the worst shake (trauma 1).
+@export var shake_decay: float = 1.2          ## Trauma lost per second.
+@export var shake_speed: float = 38.0         ## How fast the view is thrown about (rad/s of the fastest wobble).
+var _trauma: float = 0.0                      ## 0..1, how much the camera is shaking now.
+var _shake_clock: float = 0.0
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS  # the viewer can still pan and zoom while the match is paused
 	_player = get_node_or_null(target_path)
 	if not _player:
 		push_warning("Camera: could not find target node at %s" % target_path)
+	EventBus.posted.connect(_on_posted)
 
 
 ## A pointer that left the window (or a window that lost focus) keeps its last edge position, so
@@ -95,6 +110,7 @@ func _wheel_notches(event: InputEvent) -> float:
 
 
 func _process(delta: float) -> void:
+	_shake(delta)
 	if _frame_mode:
 		_steer_by_hand(delta)
 		_frame_combatants()
@@ -102,6 +118,30 @@ func _process(delta: float) -> void:
 		var target_pos := _calculate_target_position()
 		global_position = global_position.lerp(target_pos, 1.0 / follow_speed)
 		_ease_zoom()
+
+
+## A grenade went off: shake by its kind and how near it is (linear to nothing at the kind's range, felt squared).
+func _on_posted(topic: StringName, data: Dictionary) -> void:
+	if topic != &"explosion":
+		return
+	var frag: bool = data.get("kind", &"") == &"frag"
+	var reach := shake_frag_range if frag else shake_stun_range
+	var near := 1.0 - global_position.distance_to(data.get("position", global_position)) / maxf(reach, 1.0)
+	if near > 0.0:
+		_trauma = minf(_trauma + (shake_frag if frag else shake_stun) * near * near, 1.0)
+
+
+## Throw the view about by the trauma left (two out-of-step wobbles per axis, so it does not read as a pattern) and drain it.
+## Divided by the zoom, so the shake is the same size on screen whatever the framing.
+func _shake(delta: float) -> void:
+	if _trauma <= 0.0:
+		offset = Vector2.ZERO
+		return
+	_shake_clock += delta * shake_speed
+	var wobble := Vector2(sin(_shake_clock) * 0.7 + sin(_shake_clock * 1.7 + 1.3) * 0.3,
+			sin(_shake_clock * 1.3 + 2.1) * 0.7 + sin(_shake_clock * 2.3 + 0.4) * 0.3)
+	offset = wobble * shake_max_offset * _trauma * _trauma / zoom.x
+	_trauma = maxf(_trauma - shake_decay * delta, 0.0)
 
 
 ## Switch to framing mode: ease to keep every live node in `targets` on screen (used by the

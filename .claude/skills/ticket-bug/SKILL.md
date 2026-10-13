@@ -22,7 +22,10 @@ time) until you can state the bug as *expected vs. actual* with nothing guessed:
 - what "fixed" looks like to them.
 
 Answer from the code what the code can answer instead of asking. Restate the bug back in one or two lines and
-get the user's agreement before going on.
+get the user's agreement before going on. Once they agree, rebase onto `main` and check what came in (the `ticket`
+skill, "Work in phases"): a change in the area of the bug (it may already be fixed, or moved) reopens the
+questions. Then invoke the `show-me` skill so the user has an editor on the worktree to watch the reproduction and
+the fix on.
 
 ## 2. Reproduce (red)
 
@@ -42,5 +45,12 @@ step 4). Never loosen, skip or special-case the test to get green.
 `fix` steps 5–6: the repro test passes (`--repeat=10` if it was intermittent), then the changed and full suites;
 update the skills whose domain or interface changed.
 
+Once every run is green, ask the user for feedback before reporting (you, not a worker): point them at the editor
+`show-me` opened (Play restarted for the latest code), ask with `AskUserQuestion` whether the bug is gone for
+them, and wait. Anything they still see is a new round: a failing test for it first, then the fix, then green, and
+ask again.
+
 When done, report on the ticket what the root cause was and which test covers it, with the red → green lines.
-Don't commit or close the ticket unless asked.
+Then ask the user with `AskUserQuestion` whether they want to give more feedback or finish the ticket. Feedback is
+another round as above; on "finish", release every settled worker and invoke the `finish` skill yourself (that answer
+is the go-ahead). Without it, never commit or close the ticket.

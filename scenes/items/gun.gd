@@ -222,6 +222,7 @@ func secondary(user) -> bool:
 	# Zeroed: the round crosses the aim line `zero_range` ahead of the body, so a gun held off the line (the
 	# butt on the right shoulder) still shoots where the character points.
 	var direction: Vector2 = (user.global_position + user.facing * GunConfig.zero_range - muzzle).normalized()
+	direction = direction.rotated(user.aim_sway())  # A stunned character's aim wanders off the line.
 	var spread := deg_to_rad(float(stat("spread_deg", 0.0)))
 	if spread > 0.0:
 		direction = direction.rotated(randf_range(-spread, spread))

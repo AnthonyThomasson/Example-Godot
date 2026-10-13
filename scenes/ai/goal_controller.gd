@@ -227,6 +227,16 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 ## the guard may secure it again.
 @export var entry_secure_time: float = 30.0
 
+@export_group("Grenades")
+## React to live grenades (`docs/grenades.md` G16): an NPC that sees one, hears it land or is told of it, and is in its danger zone, radios
+## it and runs for the nearest safe spot (out of its line, behind cover that shields it, or outside the zone), holding it to the burst.
+## Off = it stands and takes it.
+@export var grenades_enabled: bool = true
+## How far (px) a grenade coming down is heard (its bounce and rest), seen or not.
+@export var hear_grenade: float = 300.0
+## How far (px) past a frag's blast radius its danger zone reaches: the NPC runs to be clear of that, not only of the blast.
+@export var evade_margin: float = 120.0
+
 @export_group("Watch")
 ## How far (px) down its path a walking NPC looks: through the doorway it is lining up, not at the wall beside it.
 @export var watch_look_ahead: float = 150.0
@@ -310,6 +320,7 @@ var _salient_init := false ## Whether _salient_key has been seeded.
 # EventBus events are queued here, then handed to perception on the next control() tick.
 var _character: Node ## The character this controller drives, captured on first control.
 var _event_queue: Array = [] ## [topic, data] pairs awaiting processing once _character is known.
+var _was_blind := false ## The character was flash-blinded last tick, to re-decide the moment its sight returns.
 
 
 ## Build the AI sub-domains and wire them together, then push every export into them with
@@ -402,6 +413,9 @@ func _apply_config() -> void:
 	_perception.entry_pie_steps = entry_pie_steps
 	_perception.entry_corner_inset = entry_corner_inset
 	_perception.entry_short_room = entry_short_room
+	_perception.grenades_enabled = grenades_enabled
+	_perception.hear_grenade = hear_grenade
+	_perception.evade_margin = evade_margin
 	_perception.apply_config()
 	# The pursuit/territory primitives become planner config: pursuit disables IDLE and starts a walk at
 	# COMBAT once a hostile is known; territory confines combat options inside the house.
@@ -461,10 +475,10 @@ func _apply_config() -> void:
 
 
 ## Buffer a world event for processing on the next control() tick (the signal can fire before the
-## controller knows which character it drives): hits (combat awareness, gunfire heard) and allies'
-## radio callouts.
+## controller knows which character it drives): hits (combat awareness, gunfire heard), allies'
+## radio callouts, and a grenade coming down or going off.
 func _on_event(topic: StringName, data: Dictionary) -> void:
-	if topic == &"hit" or topic == &"callout":
+	if topic == &"hit" or topic == &"callout" or topic == &"grenade" or topic == &"explosion":
 		_event_queue.append([topic, data])
 
 
@@ -580,6 +594,17 @@ func debug_progress() -> Dictionary:
 	return _behavior.debug_progress() if _behavior != null else {}
 
 
+## Read-only: the NPC's grenade awareness for the grenade overlay: `known` (the live grenades it knows of, soonest first, each
+## `{ point, kind, fuse_left, fuse, radius, source }`, `source` being `&"seen"` / `&"heard"` / `&"called"` / `&"own"`), `escape` (the safe spot
+## it is running to, `Vector2.INF` when it is not running to one) and `throw` (the throw it is about to make, `{ from, to, kind, radius }`;
+## {} when it is not making one, or once the grenade has left its hand).
+func debug_grenades() -> Dictionary:
+	if _perception == null or _behavior == null:
+		return { "known": [], "escape": Vector2.INF, "throw": {} }
+	return { "known": _perception.known_grenades(), "escape": _behavior.evade_spot(),
+		"throw": _behavior.throw_plan(_character) if _character != null else {} }
+
+
 ## Read-only: the last callout this NPC radioed (`position`, `point`, `label`, `at` msec), or empty.
 func debug_sent_callout() -> Dictionary:
 	return _last_callout
@@ -651,6 +676,7 @@ func control(character, delta: float) -> void:
 	_process_events(character)
 	_perception.openings = openings
 	_perception.observe(character, rooms)
+	_react_to_grenades(character)
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
 		_perception.entry_point = entry_point # Hand the injected entrance to the perception once.
@@ -678,6 +704,9 @@ func control(character, delta: float) -> void:
 	for step in _behavior.take_entry_calls():
 		if send_callouts:
 			_post_entry_call(step)
+	for throw in _behavior.take_throw_calls():
+		if send_callouts:
+			_post_throw_call(throw)
 
 
 ## Raise the force-decide flag and remember why, for the brain debug overlay.
@@ -692,8 +721,8 @@ func _force_now(reason: String) -> void:
 ## fight, a move, an approach) or the decide cadence has elapsed. One that may must also get one of the frame's
 ## snapshots (`DecisionBudget`); refused, it keeps its wish (`_force`, the elapsed timer) and asks again next frame.
 func _should_decide() -> bool:
-	if _behavior.committed():
-		return false
+	if _behavior.committed() or _behavior.evading() or _character.is_blind():
+		return false  # A blinded NPC starts no new decision (G15), one running from a grenade none until the burst (G16).
 	if not _force and not _behavior.wants_decision(_decide_timer <= 0.0):
 		return false
 	return Budget.claim()
@@ -703,6 +732,8 @@ func _should_decide() -> bool:
 ## calls for a different starting node (e.g. it came under fire mid-way through choosing a room to
 ## search → straight to COMBAT). Otherwise the walk in flight already fits; let it finish.
 func _maybe_interrupt(character) -> void:
+	if _behavior.evading() or character.is_blind():
+		return
 	if _planner.entry_for(_perception.quick_facts(character)) != _planner.current_entry():
 		if Budget.claim():  # Else `_force` stays and the restart is tried again next frame.
 			_start_decision(character)
@@ -729,13 +760,37 @@ func _start_decision(character) -> void:
 func _process_events(character) -> void:
 	if _event_queue.is_empty():
 		return
+	var deaf: bool = character.is_deaf()  # A deafened NPC hears no gunfire, no hit elsewhere and no radio call (G15).
 	for ev in _event_queue:
-		if ev[0] == &"hit":
-			if _perception.process_hit(character, ev[1]) and not _behavior.in_combat():
-				_force_now("attacked")
-		elif hear_callouts:
-			_perception.process_callout(character, ev[1])
+		match ev[0]:
+			&"hit":
+				if deaf and ev[1].get("victim") != character:
+					continue
+				if _perception.process_hit(character, ev[1]) and not _behavior.in_combat():
+					_force_now("attacked")
+			&"callout":
+				if hear_callouts and not deaf:
+					_perception.process_callout(character, ev[1])
+			&"grenade":
+				_perception.process_grenade(character, ev[1], deaf)
+			&"explosion":
+				_perception.process_explosion(character, ev[1])
 	_event_queue.clear()
+
+
+## The grenade reflex (G16) and the blind NPC's recovery (G15), every tick after the SEE pass: hand the behaviour the plan to get clear
+## of the live grenade that threatens the NPC (or {}), radio the grenades it has seen or heard come down, and re-decide the moment
+## its sight returns.
+func _react_to_grenades(character) -> void:
+	_behavior.poll_throw(character)
+	_behavior.set_evade(_perception.evade_plan(character))
+	for grenade in _perception.grenade_announcements():
+		if send_callouts:
+			_post_grenade_call(grenade)
+	var blind: bool = character.is_blind()
+	if _was_blind and not blind:
+		_force_now("sight returned")
+	_was_blind = blind
 
 
 ## Force a re-decision when the NPC's BELIEF about hostiles changes: one is spotted, lost or newly
@@ -756,6 +811,8 @@ func _check_salient() -> void:
 ## Adopt the planner's leaf: hand it to the behaviour, log the full decision path, and tell allies
 ## (a combat or investigation decision) over the radio.
 func _on_decided(leaf: Dictionary) -> void:
+	if _behavior.evading():
+		return  # Overtaken by a grenade while Von was answering; the burst ends in a new decision.
 	_behavior.set_leaf(leaf)
 	GameLog.say("%s (Von) %s  [%s]" % [_npc_name(), " - ".join(leaf["labels"]), _planner.walk_digest()])
 	if send_callouts and _character != null and not leaf["path"].is_empty() \
@@ -779,6 +836,43 @@ func _post_callout(leaf: Dictionary) -> void:
 		"label": " - ".join(leaf["labels"]),
 		"target_id": params.get("target_id", 0),
 		"point": params.get("point", _character.global_position),
+	})
+
+
+## Radio a live grenade the NPC has seen or heard come down (`{ point, kind }`) as an `&"grenade"` callout: the spot it landed
+## at and its kind, for the allies in its danger zone who neither saw nor heard it (G16). `point` is the landing.
+func _post_grenade_call(grenade: Dictionary) -> void:
+	var label := "a %s grenade" % grenade["kind"]
+	_last_callout = { "position": _character.global_position, "point": grenade["point"], "label": label, "at": Time.get_ticks_msec() }
+	EventBus.post(&"callout", {
+		"speaker": _character,
+		"faction": _character.faction,
+		"position": _character.global_position,
+		"status": "grenade",
+		"path": "",
+		"label": label,
+		"target_id": 0,
+		"point": grenade["point"],
+		"kind": grenade["kind"],
+	})
+
+
+## Radio a grenade this NPC has just thrown (`{ kind, point }` from the behaviour) as a `frag_out` / `bang_out` `&"callout"`: where it is
+## going to land and its kind, for the allies near it to get clear of (G16, G17). `point` is the landing.
+func _post_throw_call(throw: Dictionary) -> void:
+	var status := "frag_out" if throw["kind"] == &"frag" else "bang_out"
+	var label := "%s!" % status.replace("_", " ")
+	_last_callout = { "position": _character.global_position, "point": throw["point"], "label": label, "at": Time.get_ticks_msec() }
+	EventBus.post(&"callout", {
+		"speaker": _character,
+		"faction": _character.faction,
+		"position": _character.global_position,
+		"status": status,
+		"path": _behavior.current_act(),
+		"label": label,
+		"target_id": 0,
+		"point": throw["point"],
+		"kind": throw["kind"],
 	})
 
 
@@ -808,6 +902,8 @@ func _post_entry_call(step: Dictionary) -> void:
 		"slot": step["slot"],
 		"side": step["side"],
 		"entry_step": step["step"],
+		"bang": step.get("bang", false),
+		"stuns": step.get("stuns", 0),
 		"cleared_room": step.get("cleared_room", ""),
 		"covering": step.get("covering", ""),
 	})

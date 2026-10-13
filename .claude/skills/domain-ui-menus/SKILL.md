@@ -10,14 +10,15 @@ Two full-screen, code-built windows that take **plain data** and only emit signa
 - `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, defenders, invaders, weapons, ticket })` shows a
   full-screen modal (40 px margins, VBox separation 20, the controls in a `ScrollContainer` fitted to the window
   height) with: a "Play as" dropdown (Defender / Invader), a "Seed" text field (blank = random), two side
-  columns (Defenders | Invaders) each with Count, Weapon, Magazine and Spares rows (the Weapon / Magazine
+  columns (Defenders | Invaders) each with Count, Weapon, Magazine, Spares and a Stun and a Frag count row (0 to 3; Main passes the rows as `grenades`, `[{ id, label, max }]`,
+  from `LoadoutConfig.grenade_options()`, else the window's own two rows, which name no cap and count up to the window's `_MAX_COUNT`; a side reports them as `stuns` / `frags`; they come with the weapon rows) (the Weapon / Magazine
   choices arrive as plain data in `weapons`, `[{ id, label, magazines: [{ id, label }] }]`, from Main — the window
   never sees Items; a weapon with no magazines hides the Magazine + Spares rows; `defenders` / `invaders` seed
-  `{ count, weapon, magazine, spares }` or a bare count), and three start buttons: **Start** (play as the chosen
+  `{ count, weapon, magazine, spares, stuns, frags }` or a bare count), and three start buttons: **Start** (play as the chosen
   side), **Watch** (AIs alone) and **Endless** (AIs alone, a fresh randomised match after each). (The Debug switch
   lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
   muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed,
-  defenders: { count, weapon, magazine, spares }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
+  defenders: { count, weapon, magazine, spares, stuns, frags }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; column headings 36pt; the Tests and Settings buttons 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
 the test browser. `current_config() -> Dictionary` returns the same

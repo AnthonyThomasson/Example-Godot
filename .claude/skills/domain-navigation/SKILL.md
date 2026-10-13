@@ -43,9 +43,12 @@ These holes live in a **second map**, not the world's: `build` adds a child regi
 its own (`steering_map(planning_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
 The world's own map stays furniture-only, because the AI plans on it (flank/fire/retreat spots, route length and exposure, tactical
 entry slots, search coverage) and a body's hole would bend every one of those. Only a `NavigationAgent2D` walks the steering map, and
-the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it; it is baked
-with `weld=true`, which merges the vertices that share a 1 px cell (`_weld_vertices`): a hole meeting a wall leaves vertices a fraction
-of a pixel apart, and the server rejects such an edge ("navigation map synchronization error").
+the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it.
+
+**Every bake is welded** (`_weld_vertices`, run by `_bake_polygon` and by `rebake_async` when its bake lands): it merges the vertices that
+share a 1 px cell, because a hole meeting a wall leaves vertices a fraction of a pixel apart and the server rejects such an edge
+("navigation map synchronization error"). A character's hole does it, and so does a piece of furniture's, a turned chair beside a wall for one,
+so the planning re-bake welds too (`tests/navigation/furniture_beside_wall_bakes_clean`, `character_beside_wall_bakes_clean`).
 
 Solid furniture is recognised by engine type alone — a non-frozen `RigidBody2D` with a
 `CollisionShape2D` (walls are `StaticBody2D`; non-solid decor freezes itself) — so Navigation stays a

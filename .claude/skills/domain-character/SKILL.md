@@ -79,6 +79,9 @@ A character is **standing or crouching** (`_posture`, a `CharacterConfig.posture
 numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* is held; the body is a *posture*.)
 - **API** (interface 7): `set_posture(p) -> bool` (idempotent, so a controller may write it every frame; refused while dead, in an interaction or
   within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
+- **Reads for a controller:** `posture_coverage(posture)` (the body's height on the coverage scale in `stand` / `crouch`: what furniture must stand above to shield it) and
+  `run_speed()` (px/s standing and running as it is now, slower while stunned): the AI's grenade geometry judges a spot by them and keeps no copy of the numbers
+  (`tests/character/posture_and_run_reads_test.gd`).
 - **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6); running (`_update_stamina`) needs `_posture == stand`, so a
   refused run costs no stamina; shooting, reloading and `melee()` work in every posture (`leg_kick()` only standing); `get_surface().coverage` is the
   posture's row (60 / 35: a bullet strikes what stands above its one height, see the Projectile skill); starting an interaction stands the
@@ -128,6 +131,17 @@ cooldown is in step with the frame that pulls the trigger. A controller re-press
 **Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)`, the carried
 magazines and the held slot (dropping any reload, re-judging the raise). Main uses it (through `LoadoutConfig.apply`) to arm the player and every NPC with its side's loadout — a chosen gun, or one random gun by default
 (`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
+
+## Grenades and the stun (`docs/grenades.md` G1, G13)
+
+`item_count(slot := -1)` reads a grenade slot's count; `throw_stats(slot := -1)` forwards the item's `throw_stats()` (a grenade's `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot), which the AI throws by. `_empty_spent_slots` (after the items tick) erases a grenade slot whose last grenade is thrown and, if it was held,
+selects `gun_slot()` (else the fists). `aim_target()` is the aim point swayed by `aim_sway()`; `GunItem.secondary` turns each shot by `aim_sway()` (0 unless stunned).
+`take_stun(blind, deaf, from)` takes the longer of the old and new timers (blind and deaf each) and posts `&"stun"`; `stun_level()` (0..1) is the longer remaining timer over
+`CharacterConfig.recover_tail` (the four stun numbers, `stun_speed`, `stun_sway`, `recover_tail` and `stun_drift`, are the body's tuning and live in `CharacterConfig`: the
+Character reads nothing of `GrenadeConfig`), and while it is above 0 `_move_speed()` scales to `stun_speed`, running is refused, the walk drifts (`_stun_drift`) and the aim sways (`aim_sway`: two
+out-of-step sines, up to `stun_sway` degrees x the level). `stun_view()` feeds the UI (`StunScreen`). `blast_push(from, impulse)` is an explosion's hook: a living body is knocked
+back (`apply_impulse`), a dead one's ragdoll is woken and thrown (`CharacterRagdoll.blast`). The `throw` stance (`CharacterConfig.stances`) is the wind-up's drawn-back arm.
+`set_loadout(..., grenades := {})` takes a slot -> count dict. Tests: `tests/items/grenade_*`, `tests/character/stunned_slow_and_sway_test.gd`.
 
 ## Walking into furniture
 

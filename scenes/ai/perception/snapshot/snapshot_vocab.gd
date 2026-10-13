@@ -92,8 +92,8 @@ func coming_text(c: Dictionary, self_pos: Vector2) -> String:
 ## facing — or that it faces away from the NPC. Empty when unknown or unremarkable.
 func aim_text(c: Dictionary, self_pos: Vector2, others: Array) -> String:
 	var facing: Vector2 = c.get("facing", Vector2.ZERO)
-	if not c.get("visible", false) or facing == Vector2.ZERO:
-		return ""
+	if not c.get("visible", false) or facing == Vector2.ZERO or c.get("blind", false):
+		return ""  # (A blinded one aims at no one.)
 	var cone := deg_to_rad(aim_cone)
 	var to_me: Vector2 = self_pos - (c["pos"] as Vector2)
 	if absf(facing.angle_to(to_me)) <= cone:
@@ -104,6 +104,10 @@ func aim_text(c: Dictionary, self_pos: Vector2, others: Array) -> String:
 	if absf(facing.angle_to(to_me)) >= PI * 0.66:
 		return "facing away from you"
 	return ""
+
+## "blinded by a flash" for a contact the NPC (or an ally) caught in a stun grenade's flash a moment ago.
+func blind_text(c: Dictionary) -> String:
+	return "blinded by a flash" if c.get("blind", false) else ""
 
 ## Where a contact is: "in the kitchen, inside the house" / "outside the house".
 func where(c: Dictionary) -> String:

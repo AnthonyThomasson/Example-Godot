@@ -52,3 +52,11 @@ static func bleed_out(parent: Node, source: Node2D, exclude: Array) -> Node:
 	if not BloodConfig.enabled:
 		return null
 	return BloodSpawner.bleed(parent, source, exclude)
+
+
+## Show a grenade's burst of `kind` (`&"frag"` or `&"stun"`) at world point `at` under `world`: a bright flash, for a frag a
+## fireball puff and, with smoke drifting off, a scorch left on the floor under it; a stun is a white flash and thin smoke.
+## Looks and timings are `PhysicsConfig.explosion_looks`; spawns nothing while `PhysicsConfig.explosion_fx_enabled` is off.
+static func spawn_explosion(world: Node, at: Vector2, kind: StringName) -> void:
+	if PhysicsConfig.explosion_fx_enabled:
+		ExplosionFx.spawn(world, at, kind)

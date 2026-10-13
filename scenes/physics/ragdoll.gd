@@ -121,6 +121,14 @@ func frame_basis(f: int) -> Basis:
 
 # --- Stepping ----------------------------------------------------------------------------
 
+## Wake a body that had gone to sleep and start its sleep clocks afresh, so a push is simulated and the body does not go
+## straight back to sleep through `ragdoll_max_time` (an explosion throws a fallen body).
+func wake() -> void:
+	asleep = false
+	_time = 0.0
+	_still = 0.0
+
+
 ## Advance the body by `delta`. `space` + `origin` (the owner's world position) place the local
 ## points in the world for the wall sweep.
 func step(delta: float, space: PhysicsDirectSpaceState2D, origin: Vector2) -> void:

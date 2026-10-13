@@ -82,7 +82,24 @@ plus z = height; gravity pulls to z = 0.
   toward the origin.
 - Sleeps once every point stays under `ragdoll_sleep_speed` for `ragdoll_sleep_time`, or after
   `ragdoll_max_time`; then `asleep` is true and `step` does nothing.
+  `wake()` undoes it and restarts both clocks.
 - Reading: `point(i)`, `point_count()`, `frame_basis(f)`.
+
+## Explosion look (`explosion_fx.gd`, `scorch_decals.gd`)
+
+`Physics.spawn_explosion(world, at, kind)` (kind `&"frag"` / `&"stun"`; the Projectile System's `Explosion` calls it) is the look of a grenade's burst, all
+procedural in the same stepped-pixel style as the debris and the blood (every disc is rows of `PhysicsConfig.explosion_pixel` px). `ExplosionFx.spawn` adds
+up to three colliderless nodes under `world`, each named for what it is, animated in `_process`, freed at the end of its life and `Despawner`-tracked:
+`ExplosionFlash` (a pale disc over a white one that swells a little and fades in `flash_time`), `ExplosionFireball` (frag only: a lumpy puff that swells and
+cools from yellow to deep red, fading over its last stretch) and `ExplosionSmoke` (puffs that drift out, swell and fade over `smoke_time`, ~4 s for a frag, a
+thin ~2.6 s for a stun). A frag also burns a mark into the world's `ScorchDecals` layer (`ScorchDecals.layer(world).burn(at, radius)`, node `ScorchDecals`):
+ragged stepped rows, a darker core in a lighter rim and a few specks, batched in 128 px chunks like `BloodDecals` / `DebrisLayer` (only the chunk that gained a
+mark redraws), drawn at the blood decals' depth and kept for good up to `Despawner.max_scene_objects` marks (the oldest dropped). A stun leaves no scorch.
+Tuning is `PhysicsConfig.explosion_looks` (one row per kind: `flash_*`, `fireball_*`, `smoke_*`, `scorch_radius`), `explosion_pixel` and `scorch_color`;
+`PhysicsConfig.explosion_fx_enabled` is the master switch (off: nothing spawns). Test: `tests/physics/explosion_fx`.
+
+`Ragdoll.wake()` clears `asleep` and both sleep clocks (`_time`, `_still`): a body that slept through `ragdoll_max_time` would otherwise go straight back to
+sleep after one step of an explosion's push. The Character domain's `CharacterRagdoll.blast` calls it (test: `tests/physics/frag_blast_pushes`).
 
 ## Blood (its own sub-domain: `scenes/physics/blood/`)
 

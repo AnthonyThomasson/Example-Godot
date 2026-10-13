@@ -10,15 +10,20 @@ const ProjectileVisuals = preload("res://scenes/projectile/projectile_visuals.gd
 ## `ignore` is the shooter's body, skipped in the sweep; `item_damage` adds to the bullet's
 ## base damage. `muzzle_speed` is the speed it leaves at (negative = `BallisticsConfig.projectile_speed`);
 ## `penetration` its power to punch through what it hits (1 = a pistol round, higher goes further).
+## `max_range` (px, negative = `Projectile.max_distance`'s default) is how far it flies before it is spent, stopping exactly
+## there; `strikes_shooter` lets it hit `ignore` as well (a grenade's fragments name their thrower as the attacker and hurt it).
 ## Returns the node so the caller can connect its `hit` signal.
 static func spawn(position: Vector2, direction: Vector2, parent: Node, ignore: Node = null, item_damage: float = 0.0,
-		muzzle_speed: float = -1.0, penetration: float = 1.0) -> Node:
+		muzzle_speed: float = -1.0, penetration: float = 1.0, max_range: float = -1.0, strikes_shooter: bool = false) -> Node:
 	var proj := Node2D.new()
 	proj.name = "Projectile"
 	proj.script = Projectile
 	proj.position = position
 	proj.direction = direction
 	proj.ignore = ignore
+	proj.strikes_shooter = strikes_shooter
+	if max_range > 0.0:
+		proj.max_distance = max_range
 	proj.muzzle_speed = muzzle_speed if muzzle_speed > 0.0 else BallisticsConfig.projectile_speed
 	proj.speed = proj.muzzle_speed
 	proj.penetration_power = maxf(penetration, 0.05)
@@ -29,5 +34,5 @@ static func spawn(position: Vector2, direction: Vector2, parent: Node, ignore: N
 	visuals.script = ProjectileVisuals
 	proj.add_child(visuals)
 
-	parent.add_child(proj)
+	parent.add_child(proj, true)  # a readable name (Projectile, Projectile2, ...) for the tests and the log
 	return proj

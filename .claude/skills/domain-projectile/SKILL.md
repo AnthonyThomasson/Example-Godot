@@ -5,7 +5,8 @@ description: Deep implementation detail for the Projectile System domain (scenes
 
 # Projectile System domain
 
-Owns shooting: penetration, damage, cover, ricochet. All knobs live in `BallisticsConfig`.
+Owns shooting: penetration, damage, cover, ricochet, and a grenade's burst (`Explosion`, below). The shooting knobs live in `BallisticsConfig`,
+the burst's in the grenade's `GrenadeConfig` row (Items), which it receives as a plain dict.
 
 ## Impact model
 
@@ -61,7 +62,10 @@ non-flesh surface it strikes (any outcome but fly-over) within `blood_carry_dist
 
 `projectile.gd` / `casing.gd` are control; `projectile_visuals.gd` / `casing_visuals.gd` draw.
 `projectile_spawner.gd` / `casing_spawner.gd` are the spawn entry points the guns call
-(`ProjectileSpawner.spawn(position, direction, parent, ignore, item_damage, muzzle_speed := -1, penetration := 1.0)`).
+(`ProjectileSpawner.spawn(position, direction, parent, ignore, item_damage, muzzle_speed := -1, penetration := 1.0, max_range := -1, strikes_shooter := false)`).
+`max_range` is `Projectile.max_distance`: the round is spent exactly there (the last step is clamped, so it is never seen past it); `strikes_shooter`
+leaves `ignore` in the sweep, so the shooter can be hit while still being the `attacker` of its hits (a grenade's fragments). A bullet is added with a
+readable name (`Projectile`, `Projectile2`, ...), which is how the tests count them.
 
 ## Interface recap (authoritative in the `architecture` skill)
 
@@ -70,3 +74,38 @@ non-flesh surface it strikes (any outcome but fly-over) within `blood_carry_dist
   `CasingSpawner` (`ProjectileSpawner.spawn` takes the round's penetration `power`, carried on its `hit` events). Casings
   despawn via the Despawner once their ~0.3 s toss ends. Each damaging hit also posts a `&"hit"` event
   on `EventBus` (interface 10).
+
+## Explosion (`explosion.gd`, `class_name Explosion`): a grenade's burst
+
+Called by Items' `ThrownGrenade` when its fuse is out: `Explosion.frag(at, world, source, row)` and `Explosion.stun(at, world, source, row)`
+(`source` the thrower or null, `row` its `GrenadeConfig` row). Both post `&"explosion"` `{ position, kind, attacker, radius }` first, call
+`Physics.spawn_explosion(world, at, kind)` and then do their work. Spec: `docs/grenades.md` G7 to G12; friendly fire is on (G9), the thrower is struck like anyone.
+
+- **The line.** `_reach(space, at, body, characters)` casts a ray from the burst to the body's centre on `PhysicsLayers.SOLID`, skipping the other
+  characters, and returns where it met the body (`{ position, normal }`; the hit's contact point) or `{}` when something stops it first:
+  a `StaticBody2D` (a wall) always does, a piece of furniture when its `get_surface().coverage` is above the **body's own height** (a character's is
+  its posture's: crouched 35, standing 60, so a crouched character behind a couch (45) is shielded and a standing one is not; a table (30) shields
+  nobody). Lower pieces are cleared and the ray goes on. A body with no collider (the fallen) is reached at its centre. The same rule serves the blast, the
+  flash; the bang asks it with `walls_only` (only a wall stops the line: furniture muffles nothing).
+- **Frag blast** (`_blast`): the bodies near are the circle's overlaps on the solid layer (walls left out: they only block) plus every dead character
+  (they left the layer but are still thrown). Each within `blast_radius` of the blast point (to its centre) with a clear line takes `blast_damage` (full to
+  `kill_radius`, `blast_damage * (R - d) / (R - kill)` beyond) through `take_hit` (a `HitInfo` with `speed_factor` 0: no impact of its own) and posts
+  `&"hit"` with `outcome` `&"blast"`, the thrower as `attacker`. A dead body is not struck (nothing to damage) but is shoved. Every body reached
+  is then shoved away by `blast_impulse` with the same fall-off, capped at `mass * blast_max_speed` so a light chair is not fired across the house:
+  `blast_push(from, impulse)` on a character (living: knockback; dead: its ragdoll thrown and woken, `Ragdoll.wake()`), `apply_impulse(v)` on furniture.
+- **Fragments** (`_fragments`): `fragments` bullets evenly round the circle (each jittered within its share), through `ProjectileSpawner.spawn` with the
+  row's `fragment_speed`, `fragment_penetration`, `fragment_range` and `strikes_shooter`; their `damage` is `fragment_damage` at full speed head-on
+  (not added to the bullet's base, unlike a gun's `damage`). So cover, penetration, ricochet, blood, debris and impact sounds all work as for bullets.
+- **Stun** (`stun`): every living character within the larger of `flash_radius` and `bang_radius`. The **flash** works by sight: with a clear line
+  it blinds `max_blind * (flash_radius - d) / (flash_radius - flash_full)` (full inside `flash_full`) times the facing factor (the dot of its `facing` with the
+  direction to the burst: 1 -> x1, 0 -> x0.6, -1 -> x0.25, linear between); no clear line, none. A wall always stops the line; a piece of furniture taller than the
+  character stops it only when the character is within the row's `flash_cover_reach` (30 px) of it on the burst's side (`_reach`'s `cover_reach`, `_against`: a reverse ray from the body to the burst), so a crouched body hunched against a couch is
+  shielded and one 120 px behind it is flashed. The blast (`_reach` without a reach) keeps the plain rule. The **bang** works by range: deaf
+  `max_deaf * (1 - d / bang_radius)`, x`wall_factor` when a wall stands between (`_reach(..., walls_only)`; a character hunched against a couch is out of the flash, not out of the bang). Both go through `Character.take_stun(blind, deaf, at)`, which posts the
+  `&"stun"` event; within `point_blank` the character also takes `point_blank_damage` through `take_damage`. A stun does no other damage.
+
+Tests: `tests/projectile/frag_blast_by_distance`, `frag_blast_blocked_by_wall`, `frag_blast_low_cover_by_posture`, `frag_fragments_hit`,
+`grenade_friendly_fire`, `tests/physics/frag_blast_pushes`, `tests/character/stun_flash_by_sight`, `stun_flash_cover_reach`, `stun_bang_by_range`, `stun_bang_through_furniture`.
+
+Interface notes: the blast's `&"hit"` events carry `attacker` = the thrower, so the AI's "attacked me" hostility sees a victim's own teammate as an
+attacker when it throws; the Audio domain ignores `&"blast"` hits (no impact profile), the burst has its own sound.

@@ -30,11 +30,12 @@ extends Node2D
 ## Which side a human player takes when there is one ("defender" / "invader"). The player joins that
 ## side on top of its NPC count, carrying the side's loadout.
 @export var player_side: StringName = &"defender"
-## What the defenders (and a player defending) carry: `{ weapon, magazine, spares }`, anything missing =
-## the `LoadoutConfig` default (a random gun with its own magazine and spares).
+## What the defenders (and a player defending) carry: `{ weapon, magazine, spares, stuns, frags }`, anything
+## missing = the `LoadoutConfig` default (a random gun with its own magazine and spares, no grenades).
 @export var defender_loadout: Dictionary = {}
-## What the invaders (and a player invading) carry; same shape as `defender_loadout`.
-@export var invader_loadout: Dictionary = {}
+## What the invaders (and a player invading) carry; same shape as `defender_loadout`. They come with a stun grenade
+## and a frag grenade each.
+@export var invader_loadout: Dictionary = { "stuns": 1, "frags": 1 }
 ## Endless run: seconds between a match ending and the next one starting.
 @export var endless_delay: float = 5.0
 ## Endless run: seconds before an undecided match is called a draw, so a stalemate can't stall the run
@@ -77,6 +78,7 @@ const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 const SPECTATOR_INSPECTOR := preload("res://scenes/ui/hud/spectator_inspector.gd")
 ## The floor markers of the human's place in an AI stack (world space, under `World`).
 const STACK_MARKERS := preload("res://scenes/ui/hud/stack_markers.gd")
+const STUN_SCREEN := preload("res://scenes/ui/hud/stun_screen.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
 const OVERLAY_TOGGLES := preload("res://scenes/ui/overlays/overlay_toggles.gd")
@@ -148,13 +150,15 @@ func _ready() -> void:
 		_setup_menu.tests_requested.connect(_open_tests)
 		_setup_menu.settings_requested.connect(_open_settings)
 		# The exports are the defaults; what the player chose last time (kept in the settings file) wins.
-		_setup_menu.open({
+		var defaults := {
 			"side": str(player_side),
 			"seed": house_seed,
 			"defenders": _side_defaults(defender_count, defender_loadout),
 			"invaders": _side_defaults(invader_count, invader_loadout),
-		}.merged(Settings.setup, true).merged({
+		}
+		_setup_menu.open(_with_saved_setup(defaults).merged({
 			"weapons": LoadoutConfig.options(),
+			"grenades": LoadoutConfig.grenade_options(),
 			"ticket": _ticket(),
 		}))
 
@@ -172,7 +176,17 @@ func _ticket() -> String:
 	return ticket.strip_edges()
 
 
-## A side's setup-window defaults: `{ count, weapon, magazine, spares }` from its count and loadout.
+## The setup window's `defaults` with what the player chose last time (kept in the settings file) over them, side by
+## side: a choice an older save does not name (the grenade counts) keeps its default.
+func _with_saved_setup(defaults: Dictionary) -> Dictionary:
+	var out := defaults.merged(Settings.setup, true)
+	for side in ["defenders", "invaders"]:
+		if defaults[side] is Dictionary and Settings.setup.get(side) is Dictionary:
+			out[side] = defaults[side].merged(Settings.setup[side], true)
+	return out
+
+
+## A side's setup-window defaults: `{ count, weapon, magazine, spares, stuns, frags }` from its count and loadout.
 func _side_defaults(count: int, loadout: Dictionary) -> Dictionary:
 	var out := LoadoutConfig.normalize(loadout).merged({ "count": count })
 	if out["spares"] < 0:
@@ -225,7 +239,7 @@ func _side_value(side: Variant, key: String, fallback: Variant) -> Variant:
 func _side_loadout(side: Variant, fallback: Dictionary) -> Dictionary:
 	var out := fallback.duplicate()
 	if side is Dictionary:
-		for key in ["weapon", "magazine", "spares"]:
+		for key in ["weapon", "magazine", "spares", "stuns", "frags"]:
 			if side.has(key):
 				out[key] = side[key]
 	return out
@@ -376,6 +390,7 @@ func _spawn_world() -> void:
 		_join_player(rooms, rng)
 		combatants.append(_player)
 		_build_stack_markers(rooms)
+		_build_stun_screen()
 	_arm_characters(combatants)
 	_configure_debug()
 	_begin_match_hud(combatants)
@@ -411,6 +426,7 @@ func _teardown_world() -> void:
 		remove_child(_world)
 		_world.queue_free()
 	_world = null
+	Sound.focus = null  # nobody's ears until the next match names the human
 	_spawner = null
 	_inspector = null
 	_nav_debug = null
@@ -475,6 +491,15 @@ func _build_stack_markers(rooms: Array) -> void:
 	markers.watch(stack)
 
 
+## The human's stun: the white-out of a flash (a `CanvasLayer` under `World`, watching the player) and, through
+## `Sound.focus`, the muffle and tinnitus of a bang. Both read the player's `stun_view()`; neither knows of the other.
+func _build_stun_screen() -> void:
+	Sound.focus = _player
+	var screen: CanvasLayer = STUN_SCREEN.new()
+	_world.add_child(screen)
+	screen.watch(_player)
+
+
 ## The performance overlay and the toggle bar, built the first time a match starts with Debug on and
 ## kept for the rest of an endless run.
 func _build_overlays() -> void:
@@ -518,16 +543,16 @@ func _process(delta: float) -> void:
 
 
 ## Choose the next endless match's parameters: a new seed, each side's count drawn from 1..its setup
-## count (a side set to 0 stays empty) and a random loadout for each side. Everything the player picked
-## in the setup window is the upper limit; the rest is luck.
+## count (a side set to 0 stays empty) and a random gun for each side, with the grenades it was set up with.
+## Everything the player picked in the setup window is the upper limit; the rest is luck.
 func _randomize_match() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.randomize()
 	house_seed = 0
 	defender_count = _random_count(rng, _endless_max["defenders"])
 	invader_count = _random_count(rng, _endless_max["invaders"])
-	defender_loadout = LoadoutConfig.random(rng)
-	invader_loadout = LoadoutConfig.random(rng)
+	defender_loadout = LoadoutConfig.random(rng).merged(LoadoutConfig.grenade_counts(defender_loadout))
+	invader_loadout = LoadoutConfig.random(rng).merged(LoadoutConfig.grenade_counts(invader_loadout))
 
 
 ## A count drawn from 1..`most`, or 0 when `most` is 0.

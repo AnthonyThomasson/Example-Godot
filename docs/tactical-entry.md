@@ -1,7 +1,7 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 and E11 to E16 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9 and E11 to E17 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`; E16's in `tests/ai/stack_*`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are tests on the Terrace house of
 `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
@@ -233,6 +233,21 @@ Tests: `stack_player_reserved_slot`, `stack_player_keeps_slot_late_ai_behind`, `
 `stack_player_idle_withdrawn`, `stack_player_leaving_withdraws`, `stack_defender_player_none`, `stack_player_slot_von` (the real
 Von server; `tools/run_tests.sh stack --include-von`), `ui/stack_markers_draw`, `general/stack_player_wiring`.
 
+**E17. A stun before the crossing (the bang entry, `docs/grenades.md` G18).** A stack that carries a stun grenade and has a reason to
+think a hostile is in the room (gunfire heard there, a hostile seen going in) goes in by STUN ENTRY instead of the quiet ENTER; the
+mode is the first claimer's and every claim on the radio repeats it (`bang`, with the stuns the member carries), so the stack goes in
+all one way (one member giving the bang up makes it quiet for all). The stack forms as in E1 and E2. Once it is ready, the **thrower**
+(the second of the stack if it carries a stun, else the lowest slot that does; alone, itself) radios `bang`, steps out in front of the
+door's edge, throws the stun to the room's far side through the doorway and comes back to its slot; every member holds its slot
+turned away from the door (phase `bang`, nobody looks at a threat in the doorway) until the stun goes off. The point does not slice
+the pie (E3): on the burst it crosses at once (E4), and the rest follow as in E6; for `BANG_WINDOW` (3 s) after it the E14 hold on a
+hostile in view does not apply, as whoever is in the doorway is blind and deaf. With no stun left, no clear lob into the room (from
+the thrower's hand, clear of the jamb), a thrower that is not ready within `BANG_CALL_CAP` (8 s) or a stun that does not go off within
+`BANG_BURST_CAP` (5 s) of the call, the stack goes in quietly. Why: a stun grenade is how real teams take a room they think is
+occupied, and the entrants go in the moment it goes off; the stack stays beside the wall, out of the burst's line, turned away from the
+flash. Tests: `ai/grenade/stun_entry_suspect_room`, `quiet_entry_unsuspected_room` (the real Von server, `--include-von --require-von`) and, scripted, one fallback each:
+`ai/grenade/bang_fallback_no_clear_lob`, `bang_fallback_stun_lost`, `bang_fallback_never_called`, `bang_fallback_never_goes_off`.
+
 ## Situations
 
 The two common room shapes, `#` wall, `D` opening, `S` stack slots outside (1 is the point), `p` the pie
@@ -276,7 +291,8 @@ the stack toward the door's axis, clear of the slots.
   wall (taken from the room edge it lies on; the data has none), the stack slots in single file on both
   sides, the pie arc, and the four corners of the room behind tagged hard or soft by a sight ray. Built
   once per opening and kept, since walls do not move.
-- **What Von decides.** Whether to enter, and by which doorway. SEARCH offers a child **ENTER**
+- **What Von decides.** Whether to enter, and by which doorway. (With a stun grenade in the stack SEARCH offers **STUN ENTRY** beside
+  ENTER: the same doorways, a bang before the crossing, E17.) SEARCH offers a child **ENTER**
   (`decision_tree.gd`) beside its rooms and unexplored areas; its options are the `entries` group
   (`snapshot_options.gd`): the doorways out of the NPC's area into a room it has not seen or not searched
   lately, nearest first ("the doorway into the kitchen — unsearched — short route"). A room a doorway leads
@@ -284,7 +300,7 @@ the stack toward the door's axis, clear of the slots.
   (`tools/von_scenarios/search_enter_*.json`, `enter_*.json`). Only invaders enter this way
   (`GoalController.entry_enabled`, on in `npc_invader.tscn`; test switch `ai.entry`).
 - **The choreography.** The ENTER leaf runs the `entry` primitive, a phase machine in the behaviour
-  sub-domain (`behavior/entry.gd`): approach (E1), stack (E2), pie (E3), cross (E4, E5), corner, clear
+  sub-domain (`behavior/entry.gd`): approach (E1), stack (E2), bang (E17, a bang entry only), pie (E3), cross (E4, E5), corner, clear
   (E8), cover (E8), rear (E8). It does not ask Von again on the cadence until the entry is over, so it runs with the server down (a forced decision
   still replaces it, or aborts it when Von is down).
   While crossing, the controller holds every decision (`Behavior.committed()`); a hit or a hostile seen
@@ -375,7 +391,7 @@ procedure.
 
 ## Not modelled
 
-Closed or locked doors, breaching, flashbangs and the dynamic-entry "shock" they give (blocked on doors, issue
-#21). Stairs (bottom-up clearing, no leapfrogging). Mirrors and cameras under a door. Hallway bounding overwatch
+Closed or locked doors and breaching (blocked on doors, issue #21); a stun grenade thrown in is modelled (E17), a frag at
+entry is not. The dynamic-entry "shock" of breaching. Stairs (bottom-up clearing, no leapfrogging). Mirrors and cameras under a door. Hallway bounding overwatch
 and corner clearing outside a room (a doorway passed in a corridor is E15). Verbal commands to non-combatants. A
 defender reacting to a stack at its door. Entry speed against the 5 to 6 second benchmark is E10.

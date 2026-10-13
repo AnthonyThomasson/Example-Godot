@@ -1,6 +1,6 @@
 class_name CharacterConfig
 
-## Tuning for a Character walking into / being shoved by world objects, being shot, its
+## Tuning for a Character walking into / being shoved by world objects, being shot, being stunned, its
 ## pixel art, its body, hand stances and pose, and its fall on death (scenes/character/). A `class_name` holder of `static var`s — read as
 ## `CharacterConfig.<name>`; there is no instance and no autoload.
 ##
@@ -65,6 +65,17 @@ static var punch_impulse: float = 900.0
 ## Base damage a full-extension punch reports, scaled by the same range of motion. Surfaced
 ## through hit_landed for the HUD; a punch does not deform what it hits.
 static var punch_damage: float = 8.0
+
+# --- Being stunned (a grenade's flash and bang, `Character.take_stun`; docs/grenades.md G13) ---
+
+## The most a stunned character moves of its speed (x0.45 at the full level).
+static var stun_speed: float = 0.45
+## Furthest (degrees) the aim sways off where it points at the full level; applied to where shots and throws go.
+static var stun_sway: float = 25.0
+## The effect tails off over the last this many seconds: the level falls linearly from 1 to 0 over them.
+static var recover_tail: float = 1.5
+## How fast (px/s) a stunned character drifts sideways of the way it walks, at the full level.
+static var stun_drift: float = 20.0
 
 # --- The leg kick (the right leg; character_kick.gd): harder than a punch, shorter in reach, and slower to come back ---
 ## Central impulse a kick imparts to a pushable object, and the damage it reports (both at full strength: a kick
@@ -189,6 +200,9 @@ static var stances: Dictionary = {
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.3, 0.0, -1.0) },
 	&"support": { "forward": 27.0, "lateral": 2.0, "height": 6.0, "swing": 0.0, "steady": true,
 		"recoil_share": 0.7, "elbow_pole": Vector3(0.6, -0.1, -1.0) },
+	# A grenade's wind-up: the throwing arm drawn back behind the shoulder and up, before it is thrown forward.
+	&"throw": { "forward": -6.0, "lateral": 15.0, "height": 6.4, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.6, -0.8, -0.5) },
 	# Reloading: the supporting hand drops to the belt for the next magazine.
 	&"reload": { "forward": 1.0, "lateral": 11.5, "height": 4.4, "swing": 0.0, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.1, -0.8, -0.2) },
@@ -266,6 +280,8 @@ static var ragdoll_knee_slack: float = 20.0
 static var ragdoll_hit_topple: float = 60.0
 static var ragdoll_knee_buckle: float = 70.0
 static var ragdoll_jitter: float = 15.0
+## How much of an explosion's shove on a fallen body goes up (a hop off the floor), as a share of its speed along it.
+static var ragdoll_blast_lift: float = 0.35
 ## Speed (px/s) a held item is tossed off at as the hand lets go, on top of the body's momentum.
 static var ragdoll_drop_toss: float = 70.0
 ## A fallen part's floor shadow shift per px of height (matches the standing drop shadow).

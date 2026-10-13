@@ -379,6 +379,24 @@ asserts a behaviour the AI does not show yet is written first, left red and tagg
 - **Flank point sampling** prefers any sampled point with a clear shot, so a "line blocked" scenario needs
   a barrier across the whole arc (a row of shelves), not one piece.
 
+## Grenade tests (tag `grenade`)
+
+The rules are `docs/grenades.md` (G1 to G19, each with its tests named under it); `tools/run_tests.sh grenade` runs them, the scenario tests
+with `--include-von --require-von`. They are spread by domain (`tests/items/grenade_*`, `loadout_grenade_counts`; `tests/projectile/frag_*`,
+`grenade_friendly_fire`; `tests/physics/frag_blast_pushes`, `explosion_fx`; `tests/character/stun_*`; `tests/audio/grenade_sounds`;
+`tests/general/camera_shakes_on_explosion`; `tests/ui/stun_screen_whiteout`) with the AI ones in `tests/ai/grenade/`, all through
+`tests/_ai/grenade_probe.gd` (`const Probe := preload(...)`): `arm(character, stuns, frags)` (a test world keeps the default inventory, so each test
+arms the thrower the way Main does, at the start of `run`), `throw_at`, `live`, `raw` / `booms` / `stuns` (bus events with their sim time), the numbers of the spec
+(`MAX_RANGE`, `FLASH_RADIUS`, `expected_blind`, ...) so a test checks the doc and not the code, and the AI reads (`offered`, `acts`, `callouts`). The scenario tests
+in `tests/ai/grenade/` run the whole AI pipeline with the real Von server and `require` the premise first (that the AI took the GRENADE / STUN ENTRY path), so a
+different Von choice reads as a set-up finding. A hall of 100 px or less with a sofa in it is **sealed in the navmesh** (the lane left is under an agent body wide) and
+a route to the far side then runs outside the house: give a scenario hall at least 140 px when the NPC has to walk past a piece of furniture.
+The mechanisms the scenarios cannot reach are scripted-Von tests: `grenade_range_drift`, `throw_dropped_when_lob_blocked` and `throw_committed_in_windup` use `von_script(rules, 30)`
+(slow answers) to change the world while a question is in flight (a character moved with `global_position`, a piece of furniture shoved onto the lob: it must be `freeze`d first and
+the teleport made a frame later, or the physics step puts a free body back), and the four `bang_fallback_*` tests run a stack of two at the Terrace house's back door through
+`tests/_ai/bang_probe.gd` (`const Bang := preload(...)`: `rules` SEARCH > STUN ENTRY > that doorway, `stack`, `arm`, `radio_mate` for a teammate that is a puppet radioing its part of
+the stack, `note_acts` / `took`).
+
 ## Errors and warnings fail the test (`log_watch.gd`)
 
 Godot 4.4 has no in-process logger hook (that arrives with `OS.add_logger` in 4.5). `LogWatch` tails
@@ -439,7 +457,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `ai.entry` | Tactical entry (`GoalController.entry_enabled`; on in the invader preset). |
 | `ai.entry_guard` | The entry guard (`GoalController.entry_guard`, on by default; needs `ai.entry`): any walk into an uncleared room goes in by entry. |
 | `nav.rebake` | `NavUpdater.enabled`. |
-| `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps and reloads make `sound` events and voices. |
+| `audio.sound` | `SoundConfig.enabled`: shots, impacts, footsteps, reloads and the grenades' throw, bounce and burst make `sound` events and voices. |
 | `physics.blood` | `BloodConfig.enabled`. |
 | `physics.footprints` | `BloodConfig.footprints_enabled`. |
 | `physics.smear` | `BloodConfig.smear_enabled`. |

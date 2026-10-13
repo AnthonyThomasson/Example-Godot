@@ -118,6 +118,15 @@ func step(delta: float, space: PhysicsDirectSpaceState2D, origin: Vector2) -> vo
 	body.step(delta, space, origin)
 
 
+## An explosion throws the fallen body: every point gains `velocity` (px/s) along the floor and a hop up, and a body that
+## had come to rest wakes.
+func blast(velocity: Vector2) -> void:
+	body.wake()
+	var lift := velocity.length() * CharacterConfig.ragdoll_blast_lift
+	for i in body.point_count():
+		body.push(i, Vector3(velocity.x, velocity.y, lift))
+
+
 ## True once the body has come to rest.
 func is_settled() -> bool:
 	return body.asleep

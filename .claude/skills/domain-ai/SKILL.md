@@ -30,7 +30,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 |---|---|---|---|
 | **Perception** | `ai/perception/` | `domain-ai-perception` (+ `domain-ai-snapshot` for the snapshot: `agent_snapshot.gd`, `perception/snapshot/`) | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
-| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
+| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry / throw) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck, the entry plan, the entry team and guard). |
 
 **The human's stack (`ai/team/player_stack.gd`).** Not a fifth sub-domain: one small module, the human's side of the entry radio
@@ -49,12 +49,29 @@ over it;
 adopts the returned leaf into **Behaviour** (and radios it to allies); then has **Behaviour** `apply()`
 the running primitive.
 
+## Grenades (`docs/grenades.md`)
+
+Two decisions Von makes and two reflexes outside it. **GRENADE** (G17) is a COMBAT tactic: offered against a hostile hidden from the NPC's line of fire, in throw range with a clear lob,
+when no known ally would be in the blast and the NPC could get safe from it itself; it runs the `throw` primitive (select, aim, throw, radio `frag_out` / `bang_out`, gun back in hand, wait out the fuse, or the evade plan if it is in the
+burst's zone). **STUN ENTRY** (G18) is a SEARCH tactic beside ENTER, offered while the NPC or its stack carries a stun: the same doorways, with a stun thrown into the room from beside the door before the point crosses (the `bang` phase of
+`entry.gd`, `docs/tactical-entry.md` E17). `perception/snapshot` words both (`domain-ai-snapshot`), the tree has the nodes (`domain-ai-decision`), `combat.gd` throws (`domain-ai-combat`), `entry.gd` runs the bang (`domain-ai-behavior`); the numbers it
+knows of a grenade not yet thrown (throw range, radii, fuses, the flash's cover reach) it reads off the grenades it carries (`Character.throw_stats(slot)`, interface 6/7; no copy in exports).
+
+Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_process_events`), and the exports **Grenades** group (`grenades_enabled`, `hear_grenade` 300 px, `evade_margin` 120 px):
+- **Evade (G16).** Perception knows the live grenades it sees, hears come down, is told of (callout `status` `grenade`, also `frag_out` / `bang_out`) or threw; when it is inside a
+  grenade's danger zone it radios an `&"grenade"` callout (`point` = where it landed, `kind`) and the behaviour runs to the nearest safe spot (out of the burst's line, behind furniture that
+  shields a crouched body, or outside the zone), holds it facing away and re-decides at the burst. No decision starts or is adopted meanwhile. `perception/agent_grenades.gd`,
+  `agent_throw.gd`, `behavior.gd` ("The evade reflex"). `debug_grenades()` reads it; the `show_grenades` overlay draws it.
+- **Stunned (G15).** Blind: no new sighting, no new decision (it re-decides the tick sight returns), its contacts kept so it fires blind at the last-known spot of the one it fought (the character's aim
+  sway applies); deaf: the orchestrator drops gunfire, hits elsewhere, callouts and grenade landings it would have heard.
+
 ## The decision tree
 
 ```
 root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
       │                             ├─ RELOAD  → swap in a magazine             (reload)
       │                             ├─ FLANK   → a side, route clear of hostiles (engage)
+      │                             ├─ GRENADE → frag or stun a hostile hidden behind cover (throw)
       │                             ├─ ADVANCE → halfway / close / rush         (move)
       │                             ├─ MELEE   → punch, only when point-blank   (melee)
       │                             ├─ RETREAT → a hidden / farther spot        (move)
@@ -62,6 +79,7 @@ root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spo
       ├─ INVESTIGATE ─┬─ a lead (last seen, heading, gunfire, ally's call)      (move)  [always asked of Von]
       │               └─ STAY → hold, when a lead is outside the house          (hold)
       ├─ SEARCH ─┬─ ENTER → a doorway into a room left to search              (entry)
+      │          ├─ STUN ENTRY → the same with a stun thrown in first (a stun in the stack) (entry{bang})
       │          └─ a room / unexplored area / the entrance                     (move)
       ├─ RELOAD_QUIET → top up with nobody about                                (reload)
       └─ IDLE ─┬─ USE → an object · GO → a room · WAIT                           (interact / move / hold)
@@ -126,6 +144,6 @@ The AI's external surface is all the orchestrator's:
 - **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s
   `target_position` and reads `get_next_path_position()`; perception's tactics query the nav map
   (closest point, path) to judge routes.
-- **EventBus** (interface 10): the orchestrator consumes `&"hit"` and `&"callout"` and hands each to
-  perception; it posts `&"callout"` when it adopts a combat or investigation decision, and at each step
+- **EventBus** (interface 10): the orchestrator consumes `&"hit"`, `&"callout"`, `&"grenade"` and `&"explosion"` and hands each to
+  perception (a deafened NPC drops what it could not hear); it posts `&"callout"` when it adopts a combat or investigation decision, when it sees or hears a live grenade that threatens it (`status` `grenade`), and at each step
   of a tactical entry (the stack's slot claims, ready, going in, through, clear, the doorway on each covers, done).

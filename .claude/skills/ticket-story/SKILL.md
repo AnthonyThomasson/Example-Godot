@@ -6,9 +6,9 @@ description: How to field a standard ticket, one with no `bug` or `spike` label 
 # Ticket: story
 
 A story is ordinary work: something to build or change. It runs in seven phases, in order, through
-`orchestration` (see the `ticket` skill, "Work in phases"). Phases 1, 2 and 7 talk to the user, so you
-(the coordinator) run them yourself; phases 3 to 6 are build phases you may dispatch to workers, and phase 6,
-the audit, is always an agent's.
+`orchestration` (see the `ticket` skill, "Work in phases"). Phases 1, 2 and 7, the feedback gate that ends
+phase 5 and the findings question in phase 6 talk to the user, so you (the coordinator) run them yourself; phases
+3 to 6 are build phases you may dispatch to workers, and phase 6's audit is always an agent's.
 
 If the ticket carries the `ai` label as well, also follow `ticket-ai` for the test phase (its §2–4: scenarios
 from the real world, rest of the AI left on, red before code).
@@ -41,9 +41,12 @@ Write a detailed plan of **everything that will be built**, concrete enough that
 - **Phases**: the build order and what each phase produces.
 - **Out of scope** and **open risks**.
 
-Show the plan and revise it until the user accepts it. **Once they accept**, add it to the ticket's content:
+Show the plan and revise it until the user accepts it. **Once they accept**, rebase onto `main` first and check
+what came in against the plan (the `ticket` skill, "Work in phases"): any change that affects the plan reopens the
+grilling, and the plan is accepted again before it goes on the ticket. Then add it to the ticket's content:
 read the current body (`gh issue view <n> --json body`), keep it exactly as it is, and append the plan under a
 `## Plan` heading with `gh issue edit <n> --body-file <file>` (write the file in the scratchpad directory).
+Then invoke the `show-me` skill, so the user has an editor on the worktree to verify the coming phases on.
 Re-read the ticket afterwards to check the body is the original plus the plan. Don't edit the ticket before
 the plan is accepted, and don't drop or reword what is already there.
 
@@ -74,14 +77,23 @@ fails is a regression your change caused until shown otherwise.
 Update every skill whose domain changed (and `architecture` for an interface) and the spec in `docs/` if the
 behaviour has one.
 
+**Then ask the user for feedback, before the audit.** Once every test run above is green, you (the coordinator,
+not a worker) tell the user in a few lines what is built and passing, point them at the editor `show-me` opened
+(run it again if it is gone, and say Play must be restarted to pick up the latest code), and **ask for their
+feedback** with `AskUserQuestion` (e.g. "looks right, go on to the audit" / "I have changes"). Wait for the answer.
+Feedback is a new round run by you: change the plan section on the ticket if the scope moved, then dispatch the
+change as phases 3 to 5 again (a test first, then the code, then green) and ask again. Go on to the audit only when
+the user says the behaviour is right.
+
 ## 6. Audit
 
 The last gate before the user sees the work: dispatch **one agent** to run the **`audit` skill** over the branch.
 It reads the branch's whole change (commits since `main` plus anything staged), so what phases 3 to 5 produced is
 in scope; commit or stage the work first if the user has asked you to commit, otherwise tell the agent which
 files are only in the working tree (the audit's load check and tests see them, its diff does not). Start it with
-`orca orchestration worker-start --task-title "audit" --spec "<spec>" --worktree current --agent claude`, a
-self-contained spec in the five parts `orchestration` asks for:
+`orca orchestration worker-start --task-title "review" --spec "<spec>" --worktree current --agent claude` (and name
+its tab `review`, as the `ticket` skill's "Work in phases" says), a self-contained spec in the five parts
+`orchestration` asks for:
 
 - **Target:** the worktree and branch, the ticket number, and the base ref (default `origin/main`).
 - **Change:** invoke the `audit` skill and run it to its checklist. The agent does every step of the audit itself
@@ -92,16 +104,33 @@ self-contained spec in the five parts `orchestration` asks for:
 - **Observable acceptance:** its `worker_done` gives the issue count and the report path, and the report is the
   audit's checklist with a verdict line.
 
-Read the report yourself; a failed or missing report is a finding, not a pass. Take each item to the right
-place: a real defect in what was built goes back to phase 4 (and its test to phase 3 first when no test would
-have caught it), a stale skill or comment is fixed with the phase 5 wrap-up, a finding you disagree with goes to
-the user with your reasoning. Then rerun the checks, and rerun the audit once more if code changed beyond the
-audit's own list. Go on when it comes back clean or the user has accepted what is left.
+Read the report yourself; a failed or missing report is a finding, not a pass. Then:
 
-## 7. Ask for feedback
+1. **Show the user the findings** ranked (high / medium / low, each in a line with its fix), say which you agree with,
+   and for any you disagree with give your reasoning. Ask how to go on with `AskUserQuestion`, recommended first:
+   fix them all and then ask for feedback; take the user's feedback first and fold it in with the fixes; or fix only
+   the high and medium ones. Wait for the answer.
+2. **Fix them in one `coding-review-fixes` worker** (stages split it as `coding-review-fixes-<stage>`), briefed with
+   the report's path and the accepted findings. Every behaviour defect is fixed **tests first**: a test that would
+   have caught it, seen red for the right reason, then the fix at its cause, then green. A set-up mistake in a test
+   is fixed only as the report names it; no assertion is loosened. Stale skills, docs and comments are fixed in the
+   same worker.
+3. **Then a `wrap-up` worker** runs phase 5's checks again over the fixed work (the new tests `--repeat=10`, the whole
+   suite, perf on a quiet machine) and makes sure no doc or skill claims a run that did not happen.
+4. **Review the fixes** with a short second audit (`review-fixes`, the same spec, told which findings were fixed)
+   when the fixes changed code beyond the report's own list or added behaviour; otherwise rerun its checks yourself.
+
+Go on to phase 7 when it is clean or the user has accepted what is left.
+
+## 7. Report, then feedback or finish
 
 Report on the ticket and to the user: what was built against the plan, the tests (red → green), the audit's
 verdict and what was done about each finding, the files changed, anything left uncovered or deviating from the
-plan and why. Then **ask for their feedback** and wait.
-Feedback is a new round: change the plan section on the ticket if the scope moved, add or adjust a test first,
-then change the code, and audit again (phase 6) before reporting back. Don't commit or close the ticket unless asked.
+plan and why. Then ask with `AskUserQuestion` whether they want to **give feedback** (try it in the `show-me`
+editor first, Play restarted for the latest code) or **finish the ticket**, and wait.
+
+- **Feedback** is a new round: change the plan section on the ticket if the scope moved, then a test first, the code,
+  `wrap-up`, and a review of the change (phase 6) before reporting back and asking again.
+- **Finish**: release every settled worker, then invoke the `finish` skill yourself (it commits, merges into `main`,
+  pushes `main`, closes the ticket and removes the workspace). The user's "finish" answer to this question is the
+  go-ahead; without it, never commit or close the ticket.

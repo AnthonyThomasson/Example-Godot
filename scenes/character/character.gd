@@ -77,6 +77,14 @@ var _reload_left := 0.0
 var _blocked := false
 var _raise := 0.0  ## How far the held weapon is raised off the aim, 0..1, easing toward `_blocked`.
 
+## The stun (a grenade's flash and bang; `take_stun`): seconds left blind and deaf, the blind seconds at the burst, and the
+## clock and phases the aim sways and the walk drifts by while it lasts. See `stun_level()`.
+var _blind_left := 0.0
+var _blind_total := 0.0
+var _deaf_left := 0.0
+var _stun_clock := 0.0
+var _stun_phase := Vector2.ZERO
+
 ## Knockback velocity from objects shoved into the character; decays each frame. Added on
 ## top of controller-driven movement.
 var _knockback := Vector2.ZERO
@@ -165,10 +173,12 @@ func _physics_process(delta: float) -> void:
 
 	_posture_cooldown = maxf(_posture_cooldown - delta, 0.0)
 	_ease_posture(delta)
-	# Items keep their own clocks (a gun's time between rounds); tick them before the controller pulls the
-	# trigger, so a round that is due this frame can leave this frame.
+	_update_stun(delta)
+	# Items keep their own clocks (a gun's time between rounds, a grenade's wind-up); tick them before the controller
+	# pulls the trigger, so a round that is due this frame can leave this frame.
 	for item: Item in _items.values():
 		item.tick(delta)
+	_empty_spent_slots()
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
@@ -198,8 +208,9 @@ func _physics_process(delta: float) -> void:
 	_hands.facing = facing
 	_update_weapon_raise(delta)
 
-	_update_stamina(run_input and _posture == &"stand" and move_input.length() > CharacterConfig.run_min_input, delta)
-	velocity = move_input * _move_speed() * _push_slow + _knockback
+	_update_stamina(run_input and _posture == &"stand" and stun_level() <= 0.0
+			and move_input.length() > CharacterConfig.run_min_input, delta)
+	velocity = move_input * _move_speed() * _push_slow + _knockback + _stun_drift()
 	move_and_slide()
 	_knockback = _knockback.move_toward(Vector2.ZERO, CharacterConfig.push_knockback_friction * delta)
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
@@ -303,6 +314,12 @@ func is_running() -> bool:
 	return _running
 
 
+## The body's height on the coverage scale when in posture `which` (`stand` / `crouch`, `CharacterConfig.postures`): what a piece of
+## furniture must stand above to shield it. `get_surface()` answers for the posture it is in.
+func posture_coverage(which: StringName) -> float:
+	return float(CharacterConfig.postures[which]["coverage"])
+
+
 ## Stamina left, 0..1 of a full bar.
 func stamina_fraction() -> float:
 	return stamina
@@ -398,10 +415,12 @@ func gun_slot() -> int:
 ## Carry only the items in `slots` (see `ItemRegistry`), holding `hold_slot`, with the spare magazines named by
 ## `spare_types` (`MagazineConfig.types` ids): how a spawner arms a character with its gun. Starts every gun
 ## loaded as `start_rounds` says (in `loaded_magazine` when that type fits the gun, else the gun's own); a reload
-## in progress is dropped. Safe after `add_child`, so a spawner can re-arm a scene-placed character.
-func set_loadout(slots: Array, hold_slot: int, spare_types: Array, loaded_magazine: StringName = &"") -> void:
+## in progress is dropped. Safe after `add_child`, so a spawner can re-arm a scene-placed character. A grenade slot among
+## `slots` holds `grenades[slot]` of them (else `start_rounds`, or one).
+func set_loadout(slots: Array, hold_slot: int, spare_types: Array, loaded_magazine: StringName = &"",
+		grenades := {}) -> void:
 	_cancel_reload()
-	_items = ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)
+	_items = ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades)
 	_magazines = ItemRegistry.create_magazines(spare_types)
 	_current_slot = hold_slot if hold_slot in _items else (_items.keys()[0] if not _items.is_empty() else hold_slot)
 	_raise = 0.0
@@ -511,9 +530,22 @@ func _update_weapon_raise(delta: float) -> void:
 	_raise = move_toward(_raise, 1.0 if _blocked else 0.0, CharacterConfig.weapon_raise_speed * delta)
 
 
-## Walking speed (slower in a lower posture), or run speed while running (only possible standing).
+## Walking speed (slower in a lower posture, and slowed to `CharacterConfig.stun_speed` while stunned), or run speed while
+## running (only possible standing and not stunned).
 func _move_speed() -> float:
-	return speed * float(CharacterConfig.postures[_posture]["speed"]) * (CharacterConfig.run_speed_mult if _running else 1.0)
+	return _speed_in(_posture, _running)
+
+
+## The speed (px/s) the body covers ground at in posture `which`, running or walking, as it is now (stunned or not).
+func _speed_in(which: StringName, running: bool) -> float:
+	return speed * float(CharacterConfig.postures[which]["speed"]) * (CharacterConfig.run_speed_mult if running else 1.0) \
+			* lerpf(1.0, CharacterConfig.stun_speed, stun_level())
+
+
+## The speed (px/s) it would cover ground at running, standing, as it is now (slowed while stunned): how a controller works out whether it
+## reaches a place in time.
+func run_speed() -> float:
+	return _speed_in(&"stand", true)
 
 
 ## `facing` turned toward the unit vector `want`: at once standing, but no faster than the posture's `turn` rate
@@ -615,6 +647,23 @@ func has_item(id: int) -> bool:
 	return _items.has(id)
 
 
+## How many of the item in `slot` are carried (the held one by default): a grenade slot's count, 1 for any other item, 0
+## when the slot is empty.
+func item_count(slot := -1) -> int:
+	var item := _item_in(slot)
+	if item == null:
+		return 0
+	return item.uses_left() if item.is_throwable() else 1
+
+
+## What the item in `slot` (the held one by default) tells its holder about itself when it is thrown: a grenade's `{ kind, max_range,
+## danger_radius, fuse, flash_cover_reach, max_blind }` (`Item.throw_stats`), {} for any other item or an empty slot. The AI reads the grenades'
+## numbers here, from what it carries, not from a copy.
+func throw_stats(slot := -1) -> Dictionary:
+	var item := _item_in(slot)
+	return item.throw_stats() if item else {}
+
+
 ## True while a punch swing is in progress.
 func is_attacking() -> bool:
 	return _hands.is_attacking()
@@ -648,6 +697,20 @@ func kick(hand: int, strength := 1.0) -> void:
 ## only — shots still leave along `facing`.
 func weapon_facing() -> Vector2:
 	return Vector2.from_angle(pose.weapon_angle)
+
+
+## The point the character is aiming at, as an item reads it (a grenade is thrown to it): the aim point, swayed about the
+## body by `aim_sway()`.
+func aim_target() -> Vector2:
+	return global_position + (aim_point - global_position).rotated(aim_sway())
+
+
+## How far (rad) the aim has swayed off where the character points: 0 unless stunned, then up to
+## `CharacterConfig.stun_sway` at the full stun, wandering. A gun turns each shot by it; `facing` itself, and so the drawn body
+## and weapon, stays on the aim.
+func aim_sway() -> float:
+	var level := stun_level()
+	return 0.0 if level <= 0.0 else deg_to_rad(CharacterConfig.stun_sway) * level * _stun_wander(0.0)
 
 
 ## How each hand is held (CharacterConfig.stances names), as the held item asks: arms hang with
@@ -718,6 +781,69 @@ func report_shot(body: Node, damage: float) -> void:
 	hit_landed.emit(body, damage, -1)
 
 
+# --- The stun (a grenade's flash and bang; docs/grenades.md G13) -------------------------
+
+## Blind and deafen the character for `blind` and `deaf` seconds by a burst at `from` (a grenade's). A new stun takes the
+## longer of the old and the new timers, blind and deaf each, and posts `&"stun"` `{ character, position, blind, deaf,
+## from }`. While either lasts the character is disoriented (`stun_level()`): slowed, drifting, unable to run and its
+## aim swaying. A stun that is neither does nothing; a dead character cannot be stunned.
+func take_stun(blind: float, deaf: float, from: Vector2 = Vector2.ZERO) -> void:
+	if is_dead or (blind <= 0.0 and deaf <= 0.0):
+		return
+	if stun_level() <= 0.0:
+		_stun_clock = 0.0
+		_stun_phase = Vector2(randf() * TAU, randf() * TAU)
+	if blind > _blind_left:
+		_blind_left = blind
+		_blind_total = blind
+	_deaf_left = maxf(_deaf_left, deaf)
+	EventBus.post(&"stun", { "character": self, "position": global_position, "blind": blind, "deaf": deaf, "from": from })
+
+
+## True while flash-blinded.
+func is_blind() -> bool:
+	return _blind_left > 0.0
+
+
+## True while deafened.
+func is_deaf() -> bool:
+	return _deaf_left > 0.0
+
+
+## How disoriented the character is, 0 (not at all) .. 1 (fully): full while the longer of the blind and deaf times has
+## more than `CharacterConfig.recover_tail` seconds to run, then falling linearly to 0 over that tail.
+func stun_level() -> float:
+	return clampf(maxf(_blind_left, _deaf_left) / maxf(CharacterConfig.recover_tail, 0.01), 0.0, 1.0)
+
+
+## What a stun looks like from outside, for the UI: `{ blind, blind_total, deaf, level }` (seconds left blind and deaf,
+## the blind seconds at the burst, the disorientation 0..1).
+func stun_view() -> Dictionary:
+	return { "blind": _blind_left, "blind_total": _blind_total, "deaf": _deaf_left, "level": stun_level() }
+
+
+## Count the stun down.
+func _update_stun(delta: float) -> void:
+	if _blind_left <= 0.0 and _deaf_left <= 0.0:
+		return
+	_stun_clock += delta
+	_blind_left = maxf(_blind_left - delta, 0.0)
+	_deaf_left = maxf(_deaf_left - delta, 0.0)
+
+
+## A slow wandering value in -1..1 that a stunned character's aim and walk follow (two out-of-step sines).
+func _stun_wander(offset: float) -> float:
+	return 0.6 * sin(_stun_clock * 1.1 + _stun_phase.x + offset) + 0.4 * sin(_stun_clock * 2.3 + _stun_phase.y + offset)
+
+
+## The sideways drift (px/s) of a stunned walk: across the way it is walking, wandering with the stun.
+func _stun_drift() -> Vector2:
+	var level := stun_level()
+	if level <= 0.0 or move_input.length_squared() < 0.0001:
+		return Vector2.ZERO
+	return move_input.orthogonal().normalized() * CharacterConfig.stun_drift * level * _stun_wander(1.7)
+
+
 # --- Hittable contract (struck by projectiles: flesh surface + deformation) -------------
 
 ## The character's ballistic surface: partial cover (the body's height, so a lower posture is struck by fewer
@@ -777,6 +903,8 @@ func _die(direction: Vector2) -> void:
 	# The body falls from the standing skeleton, whatever it was doing.
 	_posture = &"stand"
 	_posture_height = 1.0
+	_blind_left = 0.0  # A dead body sees and hears nothing more to fade.
+	_deaf_left = 0.0
 	_legs.clear()
 	_kick.clear()
 	ragdoll = CharacterRagdoll.new(self, momentum, direction)
@@ -784,6 +912,23 @@ func _die(direction: Vector2) -> void:
 	velocity = Vector2.ZERO
 	_knockback = Vector2.ZERO
 	died.emit()
+
+
+## Empty the grenade slots whose last grenade has been thrown, and if one was held, take up the gun again (the lowest slot
+## that takes ammo, as `gun_slot()` says), else the fists.
+func _empty_spent_slots() -> void:
+	var emptied := false
+	for slot: int in _items.keys():
+		if _items[slot].uses_left() == 0:
+			_items.erase(slot)
+			emptied = emptied or slot == _current_slot
+	if not emptied:
+		return
+	_current_slot = gun_slot()
+	if _current_slot < 0:
+		_current_slot = ItemRegistry.FISTS_SLOT if ItemRegistry.FISTS_SLOT in _items else ItemRegistry.UNARMED_SLOT
+	_rig_cache = null  # The weapon hand may change: the rig is solved afresh on the next read.
+	_update_weapon_raise(0.0)
 
 
 ## Let go of the held item: it flies off with the body's `momentum` plus a toss, and leaves the
@@ -817,6 +962,16 @@ func damage_taken() -> float:
 ## Take a shove; divided by mass and folded into locomotion.
 func apply_impulse(impulse: Vector2) -> void:
 	_knockback += impulse / maxf(CharacterConfig.player_mass, 0.5)
+
+
+## An explosion's shove: away from the blast point `from`, `impulse` hard (the units of `apply_impulse`). A living character
+## is knocked back like any shove; a dead one's ragdoll is thrown (and woken, if it had come to rest).
+func blast_push(from: Vector2, impulse: float) -> void:
+	var away := (global_position - from).normalized() if global_position.distance_squared_to(from) > 0.01 else Vector2.RIGHT
+	if is_dead:
+		ragdoll.blast(away * impulse / get_mass())
+	else:
+		apply_impulse(away * impulse)
 
 
 ## The character's mass, used by pushers to scale their shove.

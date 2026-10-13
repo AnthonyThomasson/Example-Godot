@@ -139,6 +139,23 @@ func round_power() -> float:
 	return 1.0
 
 
+## How many uses are left: a grenade's count, spent one per throw. -1 for an item that is never used up (the default).
+func uses_left() -> int:
+	return -1
+
+
+## Whether the item is thrown rather than fired or swung (a grenade). Default: no.
+func is_throwable() -> bool:
+	return false
+
+
+## What a holder may know of a throwable before throwing it, `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }` (a grenade's
+## numbers: how far a throw first comes down, how far its burst reaches, the seconds to it, how near furniture must be to shield from a flash).
+## Default: nothing ({}), as for every item that is not thrown.
+func throw_stats() -> Dictionary:
+	return {}
+
+
 ## Seconds a reload of this item takes. Default: 0 (instant).
 func reload_time() -> float:
 	return 0.0

@@ -24,6 +24,7 @@ Files:
 ```
 root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
       │                                         ├─ flank   [flank_sides, drop `held`, `crosses`, `no_shot`, `heading`, `lane`] → engage (anchored at the side)
+      │                                         ├─ grenade [grenade_throws, drop `ally_in_blast`, `no_safe_spot`] → throw
       │                                         ├─ advance [advance_positions]         → move{aim target}
       │                                         ├─ melee   [melee: point-blank only]   → melee
       │                                         ├─ reload  [reload: gun low + spare] → reload
@@ -33,7 +34,8 @@ root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_posi
       ├─ investigate [leads] (ask)         → move{aim travel}
       │    └─ stay [lead_outside]          → hold          (decline a lead outside the house)
       ├─ search [search_rooms, explore]    → move{aim travel}
-      │    └─ enter [entries]              → entry         (a doorway into a room left to search)
+      │    ├─ enter [entries]              → entry         (a doorway into a room left to search)
+      │    └─ stun_entry [entries; requires stack_has_stun] → entry{bang}  (a doorway into a room where a hostile may be waiting)
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
 ```
 
@@ -42,13 +44,13 @@ children/options — it names the trade-off), `context` (which perception sectio
 level; the goal is always shown), `children` (static node ids), `options` (perception option-group
 names → leaves; looked up under the bound target first, then globally), `summary` (group whose
 summary fills `{summary}`; `summary_inside` within a confined subtree; `{gun}` in a template is what the NPC calls its gun, from the
-snapshot's `gun`: "pistol", "assault rifle"), `bind` + `bind_options` +
+snapshot's `gun`: "pistol", "assault rifle"; `{blinded}` the bound hostile's "X is blinded by a flash and cannot see you, or " clause, empty unless it is, from the `blinded` key of its `hostiles` bind), `bind` + `bind_options` +
 `bind_question` + `bind_context` (pick and bind one option first, e.g. which hostile — with a leaner
 state, since the options carry each candidate's details), `requires` (fact names, `!` negates; a bound
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
 route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
-whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `run_through_fire: true` on retreat lets it keep sprinting with a shot available (every other walk drops to a walk to take it, `docs/gaze-and-fire.md` W6); `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
+whose point or route lies in an ally's line of fire), `primitive` (move / engage / melee / interact / hold / reload / entry / throw), `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `run_through_fire: true` on retreat lets it keep sprinting with a shot available (every other walk drops to a walk to take it, `docs/gaze-and-fire.md` W6); `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
 `ask` (INVESTIGATE: the planner never takes the node, or the level that offers it as its lone option, without asking Von — whether a
 lead is worth going to is Von's call). **Staying in the house is Von's call too, guided by the prompt, not a rule:** a territorial
 goal ("hold your ground inside the house; do not chase anyone outside") is in every state, the state and the leads say where the gunfire
@@ -74,6 +76,21 @@ search (the doorway to the west — unexplored — short route)") and the questi
 (measured: "the nearest one into an unsearched or unexplored room" lets "unexplored" outweigh a short route). Von chooses only whether and which doorway; the stack, pie, crossing and corners are the
 behaviour's `entry` primitive (`domain-ai-behavior`), which asks Von nothing on the cadence until the entry is over
 (a forced decision — a hit, a hostile belief change — still starts, and replaces the entry or, with Von down, aborts it).
+
+**GRENADE** (`grenade`, a COMBAT child; `docs/grenades.md` G17): offered while some hostile has a `grenade_throws` option (the NPC carries a grenade, the
+hostile's last-known spot is hidden from its line of fire, in throw range with a clear lob) that is not tagged `ally_in_blast` or `no_safe_spot`; runs the `throw`
+primitive (`domain-ai-combat`). Its options are `frag` and `stun` (asked of Von only when it carries both). Measured on the three real-Von scenarios
+(`combat_frag_hidden_hostile`, `combat_frag_take_cover`, `combat_stun_then_advance`) with `tools/von_probe.py`: the desc "Your line to {target} is blocked and you can throw a
+grenade onto their spot ({summary})" together with the sentence the exposure section gains ("You can throw a frag grenade onto their spot.") gives GRENADE
+0.46 to 0.52 against ENGAGE 0.23 to 0.26 (the old plan cue on ENGAGE changes nothing); either half alone leaves ENGAGE ahead (0.35 to 0.43 against GRENADE 0.22 to 0.36: ENGAGE's "clear shot"
+wording wins on the loaded-gun facts), and a desc that opens with "{target} is hidden behind cover where a bullet cannot reach" loses. After a stun the state says the hostile is
+"blinded by a flash and cannot see you" (the sentence in the exposure section, the `{blinded}` clause in ADVANCE's desc: "{target} is blinded by a flash and cannot see you, or
+{target} looks badly wounded, ..."; the planner fills `{blinded}` from the bound hostile's option, empty otherwise, so every other desc is unchanged): ADVANCE 0.71 against ENGAGE 0.18 (0.26
+against 0.48 with the state's contact line alone). **STUN ENTRY** (`stun_entry`, a SEARCH child, requires `stack_has_stun`, G18): the same `entries` group and `entry` primitive as
+ENTER with `params { bang: true }`; desc "A doorway leads into a room where gunfire was heard or a hostile was seen going in ({summary})", the summary being the nearest doorway's (a doorway into a room a hostile is
+suspected in is listed first and says "gunfire heard there" / "a hostile seen going in" instead of "unexplored"/"unsearched"): with the gunfire STUN ENTRY 0.42 to 0.44 against ENTER 0.34 to 0.37, quiet ENTER 0.46
+against 0.29 (the original "a hostile may be waiting: gunfire heard there, a hostile seen going in" cannot tell the two: 0.37 to 0.42 against 0.36 to 0.38). At the doorway level the unexplored/unsearched word
+costs the suspect doorway (0.48 against 0.52), "gunfire heard there" in its place gives 0.61 and "into the room where gunfire was heard" 0.66. Re-run the probes after any rewording of either.
 
 **How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
 state (`criteria` in its API are classification criteria). A branch's desc therefore states the

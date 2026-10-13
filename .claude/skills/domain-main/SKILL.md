@@ -40,9 +40,12 @@ Everything one match builds lives under a fresh `World` node (group `match_world
 4. a human, when there is one, joins its side (`_join_player`: a clear spot for a defender, the scene anchor for an invader) and is reparented
    under `World` (draw order house < player < NPCs), is handed the stack radio (`MatchSpawner.bind_player` attaches a `PlayerStack` with the
    house's rooms and openings) and `_build_stack_markers` adds the floor markers (`StackMarkers`, `watch`ing it) under `World` (`docs/tactical-entry.md` E16);
+   `_build_stun_screen` then names the human the listener (`Sound.focus = _player`, the Audio autoload's one input from Main: a bang's muffle and tinnitus are
+   the human's alone) and adds the `StunScreen` (UI hud) under `World`, `watch`ing the player (`docs/grenades.md` G14). A spectator match has no human, so `Sound.focus`
+   stays null; `_teardown_world` clears it;
 5. `_arm_characters`: every character gets its side's loadout through `LoadoutConfig.apply` → `Character.set_loadout` — a chosen gun with its
-   magazine and spares, or by default one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins
-   the loadouts without shifting placement. Tests and sandboxes never come through here and keep the weapon they ask for;
+   magazine and spares and its stun / frag grenade counts (invaders default to 1 + 1, defenders 0 + 0: `invader_loadout`'s default `{ stuns: 1, frags: 1 }`), or by default
+   one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement. Tests and sandboxes never come through here and keep the weapon they ask for;
 6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit, show_details)`, in spectator mode the camera framing + `SpectatorInspector`
    (the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 

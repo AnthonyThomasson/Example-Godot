@@ -11,6 +11,8 @@ extends RefCounted
 ##   pie      — the point (or a lone entrant) sweeps the arc beside the door in angle steps, looking through it,
 ##              and notes the share of the room seen and the corners still hidden (E3); alone, both sides (E7)
 ##              Nobody crosses while a hostile stands in view (E14): the pie stops where it is and the watch stage fires.
+##   bang     — a bang entry (`docs/grenades.md` G18): once the stack is ready its thrower radios `bang`, steps out beside the door and
+##              throws a stun into the room; every member holds its slot turned away from the door until the stun goes off
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
 ##              `in` once it is in the room and off the door's axis
 ##   corner   — holds the corner looking across the room, then clears the rest by sight (`search_coverage.gd`)
@@ -24,7 +26,8 @@ extends RefCounted
 ## step (`take_calls()`) and the controller radios it; the team is read back through the perception
 ## (`entry_team`). The point crosses when every member of the stack is ready or `ready_timeout` runs out (E6); a
 ## follower crosses `follow_gap` after the member ahead of it is through. With nobody else claiming the doorway the
-## NPC goes alone; an ally that claims a slot before it commits joins the stack (E7). Owns that state and nothing
+## NPC goes alone; an ally that claims a slot before it commits joins the stack (E7). In a **bang entry** the stack throws a stun grenade
+## into the room first (the `bang` phase, below): the point skips the pie and crosses the moment it goes off. Owns that state and nothing
 ## else: `Behavior` calls `begin()` on adopting an ENTER leaf and `step()` every tick until it reports done.
 
 const Watch := preload("res://scenes/ai/behavior/watch.gd")
@@ -57,6 +60,23 @@ const GAZE_SETTLED := 0.12
 const SECURITY_CAP := 30.0
 ## Most seconds one entry spends topping its gun off before the crossing (a reload that will not start is not waited on forever).
 const TOP_OFF_CAP := 8.0
+## A bang entry (G18): where the thrower steps out to throw from (px out from the wall, and along it from the doorway's centre as shares of
+## its width, toward the stack's side first), how far its throwing hand reaches to its right (px) and how much room a throw leaves either
+## side of the doorway's edge, how deep into the room and how far across it (shares of the room's depth and width) the stun is aimed, in order
+## of preference, and the least distance (px) from the door it lands at.
+const BANG_STEP_OUT := 78.0
+const BANG_STEP_ALONG := [0.25, 0.0, -0.25]
+const BANG_HAND_REACH := 28.0
+const BANG_EDGE_MARGIN := 8.0
+const BANG_DEPTHS := [0.85, 0.7, 0.55]
+const BANG_ACROSS := [0.0, 0.2, -0.2]
+const BANG_MIN_DEPTH := 120.0
+## The most seconds a stack-ready member waits for its thrower to call the bang before the stack goes in quietly, and the most the
+## stack waits for the stun to go off once it was called.
+const BANG_CALL_CAP := 8.0
+const BANG_BURST_CAP := 5.0
+## Seconds after the stun went off in which the stack goes in whatever stands in view (a hostile in the doorway is blind and deaf).
+const BANG_WINDOW := 3.0
 
 var ready_timeout: float = 6.0     ## Seconds the point waits for the stack, once ready, before going in without it.
 var follow_gap: float = 0.3        ## Seconds a follower leaves after the member ahead of it is through.
@@ -80,6 +100,7 @@ var corner := Vector2.INF          ## The corner this NPC enters to.
 var secure := false                ## A pass-by (E15): the doorway is only secured, from one side of its pie, never crossed or radioed.
 var secured := false               ## A secure entry got to the end of its pie.
 var covering := ""                 ## The doorway on (its id) this NPC covers once the room is clear ("" = none).
+var bang := false                  ## A bang entry (G18): a stun is thrown into the room before anyone crosses. Radioed with every claim; the stack is in bang mode only if all of it is.
 
 var _loco: Node                    ## The Locomotion child (pathing, rooms).
 var _perception: Node              ## The perception sub-domain (doorway geometry, the team on the radio, sight).
@@ -113,6 +134,16 @@ var _holders := {}                 ## Allies seen holding the cleared room (cove
 var _eyes: RefCounted              ## The watch module: where a walking entrant looks (`Watch.travel_point`).
 var _combat: RefCounted            ## The combat module: the tactical reload at the stack (`Combat.top_off`).
 var _top_off_spent := 0.0          ## Seconds this entry has spent topping its gun off.
+var _stuns := 0                    ## Stun grenades this NPC carries (radioed, so the stack knows who can throw).
+var _self_id := 0                  ## This NPC's instance id (to know it is the thrower on the radio's terms).
+var _bang_stage := ""              ## The thrower's part: "go" (to the throw spot), "throw", "back" (to its slot); "" for everyone else.
+var _bang_spot := Vector2.INF      ## Where the thrower throws from.
+var _bang_route: Array = []        ## The points it walks through to get there: out from its slot first, clear of the member ahead of it, then along.
+var _bang_target := Vector2.INF    ## Where the stun is thrown to, in the room.
+var _bang_wait := 0.0              ## Seconds a stack-ready member has waited for the bang to be called.
+var _bang_over := false            ## The stun went off (or the bang was given up): the point crosses at once, no pie.
+var _burst_seen := -1              ## The physics frame of the last stun burst in the room this entry has taken note of.
+var _burst_at := -INF              ## `_time` of the stun burst in the room.
 var _security_clock := 0.0         ## Seconds spent holding the stack outside a short room (E13).
 var _security_held_at := -1.0      ## `_security_clock` the room was first called clear (-1 = not yet).
 ## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
@@ -146,6 +177,11 @@ func begin(character, params: Dictionary) -> bool:
 		phase = "done"
 		return false
 	var team: Array = [] if secure else _perception.entry_team(opening)
+	_self_id = character.get_instance_id()
+	bang = bool(params.get("bang", false)) and not secure
+	if not team.is_empty():
+		bang = team.all(func(m): return m["bang"])  # The stack goes in the way its first claimer chose.
+	_stuns = character.item_count(ItemRegistry.STUN_SLOT)
 	slot = _perception.entry_free_slot(team, character.get_instance_id(), int(params.get("slot", 0)))
 	side = _perception.entry_stack_side(_geo, team, character.global_position)
 	solo = team.is_empty()
@@ -172,6 +208,15 @@ func reset() -> void:
 	pie_sides = 0
 	corner = Vector2.INF
 	covering = ""
+	bang = false
+	_bang_stage = ""
+	_bang_spot = Vector2.INF
+	_bang_route = []
+	_bang_target = Vector2.INF
+	_bang_wait = 0.0
+	_bang_over = false
+	_burst_seen = -1
+	_burst_at = -INF
 	_geo = {}
 	_calls = []
 	_last_call = {}
@@ -213,7 +258,7 @@ func abandon() -> void:
 ## Whether the entrant is committed to the crossing: nothing may stop it (no re-decision, no reload, no crouch)
 ## until it is through the threshold and off the door's axis (E4).
 func committed() -> bool:
-	return phase == "cross"
+	return phase == "cross" or (phase == "bang" and _combat.throw_stage == "windup")
 
 
 ## The steps queued for the radio since the last call, oldest first: { step, cleared_room? }.
@@ -236,7 +281,7 @@ func debug() -> Dictionary:
 		"opening": opening, "into": into, "slot": slot, "side": side, "solo": solo, "phase": phase, "secure": secure,
 		"seen_fraction": seen_fraction, "pie_sides": pie_sides, "hidden_corners": hidden, "corner": corner,
 		"stack_point": _stack_point() if not _geo.is_empty() else Vector2.INF, "team": _team_size,
-		"covering": covering, "watch_doors": _watch.map(func(w): return w["id"]),
+		"covering": covering, "watch_doors": _watch.map(func(w): return w["id"]), "bang": bang, "bang_stage": _bang_stage,
 	}
 
 
@@ -288,6 +333,8 @@ func step(character, delta: float) -> bool:
 	_time += delta
 	_clock += delta
 	var team: Array = [] if secure else _perception.entry_team(opening)
+	_stuns = character.item_count(ItemRegistry.STUN_SLOT)
+	_note_burst()
 	if team.size() > _team_size:
 		_team_grew_at = _time  # Someone joined: the point gives the newcomer the full wait.
 	_team_size = team.size()
@@ -301,9 +348,11 @@ func step(character, delta: float) -> bool:
 		_radio(_last_call["step"], _last_call)  # Keep the claim (and what it covers) alive on the radio.
 	match phase:
 		"approach":
-			_tick_approach(character)
+			_tick_approach(character, team, delta)
 		"stack":
 			_tick_stack(character, team, delta)
+		"bang":
+			_tick_bang(character, team, delta)
 		"pie":
 			_tick_pie(character, team, delta)
 		"cross":
@@ -363,11 +412,13 @@ func _enter_approach(character) -> void:
 
 
 ## Walk the approach waypoints, then into the slot; give up the claim when it takes too long.
-func _tick_approach(character) -> void:
+func _tick_approach(character, team: Array, delta: float) -> void:
 	if _clock > approach_time:
 		_radio("abort")
 		phase = "done"
 		return
+	if not team.is_empty() and _bang_due(character, team, delta):
+		return  # The rest of the stack is in place: the thrower goes straight to throw, rather than into its slot first.
 	_aim_travel(character)
 	while not _waypoints.is_empty() and character.global_position.distance_to(_waypoints[0]) <= WAYPOINT_REACH:
 		_waypoints.pop_front()
@@ -396,19 +447,26 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 		_look_toward(character, spot + (_geo["along"] as Vector2) * side * 300.0, delta, 3.0)  # Back along the line, away from the door.
 	else:
 		_look_toward(character, _geo["pos"], delta)
-	if _topping_off(character, delta):
+	if not _bang_over and _topping_off(character, delta):
 		return
 	if _holds_outside(team):
 		_tick_security(character, team, delta)
 		return
+	if _bang_due(character, team, delta):
+		return
 	var ahead := _ahead(team)
 	if ahead.is_empty():
-		_start_pie(character, team)
+		if _bang_over:
+			_start_cross(character, team)  # The stun went off: in at once, whatever stands in view, no pie.
+		elif _waits_for_bang(team):
+			return
+		else:
+			_start_pie(character, team)
 		return
 	if THROUGH.has(ahead[-1]["step"]):
 		if _turn_at < 0.0:
 			_turn_at = _time
-		if _time - _turn_at >= follow_gap and not hostile_in_view:
+		if _time - _turn_at >= follow_gap and (not hostile_in_view or _in_bang_window()):
 			_start_cross(character, team)
 
 
@@ -465,6 +523,189 @@ func _tick_security(character, team: Array, delta: float) -> void:
 func _ahead(team: Array) -> Array:
 	var waited := _ready_at >= 0.0 and _time - _ready_at >= ready_timeout
 	return team.filter(func(m): return m["slot"] < slot and not (waited and m["step"] == "claim"))
+
+
+# --- The bang (G18) ------------------------------------------------------------------------------
+
+## Whether the stack is in bang mode and has a stun to throw: every member's claim says bang (one that gave it up vetoes it) and a
+## member carries one. The mode is the first claimer's (`begin`), so a stack goes in all one way.
+func _banging(team: Array) -> bool:
+	return bang and not _bang_over and team.all(func(m): return m["bang"]) and _thrower(team) != -1
+
+
+## The instance id of the member who throws the stun, or -1 when nobody can: the second of the stack if it carries one, else the lowest
+## slot that does (alone, this NPC). Every member works it out from the radio's `stuns` the same way.
+func _thrower(team: Array) -> int:
+	var carriers: Array = team.filter(func(m): return int(m["stuns"]) > 0).map(func(m): return { "id": m["id"], "slot": m["slot"] })
+	if _stuns > 0:
+		carriers.append({ "id": _self_id, "slot": slot })
+	if carriers.is_empty():
+		return -1
+	carriers.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
+	for c: Dictionary in carriers:
+		if c["slot"] == 2:
+			return c["id"]
+	return carriers[0]["id"]
+
+
+## A member in its slot with the stack ready that is the thrower calls the bang and goes to throw. Returns true once the phase has
+## changed. A thrower with nowhere to throw from (no clear lob into the room) gives the bang up: the stack goes in quietly.
+func _bang_due(character, team: Array, delta: float) -> bool:
+	if _bang_over or not bang:
+		return false
+	if not team.all(func(m): return m["bang"]):
+		_give_up_bang()  # A teammate gave the bang up: this member goes in quietly too, and its claims say so.
+		return false
+	if team.any(func(m): return m["step"] == "bang"):
+		_enter_bang(character)  # The thrower called it: hold, turned away, until the stun goes off.
+		return true
+	if _thrower(team) == -1 or not _stack_ready(team) or hostile_in_view:
+		return false
+	if _thrower(team) != _self_id:
+		_bang_wait += delta  # Waiting for the thrower to call the bang.
+		return false
+	if not _plan_bang(character):
+		_give_up_bang()
+		return false
+	_bang_stage = "go"
+	_enter_bang(character)
+	_radio("bang")
+	return true
+
+
+## Begin the bang phase, taking note of the last burst so only a stun that goes off from now on ends it.
+func _enter_bang(character) -> void:
+	_set_phase(character, "bang")
+	_burst_seen = int(_perception.last_burst.get("frame", -1))
+	_burst_at = -INF
+
+
+## Whether the point holds in its slot for the bang the stack's thrower is about to call, rather than slicing the pie: the stack is in
+## bang mode and has waited less than `BANG_CALL_CAP` for it.
+func _waits_for_bang(team: Array) -> bool:
+	if not _banging(team):
+		return false
+	if _bang_wait >= BANG_CALL_CAP:
+		_give_up_bang()
+		return false
+	return true
+
+
+## The bang is off: the stack goes in quietly (the point slices the pie). Radioed with the next claim, so the whole stack follows.
+func _give_up_bang() -> void:
+	bang = false
+	_bang_stage = ""
+	_radio(str(_last_call.get("step", "ready")), _last_call)
+
+
+## Plan the throw: a spot to throw from and a target in the room, a clear lob from the thrower's hand there to the target (a hand that
+## clears the jamb, with `BANG_EDGE_MARGIN` to spare either side). The target is the room's far side, `BANG_DEPTHS` of the way in and
+## `BANG_ACROSS` of the way across, at least `BANG_MIN_DEPTH` from the door; the first of them that some spot can reach wins, the thrower's
+## own slot before a step out in front of the door (`BANG_STEP_ALONG`). False when nowhere gives a clear lob.
+func _plan_bang(character) -> bool:
+	var door: Vector2 = _geo["pos"]
+	var out: Vector2 = _geo["out"]
+	var along: Vector2 = _geo["along"]
+	var room: Rect2 = _geo["room"]
+	var depth := 0.0
+	for c: Vector2 in [room.position, Vector2(room.end.x, room.position.y), room.end, Vector2(room.position.x, room.end.y)]:
+		depth = maxf(depth, (door - c).dot(out))
+	var width := absf(room.size.dot(along.abs()))
+	var spots: Array = [_stack_point()]
+	for share: float in BANG_STEP_ALONG:
+		spots.append(_loco.reachable(door + out * BANG_STEP_OUT + along * side * float(_geo["width"]) * share))
+	for d: float in BANG_DEPTHS:
+		for a: float in BANG_ACROSS:
+			var target: Vector2 = door - out * depth * d + along * width * a
+			if not room.grow(-30.0).has_point(target) or target.distance_to(door) < BANG_MIN_DEPTH:
+				continue
+			for spot: Vector2 in spots:
+				if _clear_lob(character, spot, target):
+					_bang_spot = spot
+					_bang_target = target
+					_bang_route = [_loco.reachable(door + out * maxf(BANG_STEP_OUT, (spot - door).dot(out)) + along * (_stack_point() - door).dot(along)), spot]
+					return true
+	return false
+
+
+## Whether a stun thrown from the hand of a thrower standing at `spot` and facing `target` flies to it clear of the jamb: its throwing hand
+## is `BANG_HAND_REACH` to its right, and the lob must be clear from there and `BANG_EDGE_MARGIN` either side of it. The target is within the
+## stun's throw reach (`Combat.throw_reach`) of the spot, so the thrower throws from where it stands and does not close in.
+func _clear_lob(character, spot: Vector2, target: Vector2) -> bool:
+	if spot.distance_to(target) > _combat.throw_reach(_perception.grenade_range(&"stun")):
+		return false
+	var toward := (target - spot).normalized()
+	var hand := spot + toward.rotated(PI * 0.5) * BANG_HAND_REACH
+	for lateral: float in [0.0, BANG_EDGE_MARGIN, -BANG_EDGE_MARGIN]:
+		if not _perception.can_lob(character, hand + toward.rotated(PI * 0.5) * lateral, target, &"stun"):
+			return false
+	return true
+
+
+## The bang phase. Everyone holds its slot turned away from the door while the stun is thrown and goes off; the thrower first steps to its
+## throw spot, throws (taking the stun in hand, `Combat`) and comes back. When the stun has gone off the stack is over the bang: the point
+## crosses at once (`_tick_stack`), the rest follow as usual. The bang is given up if the throw fails, a teammate gave it up (its claims say
+## quiet) or the stun does not go off.
+func _tick_bang(character, team: Array, delta: float) -> void:
+	if _burst_at > -INF:
+		_bang_over = true
+		_set_phase(character, "stack")
+		return
+	if _clock > BANG_BURST_CAP or not team.all(func(m): return m["bang"]):
+		_give_up_bang()
+		_set_phase(character, "stack")
+		return
+	var away: Vector2 = _stack_point() + (_geo["out"] as Vector2) * 300.0
+	match _bang_stage:
+		"go":
+			while _bang_route.size() > 1 and character.global_position.distance_to(_bang_route[0]) <= WAYPOINT_REACH:
+				_bang_route.pop_front()
+			if not _at(character, _bang_spot):
+				_loco.move_to(character, _bang_route[0])
+				_look_toward(character, _bang_target, delta, 3.0)
+				return
+			character.move_input = Vector2.ZERO
+			_combat.begin_throw(ItemRegistry.STUN_SLOT, _bang_target, _perception.grenade_range(&"stun"))
+			_bang_stage = "throw"
+		"throw":
+			if _combat.throw_stage != "away" and _combat.throw_step(character, delta) == &"failed":
+				_combat.end_throw()
+				_give_up_bang()
+				_set_phase(character, "stack")
+				return
+			if _combat.throw_released(character):
+				_combat.end_throw()
+				_bang_stage = "back"
+		_:
+			var spot := _stack_point()
+			if character.global_position.distance_to(spot) > WAYPOINT_REACH:
+				_loco.move_to(character, spot)  # Back in its slot (or, shoved out of it, a step back in).
+			else:
+				character.move_input = Vector2.ZERO
+			_look_toward(character, away, delta, 3.0)
+
+
+## Whether the stun grenade the stack threw has gone off in the room being entered: the perception notes every burst
+## (`last_burst`), and one in this room that came after the bang phase began ends it.
+func _note_burst() -> void:
+	var burst: Dictionary = _perception.last_burst
+	if phase != "bang" or burst.is_empty() or int(burst["frame"]) <= _burst_seen or burst["kind"] != &"stun" \
+			or not (_geo.get("room", Rect2()) as Rect2).has_point(burst["position"]):
+		return
+	_burst_seen = int(burst["frame"])
+	_burst_at = _time
+
+
+## Whether the stun went off a moment ago (`BANG_WINDOW`): the stack goes in without the usual hold for a hostile in view.
+func _in_bang_window() -> bool:
+	return _bang_over and _time - _burst_at < BANG_WINDOW
+
+
+## Whether a live grenade of `kind` is the stun this entry is waiting for (the evade reflex then leaves the stack to its own turned-away
+## hold, beside the wall and out of the burst's line): any stun, while the bang phase runs. (In flight it is at the doorway, where its
+## landing is not known to those who did not throw it.)
+func expects_burst(kind: StringName) -> bool:
+	return phase == "bang" and kind == &"stun"
 
 
 # --- The pie (E3, E7) ---------------------------------------------------------------------------
@@ -837,6 +1078,8 @@ func _radio(what: String, extra := {}) -> void:
 		return  # A pass-by joins no stack and claims nothing on the radio.
 	var msg := { "step": what }
 	msg.merge(extra)
+	msg["bang"] = bang
+	msg["stuns"] = _stuns
 	_calls.append(msg)
 	_last_call = msg.duplicate()
 	_heartbeat = HEARTBEAT

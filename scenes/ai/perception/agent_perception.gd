@@ -27,6 +27,8 @@ const AgentHostility := preload("res://scenes/ai/perception/agent_hostility.gd")
 const AgentMemory := preload("res://scenes/ai/perception/agent_memory.gd")
 const AgentTactics := preload("res://scenes/ai/perception/agent_tactics.gd")
 const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
+const AgentThrow := preload("res://scenes/ai/perception/agent_throw.gd")
+const AgentGrenades := preload("res://scenes/ai/perception/agent_grenades.gd")
 ## The BUILD half: turns what the NPC knows + the combat geometry into the decision snapshot Von walks.
 const AgentSnapshot := preload("res://scenes/ai/perception/agent_snapshot.gd")
 const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
@@ -34,6 +36,10 @@ const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_voc
 ## Physics frames between an unfamiliar NPC's looks for rooms and furniture it does not know yet. Learning is permanent and
 ## a decision looks again first, so a glimpse shorter than this still counts when it is the moment of a decision.
 const LEARN_EVERY_FRAMES := 6
+
+## The share of a stun's longest blindness (`max_blind`) a hostile caught at its burst is taken to be blinded for, at point-blank (less with distance): the NPC cannot
+## see which way their eyes were turned.
+const FLASH_SHARE := 0.8
 
 ## Physics frames between two sight tests of a character that stays inside an NPC's view cone. The range and cone test runs
 ## every frame, so one that enters the cone is tested at once and one that leaves it is dropped at once; only the line of
@@ -107,12 +113,18 @@ var entry_pie_radius: float = 100.0
 var entry_pie_steps: int = 5
 var entry_corner_inset: float = 40.0
 var entry_short_room: float = 150.0   ## A room with a side under this (px) is too small for the team (agent_entry.gd `short_room`).
+# Grenades (live ones known by sight, hearing and callouts, and the danger zone; see agent_grenades.gd).
+var grenades_enabled: bool = true      ## Whether the NPC reacts to live grenades at all.
+var hear_grenade: float = 300.0        ## How far (px) a grenade coming down is heard.
+var evade_margin: float = 120.0        ## How far past a frag's blast radius its danger zone reaches (px).
 
 var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
 var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
 var _memory: RefCounted          ## The event memory; see agent_memory.gd.
 var _tactics: RefCounted         ## The combat geometry; see agent_tactics.gd.
 var _entry: RefCounted           ## The doorway geometry and the team's claims; see agent_entry.gd.
+var _throw: RefCounted           ## The grenade geometry (danger zone, escape spot, lob); see agent_throw.gd.
+var _grenades: RefCounted        ## The live grenades known and the plan to get clear of them; see agent_grenades.gd.
 var _snapshot: RefCounted        ## The BUILD half: writes the decision snapshot; see agent_snapshot.gd.
 var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the first observe() call.
 var _post_set := false           ## Whether _post has been captured yet.
@@ -129,6 +141,9 @@ var _visible_now := {}           ## Instance ids of characters visible on the la
 var _visible_before := {}        ## The same one tick earlier (what a character not due for a sight test keeps).
 var _looked := {}                ## Instance ids of characters in the view cone that have had a sight test since they entered it.
 var _tracks := {}                ## Per-character movement track: id → { pos, vel, t } (last seen).
+var _blind := false              ## The NPC was flash-blinded on the latest observe() tick: it sees nothing new.
+## The latest grenade burst (`{ kind, position, frame }`, the physics frame it was taken note of in), or {}: a bang entry waits for its stun's.
+var last_burst := {}
 
 
 ## Build the owned sensing modules. The controller calls this once in its _ready(); it then pushes the
@@ -143,8 +158,12 @@ func setup() -> void:
 	_tactics.vision = _vision
 	_entry = AgentEntry.new()
 	_entry.vision = _vision
+	_throw = AgentThrow.new()
+	_throw.vision = _vision
+	_grenades = AgentGrenades.new()
+	_grenades.setup(_throw)
 	_snapshot = AgentSnapshot.new()
-	_snapshot.setup(_memory, _tactics, _entry)
+	_snapshot.setup(_memory, _tactics, _entry, _throw)
 
 
 ## Push the current config fields into the owned modules. Idempotent and state-free (it only sets
@@ -178,6 +197,9 @@ func apply_config() -> void:
 	_entry.pie_steps = entry_pie_steps
 	_entry.corner_inset = entry_corner_inset
 	_entry.short_room = entry_short_room
+	_throw.evade_margin = evade_margin
+	_grenades.enabled = grenades_enabled
+	_grenades.hear_grenade = hear_grenade
 	_snapshot.vocab.shoot_range = shoot_range
 	_snapshot.vocab.punch_range = punch_range
 	_snapshot.vocab.recency_bands = recency_bands
@@ -248,12 +270,48 @@ func process_callout(character, data: Dictionary) -> void:
 	var at: Vector2 = data.get("position", character.global_position)
 	if callout_range > 0.0 and character.global_position.distance_to(at) > callout_range:
 		return
+	if AgentGrenades.is_call(data.get("status")):
+		_grenades.called(character, data)  # "Grenade!": a live grenade, not what the ally is doing, so not a callout to weigh.
+		return
 	_memory.remember(&"heard_callout", data, callout_ttl, str(speaker.get_instance_id()))
 	var cleared := str(data.get("cleared_room", ""))
 	if cleared != "":
 		_learn_room({ "key": cleared })
 		_memory.remember(&"visited_room", { "key": cleared }, search_memory_ttl, cleared)
 		mark_cleared(cleared)
+
+
+## A grenade came down (`&"grenade"`, `{ position, kind, stage }`): heard if within earshot and the NPC is not `deaf`,
+## so known (G16).
+func process_grenade(character, data: Dictionary, deaf: bool) -> void:
+	_grenades.hear(character, data, deaf)
+
+
+## A grenade went off (`&"explosion"`, `{ position, kind, attacker, ... }`): it is forgotten, and so is the plan to get clear of it. A
+## stun the NPC or an ally threw also blinds the hostiles it knew in its flash (`flashed`).
+func process_explosion(character, data: Dictionary) -> void:
+	_grenades.burst(data.get("position", Vector2.INF), data.get("kind", &""))
+	last_burst = { "kind": data.get("kind", &""), "position": data.get("position", Vector2.INF), "frame": Engine.get_physics_frames() }
+	if data.get("kind") == &"stun":
+		_note_flash(character, data)
+
+
+## A stun thrown by the NPC or an ally went off at `data.position`: every hostile it knew of within the flash radius with a clear line
+## from the burst is blinded for a few seconds (`FLASH_SHARE` of the stun's longest blindness at the burst, less with distance), which it holds as `flashed` (the contact's
+## `blind`). It cannot see their eyes, but it knows what it threw the flash at.
+func _note_flash(character, data: Dictionary) -> void:
+	var by = data.get("attacker")
+	if by != character and not (is_instance_valid(by) and _hostility.is_ally(by.get("faction") if by.get("faction") != null else &"")):
+		return
+	var burst: Vector2 = data["position"]
+	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
+	var rids := _character_rids(character)
+	var flash := float(data.get("radius", 0.0))  # (The flash radius the burst reports.)
+	var reach: float = _throw.cover_reach(&"stun")
+	for c in _sightings(null, lead_memory_ttl, -1.0, true):
+		var d: float = burst.distance_to(c["pos"])
+		if d <= flash and not _throw.shielded(space, burst, c["pos"], _throw.stand_height(), rids, reach):
+			_memory.remember(&"flashed", { "id": c["id"] }, maxf(_throw.max_blind_of(&"stun") * FLASH_SHARE * (1.0 - d / flash), 1.0), str(c["id"]))
 
 
 ## Refresh the combat engagement (called by the behaviour when it fires or adopts a fight), so an
@@ -372,6 +430,8 @@ func observe(character, rooms: Array) -> void:
 		_post = character.global_position
 		_post_set = true
 	_ensure_interactables(character)
+	_throw.learn_carried(character)
+	_throw.learn_body(character)
 	_seed_house(rooms)
 	_entry.set_house(openings, rooms)
 
@@ -382,13 +442,17 @@ func observe(character, rooms: Array) -> void:
 	var now := Time.get_ticks_msec()
 
 	# Every other character (the player included): one sighting per character, superseded while it
-	# stays visible. Dead characters are skipped — corpses add no tactical information.
+	# stays visible. Dead characters are skipped — corpses add no tactical information. A flash-blinded NPC
+	# (G15) sees nothing: no new sighting, and nothing is visible, so what it holds stays where it was last seen.
 	var frame := Engine.get_physics_frames()
 	var swap := _visible_before
 	_visible_before = _visible_now
 	_visible_now = swap
 	_visible_now.clear()
-	for other in _other_characters(character):
+	_blind = character.is_blind()
+	if _blind:
+		_looked.clear()
+	for other in (_other_characters(character) if not _blind else []):
 		var id: int = other.get_instance_id()
 		if other.get("is_dead") == true:
 			_looked.erase(id)
@@ -432,7 +496,8 @@ func observe(character, rooms: Array) -> void:
 	if not here.is_empty():
 		_memory.remember(&"visited_room", { "key": here["key"] }, search_memory_ttl, str(here["key"]))
 
-	if not familiar_with_house and Engine.get_physics_frames() >= _learn_next:
+	_grenades.observe(character, _vision, space, exclude, _blind)
+	if not familiar_with_house and not _blind and Engine.get_physics_frames() >= _learn_next:
 		_learn_by_sight(character, rooms)
 
 
@@ -488,7 +553,7 @@ func _track(id: int, pos: Vector2, now: int, frame: int) -> Vector2:
 ## sighting per character, with `hostile` / `reason`, `visible` (seen on the latest tick) and `age`.
 ## Hostiles first, then nearest to `self_pos`. Dead or freed characters are dropped.
 func contacts(self_pos: Vector2) -> Array:
-	return _sightings(self_pos, contact_memory_ttl)
+	return _sightings(self_pos, _contact_ttl())
 
 
 ## Every character in memory regardless of contact_memory_ttl — all non-expired sightings (up to
@@ -501,7 +566,13 @@ func all_seen_characters(self_pos: Vector2) -> Array:
 ## Hostiles the NPC has lost track of — last seen longer ago than `contact_memory_ttl` but within
 ## `lead_memory_ttl` — newest first: where to investigate.
 func lost_hostiles() -> Array:
-	return _sightings(null, INF, contact_memory_ttl, true)
+	return _sightings(null, INF, _contact_ttl(), true)
+
+
+## How long (s) a sighting counts as a live contact. A blinded NPC cannot tell that a contact has gone, so it keeps
+## acting on every sighting its memory holds (G15); it is back to `contact_memory_ttl` the moment it can see.
+func _contact_ttl() -> float:
+	return maxf(contact_memory_ttl, lead_memory_ttl) if _blind else contact_memory_ttl
 
 
 ## The live character sightings in memory as contact dicts — the one source behind contacts(),
@@ -537,6 +608,7 @@ func _live_sighting(rec: Dictionary) -> Dictionary:
 	c["reason"] = _hostility.reason(c["id"], _memory)
 	c["hostile"] = c["reason"] != ""
 	c["visible"] = _visible_now.has(c["id"])
+	c["blind"] = _memory.age_of(&"flashed", "id", c["id"]) < INF
 	return c
 
 
@@ -563,9 +635,10 @@ func _callouts() -> Array:
 ## the decision snapshot the planner walks: { facts, sections, sections_per_target, options }. The
 ## author reads this knowledge and the combat geometry only — it writes no memory and holds no policy.
 func sense(character, rooms: Array, goal: String, activity: String) -> Dictionary:
-	if not familiar_with_house:
+	if not familiar_with_house and not character.is_blind():
 		_learn_by_sight(character, rooms)
 	var self_pos: Vector2 = character.global_position
+	var carried := AgentThrow.carried(character)
 	var knowledge := {
 		"known_rooms": _known_rooms(rooms),
 		"known_room_keys": _known_room_keys(),
@@ -575,6 +648,8 @@ func sense(character, rooms: Array, goal: String, activity: String) -> Dictionar
 		"entry_point": entry_point,
 		"entry_enabled": entry_enabled,
 		"lost": lost_hostiles(),
+		"carried_grenades": carried,  # The kinds of grenade it holds, and the bodies a throw's line goes through.
+		"character_rids": _character_rids(character) if not carried.is_empty() else [],
 	}
 	return _snapshot.build(character, rooms, goal, activity, contacts(self_pos), _callouts(), knowledge)
 
@@ -809,3 +884,75 @@ func combat_spots(character, target: Node2D, tgt_pos: Vector2, radius: float, co
 		exclude.append(target.get_rid())
 	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
 	return _tactics.combat_spots(space, character.global_position, tgt_pos, exclude, radius, count)
+
+
+# --- Grenades --------------------------------------------------------------------------------
+
+## The live grenades the NPC knows of (seen, heard, called or its own), soonest to go off first, as
+## `{ point, kind, fuse_left, fuse, radius, source }` (`source`: `&"seen"` / `&"heard"` / `&"called"` / `&"own"`).
+func known_grenades() -> Array:
+	return _grenades.known()
+
+
+## The plan to get clear of the live grenade that goes off first among those the NPC is in the danger zone of (or is
+## already running from): `{ id, point, kind, radius, spot, crouch, fuse_left }` (see agent_grenades.gd `plan`), or {}. Made
+## from where the NPC stands and kept while the grenade lives. A pure read of what it knows plus the physics space and the navmesh.
+func evade_plan(character) -> Dictionary:
+	if not _grenades.has_known():
+		return {}
+	return _grenades.plan(character, character.get_world_2d().direct_space_state, character.get_world_2d().navigation_map,
+		_character_rids(character))
+
+
+## The grenades to radio now, `{ point, kind }`, each once, when they have come down (see agent_grenades.gd `announcements`).
+func grenade_announcements() -> Array:
+	return _grenades.announcements()
+
+
+## How far (px) from a burst of `kind` and danger `radius` the danger zone reaches (a frag's blast radius and `evade_margin`).
+func grenade_zone_radius(kind: StringName, radius: float) -> float:
+	return _throw.zone_radius(kind, radius)
+
+
+## Whether a body `height` tall (-1: the standing height) at world point `p` is inside the danger zone of a grenade of `kind`
+## and danger `radius` that would go off at `burst`: within the zone's reach and not shielded from the burst (docs/grenades.md G7, G16).
+func in_grenade_zone(character, kind: StringName, radius: float, burst: Vector2, p: Vector2, height := -1.0) -> bool:
+	return _throw.in_zone(character.get_world_2d().direct_space_state, kind, radius, burst, p,
+		height if height >= 0.0 else _throw.stand_height(), _character_rids(character))
+
+
+## The nearest safe spot (by route) the NPC can reach before a grenade of `kind` and danger `radius` at `burst` goes off
+## in `fuse_left` s: `{ spot, crouch, route }`, `spot` being `Vector2.INF` when there is none in time (see agent_throw.gd `escape`).
+func grenade_escape(character, kind: StringName, radius: float, burst: Vector2, fuse_left: float) -> Dictionary:
+	var world: World2D = character.get_world_2d()
+	return _throw.escape(world.direct_space_state, world.navigation_map, kind, radius, burst, character.global_position, fuse_left,
+		_throw.run_speed(character), _character_rids(character))
+
+
+## Whether a grenade of `kind` can be lobbed from `from` to `to`: within its throw range and over everything between, low furniture included.
+func can_lob(character, from: Vector2, to: Vector2, kind: StringName) -> bool:
+	return _throw.can_lob(character.get_world_2d().direct_space_state, from, to, _throw.range_of(kind), _character_rids(character))
+
+
+## Whether nothing stops a lob from `from` to `to` (any distance: the range is `grenade_range`'s).
+func lob_clear(character, from: Vector2, to: Vector2) -> bool:
+	return _throw.lob_clear(character.get_world_2d().direct_space_state, from, to, _character_rids(character))
+
+
+## How far (px) a grenade of `kind` first comes down (what the NPC learned of it off the grenades it carries).
+func grenade_range(kind: StringName) -> float:
+	return _throw.range_of(kind)
+
+
+## Seconds from release to the burst of a grenade of `kind` (what the NPC learned of it off the grenades it carries).
+func grenade_fuse(kind: StringName) -> float:
+	return _throw.fuse_of(kind)
+
+
+## The rids of every character in the world, this NPC included: the bodies a blast or a lob goes through.
+func _character_rids(character) -> Array:
+	var rids := [character.get_rid()]
+	for other in _other_characters(character):
+		if other is CollisionObject2D:
+			rids.append(other.get_rid())
+	return rids
