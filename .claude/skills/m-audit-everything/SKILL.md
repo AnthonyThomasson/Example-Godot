@@ -1,6 +1,6 @@
 ---
 name: m-audit-everything
-description: Audit the WHOLE codebase for accumulated rot — orphaned mechanisms whose consumer is gone, unreferenced code, duplication, cross-domain coupling that bypasses the published interfaces, domains due for a sub-domain split, and stale skills/comments — as a checklist of file:line findings with concrete fixes. It never deletes anything on its own. Manual only — invoked as `/m-audit-everything`.
+description: Audit the WHOLE codebase for accumulated rot — orphaned mechanisms whose consumer is gone, unreferenced code, duplication, cross-domain coupling that bypasses the published interfaces, domains due for a sub-domain split, and stale skills/comments — as a checklist of file:line findings with concrete fixes. Run as a phased Orca orchestration (scan, code-analysis wave, docs wave, merged report, then fixes only on the user's word). It never deletes anything on its own. Manual only — invoked as `/m-audit-everything`.
 disable-model-invocation: true
 model: claude-sonnet-5-5
 effort: xhigh
@@ -16,8 +16,8 @@ that outgrew one folder, and documentation that quietly stopped being true.
 The output is a **checklist of concrete findings**, each tied to a `file:line` with a specific fix.
 
 **Propose, don't delete.** Removal is destructive and some findings will be false positives
-(Step 1 explains why). Present the checklist and let the user choose what goes. Only edit after
-they say so, and then run Step 6.
+(Brief 1 explains why). Present the checklist and let the user choose what goes. Only edit after
+they say so (Phase 4), and then run Step 6.
 
 ## What rot actually looks like here
 
@@ -31,16 +31,88 @@ declarations. The rot that genuinely accumulates is the kind a scan can't see:
 3. **Eroded boundaries** — a domain quietly relying on another's API that the `architecture` skill
    never published, so a rename in one place changes behaviour in another.
 
-So weight your effort accordingly: the scanner is a five-minute first pass, and Steps 2–5 are where
+So weight your effort accordingly: the scanner is a five-minute first pass, and Briefs 1b–5 are where
 the real findings are.
 
-## Step 0 — Ground truth
+## How it runs — phases
+
+Load the `orchestration` skill and follow its coordinator loop (`orca skills get orchestration`; use the executable that
+skill resolves — plain `orca` on macOS — for every command). This audit is explicitly supervised, so you are the
+coordinator; never substitute a non-Orca subagent. The briefs below are handed to supervised workers; you scan, dispatch,
+merge and decide.
+
+| Phase | Owner | Work | Gate to the next phase |
+| --- | --- | --- | --- |
+| 0 — Scan | you | Step 0 survey, `audit_scan.py all`, uid check, `test_coverage.py`, all saved under `$AUDIT_DIR` | outputs exist |
+| 1 — Code wave | 5 workers, parallel, read-only | **1a** unreferenced symbols · **1b** orphaned mechanisms + vestigial config · **2** redundancy · **3** isolation · **4** splits | every Dispatch settled |
+| 2 — Docs wave | up to 4 workers, parallel, read-only | **5a** `AGENTS.md` + `architecture` skill · **5b–5c** the domain skills, sharded · **5d** code comments | every Dispatch settled |
+| 3 — Merge | you | read all reports, dedupe, rank, write the checklist (Output), then stop and ask which items to apply | the user answers |
+| 4 — Fix + verify | one worker per disjoint file set, then one verifier | apply the accepted items; Step 6 | verifier green |
+
+The docs wave comes after the code wave on purpose: Brief 5 must delete the skill passages for every mechanism Phase 1
+finds dead, and must describe a split the way Phase 1 recommends it. Hand the Phase 1 report paths to every Phase 2
+worker. Phase 4 runs only on the user's word; before that nothing is edited.
+
+**Phase 0.** Do Step 0 yourself, then record the scans where every worker can read them (workers share this worktree):
+
+```bash
+AUDIT_DIR="${TMPDIR:-/tmp}/m-audit-everything-$(basename "$PWD")"; mkdir -p "$AUDIT_DIR"
+python3 -I tools/audit_scan.py all > "$AUDIT_DIR/scan.txt"
+python3 tools/test_coverage.py      > "$AUDIT_DIR/test_coverage.txt"
+for f in $(find scenes tests tools addons -name '*.gd'); do [ -f "$f.uid" ] || echo "no uid: $f"; done  > "$AUDIT_DIR/uids.txt"
+for u in $(find scenes tests tools addons -name '*.gd.uid'); do [ -f "${u%.uid}" ] || echo "orphan uid: $u"; done >> "$AUDIT_DIR/uids.txt"
+# plus the Step 0 size table, saved as $AUDIT_DIR/survey.txt
+```
+
+**Dispatching a wave.** Create the Run once (`orca orchestration run-create --objective "m-audit-everything of <branch>"
+--json`), then start every worker of the wave before waiting on any:
+
+```bash
+orca orchestration worker-start --task-title "<name>" --spec "<spec>" --worktree current --agent claude --json   # one per worker
+orca orchestration check --wait --types "worker_done,escalation,question" --timeout-ms 900000 --json
+```
+
+Every spec is self-contained. Fill this template, changing only the bracketed parts, with literal paths (a worker has no
+`$AUDIT_DIR`):
+
+> **Target:** the whole codebase as it stands in `<worktree path>`; scan outputs in `<AUDIT_DIR>` (`scan.txt`,
+> `test_coverage.txt`, `uids.txt`, `survey.txt`) [; Phase 1 reports `<AUDIT_DIR>/report-*.md` for a docs worker].
+> **Change:** produce the findings of `[Brief N — name, part ‹x›]` in `.claude/skills/m-audit-everything/SKILL.md`; read
+> that brief, the `architecture` skill first, then `[the domain-*/ skills for the domain(s) it covers]`.
+> **Constraints:** read-only — edit, stage, commit, stash and ticket nothing; propose, never delete; confirm every scan hit
+> by hand and name which dynamic-dispatch mechanism you ruled out; do not pad a clean section. **Ownership:** you own
+> exactly one file, `<AUDIT_DIR>/report-[id].md`. **Observable acceptance:** that file holds the brief's checklist — one
+> `- [ ] file:line — problem. Fix: …` per issue, `- [x] …` per confirmed-clean item, ending in a one-line verdict; your
+> `worker_done` summary gives the issue count and passes the file as `--report-path`.
+
+Shard the work by the split in the table: worker ids are `1a 1b 2 3 4 5a 5b 5c 5d`. For 5b–5c, divide the domain skills
+into two halves of roughly equal line count (the AI family `domain-ai*` is the natural first half; `domain-ui*`,
+`general`, `main` and `testing` belong with the second). Brief 5d may be split the same way by `scenes/` subtree if the
+comment sweep is large. Each worker reads only its shard's skills.
+
+A `failed` outcome, a missing report or a shard nobody covered is a finding in the final checklist ("brief N did not
+complete: …"), never a silent clean section. After each wave's reports are read, release the settled workers per the
+orchestration skill, and do not start the next phase while `worker-list --run <run_id> --terminal-state reclaimable`
+returns anything.
+
+**Phase 3.** Merge every `report-*.md` into the Output checklist, keeping each worker's `file:line` and fix verbatim; two
+workers raising the same line is one item. Rank module-split candidates by seam cleanliness. Present it and ask which
+items the user wants applied.
+
+**Phase 4.** For the accepted items only: group them by the files they edit, one worker per **disjoint** file set (two
+workers never own the same file), each spec naming exactly the items, files and the acceptance "the item is gone and
+behaviour is identical". Then run one verifier worker for Step 6 — alone, because it launches Godot and the Von server —
+and report its result. If the verifier fails, the failing item is reported, not retried silently.
+
+The briefs follow, each written for the worker who receives it.
+
+## Step 0 — Ground truth (Phase 0, coordinator)
 
 Load the **`architecture`** skill: the domain table, the vital interfaces (the *entire* sanctioned
 cross-domain surface), the dependency graph, the cross-cutting conventions. Everything not on that
 list is private to its domain, and you are about to audit the whole codebase against it.
 
-Then survey the shape of the thing, so Step 4 has numbers rather than impressions:
+Then survey the shape of the thing, so Brief 4 has numbers rather than impressions:
 
 ```bash
 cd "$(git rev-parse --show-toplevel)"
@@ -61,11 +133,11 @@ the top-level ones.
 `tools/audit_scan.py` holds the mechanical detectors used below (`deps`, `dead`, `signals`,
 `facts`, `events`; `all` runs them together). It reads files only — no Godot needed.
 
-## Step 1 — Dead code
+## Brief 1 — Dead code (Phase 1, workers 1a and 1b)
 
 Three distinct kinds, in increasing order of how much they actually matter.
 
-### 1a. Unreferenced symbols (cheap, usually near-empty)
+### 1a. Unreferenced symbols (cheap, usually near-empty) — worker 1a
 
 ```bash
 python3 -I tools/audit_scan.py dead
@@ -105,7 +177,7 @@ Before proposing a deletion, grep the `.tscn` files and `tools/` for the bare na
 finding which of these you ruled out. A method that is documented as published API but has no
 caller is still a finding: either the doc or the method goes.
 
-### 1b. Orphaned mechanisms (the valuable category)
+### 1b. Orphaned mechanisms (the valuable category) — worker 1b
 
 A producer whose consumer was removed. The code runs, so nothing flags it, and its comments still
 confidently explain a purpose the codebase no longer has. Find these by tracing each *mechanism*
@@ -140,7 +212,7 @@ export still configures but no code branches on; a cache or log nothing queries.
 (`behavior.gd` `debug_state()`) are read generically through `gcmd`, so an unread key there is low
 value — mention it, don't push it.
 
-### 1c. Vestigial configuration
+### 1c. Vestigial configuration — worker 1b
 
 An `@export` or `const` that nothing branches on, a tuning knob for a behaviour that is gone, or a
 `project.godot` setting with no reader. These are worse than dead functions because they look like
@@ -149,7 +221,7 @@ working controls — someone will tune them and wonder why nothing happens. Chec
 controller exports. `dead` already catches an export no code reads; here look for ones that are read
 only to be passed along and never branched on.
 
-## Step 2 — Redundancy and duplication
+## Brief 2 — Redundancy and duplication (Phase 1, worker 2)
 
 Not "two lines look alike" — duplication that means one fix will have to be made twice.
 
@@ -166,9 +238,9 @@ Not "two lines look alike" — duplication that means one fix will have to be ma
 - **Dead branches.** A condition that can't be false any more; a null guard on something now
   guaranteed.
 
-## Step 3 — Domain isolation, repo-wide
+## Brief 3 — Domain isolation, repo-wide (Phase 1, worker 3)
 
-Step 1 of `/m-audit` asks this of a diff; ask it of every boundary that exists. For each
+Brief A of `/m-audit` asks this of a diff; ask it of every boundary that exists. For each
 cross-domain reference, is the connection **crucial**, and is it one of the **vital interfaces** in
 the `architecture` skill?
 
@@ -221,7 +293,7 @@ sub-domain→sub-domain `class_name` edge; also read how `behavior.gd` reaches `
 debug overlays reach the controller), and a shortcut between them is an isolation finding exactly
 like a cross-domain one.
 
-## Step 4 — Is a domain due to be split?
+## Brief 4 — Is a domain due to be split? (Phase 1, worker 4)
 
 A concern earns its own module when **its complexity bleeds into several others**, or when one
 folder has grown a second, unrelated responsibility. This is how `interaction/` and `ai/` came to
@@ -259,10 +331,12 @@ bigger call than a reroute, so frame it as a recommendation with its reasoning a
 by seam cleanliness. If nothing warrants one, say so in a line and move on. **Do not invent a split to
 look thorough.**
 
-## Step 5 — Documentation accuracy
+## Brief 5 — Documentation accuracy (Phase 2, workers 5a–5d)
 
 Every doc here is held to the same bar as a code comment: **concise, present-tense, current-state
-only.** Audit four layers.
+only.** Audit four layers, split across workers: layers 1–2 are **5a**, layer 3 is **5b–5c** (one shard of
+domain skills each), layer 4 is **5d**. Read the Phase 1 reports first: they name the mechanisms to remove from the skills
+and the splits to describe.
 
 **1. `AGENTS.md`** — a stub pointing at the skills. It should say almost nothing, and that nothing
 should be true.
@@ -284,7 +358,7 @@ assertions in the skill drift independently when a domain is added or removed.
 **3. Each `domain-<name>` skill (the deep detail)** — it must describe the domain's internals *as
 they are*. Read it against the code and flag every passage that is no longer true. Interface
 changes land in two places: the `architecture` list **and** that skill's own recap. Where a
-mechanism or method was removed (Step 1a/1b), the skill passages describing it must go too — a
+mechanism or method was removed (Brief 1a/1b), the skill passages describing it must go too — a
 deleted read-only accessor still listed as a sub-domain interface, or a removed signal still in the
 Character interface recap, is the usual instance. Also check the files and tests a skill names still
 exist (tests live under `tests/<domain>/`, not `scenes/`).
@@ -312,7 +386,7 @@ grep -rniE '\b(renamed|moved to|moved from|used to|formerly|previously|no longer
 The history sweep is noisy by design — "no longer held" appears in plenty of honest sentences. Judge
 each hit.
 
-## Step 6 — Nothing broke
+## Step 6 — Nothing broke (Phase 4, fix wave and verifier)
 
 An audit that only reads changes nothing, so if you changed nothing, say so and skip this.
 
