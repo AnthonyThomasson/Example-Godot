@@ -23,7 +23,7 @@ extends RefCounted
 ## every event stored, and the order the log promises (newest first, oldest evicted first) is the `seq` order.
 
 ## Hard cap on total stored events; the oldest are evicted past it. <= 0 = unlimited.
-var capacity: int = 64
+var capacity: int = 128
 
 ## The stored events by topic, each list oldest first. An entry is `{ topic, key, data, at, ttl, seq }` (`at` in msec,
 ## `ttl` in s, `seq` the write order across all topics).

@@ -547,11 +547,12 @@ func _initial_overlays() -> Dictionary:
 func _configure_debug() -> void:
 	if _spawner == null:
 		return
+	var flags := {}
+	for flag in _overlay_flags:
+		if not OVERLAY_REGISTRY.is_global(flag):
+			flags[flag] = _overlay_flags[flag]
 	for npc in _spawner.combatants:
-		for child in npc.get_children():
-			for flag in _overlay_flags:
-				if not OVERLAY_REGISTRY.is_global(flag) and flag in child:
-					child.set(flag, _overlay_flags[flag])
+		OVERLAY_REGISTRY.apply(npc, flags)
 
 
 ## A toggle-bar button was pressed: record the flag and apply it live. The navigation holes go to the single

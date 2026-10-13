@@ -302,18 +302,25 @@ static func furniture_holes(house: Node2D) -> Array:
 		var body := node as RigidBody2D
 		if body == null or body.freeze:
 			continue
-		var points := PackedVector2Array()
-		for child in body.get_children():
-			var col := child as CollisionShape2D
-			if col == null or col.shape == null:
-				continue
-			points.append_array(_footprint_world(col))
-		var hull := Geometry2D.convex_hull(points)
-		if hull.size() > 1:
-			hull.remove_at(hull.size() - 1)  # convex_hull closes the ring by repeating the first point
-		if hull.size() >= 3:
+		var hull := _body_hull(body)
+		if not hull.is_empty():
 			out.append(hull)
 	return out
+
+
+## The world-space footprint of `body`, the convex hull of its collision shapes as an open ring (the closing point
+## dropped), or empty when fewer than three points come out of it.
+static func _body_hull(body: Node2D) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for child in body.get_children():
+		var col := child as CollisionShape2D
+		if col == null or col.shape == null:
+			continue
+		points.append_array(_footprint_world(col))
+	var hull := Geometry2D.convex_hull(points)
+	if hull.size() > 1:
+		hull.remove_at(hull.size() - 1)  # convex_hull closes the ring by repeating the first point
+	return hull if hull.size() >= 3 else PackedVector2Array()
 
 
 ## The footprint holes of the living characters AT REST under `root` (the node the nav region lives under, which
@@ -334,16 +341,8 @@ static func character_holes(root: Node) -> Array:
 		var body := node as CharacterBody2D
 		if body == null or body.collision_layer == 0 or body.get_real_velocity().length() >= REST_SPEED:
 			continue
-		var points := PackedVector2Array()
-		for child in body.get_children():
-			var col := child as CollisionShape2D
-			if col == null or col.shape == null:
-				continue
-			points.append_array(_footprint_world(col))
-		var hull := Geometry2D.convex_hull(points)
-		if hull.size() > 1:
-			hull.remove_at(hull.size() - 1)  # convex_hull closes the ring by repeating the first point
-		if hull.size() >= 3:
+		var hull := _body_hull(body)
+		if not hull.is_empty():
 			out.append(hull)
 	return out
 

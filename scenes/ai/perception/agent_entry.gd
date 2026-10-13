@@ -13,6 +13,7 @@ extends RefCounted
 ## never decides which door, which slot or when to go.
 
 ## How far (px) outside the threshold the "entry point" is that a corner is judged hard or soft from.
+const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
 const ENTRY_POINT_DEPTH := 24.0
 ## Slots worked out per side: a fuller team queues in the last one.
 const MAX_SLOTS := 6
@@ -99,10 +100,7 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 	var tail: Vector2 = (pts[-1] as Vector2) - (pts[-2] as Vector2)
 	if tail.length() > 0.001:
 		pts.append((pts[-1] as Vector2) + tail.normalized() * THRESHOLD_EXTEND)
-	var here := ""
-	for r in _rooms:
-		if (r["rect"] as Rect2).has_point(from_pos):
-			here = str(r["key"])
+	var here := str(SnapshotVocab.room_at(from_pos, _rooms).get("key", ""))
 	var walked := 0.0
 	for i in range(1, pts.size()):
 		var a: Vector2 = pts[i - 1]
@@ -138,10 +136,7 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 
 ## The rect of room `key`, or an empty Rect2.
 func _room_rect(key: String) -> Rect2:
-	for r in _rooms:
-		if str(r["key"]) == key:
-			return r["rect"]
-	return Rect2()
+	return SnapshotVocab.room_by_key(_rooms, key).get("rect", Rect2())
 
 
 ## The geometry of going through opening `id` into room `into`, or {} when either is unknown. Built once on a

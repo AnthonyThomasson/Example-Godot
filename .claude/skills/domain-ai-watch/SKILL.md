@@ -46,8 +46,9 @@ place a threat is shot at, whichever primitive or entry phase is running.
 - `Combat`: `can_fire_at`, `reload_due`, `_faces`; `peek_cover` shoots only once facing, ducks only after a shot or an empty click
   (not after a refused shot); `ambush` waits for the facing.
 - `Entry`: `gaze_held` (set from `_threat` each tick) makes `_look_toward` report "settled", so a pie step the gaze cannot settle on
-  because of a threat does not hold the entry. `_look_toward` and `SearchCoverage.step` ease from the actual facing, not a private angle,
-  so the gaze does not snap back when a threat lets go.
+  because of a threat does not hold the entry. Every gaze turn goes through one static, `Watch.ease_gaze(character, point, rate, delta)`
+  (the doors here, `Entry._look_toward`, `SearchCoverage.step`): it eases from the actual facing, not a private angle, so the gaze
+  does not snap back when a threat lets go.
 
 ## Exports (`GoalController`, group *Watch*)
 
