@@ -23,7 +23,7 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
 
 - **Floorplans** (`house_definitions.gd`): rooms are house-local `Rect2`s with a `type`;
   `openings` are doorway points on wall lines. `HouseSpawner` cuts each opening into every wall
-  through it, keeps opening clearances free of furniture, and mirrors the plan L/R 50% of the time.
+  through it (`WallFactory.openings_for`), keeps opening clearances free of furniture, and mirrors the plan L/R 50% of the time.
   Openings are plain archways — there are no physical door objects. Exactly one opening is `front`
   (the house is positioned by it, always on the south wall); a plan may add `"exit": true` openings
   (an exterior back/side/garage door on exactly one room's wall). The houses have an exit; the flats and the
@@ -84,6 +84,9 @@ ArrangementDefinitions                          └▶ FloorFactory (the floor t
 - Every definition sets `art` (a painter id) and usually `art_opts` (the painter's variant, e.g.
   `{ "front": "drawers", "count": 3 }`, or `props` dressing a surface); the Objects domain owns
   the painters (see `domain-objects`).
+- **Outside builders** (the Testing domain's arenas and placed pieces): `WorldGen.annotate_layout` derives the room keys
+  each door joins with `HouseSpawner.room_keys_on`; the catalogue lookups read `ObjectDefinitions.get_definition`
+  (`object_definition`), `GeneralCatalog.FLOORS` (`floor_definition`) and `GeneralCatalog.WALL` (`wall_style`).
 
 ## To add a room type
 
@@ -100,26 +103,4 @@ satisfy `LayoutRules` (check with `tools/run_tests.sh worldgen`). Mind the room 
 for its required pieces plus the door lanes (`OPENING_CLEARANCE` each side of every doorway), or the
 furnisher warns "no room for required zone" and the doorway test fails.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
-  front_entrance_world, parent) -> Node2D` seeds one RNG for the whole run (plan
-  pick is its first draw), prints `House: <plan>  seed: N`, builds the house; every doorway is an
-  open archway. `WorldGen.annotate_layout(root, rooms, doors)` writes the same `rooms` / `openings` metadata onto a hand-built
-  root (the Testing domain's arenas and layouts; `HouseSpawner.room_keys_on` derives the room keys a door joins).
-  `WorldGen.get_openings(house) -> Array`
-  returns the doorways as `{ pos, width, front, exit, rooms }` (world space; `rooms` = the room keys it joins).
-  `WorldGen.get_rooms(house) -> Array`
-  returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's
-  `rooms` metadata. `main.gd` positions the front entrance, fixes draw order, builds the nav map, and
-  drops the NPC in — all via `get_rooms`; it never touches world-gen internals. Read-only catalogue
-  lookups for outside builders (the Testing domain's arenas and placed pieces):
-  `WorldGen.object_definition(key)` (`ObjectDefinitions.get_definition`),
-  `WorldGen.floor_definition(key)` (`GeneralCatalog.FLOORS`) and `WorldGen.wall_style()`
-  (`GeneralCatalog.WALL`).
-- **World Generation → Objects** (interface 2, the only way world-gen makes entities):
-  `ObjectFactory.spawn(definition, position, parent, opts) -> Node`,
-  `WallFactory.spawn(rect, thickness, openings, name, parent, style) -> Node`,
-  `FloorFactory.spawn(rect, definition, name, parent) -> Node`; `HouseSpawner` cuts each room's doorways
-  with `WallFactory.openings_for(rect, openings)`. World-Gen's only outward code deps are the three
-  factories — it is a leaf.
+**Interfaces:** 1 (Main → World Generation), 2 (World Generation → Objects) — signatures in `architecture`.

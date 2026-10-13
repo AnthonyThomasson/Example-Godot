@@ -10,8 +10,8 @@ The in-game observers: each reads only the Character public API / signals, the A
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
   item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
   `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), a grenades line (`Grenades: 1 stun, 2 frag`, "—" with none, read through `item_count(slot)` for the slots of `LoadoutConfig.grenade_options()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
-  (punch left/right or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Listens to `hit_landed` on the character;
-  freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
+  (punch left/right or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Attaches to its character by the
+  exported `character_path`; listens to `hit_landed` on the character; freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
 
 - `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants, time_limit := 0.0, show_details := true)` wires it to
   any number of characters (a human included); it is **re-entrant** (an endless run calls it for each new match),
@@ -20,11 +20,12 @@ The in-game observers: each reads only the Character public API / signals, the A
   `show_details` off (a match with a human) hides the goal readout and combat feed, leaving the timer and result. Also: a top-centre
   running timer (34pt), a top-left goal readout listing every NPC's name and goal (28pt, spans the left half of the screen and word-wraps), a centre
   winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus
-  `&"hit"`). Declares the winner once an entire faction is eliminated.
+  `&"hit"`). Declares the winner once an entire faction is eliminated. `main.gd` calls `begin` / `set_countdown` and listens to
+  `match_ended`. Tested by `tests/ui/match_hud_verdict_test.gd`.
 
 - `seed_display.gd` — the **seed readout** (`SeedDisplay` node). `show_seed(level_seed)` writes the
   run's seed into a 32pt label anchored to the bottom-right corner (semi-transparent), so a layout
-  you like can be re-entered in the setup window.
+  you like can be re-entered in the setup window. `main.gd` calls it once per match.
 
 - `spectator_inspector.gd` — the **spectator inspector** (`SpectatorInspector` node), built by `main.gd`
   only in spectator mode via `setup(combatants, flags)` (`flags` = the current overlay toggles; `set_flag(flag, on)` updates one live from the toggle bar and re-applies it to the selected NPC).
@@ -49,7 +50,8 @@ The in-game observers: each reads only the Character public API / signals, the A
 - `stack_markers.gd` — the **stack markers** (`StackMarkers` Node2D, world space, built by `main.gd` under `World` for a human match). Draws the
   slots of the doorway the human's `PlayerStack` has reserved a place at (`docs/tactical-entry.md` E16): a numbered ring on the floor for each
   slot, the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
-  `watch(stack)` then it polls the stack's `view()` and redraws on change; `drawn()` is what is shown (what the test reads).
+  `watch(stack)` then it polls the stack's `view()` and redraws on change; `drawn()` is what is shown (what the test reads,
+  `tests/ui/stack_markers_draw_test.gd`).
 
 - `stun_screen.gd` — the **stun screen** (`StunScreen` CanvasLayer, layer 90, built by `main.gd` under `World` for a human match; G14 of
   `docs/grenades.md`). `watch(character)`, then it reads the character's `stun_view()` each frame (`blind`, `blind_total`): the screen is
@@ -57,9 +59,6 @@ The in-game observers: each reads only the Character public API / signals, the A
   when the flash landed (`get_viewport().get_texture().get_image()`, taken on the character's `&"stun"` event with `blind` > 0 and held solid until the
   white is half gone, then faded out to the live view; none on a headless display, where `afterimage` is still true). A new flash while still white
   (≥ 0.2) keeps the old frame. A deaf-only stun, another character's flash and a dead/freed character draw nothing. `drawn()` is `{ white, afterimage,
-  remaining }` (what the test reads). A decoupled observer; the white is drawn on an inner full-rect `Control` (mouse-ignoring).
+  remaining }` (what the test reads, `tests/ui/stun_screen_whiteout_test.gd`). A decoupled observer; the white is drawn on an inner full-rect `Control` (mouse-ignoring).
 
-## Interface recap
-
-- `main.gd` calls `MatchHUD.begin(combatants, time_limit, show_details)` / `set_countdown(text)` and listens to `match_ended`; `SeedDisplay.show_seed(seed)`; builds `SpectatorInspector` (spectator mode only) with `setup(combatants, flags)` / `set_flag(flag, on)`. `DebugUI` attaches by exported `character_path`; builds `StackMarkers` and calls `watch(stack)` with the player's `PlayerStack` (human match only), and a `StunScreen` that `watch`es the player (human match only).
-- Tests: `tests/ui/match_hud_verdict_test.gd`, `tests/ui/stack_markers_draw_test.gd`, `tests/ui/stun_screen_whiteout_test.gd`.
+**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus `&"hit"`, `&"stun"`), 17 (stack markers), 18 (stun screen) — signatures in `architecture`.

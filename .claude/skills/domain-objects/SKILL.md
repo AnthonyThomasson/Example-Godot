@@ -9,39 +9,27 @@ Owns the world's objects (furniture, walls, floors): their data, how they're hit
 their procedural pixel art. Objects owns the *field schema* and turns a plain definition dict
 from World-Gen into a node.
 
-## The hittable contract (Objects ↔ strikers)
+## The hittable contract (interface 3)
 
-Every world object (furniture **and** walls) implements:
-- `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }` — `coverage` (0–100) is the
-  object's **height**: a bullet flies at one height and strikes what stands above it (a character's is its posture's;
-  see `docs/cover-and-stance.md`)
-- `take_hit(hit: HitInfo) -> void`
+Every world object (furniture **and** walls) implements it; the signatures and `HitInfo`'s fields are in `architecture`.
+The striker decides the ballistic outcome and hands the object a HitInfo; the object decides what a hit *does to it*
+(shove + deform + debris). A melee punch shoves through the pushable contract below and does **not** deform.
 
-`HitInfo` (`physics/hit_info.gd`) carries `position, normal, direction, damage, speed_factor, has_exit, exit_position, exit_normal, blood,
-penetrated, source`. The projectile decides the ballistic outcome, then hands the object a
-HitInfo; the object decides what a hit *does to it* (shove + deform + debris). The projectile is
-the only striker that uses this; a melee punch shoves through the "pushable" contract below and
-does **not** deform.
+## The pushable contract (interface 5)
 
-## The pushable contract
+Furniture is a `RigidBody2D`, so its native methods serve the contract (the engine integrates motion, collisions, pivoting and
+settling). A melee punch is a range-of-motion-scaled central shove.
 
-Anything shoveable exposes `apply_impulse(v)` + `get_mass()`. Furniture is a `RigidBody2D`, so
-its native methods serve the contract (the engine integrates motion, collisions, pivoting and
-settling). Used by furniture→character contact transfers, bullet impacts, melee punches (a
-range-of-motion-scaled central shove), and the walking character.
+## The interactable contract (interface 8)
 
-## The interactable contract
-
-Every world object implements `get_interactions() -> Array` (plain data dicts: `id`, `label`,
-optional `move_to` / `requires_item`), advertised via the optional `interactions` object field.
-Which objects offer which actions is pure catalogue data — the Interaction domain consumes this
-and never learns what an interaction *means*.
+Which objects offer which actions is pure catalogue data: `get_interactions()` returns the object's `interactions` field and
+holds no interaction logic.
 
 ## Objects → Physics (objects compose physics; Physics is a leaf)
 
 - `Knockback` (Node child): RigidBody2D adapter — configures its parent body (no gravity,
   `mass`, damping, origin-pinned center of mass) and owns `apply_impulse(v, at_world)`.
-- `Deformable` (Node child): `record(hit)`, `impacts`, `damage_total`, `changed` signal.
+- `Deformable` (Node child): `record(hit, turn = 0.0)`, `impacts`, `damage_total`, `changed` signal.
 - `BloodSmear` (Node child, solid pieces only): fed the footprint polygon (`Deformation.shape_polygon`, re-fed
   when the collider is rebuilt); drags blood out of a puddle as streaks while the piece slides.
 - `Deformation` (static): silhouette/collider polygons + drawing.
@@ -122,12 +110,4 @@ the wall (`art_color` is also the debris color); `wall_visuals.gd` fetches a
 wall_tile_px)`. To add a painter: write `<name>_painter.gd`, register it in `ObjectArt.PAINTERS`,
 add its knobs to `ObjectArtConfig`, and set `"art": "<name>"` on catalogue definitions.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **World Generation → Objects** (interface 2): `ObjectFactory.spawn(definition, position,
-  parent, opts) -> Node`, `WallFactory.spawn(rect, thickness, openings, name, parent, style) ->
-  Node`, `WallFactory.openings_for(rect, doors) -> Array` (the doorways on a rect's walls, as `openings`),
-  `FloorFactory.spawn(rect, definition, name, parent) -> Node`, `Wall.Side` enum.
-- **Objects → Art** (interface 12): its painters render through `PixelArt.render`, draw on
-  `PixelCanvas`, and read `ArtConfig`.
-- Objects also implements the hittable (3), pushable (5) and interactable (8) contracts above.
+**Interfaces:** 2 (World Generation → Objects), 3 (hittable), 4 (Objects → Physics), 5 (pushable), 8 (interactable), 12 (Objects → Art), 16 (`SoundSurface`) — signatures in `architecture`.

@@ -26,10 +26,4 @@ world object implements `get_interactions() -> Array` (plain data dicts: `id`, `
 A non-player controller uses `interactions_in_reach()` + `interact_with(object, id)` to pick a
 specific object and action instead of the random toggle.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Interaction ↔ Character & Objects** (interface 8): the character exposes only opaque
-  forwards — `try_interact()` (the player's Space toggle), `interactions_in_reach()` and
-  `interact_with(object, id)` / `end_interaction()` (for a controller/AI), `is_busy()`
-  (movement/actions lock) and `interaction_label()` (HUD). Objects advertise actions via
-  `get_interactions()`.
+**Interfaces:** 8 (Interaction ↔ Character & Objects) — signatures in `architecture`.

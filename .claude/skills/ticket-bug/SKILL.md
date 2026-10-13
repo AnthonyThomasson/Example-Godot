@@ -1,56 +1,38 @@
 ---
 name: ticket-bug
-description: How to field a ticket labelled `bug`. Grill the user about the issue, reproduce it as a failing game test with the `fix` skill, then implement the fix. Runs in phases through `orchestration`. Invoked from the `ticket` skill when a ticket carries the `bug` label.
+description: Work a ticket labelled `bug` in phases - grill the user to an agreed expected-vs-actual, then reproduce, fix and green it with the `fix` skill, then feedback and report. Invoked from `ticket`.
 ---
 
 # Ticket: bug
 
-A bug runs in four phases, in order, through `orchestration` (see the `ticket` skill, "Work in phases"). Phase 1
-talks to the user, so you (the coordinator) run it yourself; phases 2 to 4 are the `fix` skill's steps, which you
-may dispatch to workers.
+Four phases through `orchestration` (`ticket`, "Work in phases"). You run phase 1 and the user questions; phases 2–4
+are `fix`'s steps and may go to workers.
 
-## 1. Grill the user about the issue
+## 1. Grill
 
-Before any test or code, load `architecture` and the `domain-<name>` skill for the domain the bug seems to live
-in, and read what the ticket points at. Then **grill the user** (`AskUserQuestion`, a few specific questions at a
-time) until you can state the bug as *expected vs. actual* with nothing guessed:
+Load `architecture` and the `domain-<name>` skill where the bug seems to live; read what the ticket points at. Answer
+from the code what it can answer. Grill the user (`AskUserQuestion`) until the bug is *expected vs. actual* with nothing
+guessed:
 
-- what should happen, and what happens instead (exact symptom, any error text);
-- the steps or situation that trigger it: map, seed, who is in it, what they carry, the moment it happens;
-- how often (always, only sometimes, only one layout), and since when or after which change, if known;
-- what they have already tried or ruled out, and anything that looks related;
+- what should happen and what happens instead (exact symptom, any error text);
+- the trigger: map, seed, who is in it, what they carry, the moment;
+- how often (always, sometimes, one layout), since when or after which change;
+- what they tried or ruled out, anything related;
 - what "fixed" looks like to them.
 
-Answer from the code what the code can answer instead of asking. Restate the bug back in one or two lines and
-get the user's agreement before going on. Once they agree, rebase onto `main` and check what came in (the `ticket`
-skill, "Work in phases"): a change in the area of the bug (it may already be fixed, or moved) reopens the
-questions. Then invoke the `show-me` skill so the user has an editor on the worktree to watch the reproduction and
-the fix on.
+Restate it in one or two lines and get agreement. Then `ticket` → "Rebase after acceptance" (a change in the bug's area,
+already fixed or moved, reopens the questions) and "Show the user".
 
-## 2. Reproduce (red)
+## 2–4. Reproduce, fix, green
 
-Invoke the **`fix` skill** through the `Skill` tool, passing the agreed expected-vs-actual (and the ticket's
-title and any useful comments) as the description, and follow its steps 1–3: write the smallest game test that
-triggers the symptom, run it, and require it to **fail for the bug's reason** (not a parse error, race or
-harness mistake). Tell the user the red result. If it passes straight away, or the bug cannot be seen headless,
-say so and agree the next step with the user rather than fixing anything blind.
+Invoke `fix` with the agreed expected-vs-actual (plus the ticket title and useful comments) and follow it: red for the
+bug's reason (tell the user the red result; passes at once or not visible headless: agree the next step with the user,
+don't fix blind), root-cause fix, green, skills updated.
 
-## 3. Implement the fix
+Then:
 
-Fix the root cause with the smallest change that addresses it, through the published interfaces only (`fix`
-step 4). Never loosen, skip or special-case the test to get green.
-
-## 4. Green and wrap up
-
-`fix` steps 5–6: the repro test passes (`--repeat=10` if it was intermittent), then the changed and full suites;
-update the skills whose domain or interface changed.
-
-Once every run is green, ask the user for feedback before reporting (you, not a worker): point them at the editor
-`show-me` opened (Play restarted for the latest code), ask with `AskUserQuestion` whether the bug is gone for
-them, and wait. Anything they still see is a new round: a failing test for it first, then the fix, then green, and
-ask again.
-
-When done, report on the ticket what the root cause was and which test covers it, with the red → green lines.
-Then ask the user with `AskUserQuestion` whether they want to give more feedback or finish the ticket. Feedback is
-another round as above; on "finish", release every settled worker and invoke the `finish` skill yourself (that answer
-is the go-ahead). Without it, never commit or close the ticket.
+- **Feedback:** you point the user at the `show-me` editor (Play restarted) and ask (`AskUserQuestion`) whether the bug
+  is gone. Anything still seen is a new round: failing test, fix, green, ask again.
+- **Report** on the ticket: the root cause, the covering test, the red → green lines. Then ask feedback or finish as in
+  `ticket` → "Report, then feedback or finish"; a bug has no audit, so a feedback round is the one above (failing test,
+  fix, green).

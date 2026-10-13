@@ -178,22 +178,4 @@ landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
 `outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Character ↔ Controller** (interface 7): the character reads intent from a controller child
-  (any node with `control(character, delta)`) that writes `move_input` / `aim_point` / `run_input` and calls
-  the action API: `melee()`, `leg_kick()`, `shoot() -> bool`, `select_slot(id)`, `try_interact()` /
-  `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
-  damage, for injury sensing), `gun_slot()`, `weapon_blocked()` and `is_automatic()`. Signals: `hit_landed(body, damage, hand)`
-  (hand 0/1 = melee punch, 2 = leg kick, −1 = shot), `died` (`is_dead`).
-  Observers (debug HUD, camera) attach by exported node path and read only the public API/signals.
-- **Character → Art** (interface 12): the body, head, hand, limb and trunk painters render through
-  `PixelArt.render_turned` / `snap_angle`, draw on `PixelCanvas`, and read `ArtConfig`.
-- **Character → Physics** (interface 4): `Deformable` / `Deformation` for wounds, a `BloodWound`
-  child (splatter spray + timed drips on a hit, stopped on death), a `BloodFootprints` child fed by
-  `character_footsteps.gd` on each footfall, and the generic `Ragdoll` the fallen body is built on.
-- **Items ↔ Character** (interface 6): the character API an item may call — `facing`,
-  `punch(hand)`, `punch_amount(hand)`, `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`,
-  `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`, `weapon_raise()`, `best_magazine(gun)` / `take_magazine(gun)` /
-  `stow_magazine(m)`; and reads the item's `hand_stance(hand)` / `raised_stance(hand)` (how each hand is held), `muzzle_ahead()`,
-  `raises_at_contact()`, `is_automatic()` and `tick(delta)`, calling its `drop(user, velocity)` on death.
+**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 12 (Character → Art) — signatures in `architecture`.

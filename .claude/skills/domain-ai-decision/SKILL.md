@@ -192,8 +192,8 @@ checks `is_resolved()` *before* awaiting, because the exported-build path resolv
 new terminal path here MUST resolve, or the setup window hangs forever. Output is appended to `user://von_server.log` and echoed as `[von] …` lines.
 Every NPC shares the one server (its port must match the clients' `server_url`).
 
-Note: `mcp__godot__stop_project` hard-kills Godot, so `_exit_tree` doesn't run and the Von server it
-spawned is orphaned on port 8000 — `pkill -f "von serve"` clears it, and you should always do so. An
+Note: killing a Bash-launched Godot (`godot-run`, step 5) is a hard kill, so `_exit_tree` doesn't run and the Von server it
+spawned is orphaned on port 8000 — `pkill -f "von serve"` clears it, and you should always run it after one. An
 orphaned server's stdout pipe is dead, so it can never load weights again (`EPIPE` kills the fetch)
 while still answering HTTP; the readiness probe above is what stops it being mistaken for a live one.
 

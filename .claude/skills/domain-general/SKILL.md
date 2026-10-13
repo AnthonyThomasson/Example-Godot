@@ -88,7 +88,7 @@ next layout when a seed is given (stashed in `Engine` meta, which survives the r
 reads it) and sets the `skip_setup` Engine meta so the reloaded scene builds immediately instead of
 reopening the pre-game setup window — the harness never clicks it. Drive it from `tools/gcmd.py` (`python3 tools/gcmd.py "tp 600 300"`) for single
 commands, or `tools/match.py` to run and score N matches in a row; each command is echoed as a
-`[cmd] …` Output line. (The `godot-drive` skill covers driving it.)
+`[cmd] …` Output line. (The `godot-run` skill covers driving it.)
 
 ## Event bus
 
@@ -152,14 +152,4 @@ human `Player` and `DebugUI`, points the camera at both NPCs in framing mode, an
 for watching and regression-testing both AI agent-types (defender and invader). Composition-root
 wiring lives in `main.gd`; the General observers only read published contracts.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- Observers (debug HUD, match HUD, camera) attach by exported node path and read only the Character
-  public API/signals plus the AI controller's observer reads `current_act()` / `goal` (interface 7).
-  `player_controller.gd` is the one gameplay consumer of `Keybinds`; `main.gd` and the test runner (`MENU`),
-  `spectator_inspector.gd` (`PAUSE`) and the camera (pan and zoom) read their own actions for
-  top-level/spectator control, `settings.gd` persists the bindings, and `command_server.gd` reads the
-  action names to inject input.
-- `main.gd` (the composition root) is the one caller of `Settings`: it loads the file at startup and routes
-  the UI settings page's signals to `Settings.set_debug` / `rebind` / `reset` / `reset_all`, redrawing the
-  page from `Settings.binding_rows()`. The UI window itself knows nothing of `Keybinds` or `Settings`.
+**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`), 14 (`Settings`, the dev command server), 15 (`GameLog`) — signatures in `architecture`.

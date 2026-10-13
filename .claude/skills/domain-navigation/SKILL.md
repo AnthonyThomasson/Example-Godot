@@ -113,14 +113,4 @@ polygon, using the exact same selection and footprint helpers the bake feeds the
 calls `setup` again after each re-bake, so the overlay **re-snapshots** and follows the furniture
 to its current positions. The characters' holes are drawn too, in another colour. The overlay reads nothing back and feeds nothing in.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Main / AI → Navigation** (interface 9): `NavBuilder.build(house, rooms, parent,
-  agent_radius)` bakes the region; consumers only set a `NavigationAgent2D`'s `target_position`
-  and read `get_next_path_position()`. `NavBuilder.rebake(region, house, rooms, agent_radius)`
-  re-carves the holes in place as furniture moves (driven internally by `nav_updater.gd`).
-  `NavBuilder.furniture_holes(house) -> Array` is the debug read Main snapshots for the
-  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(planning_map) -> RID` (invalid when the world has none),
-  `steering_region(region)` and `rebake_steering(region, house, rooms)` are the characters-at-rest side (above).
-  `NavBuilder.ready(map)`, `snap(map, p)`, `route(map, from, to)` and `path_length(path)` are the map queries the AI
-  reads a baked map through (above).
+**Interfaces:** 9 (Main / AI → Navigation) — signatures in `architecture`.

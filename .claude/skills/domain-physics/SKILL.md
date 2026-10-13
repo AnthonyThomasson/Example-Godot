@@ -115,9 +115,4 @@ The core keeps only the entry points: `Physics.spawn_debris` (draws a bullet's `
 (the layer the ragdoll sweep and the blood queries treat as blocking). `BloodConfig` (blood tuning and its master switches) is
 documented in `domain-physics-blood`. Both are `class_name` static holders — there is no `Config` autoload.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Objects → Physics** (interface 4): objects add `Knockback` / `Deformable` as child Nodes and
-  call `Physics.impact_impulse` / `Physics.spawn_debris`. The character composes a `BloodWound` (see `domain-physics-blood`), and its death builds its fallen body on a `Ragdoll` and, once it rests,
-  calls `Physics.bleed_out`. Casings and flying chips
-  despawn via the Despawner; a landed chip lives in the `DebrisLayer`, capped the same.
+**Interfaces:** 4 (Objects / Character → Physics), 11 (`PhysicsLayers` in `PhysicsConfig.wall_mask`) — signatures in `architecture`.

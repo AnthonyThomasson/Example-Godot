@@ -8,7 +8,8 @@ description: Deep implementation detail for the Physics blood sub-domain (scenes
 Self-contained and separate from debris / deformation: `blood_config, blood_field, blood_decals, blood_splat, blood_pool,
 blood_pool_visuals, blood_flow, blood_smear, blood_footprints, blood_wound, blood_spawner, blood_surface`. The rest of
 `physics/` (hit packet, knockback, deformation, debris, hit particles, ragdoll) reaches it only through `Physics.spawn_debris`
-(a hit that carries blood) and `Physics.bleed_out`; every other domain meets it through the classes in interface 4, all
+(a hit that carries blood; the bloody mark a bullet's `HitInfo.blood` leaves on an object is drawn by the core's
+`Deformation.draw_marks`) and `Physics.bleed_out`; every other domain meets it through the classes in interface 4, all
 resolved by `class_name`. It imports nothing outside Physics except `Despawner` (General).
 
 **Master switches** (`BloodConfig.enabled`, and under it `footprints_enabled` / `smear_enabled`, `surface_flow`): off, `BloodWound.record` /
@@ -19,7 +20,7 @@ layer the splat clipping and flow queries treat as blocking.
 
 Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and a dead body's **bleed-out**.
 
-- `BloodWound` (`class_name`, a Node the character composes like `Knockback`): `record(hit)` throws
+- `BloodWound` (`class_name`, a Node the character composes like `Knockback`; the character's `take_hit` calls `record`): `record(hit)` throws
   `ceil(damage / hit_splat_damage)` splatters (max `hit_splat_max`) out the wound's exit side at once, then adds
   `ceil(damage * drips_per_damage)` to a drip budget (cap `max_pending_drips`). While it lasts, one drop falls
   every random `drip_interval_min..max` s (3..10) from the host's `blood_origin()`; it keeps the host's
@@ -81,7 +82,7 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   point), `ribbon_count()`; a ribbon is drawn as two quads per segment via `draw_primitive`, solid on its centre line
   and fading to `smear_feather` at the edges. `items()` / `print_count()` for tests. `print_at` drops polygons the
   engine can't triangulate.
-- `BloodFootprints` (Node child of a walker): `step(...)` per footfall. Per foot id: soak `max(load, wetness *
+- `BloodFootprints` (Node child of a walker): `step(...)` per footfall (the character's `character_footsteps.gd` calls it). Per foot id: soak `max(load, wetness *
   pickup_gain)` (sampled heel/middle/toe), stamp a mirrored sole (heel, arch on the `inner` side, ball, toe) with
   alpha from the load unless already in thick blood, then lose `print_decay`. Low load = thin arch + rough edge;
   speed and load slip the print forward.
@@ -102,7 +103,4 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   continue as the wispy tail (`BloodField.pool_near(pos, radius)` finds the pool; wetness includes the trail).
 - Tests: `tests/physics/footprints_*`, `object_smear*` (incl. `object_smear_pool`), `smear_ribbon_shape`, `blood_pool_trail`, `blood_field_query`, `blood_decals_cap`.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Character → Physics** (interface 4): the character composes `BloodWound` (its `take_hit` calls `record`, its death `stop`) and `BloodFootprints` (fed by `character_footsteps.gd`); a dead body calls `Physics.bleed_out`, and the pool reads its `blood_origin()`.
-- **Objects → Physics**: an object composes `BloodSmear` (`set_footprint`) and its `Floor` and its non-solid pieces (rugs, porous) register `BloodSurface` rects; a bullet's `HitInfo.blood` is drawn by `Deformation.draw_marks` (Physics core).
+**Interfaces:** 4 (Objects / Character → Physics) — signatures in `architecture`.

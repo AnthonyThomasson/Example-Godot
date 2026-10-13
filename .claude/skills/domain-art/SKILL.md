@@ -60,7 +60,4 @@ Shared tuning: `pixel_size`, `light_from`, `turn_steps`, drop shadow (`drop_shad
 the tone ramp, and the surface-finish densities. Domain-specific proportions and colors stay in
 each domain's config (`ObjectArtConfig`, `CharacterConfig.art_*`).
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Objects / Character / Items → Art** (interface 12): `PixelArt.render`, `PixelArt.render_turned`,
-  `PixelArt.snap_angle`, the `PixelCanvas` drawing API for painters, and `ArtConfig`.
+**Interfaces:** 12 (Objects / Character / Items → Art) — signatures in `architecture`.

@@ -7,7 +7,7 @@ description: Overview of the UI domain (scenes/ui/) — all HUDs and menus, spli
 
 `CanvasLayer` / `Node` widgets, all built entirely in code (no scene-side layout), all decoupled observers
 that read only published contracts — Character public API/signals, the AI controller's
-`goal_text()`, `debug_zones()` and `known_contacts_for_display()`, and the EventBus `&"hit"` topic. They know nothing of
+`goal_text()`, `debug_zones()` and `known_contacts_for_display()`, and the EventBus `&"hit"` and `&"stun"` topics. They know nothing of
 the domains.
 
 ## Sub-domains (one folder, one skill each)
@@ -22,11 +22,8 @@ the domains.
 Load the matching sub-skill before editing a folder. What they share: every widget is built in code (no scene-side layout), takes plain
 data or reads published contracts only, never reaches into another domain's internals, and runs `PROCESS_MODE_ALWAYS` when it must keep
 working while the match is paused. There are no `class_name`s in this domain; callers `preload` the script by path.
+`main.gd` and the Testing runner are the only outward callers (`MatchHUD.begin`, `SetupMenu.open`, `SeedDisplay.show_seed`,
+`OverlayToggles.setup`, …); `main.gd` finds its HUD nodes by name (`get_node_or_null("MatchHUD")`, `"DebugUI"`, `"SeedDisplay"`)
+and calls them duck-typed. Each sub-skill lists the calls its folder receives.
 
-## Interface recap
-
-- UI observers attach by exported node path (or node name duck-typed in `main.gd`) and read only the
-  Character public API/signals plus `AIController.current_act()` / `goal_text()` (interface 7 in the
-  `architecture` skill). EventBus `&"hit"` is the only cross-domain event consumed here.
-- `main.gd` and the Testing runner are the only outward callers (`MatchHUD.begin`, `SetupMenu.open`, `SeedDisplay.show_seed`,
-  `OverlayToggles.setup`, …); each sub-skill lists the calls its folder receives.
+**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus), 13 (Testing), 14 (settings page), 17 (stack markers), 18 (stun screen) — signatures in `architecture`.

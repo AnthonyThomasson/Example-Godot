@@ -28,7 +28,8 @@ the test browser. `current_config() -> Dictionary` returns the same
   open for a moment (it waits for the Von decision server) and a second press would build the world
   twice. `set_status(text)` writes a 24pt line above the Start button (hidden when blank) — Main
   shows "Waiting for the decision server…" there so that pause is never silent. A **Settings** button
-  (28pt) below Tests emits `settings_requested`; Main opens the settings page over this window.
+  (28pt) below Tests emits `settings_requested`; Main opens the settings page over this window. Tested by
+  `tests/ui/setup_menu_config_test.gd` and `tests/ui/setup_menu_ticket_test.gd`.
 
 - `settings_menu.gd` — the **settings page** (`SettingsMenu` CanvasLayer, layer 20 so it opens over the
   setup window, built by Main on `settings_requested`). A plain-data window like the test browser: it
@@ -46,7 +47,4 @@ the test browser. `current_config() -> Dictionary` returns the same
   reaches the game; so Esc itself can't be bound. A redraw keeps the list's scroll position. Key and
   Reset buttons take no focus (Space/Enter must not re-press them). Tested by `tests/ui/settings_menu_test.gd`.
 
-## Interface recap
-
-- `main.gd` calls `SetupMenu.open(defaults)` / `set_status(text)` / `current_config()` and connects `start_requested`, `tests_requested`, `settings_requested`; it opens `SettingsMenu.open({ debug, rows })` / `set_rows(rows)` and applies `debug_changed`, `rebind_requested`, `reset_requested`, `reset_all_requested`, `back_requested` to `Settings` (architecture interface 14). The Tests button changes scene to the test browser (interface 13).
-- Tests: `tests/ui/setup_menu_config_test.gd`, `setup_menu_ticket_test.gd`, `settings_menu_test.gd`.
+**Interfaces:** 13 (the Tests button's scene change), 14 (the settings page; the setup window is called only by `main.gd`, see above) — signatures in `architecture`.

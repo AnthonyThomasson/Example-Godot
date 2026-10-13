@@ -37,7 +37,4 @@ The two widgets the Testing domain's browser and runner show. Both take plain di
   A **Pause / Resume** button emits `pause_requested` (`set_paused(on)` relabels it, `set_pause_enabled(on)` hides
   it when a test locks pause); the HUD is `PROCESS_MODE_ALWAYS` so its buttons work while the world is frozen.
 
-## Interface recap
-
-- `scenes/testing/test_browser.gd` hosts `TestBrowserWindow` (`open`, `set_run_status`, `set_results`); `scenes/testing/test_runner.gd` builds `TestResultHUD` and the overlay bar.
-- Tests: `tests/ui/test_browser_window_test.gd`.
+**Interfaces:** 13 (Testing → every domain) — signatures in `architecture`.

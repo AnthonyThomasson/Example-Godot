@@ -1,6 +1,6 @@
 ---
 name: domain-ai
-description: Light overview of the AI domain (scenes/ai/) — non-player brains, split into four isolated sub-domains under scenes/ai/ around a thin orchestrator. Start here to see the shape of the AI (sense → decision-tree walk → primitive, the sub-domain map, the two NPC presets, the cross-domain interfaces), then load the matching `domain-ai-<name>` skill for deep detail: `domain-ai-perception` (what the NPC knows: vision, hostility, memory, tracks, callouts, tactics geometry, the decision snapshot Von reads), `domain-ai-decision` (the decision tree, its planner walk, the Von round-trip + server), `domain-ai-behavior` (the primitives: move/engage/melee/interact/hold/entry + pathing + commitment + tactical entry; its `combat.gd` is `domain-ai-combat`, `search_coverage.gd` is `domain-ai-coverage` and `watch.gd`, where it looks and when it shoots, is `domain-ai-watch`), `domain-ai-debug` (the overlays); the decision snapshot inside perception is `domain-ai-snapshot`. Use when editing scenes/ai/ or working on NPC goals/behaviour, or to find which sub-domain owns a concern. Complements the `architecture` skill (cross-domain interfaces).
+description: Light overview of the AI domain (scenes/ai/) — non-player brains, split into four isolated sub-domains under scenes/ai/ around a thin orchestrator. Start here to see the shape of the AI (sense → decision-tree walk → primitive, the sub-domain map, the two NPC presets, which cross-domain interfaces it uses), then load the matching `domain-ai-<name>` skill for deep detail: `domain-ai-perception` (what the NPC knows: vision, hostility, memory, tracks, callouts, tactics geometry, the decision snapshot Von reads), `domain-ai-decision` (the decision tree, its planner walk, the Von round-trip + server), `domain-ai-behavior` (the primitives: move/engage/melee/interact/hold/entry + pathing + commitment + tactical entry; its `combat.gd` is `domain-ai-combat`, `search_coverage.gd` is `domain-ai-coverage` and `watch.gd`, where it looks and when it shoots, is `domain-ai-watch`), `domain-ai-debug` (the overlays); the decision snapshot inside perception is `domain-ai-snapshot`. Use when editing scenes/ai/ or working on NPC goals/behaviour, or to find which sub-domain owns a concern. Complements the `architecture` skill (cross-domain interfaces).
 ---
 
 # AI domain (`scenes/ai/`) — overview
@@ -24,7 +24,8 @@ invader preset is all data on this one node), it wires the sub-domains and pushe
 them — building them once, then re-pushing the config each decision so a tunable retuned at runtime
 (a behaviour test, the dev command server) takes effect without a rebuild — and it runs the
 **SENSE → THINK → ACT** loop plus the decide cadence, salient-event detection, interrupting a decision
-walk the situation has overtaken, and the EventBus intake (hits, allies' callouts) and its own callouts.
+walk the situation has overtaken, and the EventBus intake (`&"hit"`, allies' `&"callout"`s, `&"grenade"` landings and
+`&"explosion"`s, queued and handed to perception on the next tick) and its own callouts.
 
 | Sub-domain | Folder | Skill | Owns (role) |
 |---|---|---|---|
@@ -48,6 +49,15 @@ default, so NPCs deciding together spread over frames), asks **Perception** for 
 over it;
 adopts the returned leaf into **Behaviour** (and radios it to allies); then has **Behaviour** `apply()`
 the running primitive.
+
+**Observer reads** (pure reads, never perturbing the loop): `debug_status()` is the decision path as labels plus the running
+primitive's progress. `debug_state() -> Dictionary` is the deep snapshot: every level of the last walk (the state and question
+Von saw, the options, its probabilities and pick), the facts, the contacts, the running primitive and pathing; the dev command
+server's `ai` verb dumps it and `tools/von_probe.py` replays captured levels against Von. `debug_zones() -> Array` flattens the
+last snapshot's option groups to world points, each with its `label`, `desc` (for an inspector to explain a clicked point) and
+`tags`, tagged by zone kind (fire / flank / advance / retreat / lead / search / entry / room / interaction, plus `waypoint` for
+the non-room go-to points: post / entrance / approach). `debug_room_zones() -> Array` gives each room `{ rect, type, status }`
+by how the NPC regards it (current / searched / unsearched / unknown). Both feed the tactics overlay (`domain-ai-debug`).
 
 ## Grenades (`docs/grenades.md`)
 
@@ -121,29 +131,4 @@ PERCEIVED: it fights a hostile's last-KNOWN position, loses a contact once its s
 becomes an investigation lead), and (unless `familiar_with_house`) must see rooms/objects before it can
 use them. The detail lives in `domain-ai-perception`, `domain-ai-decision` and `domain-ai-behavior`.
 
-## Cross-domain interfaces (authoritative in the `architecture` skill)
-
-The AI's external surface is all the orchestrator's:
-- **Character ↔ Controller** (interface 7): the controller is any node with `control(character,
-  delta)`; it writes `move_input` / `aim_point` and calls `melee()`, `shoot()`, `select_slot(id)`,
-  `interact_with(object, id)` / `end_interaction()`; reads `damage_taken()`, `faction`,
-  `current_item()`, `has_item()` — and, for a character it can SEE, `facing`, `damage_taken()`, `is_reloading()`, `posture()`,
-  `current_item()` and `faction`.
-  Main injects only `rooms` and `openings` (and `entry_point`). For observers the controller exposes
-  `current_act()` (the decision path as ids), `debug_status()` (the full path as labels, every level —
-  `COMBAT - Intruder - FLANK - their left side (kitchen)` — plus progress) and `debug_state() ->
-  Dictionary` — the deep snapshot (every level of the last walk: the state and question Von saw, the
-  options, its probabilities and pick; the facts; the contacts; the running primitive; pathing). The
-  dev command server's `ai` verb dumps it; `tools/von_probe.py` replays captured levels against Von.
-  `debug_zones() -> Array` flattens the last snapshot's option groups to world points (each with its
-  `label` + `desc`, for an inspector to expose a clicked point) tagged by zone kind (fire / flank /
-  advance / retreat / lead / search / room / interaction / entry, plus waypoint for the non-room go-to points —
-  post / entrance / approach; each entry also carries the option's `tags`), and `debug_room_zones()
-  -> Array` returns each room `{ rect, type, status }` tagged by how the NPC regards it (current /
-  searched / unsearched / unknown) — both for the tactics overlay.
-- **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s
-  `target_position` and reads `get_next_path_position()`; perception's tactics query the nav map
-  (closest point, path) to judge routes.
-- **EventBus** (interface 10): the orchestrator consumes `&"hit"`, `&"callout"`, `&"grenade"` and `&"explosion"` and hands each to
-  perception (a deafened NPC drops what it could not hear); it posts `&"callout"` when it adopts a combat or investigation decision, when it sees or hears a live grenade that threatens it (`status` `grenade`), and at each step
-  of a tactical entry (the stack's slot claims, ready, going in, through, clear, the doorway on each covers, done).
+**Interfaces:** 7 (Character ↔ Controller, the observer reads and overlay exports), 9 (AI → Navigation), 10 (EventBus), 11 (`PhysicsLayers`), 13 (`DecisionStub` / `DecisionServerLauncher` for tests), 17 (the human's `PlayerStack`) — signatures in `architecture`.

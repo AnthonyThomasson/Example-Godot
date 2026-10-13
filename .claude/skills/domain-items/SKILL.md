@@ -11,8 +11,8 @@ lives in the item; the reload clock and the aim are the character's.
 ## Slots
 
 Number keys 1–9 select a slot (`ItemRegistry`):
-- **1** unarmed — no hands, F/LMB do nothing.
-- **2** fists — both hands, F alternates (alternation state lives in the item).
+- **1** unarmed — no hands, F/LMB do nothing (both hands `relaxed`, the `Item.hand_stance` default).
+- **2** fists — both hands, F alternates (alternation state lives in the item); both held in `guard`.
 - **3** pistol — right hand + pistol art; F jabs, LMB fires (one round per click), R reloads.
 - **4** key — inert carryable; it exists so a `requires_item: 4` interaction has something to
   gate on (gates the wardrobe's "Rummage" interaction).
@@ -141,17 +141,4 @@ Art: `art/stun_grenade_painter.gd`, `frag_grenade_painter.gd` (option `spoon`: t
 Guns are the one place Items reach into the Projectile System
 (`ProjectileSpawner` / `CasingSpawner`). No other item crosses that boundary.
 
-## Interface recap (authoritative in the `architecture` skill)
-
-- **Items ↔ Character** (interface 6): `Item` (`items/item.gd`) exposes `display_name`, `reach`,
-  `hand_stance(hand)` (how that hand is held: a `CharacterConfig.stances` name — `relaxed` by default,
-  `guard` for fists, `aim` / `support` for the pistol, `smg_*` / `rifle_*` for the long guns), `primary(user)` (F),
-  `secondary(user) -> bool` (LMB), `tick(delta)`, `is_automatic()`, `weapon_hand()`, `muzzle_ahead()`, `raises_at_contact()`,
-  `raised_stance(hand)`, `draw_weapon(canvas, user)`, `drop(user, velocity)` and `draw_dropped(canvas, at, angle, modulate, opts)`.
-  The character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)`, `hand_position(hand)`,
-  `hand_world(hand)`, `muzzle_origin(hand)`, `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength)`, `weapon_facing()`,
-  `weapon_raise()`, and for reloading
-  `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Ammo hooks on `Item`: `rounds_loaded()`,
-  `ammo_capacity()`, `reload_time()`, `can_reload(user)`, `finish_reload(user)`, `reloading`; and `gun_id()` / `round_power()`
-  (the gun's id and its rounds' penetration power; `&""` / 1 on a non-gun), read for the character's `reload` event.
-- **Items → Art** (interface 12): each gun's art via `PixelArt.render_turned` / `snap_angle`.
+**Interfaces:** 6 (Items ↔ Character), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 12 (Items → Art) — signatures in `architecture`.

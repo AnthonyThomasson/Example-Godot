@@ -45,8 +45,8 @@ the exports are the **`domain-main`** skill. `project.godot` autoloads only `Key
 
 ## The vital interfaces (this is the whole cross-domain surface)
 
-Everything not listed here is private to its domain. Each domain's skill recaps its own
-interface(s) and describes how they're implemented; this list is authoritative for signatures.
+Everything not listed here is private to its domain. The signatures live only here: a domain's skill names the
+interfaces it takes part in (by number) and describes how they're implemented.
 
 1. **Main → World Generation**
    - `WorldGen.generate(seed, force_plan, front_entrance_world, parent) -> Node2D` — seeds one RNG
@@ -219,7 +219,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
    exported node path and read only the public API/signals; the controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
-   side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry` (`show_grenades` reads `debug_grenades()`: `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: none), throw: {} }`);
+   side (kitchen)`), `debug_state() -> Dictionary` (the deep snapshot the dev command server's `ai` verb dumps), `debug_zones() -> Array`
+   (the tactical points the spectator inspector picks from), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry` (`show_grenades` reads `debug_grenades()`: `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: none), throw: {} }`);
    Main, the spectator inspector and the Testing world set those flags by that name, so an overlay's export is part of this surface. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`ai/npc_defender.tscn`) and the invader
    (`ai/npc_invader.tscn`), both inherited from `ai/npc.tscn` (itself an inherited scene of the controller-less
@@ -256,7 +257,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
 	 living characters at rest under the region's parent), `NavBuilder.steering_map(planning_map) -> RID` (a map of its own, holding
 	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
-	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
+	 `rebake_steering(region, house, rooms, agent_radius=14.0)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
 	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
    - **Map queries**, what the AI asks of a baked map when it weighs a point or a route: `NavBuilder.ready(map) -> bool`
 	 (valid, synchronized at least once and has taken in every region `build` put on it, so a map still showing the previous
@@ -472,7 +473,7 @@ Two conventions hold across domains; the per-domain specifics live in each domai
   command-server port (`GODOT_CMD_PORT`), importing first in a fresh worktree. `--autorun`
   makes the editor plugin `addons/ticket_autorun/` press Play once it is up.
 - **Verification ladder** — use the cheapest rung that proves the change:
-  1. **Loads?** `godot-debug` skill: headless load check (run `--import` first when you add a `class_name`).
+  1. **Loads?** `godot-run` skill: headless load check (run `--import` first when you add a `class_name`).
      **Clean?** `tools/lint.sh [paths]` (a few seconds) prints every GDScript analyzer warning of the editor's
      Debugger > Errors tab (unused variable, integer division, shadowed names ...) per file; it runs first in
      every `run_tests.sh` and fails the run before a test starts. Fix the code; silence a warning only as a last resort.
@@ -484,11 +485,11 @@ Two conventions hold across domains; the per-domain specifics live in each domai
      `--no-lint`, `--json`, `--include-von` / `--require-von`. A failure prints actor state and a `bundle:` JSON path.
      Writing tests: `domain-testing` skill; debugging one: `test-debug` skill. In the game, the setup
      window's **Tests** button opens the browser to play one.
-  3. **Exploratory / not yet scriptable?** `godot-drive` skill: drive the live game through the dev
+  3. **Exploratory / not yet scriptable?** `godot-run` skill: drive the live game through the dev
      command server (`tools/gcmd.py`).
   4. **Whole-AI outcomes?** `tools/match.py` scores full defender-vs-invader matches.
   **Fast enough?** `tools/run_tests.sh --domain=perf`: the performance tests (`tests/perf/`) hold a 5v5 and a 10v10 match to one 60 fps
   frame on average (`domain-testing` skill, "Performance tests"); a change to a per-frame path should leave them green.
-  A bugfix starts with a failing test on rung 2 (`test-debug` skill).
+  A bugfix starts with a failing test on rung 2 (`fix` skill).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
   generation, movement/pushing, items, interactions, combat).

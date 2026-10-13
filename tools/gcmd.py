@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Send one command to the running game's dev command server and print its reply.
 
-The Godot MCP can launch/kill the game and read its stdout, but cannot open a socket into it,
-so this is how the agent drives a live instance. The in-game server (scenes/general/command_server.gd)
+The game is launched from Bash (tools/editor.sh or Godot directly; the godot-run skill), and this
+client is how an agent drives a live instance over the in-game server's socket. The in-game server (scenes/general/command_server.gd)
 listens on 127.0.0.1 and speaks a line-delimited text protocol.
 
 Usage:

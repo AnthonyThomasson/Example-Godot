@@ -1,39 +1,31 @@
 ---
 name: ticket-spike
-description: How to field a ticket labelled `spike`. A spike produces no code — its job is to investigate in the workspace and plan out work for future tickets, which you create with the GitHub CLI (`gh`). Invoked from the `ticket` skill when a ticket carries the `spike` label.
+description: Work a ticket labelled `spike` - investigate in the workspace without changing the game, then plan the work as new, well-scoped GitHub tickets created with `gh`. Invoked from `ticket`.
 ---
 
 # Ticket: spike
 
-A spike's job is to **plan out work for future tickets**. You investigate the question in your workspace,
-then turn what you learned into new, well-scoped tickets that can each be picked up later.
-
-A spike does **not** change the game: no feature code, no refactors, no test changes, no commit of
-implementation work. Reading code and running the game or tests to learn things is fine.
+A spike plans work for future tickets. It changes nothing in the game: no feature code, refactors, test changes or
+implementation commits. Reading code and running the game or tests to learn is fine.
 
 ## Steps
 
-1. **Read the ticket** (via the `ticket` skill) and state the question the spike must answer.
-2. **Investigate in the workspace.** Load the `architecture` skill, then the `domain-<name>` skills for the domains
-   involved. Read the code, run `tools/run_tests.sh` or drive the game (`godot-drive`) where that answers a
-   question. Note which files, domains and cross-domain interfaces the work would touch, what is risky or
-   unknown, and what order the pieces must come in.
-3. **Break the work into tickets.** Each future ticket should be:
-   - **Small and independent enough** to finish in one go; split along domain boundaries where you can.
-   - **Self-contained:** the problem, the intended outcome, the relevant files / interfaces / skills found in
-     step 2, acceptance criteria (the tests or behaviour that prove it done), and any ticket it depends on.
-   - **Labelled by kind** (e.g. `spike` for a further unknown, otherwise whatever the repo's labels call for).
-4. **Create the tickets with the GitHub CLI** (`gh issue create`), not the web UI. Use `--repo` for the repo the spike came
-   from, and `--label` for each label. Create them in dependency order so later tickets can link to earlier ones by
-   number. Link each back to the spike ticket (`gh issue view <n>` / `gh issue comment <n>`).
-5. **Report back** on the spike ticket: a summary of the findings and the list of tickets you created
-   (number, title, one line each). Say plainly what stays unknown.
+1. Read the ticket (`ticket`) and state the question the spike answers.
+2. **Investigate.** Load `architecture`, then the domain skills involved. Read code; run `tools/run_tests.sh` or drive
+   the game (`godot-run`) where that answers a question. Note the files, domains and interfaces the work would touch,
+   the risks and unknowns, and the order the pieces must come in.
+3. **Break it into tickets**, each:
+   - small and independent enough to finish in one go, split along domain boundaries where possible;
+   - self-contained: problem, intended outcome, relevant files / interfaces / skills, acceptance criteria (tests or
+     behaviour that prove it done), and any ticket it depends on;
+   - labelled by kind (`spike` for a further unknown, else what the repo's labels call for).
+4. **Create them with `gh issue create`** on the spike's repo (`--repo`, `--label` per label), in dependency order so
+   later ones link earlier ones by number, each linked back to the spike (`gh issue comment <n>`).
+5. **Report** on the spike ticket: findings, the created tickets (number, title, one line each), and what stays unknown.
 
 ## Rules
 
-- **Create tickets on the repo the spike came from**, unless told otherwise.
-- **Check for duplicates** before creating a ticket (search existing open issues).
-- **Don't create tickets for work that isn't backed by your investigation.** A short, accurate list beats a long
-  speculative one.
-- Creating tickets publishes them to an external service; if the user hasn't asked you to proceed without
-  checking, show the planned list and get a go-ahead first.
+- Search open issues for duplicates first.
+- Only tickets backed by the investigation; a short accurate list beats a long speculative one.
+- Creating tickets publishes them: unless the user said to proceed without checking, show the planned list and get a
+  go-ahead first.

@@ -13,7 +13,8 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
   plus its draw script (`scenes/ai/debug/`) and a node in `ai/npc.tscn`. `show_grenades` ("Grenades", group Combat) is the grenade overlay (`grenade_overlay.gd`, docs/grenades.md G19).
 
 - `overlay_toggles.gd` — the **in-game overlay toggle bar** (`OverlayToggles` CanvasLayer, built by
-  `main.gd` after the world spawns, both modes, only when Debug is on). A collapsible top-right panel (1.5× scale: `SCALE` in the script) of toggle buttons grouped
+  `main.gd` after the world spawns, both modes, only when Debug is on; the Testing runner builds the same bar, and the
+  performance overlay, for its own overlay toggles). A collapsible top-right panel (1.5× scale: `SCALE` in the script) of toggle buttons grouped
   from the registry (Perception / Combat / Movement / Brain / Entry / Map / Stats). An **All (n/N)** button and each
   group's header button (`Perception (n/N)`) flip a whole set: all on unless already all on, then all off; each
   changed flag emits its own `overlay_toggled`, so Main needs no bulk path. `RESERVED_WIDTH` is the screen width it occupies from the right edge. `setup(flags)` seeds the buttons;
@@ -24,7 +25,7 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
   the selected NPC follows; `show_nav_holes` → the single NavDebug; `show_perf` → the PerformanceOverlay).
   `PROCESS_MODE_ALWAYS` (works while paused); the panel swallows clicks so pressing a button never selects
   an NPC; buttons take no focus (Space stays pause/interact). The "Overlays" title is a drag handle
-  (`DragHandle`) that moves the bar; the `▸/▾` button beside it collapses it.
+  (`DragHandle`) that moves the bar; the `▸/▾` button beside it collapses it. Tested by `tests/ui/overlay_toggles_test.gd`.
 
 - `drag_handle.gd` — the **drag-to-move helper** (`DragHandle` Node, added as a child of the handle Control;
   `setup(handle, target)`). Left-drag the handle to move `target` by shifting its offsets (anchors kept, so it
@@ -41,7 +42,4 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
   move it (it swallows clicks, so it blocks click-to-inspect beneath it). `PROCESS_MODE_ALWAYS` (keeps
   updating while paused); hidden it stops processing.
 
-## Interface recap
-
-- `main.gd` reads `OverlayRegistry` (`defaults()`, `is_global`, `NAV_HOLES`, `PERF`), builds `OverlayToggles` + `PerformanceOverlay` when Debug is on and applies `overlay_toggled(flag, on)`; the Testing runner builds the same widgets for its overlay bar (architecture interface 13).
-- Tests: `tests/ui/overlay_toggles_test.gd`.
+**Interfaces:** 7 (the overlays' `show_<x>` exports), 13 (the Testing runner's overlay bar) — signatures in `architecture`.
