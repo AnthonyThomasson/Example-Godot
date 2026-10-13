@@ -60,7 +60,7 @@ extends Node2D
 @export var show_room_zones: bool = false
 ## When false, the search-coverage overlay (room sample points a searcher is seeing / still to see) is hidden.
 @export var show_search: bool = false
-## When false, the navigation furniture-hole overlay (the footprints carved out of the navmesh) is hidden.
+## When false, the navigation-hole overlay (the footprints of furniture and characters at rest carved out of the navmesh) is hidden.
 @export var show_nav_holes: bool = false
 
 ## NPC placement for one match (where defenders and invaders start; see match_spawner.gd).
@@ -69,7 +69,7 @@ const MATCH_SPAWNER := preload("res://scenes/match_spawner.gd")
 ## so that side's NPCs treat them as an ally.
 const DEFENDER_FACTION := &"household"
 const INVADER_FACTION := &"invader"
-## Draw-only overlay for the baked navmesh's furniture holes (Navigation domain).
+## Draw-only overlay for the baked navmesh's holes, furniture and characters at rest (Navigation domain).
 const NAV_DEBUG := preload("res://scenes/navigation/nav_debug.gd")
 ## Periodic navmesh re-baker: re-carves furniture holes as pieces are shoved around (Navigation domain).
 const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
@@ -111,7 +111,7 @@ var _spawner: RefCounted = null
 var _overlay_flags: Dictionary = {}
 ## The spectator inspector (spectator mode only), told of live toggles so the selected NPC follows them.
 var _inspector: Node = null
-## The world-space furniture-hole overlay, one of the two overlays that aren't per NPC.
+## The world-space navigation-hole overlay, one of the two overlays that aren't per NPC.
 var _nav_debug: Node2D = null
 ## The performance overlay (the other global overlay); null when Debug is off.
 var _perf_overlay: CanvasLayer = null
@@ -348,8 +348,8 @@ func _spawn_world() -> void:
 	var rooms := WorldGen.get_rooms(house)
 	_spawner.openings = WorldGen.get_openings(house)
 	var nav_region := NavBuilder.build(house, rooms, _world)
-	# Debug overlay (world-space, single node): snapshot the furniture holes carved into the navmesh
-	# right after the bake. The updater below re-snapshots it after each re-bake so it tracks furniture.
+	# Debug overlay (world-space, single node): snapshot the holes carved into the navmesh right after the bake.
+	# The updater below re-snapshots it after each re-bake so it tracks furniture and characters.
 	var nav_debug: Node2D = NAV_DEBUG.new()
 	nav_debug.name = "NavDebug"
 	_world.add_child(nav_debug)
@@ -522,7 +522,7 @@ func _random_count(rng: RandomNumberGenerator, most: int) -> int:
 
 
 ## The overlays' starting state: each registry default, overridden by the Main exports that name an
-## overlay (labels / paths / vision / tactics / room zones / search / furniture holes).
+## overlay (labels / paths / vision / tactics / room zones / search / navigation holes).
 func _initial_overlays() -> Dictionary:
 	var flags: Dictionary = OVERLAY_REGISTRY.defaults()
 	flags["show_actions"] = show_agent_labels
@@ -554,7 +554,7 @@ func _configure_debug() -> void:
 					child.set(flag, _overlay_flags[flag])
 
 
-## A toggle-bar button was pressed: record the flag and apply it live. The furniture holes go to the single
+## A toggle-bar button was pressed: record the flag and apply it live. The navigation holes go to the single
 ## NavDebug node and the performance flag to the performance overlay; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
 ## only); in player mode every NPC's overlay takes it directly.
 func _on_overlay_toggled(flag: String, on: bool) -> void:

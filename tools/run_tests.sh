@@ -11,6 +11,9 @@
 #   tools/run_tests.sh --domain=ai        only the tests of exactly that domain; comma list allowed
 #                                         (--domain=ai,navigation). No word-prefix matching.
 #   tools/run_tests.sh --id=ai/foo_bar    exactly that test id (comma list allowed)
+#   tools/run_tests.sh --skip-domain=perf leave out the tests of exactly that domain (comma list allowed); wins over
+#                                         every other selection, --changed's included. The pre-commit hook skips perf:
+#                                         its frame-time budgets fail on a loaded machine, so they are a separate run.
 #   tools/run_tests.sh --failed           only the tests that FAILED / TIMED OUT in the previous run
 #                                         of this checkout (its report is kept in $TMPDIR)
 #   tools/run_tests.sh --changed          tests for what uncommitted changes can affect: each changed
@@ -76,6 +79,7 @@ STRICT=
 JOBS=
 CHANGED=0
 LINT=1
+SKIP=""   # --skip-domain=a,b, also forwarded to the runner
 args=()
 for a in "$@"; do
   case "$a" in
@@ -84,6 +88,7 @@ for a in "$@"; do
     --jobs=*) JOBS="${a#--jobs=}" ;;
     --changed) CHANGED=1 ;;
     --no-lint) LINT=0 ;;
+    --skip-domain=*) SKIP="${a#--skip-domain=}"; args+=("$a") ;;
     --failed)
       [[ -f "$LAST" ]] || { echo "No previous run of this checkout to take failures from." >&2; exit 2; }
       args+=("--failed=$LAST") ;;
@@ -328,7 +333,7 @@ if [[ $CHANGED -eq 1 ]]; then
       echo "== ${only_ids#,} =="
       run "--id=${only_ids#,}" || status=1
     fi
-    if [[ $perf -eq 1 ]]; then
+    if [[ $perf -eq 1 && ",$SKIP," != *",perf,"* ]]; then
       ran=1
       echo "== perf tests (tests/_perf changed) =="
       run --domain=perf || status=1

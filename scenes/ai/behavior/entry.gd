@@ -101,13 +101,20 @@ var _sweep: Array = []             ## Alone: the doorways still to look through,
 var _cover_spot := Vector2.INF     ## Where this NPC stands to cover its doorway.
 var _cover_aim := Vector2.INF      ## A point through that doorway, in the room beyond: where its gun points.
 var _holders := {}                 ## Allies seen holding the cleared room (cover / rear): instance id -> true.
+var _eyes: RefCounted              ## The watch module: where a walking entrant looks (`Watch.travel_point`).
+## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
+## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
+## for a gaze the hostile will not let go of.
+var gaze_held := false
 
 
-## Capture the locomotion, the perception and the room coverage. Called once by `Behavior.setup()`.
-func setup(loco: Node, perception: Node, coverage: RefCounted) -> void:
+## Capture the locomotion, the perception, the room coverage and the watch module (where a walker looks). Called once by
+## `Behavior.setup()`.
+func setup(loco: Node, perception: Node, coverage: RefCounted, eyes: RefCounted) -> void:
 	_loco = loco
 	_perception = perception
 	_coverage = coverage
+	_eyes = eyes
 
 
 ## Start an entry from an ENTER leaf's params (`opening`, `into`, `slot`, `side`). False when the doorway is unknown
@@ -184,11 +191,6 @@ func abandon() -> void:
 ## until it is through the threshold and off the door's axis (E4).
 func committed() -> bool:
 	return phase == "cross"
-
-
-## Whether the entrant may shoot on the move this tick (crossing, or in the room).
-func fires_at_will() -> bool:
-	return phase in ["cross", "corner", "clear", "cover", "rear"]
 
 
 ## The steps queued for the radio since the last call, oldest first: { step, cleared_room? }.
@@ -752,17 +754,21 @@ func _radio(what: String, extra := {}) -> void:
 	_heartbeat = HEARTBEAT
 
 
-## Look where it walks.
+## Look where it walks: a few paces down its path (the door it is lining up), not the next waypoint beside it.
 func _aim_travel(character) -> void:
-	if character.move_input != Vector2.ZERO:
-		character.aim_point = character.global_position + character.move_input * 100.0
-		_look_angle = character.move_input.angle()
+	if character.move_input == Vector2.ZERO:
+		return
+	var ahead: Vector2 = _eyes.travel_point(character)
+	var toward: Vector2 = (ahead - character.global_position) if ahead != Vector2.INF else character.move_input
+	character.aim_point = character.global_position + toward.normalized() * 100.0
+	_look_angle = toward.angle()
 
 
 ## Turn the gaze toward `point` at `look_rate` (× `speed`); true once it is there.
 func _look_toward(character, point: Vector2, delta: float, speed := 1.0) -> bool:
 	var self_pos: Vector2 = character.global_position
 	var desired := (point - self_pos).angle()
+	_look_angle = (character.facing as Vector2).angle()  # From where it looks now: something else may have held its eyes meanwhile.
 	_look_angle = rotate_toward(_look_angle, desired, look_rate * speed * delta)
 	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
-	return absf(angle_difference(_look_angle, desired)) <= GAZE_SETTLED
+	return gaze_held or absf(angle_difference(_look_angle, desired)) <= GAZE_SETTLED

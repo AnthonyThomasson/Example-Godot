@@ -23,7 +23,7 @@ func describe() -> Dictionary:
 func configure(s: TestSetup) -> void:
 	Maps.house(s)
 	Flank.rules(s)
-	Flank.npc(s, &"npc", NPC_POS)
+	Flank.npc(s, &"npc", NPC_POS, {}, &"invader", TARGET_POS)  # starts looking at the target, as a held NPC must
 	Flank.target(s, &"target", TARGET_POS, NPC_POS)
 
 

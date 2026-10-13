@@ -24,6 +24,10 @@ func run(t: TestContext) -> void:
 	t.check(ai.size() < all.size(), "and leaves the others out")
 	var one := Catalog.discover(Catalog.ROOT, [], [ai[0]["id"]])
 	t.expect_eq(one.size(), 1, "an id filter keeps exactly one test")
+	var without_ai := Catalog.discover(Catalog.ROOT, [], [], ["ai"])
+	t.check(not without_ai.is_empty() and not without_ai.any(func(e): return e["domain"] == "ai"), "a skipped domain is left out")
+	t.expect_eq(without_ai.size() + ai.size(), all.size(), "and nothing else is")
+	t.expect_eq(Catalog.discover(Catalog.ROOT, ["ai"], [], ["ai"]).size(), 0, "a skip wins over a selection of the same domain")
 
 	var fake: Array = []
 	for i in 7:

@@ -25,8 +25,8 @@ func configure(s: TestSetup) -> void:
 	Maps.house(s)
 	Flank.rules(s)
 	var disabled: Array[StringName] = [&"flank"]
-	Flank.npc(s, &"disabled", DISABLED_POS, { "disabled_nodes": disabled })
-	Flank.npc(s, &"control", CONTROL_POS)
+	Flank.npc(s, &"disabled", DISABLED_POS, { "disabled_nodes": disabled }, &"invader", TARGET_POS)  # both start looking at the target
+	Flank.npc(s, &"control", CONTROL_POS, {}, &"invader", TARGET_POS)
 	Flank.target(s, &"target", TARGET_POS, Vector2(150, 415))
 
 

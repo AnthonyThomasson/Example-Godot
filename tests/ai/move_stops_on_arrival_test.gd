@@ -7,7 +7,8 @@ extends GameTest
 
 const Probe := preload("res://tests/_ai/investigate_probe.gd")
 const LEAD := Vector2(60, 415)            # just inside the front doorway, on the hall's axis
-const LATENCY := 4.0                      # seconds Von takes to answer
+const LATENCY_FRAMES := 240               # physics frames (4 s) Von takes to answer
+const LATENCY := 4.0                      # the same, in seconds
 const STILL_SPEED := 5.0                  # px/s: standing still
 
 
@@ -22,8 +23,7 @@ func describe() -> Dictionary:
 
 func configure(s: TestSetup) -> void:
 	Probe.world(s, &"defender")
-	s.von_script([{ "pick": "investigate" }])
-	s.von_latency(0.0)   # answers at once while the defender is sent; run() makes them slow once it is under way (restored after the test)
+	s.von_script([{ "pick": "investigate" }])   # answers at once while the defender is sent; run() makes them slow once it is under way
 
 
 func run(t: TestContext) -> void:
@@ -33,7 +33,7 @@ func run(t: TestContext) -> void:
 	Probe.gunfire(LEAD)
 	if not t.require(await t.until(func(): return String(brain.current_act()).begins_with("investigate/lead_gunfire"), 6.0), "the defender is sent to the gunfire (%s)" % brain.current_act()):
 		return
-	DecisionStub.latency = LATENCY
+	DecisionStub.latency_frames = LATENCY_FRAMES   # restored after the test (von_script registered it)
 	if not t.require(await t.until(func(): return npc.global_position.distance_to(LEAD) < 40.0, 8.0), "it walks to the gunfire (at %s)" % npc.global_position.round()):
 		return
 	var left := false

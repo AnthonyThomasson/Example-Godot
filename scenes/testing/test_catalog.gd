@@ -29,14 +29,18 @@ static var show_internal := false
 
 ## Every test under `root`, sorted by id (so grouped by domain). Harness self-tests (`internal: true`
 ## in `describe()`) are left out unless `show_internal`. `domains` / `ids` (when non-empty) keep only
-## tests of those domains / with those exact ids, decided from the path so the rest are never loaded.
-static func discover(root := ROOT, domains: Array = [], ids: Array = []) -> Array:
+## tests of those domains / with those exact ids, decided from the path so the rest are never loaded; `skipped`
+## domains are left out the same way.
+static func discover(root := ROOT, domains: Array = [], ids: Array = [], skipped: Array = []) -> Array:
 	var out: Array = []
 	for path in _find(root):
 		var rel: String = path.trim_prefix(root + "/").trim_suffix(SUFFIX)
 		if not ids.is_empty() and not ids.has(rel):
 			continue
-		if not domains.is_empty() and not domains.has(rel.get_slice("/", 0) if "/" in rel else "general"):
+		var domain := rel.get_slice("/", 0) if "/" in rel else "general"
+		if not domains.is_empty() and not domains.has(domain):
+			continue
+		if skipped.has(domain):
 			continue
 		var entry := describe(path, root)
 		if show_internal or not entry["internal"]:

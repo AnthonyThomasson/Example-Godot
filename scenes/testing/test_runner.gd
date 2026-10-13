@@ -10,7 +10,8 @@ extends Node2D
 ##   batch       — `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn --
 ##                 --run-tests [filter] [--domain=a,b] [--id=a,b] [--failed=<report>] [--shard=I/N]
 ##                 [--costs=<json>] [--fail-fast] [--summary] [--include-von]` runs every matching test
-##                 (`--domain` / `--id` keep only those exact domains / ids, unlike the prefix-matching filter;
+##                 (`--domain` / `--id` keep only those exact domains / ids and `--skip-domain=a,b` leaves those exact
+##                 domains out, unlike the prefix-matching filter;
 ##                 `--shard` takes one balanced slice of the run, balanced by the per-test wall-clock ms in the
 ##                 `--costs` file when there is one, by declared timeout when not) in turn, prints one
 ##                 line each (just the non-passing ones with `--summary`) plus a summary, writes `user://test_report.json` and exits 1 on any
@@ -514,7 +515,8 @@ func _run_batch(args: PackedStringArray) -> void:
 	_compact = args.has("--summary")
 	var self_test := args.has("--self-test")
 	TestCatalog.show_internal = self_test
-	var picked := TestCatalog.discover(TestCatalog.ROOT, domains, ids).filter(func(e): return (e["internal"] or not self_test) \
+	var skipped := TestCatalog.csv(_option(args, "--skip-domain", ""))
+	var picked := TestCatalog.discover(TestCatalog.ROOT, domains, ids, skipped).filter(func(e): return (e["internal"] or not self_test) \
 		and TestCatalog.matches(e, filter))
 	var shard := _option(args, "--shard", "")
 	if shard != "":

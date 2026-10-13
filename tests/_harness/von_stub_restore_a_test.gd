@@ -11,8 +11,10 @@ func describe() -> Dictionary:
 func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 200, 200))
 	s.von_down()
+	s.set_static(DecisionStub, &"latency_frames", 7)
 
 
 func run(t: TestContext) -> void:
 	await t.frames(2)
 	t.check(DecisionStub.active and DecisionStub.fail, "the stub is active and failing")
+	t.expect_eq(DecisionStub.latency_frames, 7, "the stub holds its answers back")

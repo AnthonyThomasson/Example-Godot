@@ -23,15 +23,15 @@ Files:
 ```
 root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
       │                                         ├─ flank   [flank_sides, drop `held`, `crosses`, `no_shot`, `heading`, `lane`] → engage (anchored at the side)
-      │                                         ├─ advance [advance_positions]         → move{aim target, fire_at_will}
+      │                                         ├─ advance [advance_positions]         → move{aim target}
       │                                         ├─ melee   [melee: point-blank only]   → melee
       │                                         ├─ reload  [reload: gun low + spare] → reload
-      │                                         ├─ retreat [retreat_positions]         → move{aim threat, fire_at_will}
-      │                                         └─ locate  [shooter]                   → move{aim point, fire_at_will}
+      │                                         ├─ retreat [retreat_positions]         → move{aim threat, run_through_fire}
+      │                                         └─ locate  [shooter]                   → move{aim point}
       ├─ reload_quiet [reload; no threat known, gun low + spare] → reload
-      ├─ investigate [leads] (ask)         → move{aim travel, fire_at_will}
+      ├─ investigate [leads] (ask)         → move{aim travel}
       │    └─ stay [lead_outside]          → hold          (decline a lead outside the house)
-      ├─ search [search_rooms, explore]    → move{aim travel, fire_at_will}
+      ├─ search [search_rooms, explore]    → move{aim travel}
       │    └─ enter [entries]              → entry         (a doorway into a room left to search)
       └─ idle ─┬─ use [interactions] → interact · go [rooms] → move · wait → hold
 ```
@@ -47,7 +47,7 @@ state, since the options carry each candidate's details), `requires` (fact names
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
 route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
-whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
+whose point or route lies in an ally's line of fire), `primitive`, `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `run_through_fire: true` on retreat lets it keep sprinting with a shot available (every other walk drops to a walk to take it, `docs/gaze-and-fire.md` W6); `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
 `ask` (INVESTIGATE: the planner never takes the node, or the level that offers it as its lone option, without asking Von — whether a
 lead is worth going to is Von's call). **Staying in the house is Von's call too, guided by the prompt, not a rule:** a territorial
 goal ("hold your ground inside the house; do not chase anyone outside") is in every state, the state and the leads say where the gunfire
@@ -120,8 +120,8 @@ question (`pick`) to `/v1/systemone`; `cancel()`; `is_pending()`.
 - **Test seam:** while `DecisionStub.active`, `ask()` answers from `decision_stub.gd` a frame later, with no
   HTTP request. `DecisionStub.rules` is an ordered `[{ pick, question? }]` (first rule whose id is offered,
   and whose `question` text occurs in the level's question, wins; else the first offered id), `fail` makes
-  every ask fail (server down), `latency` (seconds before a scripted answer arrives, like a real server's reply time; the NPC
-  carries on with its old order meanwhile; `TestSetup.von_latency`) and `requests` logs `{ state, question, options, pick }` per ask. Only the
+  every ask fail (server down), `latency_frames` (physics frames an answer is held back, like a slow server; the NPC carries on with
+  its old order meanwhile; `TestSetup.von_script`'s second argument) and `requests` logs `{ state, question, options, pick }` per ask. Only the
   Testing domain sets these (`TestSetup.von_script` / `von_down`; statics restored after each test).
 - `signal failed()` — request couldn't start, transport failure, non-200, malformed or no offered id.
   **A transport failure and an HTTP error answer are reported as different faults**: a 4xx/5xx prints

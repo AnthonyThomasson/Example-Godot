@@ -164,4 +164,5 @@ when an ally radios `cleared_room`. `is_cleared(key)` reads it; the snapshot's `
 `AgentEntry.threshold_ahead`) walks a nav path and returns the first doorway whose wall plane a step crosses, within the
 doorway's width and heading into a room that is not the one the NPC is in and is not cleared: `{ opening, into, dist }`, or
 {}. The last step is extended by `THRESHOLD_EXTEND` (30 px) so a destination that is the doorway counts. The behaviour's
-entry guard calls it every tick.
+entry guard calls it every tick. `room_doorways(room_key)` (over `AgentEntry.room_doorways`) lists every doorway of a room, outer doors
+included, as `{ id, pos, width }`: the places a resting NPC watches (`Watch.idle_gaze`, `domain-ai-watch`).

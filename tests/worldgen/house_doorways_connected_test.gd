@@ -66,8 +66,13 @@ func _check_house(t: TestContext, plan: String, house_seed: int) -> void:
 	t.check(exits.size() <= 1, "%s has %d exits" % [label, exits.size()])
 
 	var region := NavBuilder.build(house, rooms, t.world, AGENT_RADIUS)
-	await t.frames(3)  # the bake is applied a frame or two after the build
 	var map := t.world.get_world_2d().navigation_map
+	# The bake is applied to the shared map a frame or more later, and under load later still: wait until the map
+	# answers with this house's navmesh (a query before that reads the old map, or logs an engine error).
+	var centre: Vector2 = (rooms[0]["rect"] as Rect2).get_center()
+	var synced := func() -> bool:
+		return NavigationServer2D.map_get_iteration_id(map) > 0 and NavigationServer2D.map_get_closest_point_owner(map, centre) == region.get_rid()
+	await t.until(synced, 5.0, "%s: the nav map took in the house's navmesh" % label)
 
 	var rect_of := {}
 	for room in rooms:

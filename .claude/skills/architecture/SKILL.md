@@ -33,7 +33,7 @@ composition root is `domain-main`.
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
-| **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
+| **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`. |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
@@ -231,6 +231,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 place at the pieces' **current** positions (driven by the Navigation domain's own `nav_updater.gd`).
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
+   - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
+	 living characters at rest under the region's parent), `NavBuilder.steering_map(world_map) -> RID` (a map of its own, holding
+	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
+	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
+	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
    `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay and the
    `nav_updater.gd` re-baker right after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at

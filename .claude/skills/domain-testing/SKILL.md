@@ -60,7 +60,8 @@ and controller contract, EventBus and character signals) and never reaches into 
   the thing to suspect if one trips only under `--jobs`. `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
 - **Output:** `--summary` prints only non-passing tests and the totals; every run reports wall-clock ms
   per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` as before.
-- **Other flags:** `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
+- **Other flags:** `--skip-domain=a,b` (leave those exact domains out; wins over every other selection, `--changed`'s included),
+  `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
   `house()` uses that seed), and, in the wrapper only, `--changed` (see below). Options take the
   `--name=value` form.
 - **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
@@ -115,7 +116,7 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **Pause and overlays (headed runs):** the banner's **Pause / Resume** (and Space, unless the test has a `player`
   actor, where Space is INTERACT) freezes the world. The runner stays `PROCESS_MODE_ALWAYS`, each `TestWorld` is
   explicitly pausable, and the test clock (`ctx.time`, so waits and the timeout) stops with the tree; the tree is
-  always unpaused on a new test, Back and exit. The overlay bar works on the test's actors; its **Nav holes**
+  always unpaused on a new test, Back and exit. The overlay bar works on the test's actors; its **Navigation holes**
   (a `NavDebug` the `TestWorld` builds and the re-baker keeps current) and **Performance** (the runner's own
   panel) toggles work too.
 - **Locking interactions:** `s.lock_interaction([&"camera", &"pause", &"overlays"])` in `configure` switches off
@@ -179,7 +180,7 @@ func run(t: TestContext) -> void:
   - Behaviour: `switch(name, on)` (table below) and `set_static(ConfigClass, prop, value)`.
   - Scripted Von: `von_script([{ pick: id, question: substring? }, …])` replaces the server with those
     picks (first rule whose id is offered; else the first offered option), so an AI test needs no server
-    and is deterministic; `von_down()` makes every decision fail (the hold-steady fallback). Read what was
+    and is deterministic (`von_script(rules, latency_frames)` holds each answer back that many physics frames, `DecisionStub.latency_frames`, to test what an NPC does while a decision is in flight); `von_down()` makes every decision fail (the hold-steady fallback). Read what was
     asked with `t.von_requests()` (`{ state, question, options, pick }`). Ids are the decision tree's node
     ids (`combat`, `flank`, `engage`, …) and option ids. Keep `requires_von` tests for judging Von itself.
   - Presentation: `show_overlays(["show_vision", …])` and `camera_follow([ids])` (default frames all
@@ -205,7 +206,6 @@ func run(t: TestContext) -> void:
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.
-- `s.von_latency(seconds)` (after `von_script`) delays each scripted answer like a real server's reply time; the NPC carries on with its old order while it waits.
 - Make randomness deterministic where the assertion depends on it (e.g. `projectile.flyover` off,
   since a character is partial cover).
 
@@ -224,7 +224,9 @@ selector. They are ordinary tests that load other domains, so they live apart fr
 | `perf/furniture_pile_stress` | 120 rigid bodies shoved at once |
 | `perf/bake_and_path_stress`, `perf/generate_houses_stress` | one-shot work: nav re-bake and path queries, world-gen |
 
-`tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. They stay in the default run, balanced across shards
+`tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. The pre-commit hook leaves them out
+(`--skip-domain=perf`): their frame-time budgets fail when the machine is busy, so run them on their own before a push
+that touches a per-frame path. They stay in the default run, balanced across shards
 by measured cost like every test, and `--changed` adds the domain whenever a scene they exercise changes (`affected()` in
 `tools/run_tests.sh`) or `tests/_perf/` changes. The shared helper is `tests/_perf/perf_probe.gd` (`const Perf :=
 preload(...)`; not a test). `audio/bank` and `character/standing_body_repaints_on_change` keep a budget or a count but are
@@ -292,8 +294,8 @@ and an invader still investigates the same gunfire outside. After rewording any 
 
 `defenders_stay_in_house_quiet` (scripted) and `defenders_stay_in_house_quiet_von` (real Von, invaders outside as at the start of a match)
 watch every defender of a generated house (`tests/_ai/house_probe.gd`: `spawn`, `watch`, whose failure message carries each
-defender's trail and what Von was last asked) and sweep with `--seed=N`. `move_stops_on_arrival` uses `s.von_latency(seconds)` to give
-the scripted Von a real server's reply time (set to 0 in `configure`, raised in `run`, restored after the test).
+defender's trail and what Von was last asked) and sweep with `--seed=N`. `move_stops_on_arrival` gives
+the scripted Von a real server's reply time by raising `DecisionStub.latency_frames` in `run` (`von_script` registered it, so it is restored after the test).
 
 ## Flanking tests (tag `flank`)
 
@@ -425,7 +427,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map answers with this world's region, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
 | `scripted_controller.gd` | The puppet controller. |

@@ -36,7 +36,7 @@ var _saved_statics: Array = []
 var _overlay_flags: Dictionary = {}
 ## The baked navigation region (see `_await_nav_sync`).
 var _nav_region: NavigationRegion2D = null
-## The navmesh-holes overlay (the "Nav holes" toggle), kept in step with re-bakes by the updater.
+## The navmesh-holes overlay (the "Navigation holes" toggle), kept in step with re-bakes by the updater.
 var _nav_debug: Node2D = null
 
 
@@ -122,18 +122,28 @@ func _set_static(script: Script, prop: StringName, value: Variant) -> void:
 ## navmesh: the closest map point to a room's centre belongs to this world's region. The map's iteration is built
 ## asynchronously, so under load its id and region list can already show the new region while queries still run on an
 ## empty (or the previous test's) iteration, and an NPC that snaps a point onto the map then gets the origin, and walks
-## there.
+## there. The steering map (the characters' own, see NavBuilder.steering_map) is built the same way and waited for too.
 func _await_nav_sync() -> void:
 	if rooms.is_empty() or not is_instance_valid(_nav_region):
 		return
 	var map: RID = get_world_2d().navigation_map
 	var centre: Vector2 = (rooms[0]["rect"] as Rect2).get_center()
+	var steering := NavBuilder.steering_region(_nav_region)
+	var steering_map := NavBuilder.steering_map(map)
 	var deadline := Time.get_ticks_msec() + NAV_SYNC_MS
-	while NavigationServer2D.map_get_closest_point_owner(map, centre) != _nav_region.get_rid():
+	while not _map_synced(map, _nav_region, centre) \
+			or (steering != null and not _map_synced(steering_map, steering, centre)):
 		if Time.get_ticks_msec() > deadline:
 			push_error("TestWorld: the navigation map did not take in the world's navmesh within %d ms" % NAV_SYNC_MS)
 			return
 		await get_tree().physics_frame
+
+
+## Whether `map` has finished an iteration and answers with `region` for `centre`. A map that has not synchronized yet
+## is not asked (that query is an engine error), so the wait just goes on.
+func _map_synced(map: RID, region: NavigationRegion2D, centre: Vector2) -> bool:
+	return NavigationServer2D.map_get_iteration_id(map) > 0 \
+			and NavigationServer2D.map_get_closest_point_owner(map, centre) == region.get_rid()
 
 
 ## Build the generated house or the arena, and read its rooms.
@@ -156,6 +166,7 @@ func _build_nav() -> void:
 	# this, the new region is not yet in the map when its NPCs first decide, and a path query against the stale map
 	# returns the origin (a point, not a route), so the NPC walks to (0, 0). Sync now, before any actor spawns.
 	NavigationServer2D.map_force_update(get_world_2d().navigation_map)
+	NavigationServer2D.map_force_update(NavBuilder.steering_map(get_world_2d().navigation_map))
 	_nav_debug = NAV_DEBUG.new()
 	_nav_debug.name = "NavDebug"
 	add_child(_nav_debug)

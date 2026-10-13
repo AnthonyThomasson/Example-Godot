@@ -110,7 +110,7 @@ while [ $# -gt 0 ]; do
     --out=*) out="${1#--out=}" ;;
     --shard=*) shard="${1#--shard=}" ;;
     --costs=*) costs="${1#--costs=}" ;;
-    --id=*|--domain=*) selection="$selection $1" ;;
+    --id=*|--domain=*|--skip-domain=*) selection="$selection $1" ;;
   esac
   shift
 done
@@ -270,11 +270,11 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(self.shards(self.run_wrapper("clean", "pistol")[1]), 1)
         self.assertEqual(self.shards(self.run_wrapper("clean", "--jobs=3", "--id=a/x,b/y")[1]), 2)  # never more than the ids
 
-    def changed(self, files, scenario="clean"):
+    def changed(self, files, scenario="clean", *extra):
         """What `--changed` runs when git reports exactly `files` as changed: the selection lines the fake prints."""
         env = dict(os.environ, GODOT=str(self.fake), FAKE_SCENARIO=scenario, TMPDIR=str(self.tmp),
                    GAME_TEST_CHANGED_FILES="\n".join(files))
-        r = subprocess.run(["bash", str(RUN), "--changed", "--no-lint", "--jobs=1"], cwd=ROOT, env=env, capture_output=True, text=True)
+        r = subprocess.run(["bash", str(RUN), "--changed", "--no-lint", "--jobs=1", *extra], cwd=ROOT, env=env, capture_output=True, text=True)
         return r.returncode, [ln for ln in (r.stdout + r.stderr).splitlines() if ln.startswith(("selection:", "== "))]
 
     def test_changed_runs_only_an_edited_test_not_the_domains_that_compose_its_code(self):
@@ -289,6 +289,13 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai"])
         _, lines = self.changed(["tests/_perf/perf_probe.gd"])
         self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=perf"])
+
+    def test_skip_domain_reaches_the_runner_and_stops_the_perf_helper_run(self):
+        _, lines = self.changed(["scenes/ai/behavior/behavior.gd"], "clean", "--skip-domain=perf")
+        self.assertEqual([l for l in lines if l.startswith("selection:")], ["selection: --domain=ai,perf --skip-domain=perf"])
+        code, lines = self.changed(["tests/_perf/perf_probe.gd"], "clean", "--skip-domain=perf")
+        self.assertEqual(code, 0)
+        self.assertEqual([l for l in lines if l.startswith("selection:")], [])
 
     def test_changed_does_not_repeat_a_test_whose_domain_already_runs(self):
         _, lines = self.changed(["scenes/ai/behavior/behavior.gd", "tests/ai/goal_names_the_gun_test.gd",

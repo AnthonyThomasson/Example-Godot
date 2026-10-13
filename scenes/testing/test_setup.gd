@@ -107,18 +107,13 @@ func set_static(script: Script, prop: StringName, value: Variant) -> TestSetup:
 
 ## Replace the Von server with scripted picks for this test: `rules` is DecisionStub's ordered list of
 ## `{ pick: id, question: substring (optional) }` (first rule whose id is offered wins; otherwise the
-## first offered option). AI tests that use it need no server and are deterministic.
-func von_script(rules: Array) -> TestSetup:
+## first offered option). AI tests that use it need no server and are deterministic. `latency_frames` holds each
+## answer back that many physics frames, to test what an NPC does while a decision is in flight.
+func von_script(rules: Array, latency_frames := 0) -> TestSetup:
 	statics.append([DecisionStub, &"active", true])
 	statics.append([DecisionStub, &"rules", rules])
 	statics.append([DecisionStub, &"requests", []])
-	return self
-
-
-## Delay every scripted Von answer by `seconds`, like a real server's reply time (the first ones at the start of a match
-## are the slowest). Call after `von_script`. The NPC carries on with its old order meanwhile.
-func von_latency(seconds: float) -> TestSetup:
-	statics.append([DecisionStub, &"latency", seconds])
+	statics.append([DecisionStub, &"latency_frames", latency_frames])
 	return self
 
 

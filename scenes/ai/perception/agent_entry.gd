@@ -67,6 +67,16 @@ func entries_from(here_key: String) -> Array:
 	return out
 
 
+## Every doorway of room `room_key`, outer doors (to outside) included: where something can come from. Each
+## `{ id, pos, width }`, in the order the house lists them. A resting NPC watches these (`Watch.idle_gaze`).
+func room_doorways(room_key: String) -> Array:
+	var out: Array = []
+	for o in _openings:
+		if room_key in (o.get("rooms", []) as Array).map(func(k): return str(k)):
+			out.append({ "id": opening_id(o), "pos": o["pos"], "width": float(o.get("width", 80.0)) })
+	return out
+
+
 ## The doorways out of room `room_key` (one already cleared) that lead on into another room that `is_cleared` (a Callable
 ## on the room key) says is not cleared, other than doorway `exclude_id` (the one the NPC came in by). Doors to outside
 ## are left out. Each `{ id, into, pos, width }`. What the team covers once it has cleared a room (E8).

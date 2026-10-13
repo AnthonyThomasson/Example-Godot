@@ -8,7 +8,7 @@ description: Deep implementation detail for the UI overlays sub-domain (scenes/u
 The tooling that switches the AI/nav debug overlays on and off and shows engine stats. The overlay draw scripts themselves live in `scenes/ai/debug/` (`domain-ai-debug`); this folder holds the registry row for each flag and the bars that flip it. See `domain-ui` for what all UI scripts share.
 
 - `overlay_registry.gd` — the ONE table of debug overlays (`ENTRIES`: `flag`, `label`, `group`, `default`;
-  `defaults()`; `NAV_HOLES` and `PERF`, the global non-per-NPC flags, listed in `GLOBAL` / `is_global(flag)`).
+  `defaults()`; `NAV_HOLES` (labelled "Navigation holes": furniture and characters at rest) and `PERF`, the global non-per-NPC flags, listed in `GLOBAL` / `is_global(flag)`).
   `flag` is the overlay node's `show_<x>` property name. The setup window, the toggle bar and Main all read it, so a new overlay is one row here
   plus its draw script (`scenes/ai/debug/`) and a node in `npc.tscn`.
 
