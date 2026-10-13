@@ -1,14 +1,14 @@
 extends GameTest
 
-## With nobody about, an NPC whose pistol is nearly empty is offered a quiet RELOAD at the top level, and
-## runs it when Von picks it.
+## With nobody about, an NPC whose pistol is nearly empty has the quiet RELOAD as the only thing on offer at the
+## top level, so it is taken without asking Von, and runs it.
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "A quiet NPC tops up its pistol",
 		"description": "No threat is known and the defender's pistol is nearly empty; the quiet reload is the only thing on offer at the top level, so it is taken and the pistol is refilled.",
-		"tags": ["ai", "decision", "scripted", "reload", "ammo"],
+		"tags": ["ai", "decision", "reload", "ammo"],
 		"timeout": 15.0,
 	}
 

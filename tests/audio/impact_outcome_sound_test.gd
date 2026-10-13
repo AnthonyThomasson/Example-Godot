@@ -1,17 +1,17 @@
 extends GameTest
 
-## What the bullet does to the surface changes the sound: a round that cannot get through is *blocked* (a dull
-## embed), one that glances off something hard *ricochets* (a wall in plaster, a car in metal), and a fist
-## *punches*. Each is checked with a real shot or swing, with the ballistics tuned only as far as needed to make
-## the outcome certain.
+## What strikes the surface changes the sound: a round that glances off something hard *ricochets* (a wall in
+## plaster, a car in metal), and a fist *punches* (a body, a chair, a wall). Each is checked with a real shot or
+## swing, with the ballistics tuned only as far as needed to make the outcome certain (a *blocked* round is
+## impact_blocked_sound).
 
 const Probe := preload("res://tests/_audio/sound_probe.gd")
 
 
 func describe() -> Dictionary:
 	return {
-		"name": "Blocked, ricochet and punch impacts have their own sounds",
-		"description": "A pistol round that cannot penetrate is heard as `blocked`, a glancing one off a wall and a car as `ricochet` (plaster and metal), and fists on a body, a chair and a wall as `punch`.",
+		"name": "Ricochet and punch impacts have their own sounds",
+		"description": "A glancing pistol round off a wall and a car is heard as `ricochet` (plaster and metal), and fists on a body, a chair and a wall as `punch`.",
 		"tags": ["sound", "impact", "ricochet", "punch", "projectile"],
 		"timeout": 12.0,
 	}

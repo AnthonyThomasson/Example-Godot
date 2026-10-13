@@ -31,12 +31,9 @@ const DOOR_FRONT := Vector2(0, 415)
 const DOOR_BACK := Vector2(840, 190)    # in the kitchen's east wall, to the back garden
 ## Places in the living room.
 const LIVING_CENTRE := Vector2(260, 190)
-const LIVING_NORTH_WALL := Vector2(260, 40)
-const LIVING_WEST_WALL := Vector2(40, 190)
 ## Places in the kitchen and the hall.
 const KITCHEN_CENTRE := Vector2(660, 190)
 const HALL_MIDDLE := Vector2(420, 415)
-const HALL_EAST_END := Vector2(800, 415)
 const GARDEN := Vector2(-110, 415)
 
 
@@ -80,13 +77,10 @@ const SPINE_CORRIDOR := Rect2(0, 200, 900, 100)
 const SPINE_ROOM_A := Rect2(0, 0, 300, 200)
 const SPINE_ROOM_B := Rect2(300, 0, 300, 200)
 const SPINE_ROOM_C := Rect2(600, 0, 300, 200)
-const SPINE_BOUNDS := Rect2(0, 0, 900, 300)
 const DOOR_A := Vector2(150, 200)
 const DOOR_B := Vector2(450, 200)
 const DOOR_C := Vector2(750, 200)
 const SPINE_ENTRANCE := Vector2(0, 250)
-const CORRIDOR_WEST := Vector2(60, 250)
-const CORRIDOR_MIDDLE := Vector2(450, 250)
 const CORRIDOR_DEAD_END := Vector2(850, 250)
 
 
@@ -128,9 +122,6 @@ static func spine(s: TestSetup, furnish := true) -> void:
 
 const WAREHOUSE := Rect2(0, 0, 1000, 700)
 const PILLAR := { "name": "Pillar", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.5, 0.5, 0.52), "weight": 5000, "coverage": 100, "penetration": 100 }
-const WAREHOUSE_WEST := Vector2(120, 350)
-const WAREHOUSE_CENTRE := Vector2(500, 350)
-const WAREHOUSE_EAST := Vector2(880, 350)
 
 
 ## Lay out the warehouse. `furnish` false leaves it as an empty hall.

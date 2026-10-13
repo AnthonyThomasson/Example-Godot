@@ -1,14 +1,13 @@
 extends GameTest
 
-## Only a standing body runs, so an NPC that is crouched in a fight and then sent across the arena (combat →
-## advance, a `run` leaf) stands up to do it: it is never crouched while running, it does run, and
-## it keeps low again when it is back to fighting in place.
+## Only a standing body runs: an NPC sent across the arena (combat → advance, a `run` leaf) runs to do it, and is
+## never crouched while running.
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "An NPC stands up to run",
-		"description": "A crouched defender told to advance on a far hostile stands, runs, and never runs while crouched.",
+		"description": "A defender told to advance on a far hostile runs, and never while crouched.",
 		"tags": ["ai", "posture", "run", "scripted"],
 		"timeout": 30.0,
 	}

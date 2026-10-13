@@ -22,6 +22,9 @@ func describe() -> Dictionary:
 
 func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 200, 200))
+	# run() flips these; registering them has the harness put them back whatever way the test ends.
+	s.set_static(WorldGenConfig, &"fill_scale", WorldGenConfig.fill_scale)
+	s.set_static(WorldGenConfig, &"fill_enabled", WorldGenConfig.fill_enabled)
 
 
 ## The solid pieces and their combined footprint area in each room of `house`: key -> { count, area }.

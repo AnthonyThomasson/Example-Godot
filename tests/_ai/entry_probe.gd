@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## Shared helpers for the tactical-entry tests (tests/ai/entry_*_test.gd; not a test itself). The behaviour they
-## assert is `docs/tactical-entry.md` (E1 to E8). The doorway geometry here is the test's own copy (a door's axis,
+## assert is `docs/tactical-entry.md` (E1 to E9). The doorway geometry here is the test's own copy (a door's axis,
 ## its outward side, the funnel), so the spec isn't read back from the code under test; the NPC is read only
 ## through its public observer API: `current_act()`, `debug_entry()`, `debug_room_zones()` and its radio callouts.
 
@@ -199,13 +199,6 @@ static func first_stop_in_room(samples: Array, id: StringName, door: Dictionary,
 			run = 0.0
 	return Vector2.INF
 
-
-## The facing of actor `id` at the first sample at or after time `at`, or Vector2.ZERO.
-static func facing_at(samples: Array, id: StringName, at: float) -> Vector2:
-	for s in samples:
-		if s["t"] >= at and s["facing"].has(id):
-			return s["facing"][id]
-	return Vector2.ZERO
 
 
 ## The position of actor `id` at the first sample at or after time `at`, or Vector2.INF.

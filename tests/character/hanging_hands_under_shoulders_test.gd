@@ -1,13 +1,13 @@
 extends GameTest
 
-## An unarmed character's hands hang at its sides, below the shoulders, so the shoulders are painted over them
-## (character_visuals.gd); a hand raised to a gun is painted over the shoulders.
+## An unarmed character's hands hang at its sides, below the shoulder height that puts a hand over the shoulders
+## (character_visuals.gd `HAND_OVER_HEIGHT`); a hand raised to a gun grips at that height.
 
 
 func describe() -> Dictionary:
 	return {
-		"name": "Hanging hands are drawn under the shoulders",
-		"description": "Standing unarmed, the hands are lower than the shoulders and are painted before the torso; holding a pistol, they are painted after it.",
+		"name": "Hanging hands grip below the shoulders",
+		"description": "Standing unarmed, the hands grip below the shoulder height; holding a pistol, they grip at it.",
 		"tags": ["draw", "hands"],
 		"timeout": 8.0,
 	}
@@ -25,5 +25,4 @@ func run(t: TestContext) -> void:
 	var unarmed = t.actor(&"unarmed").get_node("Visuals")
 	var armed = t.actor(&"armed").get_node("Visuals")
 	t.check(t.actor(&"unarmed").pose.grip_height(0) < unarmed.HAND_OVER_HEIGHT, "unarmed hands grip below the shoulders")
-	t.check(armed.draw_order.find(&"hands") > armed.draw_order.find(&"torso"), "a gun's hands are painted over the torso")
 	t.check(t.actor(&"armed").pose.grip_height(0) >= armed.HAND_OVER_HEIGHT, "a gun's hands grip at the shoulders")

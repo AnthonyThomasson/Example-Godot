@@ -1,6 +1,6 @@
 extends GameTest
 
-## The same shot as shot_spawns_debris with the `physics.debris` switch off: the chair is still hit,
+## The same shot as debris_rests_in_a_layer with the `physics.debris` switch off: the chair is still hit,
 ## but no debris spawns.
 
 

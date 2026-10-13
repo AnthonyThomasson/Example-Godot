@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (issue #40): an NPC that reaches the point of a `move` order stands still until it is given a new one. Von
+## Desired: an NPC that reaches the point of a `move` order stands still until it is given a new one. Von
 ## takes a moment to answer (the first answers of a match are the slowest), and the old order must not keep the NPC walking
 ## meanwhile: it used to carry on in its last heading, which from a point just inside the front door is out of the house.
 ## Gunfire is heard just inside the front door; a defender in the hall goes to it, and the next answer is slow to come.

@@ -1,8 +1,9 @@
 extends GameTest
 
-## A target is shot dead on a glazed-tile floor; once its body rests, the bleed-out pool it spreads
-## lies along the grout lines far more than chance (grout covers ~1/6 of the floor), because the
-## flow follows the floor texture (BloodSurface). Pair: death_bleeds_out (same flow, no floor steering).
+## A one-hit target is shot dead on a glazed-tile floor: it dies, the wound leaves a splatter, and once its body
+## rests the bleed-out pool it spreads lies along the grout lines far more than chance (grout covers ~1/6 of the
+## floor), because the flow follows the floor texture (BloodSurface). Pair: death_without_blood (the same kill with
+## blood off).
 
 
 func describe() -> Dictionary:
@@ -33,7 +34,9 @@ func run(t: TestContext) -> void:
 	shooter.shoot()
 	if not t.require(await t.until(func(): return t.happened(&"died", func(d): return d["actor"] == &"target"), 2.0), "the target dies"):
 		return
-	# The wound pool is the first BloodPool; the bleed-out pool (the one with a flow) comes once the body rests.
+	t.check(target.is_dead, "is_dead is set")
+	t.check(not t.spawned("BloodSplat").is_empty(), "the lethal wound left a splatter")
+	# The bleed-out pool (the one BloodPool, with a flow) comes once the body rests.
 	await t.until(func(): return _bleed_out_pool(t) != null, 8.0, "a bleed-out pool starts")
 	var pool := _bleed_out_pool(t)
 	if not t.require(pool != null, "the body bled out a flowing pool"):

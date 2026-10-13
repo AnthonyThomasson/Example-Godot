@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (issue #40): the same as defenders_stay_in_house_quiet, but with the real Von deciding and with invaders
+## Desired: the same as defenders_stay_in_house_quiet, but with the real Von deciding and with invaders
 ## standing outside the house heading for its front door (as in a match, before the fight starts): no defender
 ## ever steps outside. Needs the Von decision server. `--seed=N` pins the layout, to sweep houses.
 

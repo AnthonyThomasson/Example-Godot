@@ -1,8 +1,8 @@
 extends GameTest
 
 ## A piece of furniture shoved out of a puddle drags the blood with it: it lays streaks on the clean floor
-## beyond the puddle that fade as the blood runs out, and lays nothing while it sits still or with the
-## smear switch off.
+## beyond the puddle that fade as the blood runs out, and lays nothing while it sits still (the switch is
+## object_smear_switch_off).
 
 const SPLAT_AT := Vector2(300, 200)
 const SPLAT_SIZE := 30.0

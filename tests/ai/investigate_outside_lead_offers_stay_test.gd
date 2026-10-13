@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (issue #40, the wiring): gunfire heard outside the house reaches Von worded as outside, and the
+## Desired (the wiring): gunfire heard outside the house reaches Von worded as outside, and the
 ## INVESTIGATE level offers a way to decline the lead (STAY: hold your ground inside the house) next to the
 ## lead itself. Nothing removes the lead: Von decides, here scripted to decline, and the NPC then stays put.
 ## What a real Von picks for a defender is `defender_stays_in_house_von`.

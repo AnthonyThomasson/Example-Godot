@@ -12,11 +12,9 @@ const MEASURE_FRAMES := 300
 # Every frame holds the smooth-match standard (Perf.SMOOTH_*), the worst ones too: twelve NPCs in one open arena see six
 # hostiles each and a decision snapshot (a firing spot search per hostile: thousands of rays and path queries) is the
 # costliest thing one does in a frame, but at most one snapshot starts per physics frame (DecisionBudget), so they never
-# stack. Before the performance work (#13): avg 22-25 / p95 30-37 / max 64-77 ms per frame; after it 14-15 / 19-22 / 60-73;
-# after the 10v10 work (#36) 5-7 / 12-15 / 15-18. ~400 nodes are added over 300 frames (the Despawner caps what firing
-# adds; landed chips live in the DebrisLayer). The window is 300 frames, not the 600 it once was, because the three frame
-# statistics do not move with a longer one; the node budget went from 3000 to 2000 with it, so a leak per frame is caught
-# at least as early.
+# stack. Measured: avg 5-7 / p95 12-15 / max 15-18 ms per frame; ~400 nodes are added over 300 frames (the Despawner caps
+# what firing adds; landed chips live in the DebrisLayer). The window is 300 frames: the three frame statistics do not
+# move with a longer one, and a node budget of 2000 over it catches a leak per frame early.
 const NODE_GROWTH := 2000
 
 

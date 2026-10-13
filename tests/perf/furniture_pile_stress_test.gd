@@ -11,8 +11,7 @@ const ROWS := 10
 const KINDS := ["chair", "side_table", "armchair", "plant"]
 const MOVING_FRAMES := 180
 const RESTING_FRAMES := 60
-# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). Before the performance work (#13): moving avg ~4.7 / p95 ~5.5 /
-# max ~5.8, resting avg ~4.5 ms per frame.
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*).
 
 
 func describe() -> Dictionary:

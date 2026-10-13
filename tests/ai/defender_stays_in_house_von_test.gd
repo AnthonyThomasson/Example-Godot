@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (issue #40): a house defender does not leave its house to investigate gunfire out in the garden.
+## Desired: a house defender does not leave its house to investigate gunfire out in the garden.
 ## Nothing in the code keeps it in: its goal says to hold its ground inside the house, the snapshot says the
 ## gunfire is outside the house, and Von, asked whether to investigate, judges. Needs the Von decision server.
 

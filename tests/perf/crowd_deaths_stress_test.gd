@@ -13,8 +13,7 @@ const IDLE_FRAMES := 60
 const FALL_FRAMES := 240
 const SETTLE_TIMEOUT := 20.0
 # Frame budgets are the smooth-match standard (Perf.SMOOTH_*), idle and while the bodies fall (the frame the deaths are
-# dealt in is not measured). The crowd was 36 bodies (idle ~3.5 ms, falling avg ~57 / p95 ~90 / max ~92 ms before the
-# performance work, ~45 / 65 / 67 after); that is nearly four matches' worth, so it is now one match's: falling avg ~13 /
+# dealt in is not measured). One match's worth of bodies, the most a match can lose at once: falling avg ~13 /
 # p95 ~18 / max ~21 ms, about 170 nodes added.
 const NODE_GROWTH := 600
 
