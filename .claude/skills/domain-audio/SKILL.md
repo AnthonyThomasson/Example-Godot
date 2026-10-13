@@ -39,7 +39,7 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 - **Materials:** `wood metal glass ceramic stone plastic fabric foliage electronics flesh`, `wall` (what walls
   report as the empty material `""`) and `default` for anything unknown.
 - **Bands** come from the round's penetration power (`SoundBank.band`): `light` < 0.9 (SMG 0.8), `medium`
-  (pistol 1.0), `heavy` ≥ 1.6 (rifle 2.2). Heavier = lower pitch, louder crack, +3 dB.
+  (pistol 1.0), `heavy` ≥ 1.6 (rifle 2.2). Heavier = lower pitch, louder crack (−4 / 0 / +4 dB by band).
 - A `hard` material (metal, glass, ceramic, stone, electronics, wall) rings long on a ricochet and adds a falling
   whine; a soft one whips instead. Penetration adds a crunch, a hiss of air and a deeper thud. `thump` is how
   much low body a hit has (flesh and fabric thud, metal and glass do not). A material may also carry `heft` (metal 0.9): extra body gain, a longer thud and a quieter ring on a non-ricochet hit, so a round striking metal lands heavy.

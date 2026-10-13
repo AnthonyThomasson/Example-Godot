@@ -31,7 +31,7 @@ state and question Von actually saw) as scenario stubs to edit into clear-cut ca
 Examples:
     python3 tools/von_probe.py                       # run every scenario
     python3 tools/von_probe.py --ablate              # also run each scenario's ablations
-    python3 tools/von_probe.py tools/von_scenarios/flank_open_side.json -v
+    python3 tools/von_probe.py tools/von_scenarios/flank_free_sides.json -v
 """
 import argparse
 import glob

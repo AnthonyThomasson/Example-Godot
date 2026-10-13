@@ -145,7 +145,8 @@ func _name_of(primary: Variant, fallback: Variant) -> String:
 	return "?"
 
 
-## The AI controller child of `character` (the node with `control`), or null (e.g. for the player).
+## The controller child of `character` (the node with `control`): the AI controller, or the player's (which has no
+## `goal_text`), or null.
 func _controller_of(character: Node) -> Node:
 	for child in character.get_children():
 		if child.has_method("control"):

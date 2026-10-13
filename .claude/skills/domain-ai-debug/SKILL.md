@@ -16,6 +16,7 @@ Files:
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
 - `zone_list.gd` — a static transform (`ZoneList.from_options`) that flattens a snapshot's option groups into the point zones the tactics overlay draws; the orchestrator's `debug_zones()` calls it (the only file here the orchestrator preloads).
 - `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
+- `debug_text.gd` — the shared text helper (a label with a shadow) the overlays draw their words with.
 - Ten further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
   character, runs `PROCESS_MODE_ALWAYS`, redraws only while its `show_<x>` is on, plus ring/arrow/line/
   timer-arc helpers): `contacts_debug.gd`, `hearing_debug.gd`, `combat_debug.gd`, `territory_debug.gd`,
@@ -45,13 +46,13 @@ Draws, next to the NPC:
 
 `label_color` / `path_color` are set per side in the preset scenes to match the body colour.
 
-## `tactics_debug.gd` (toggles `show_tactics`, `show_room_zones` — `main.gd` drives both, on by default)
+## `tactics_debug.gd` (toggles `show_tactics`, `show_room_zones` — `main.gd` drives both, off by default)
 
 The tactical-geometry overlay, in two independent aspects (both draw on the NPC's own child Node2D,
 reading the controller's public API; both default off — they are dense).
 
 **Point zones (`show_tactics`)** — the candidate positions the NPC's perception laid out for its last
-decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc }`, one
+decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc, tags }`, one
 per option in the last snapshot's option groups that carries a world location (its `point` param, or an
 interactable's current position); the spectator inspector reads `label`/`desc` to detail a clicked
 point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()`. Each is a translucent disc + outline + a dot at the exact point,
@@ -97,7 +98,7 @@ it holds (the flattening is `zone_list.gd` in this folder: a static `ZoneList.fr
 `debug_search_coverage()` from the behaviour's `debug_coverage()`, and holds the Vision group exports —
 so these overlays need no reference into the perception/behaviour internals.
 
-## The behaviour overlays (all default off; toggled from the UI toggle bar / setup window)
+## The behaviour overlays (all default off; toggled from the UI toggle bar)
 
 Each is a child of the NPC in `ai/npc.tscn`, found by its `show_<x>` property (registry in
 `scenes/ui/overlays/overlay_registry.gd`), and reads only the controller's public `debug_*` getters:
@@ -121,8 +122,8 @@ state as world-space data), `debug_brain()` (planner pending / last-failed / lev
 and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
 reacts to a stall), `debug_sent_callout()` and `debug_entry_view()` (behaviour `debug_entry_view`: the running entry as
 world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`; the guard's
-look-ahead along the walk is computed only when asked). `debug_zones()` entries now also carry the option's `tags`
+look-ahead along the walk is computed only when asked). `debug_zones()` entries also carry the option's `tags`
 (`inside`, `held`, `crosses`/`crosses_name`, `no_shot`, `heading`, `lane`, `hidden`, plus `clear_shot`,
 `route_exposed`, `cover`, `ally_lane`, `held_by` added by the snapshot's
-`_geo_tags()`; the planner reads only the booleans (`inside`, `held`, `crosses`, `no_shot`, `heading`,
-`lane`, `hidden`), so the extras don't affect decisions).
+`_geo_tags()`; the planner reads only `inside` and the booleans a node's `drop_tags` names, and `hidden` only orders the
+retreat summary, so the extras don't affect decisions).

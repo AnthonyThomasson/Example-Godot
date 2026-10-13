@@ -59,14 +59,14 @@ and controller contract, EventBus and character signals) and never reaches into 
   unmeasured id costs the median. Perf tests budget wall-clock ms about 4x their baseline, so heavy CPU contention is
   the thing to suspect if one trips only under `--jobs`. `--fail-fast` stops after the first FAIL/TIMEOUT (per shard).
 - **Output:** `--summary` prints only non-passing tests and the totals; every run reports wall-clock ms
-  per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` as before.
+  per test (`wall_ms` in the report) and ends with a `Slowest:` line. `--verbose`, `--json` apply too.
 - **Other flags:** `--skip-domain=a,b` (leave those exact domains out; wins over every other selection, `--changed`'s included),
   `--repeat=N` (each test N times; names `FLAKY` / `FAILING` ones), `--seed=N` (every
   `house()` uses that seed), and, in the wrapper only, `--changed` (see below). Options take the
   `--name=value` form.
 - **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
   runs those domains plus the ones that compose them (its `affected()` table, from the architecture
-  dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art and general
+  dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art, general, audio and testing
   run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
   (`tests/<domain>/<name>_test.gd`) runs only that test** (`--id=<domain>/<name>`; it can only change its own
   result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
@@ -248,9 +248,8 @@ functional tests of their domain.
   "before" numbers in a test's comment only when its load changes.
 - **Finding what costs:** the wall time of a frame is script time, so attribute it by timing. A throwaway `Time.get_ticks_usec`
   accumulator wrapped around the suspect functions (never committed), dumped at the end of the measured window, ranks them
-  in minutes; switching a feature off with `set_static`/`switch` shows what it is worth. The costs found so far were not
-  where reading the code suggested: a tree scan per NPC per frame, a polygon merge per pair of footprints, a recomputed
-  silhouette per body part and a texture painted every frame.
+  in minutes; switching a feature off with `set_static`/`switch` shows what it is worth. Measure before reading: a per-frame
+  cost is rarely where the code suggests.
 - **Gotchas:** a lambda captures ints by value (count into an Array); `nav.rebake` is off in tests that
   shove or shoot furniture into overlaps (re-baking overlapping holes logs a nav sync error; the nav
   test covers re-baking), and the 5v5 test, which keeps it on, allows that log (`allowed_logs`); world-gen's first run in a
@@ -441,8 +440,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 ## Gotchas
 
 - **Von tests are paced in real time.** Batch runs use `--fixed-fps 60`, so the sim outruns the wall
-  clock and game-time timers (HTTP timeouts, the launcher's probe interval) fire early; that once
-  flooded the server with probes. While a `requires_von` test is open the runner sleeps each frame to
+  clock and game-time timers (HTTP timeouts, the launcher's probe interval) fire early. While a `requires_von` test is open the runner sleeps each frame to
   1/60 s, because `Engine.max_fps` is not honoured under `--fixed-fps` headless. A cold Von start
   takes about 5 s.
 - A test that ends mid-wait (a failure or timeout) leaves its coroutine parked. Godot may report

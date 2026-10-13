@@ -31,8 +31,8 @@ Why: the NPC would walk into their fire. Tests: `flank_rear_route_crosses_target
 `flank_route_passes_second_hostile`.
 
 **B3. Do not flank across a friend's line of fire.** A side whose point lies in an ally's line of fire to
-the target, or whose route crosses that line, is not offered. Only allies the NPC can see (or that
-radioed a side) count: it weighs what it perceives, so an ally outside its view cone has no lane.
+the target, or whose route crosses that line, is not offered. Only allies the NPC can see count: it
+weighs what it perceives, so an ally outside its view cone has no lane (a radioed side is B4's `held`).
 Why: blue-on-blue; the assault must land where the base of fire is not shooting. Tests: `flank_ally_lane`,
 `flank_two_invaders_split_sides`.
 
@@ -102,7 +102,7 @@ Terrace house                     Corridor spine                  Warehouse
 
 A side the AI will not take is still weighed: `debug_zones()` lists it with its words and tags, and the
 decision tree's `flank` node drops it through `drop_tags`. The tags, set in `snapshot/snapshot_options.gd`
-(`_flank_group`), are `held` (B4), `crosses` (B2), `no_shot` (B5/B6), `heading` (B7) and `lane` (B3). The
+(`flank_group`), are `held` (B4), `crosses` (B2), `no_shot` (B5/B6), `heading` (B7) and `lane` (B3). The
 geometry behind them is in `agent_tactics.gd` (`flank_sides`, `ally_lane`, `route_exposed`, which takes the
 target's front for B1). A FLANK tactic whose every side is dropped is not offered at all.
 
@@ -135,5 +135,5 @@ How far each is to be trusted:
   answer to suppression. Review, not design material.
 - Shardpunk devlog, [Tweaking the AI](https://bryqu.itch.io/shardpunk/devlog/56198/tweaking-the-ai): scoring
   flank options against the risk of being flanked (B7). Hobbyist devlog.
-- B8 and B9 are this game's own requirements (the territory rule in `domain-ai-perception`; the commit
+- B8 and B9 are this game's own requirements (the territory rule in `domain-ai-decision` / `domain-ai-snapshot` / `domain-ai-behavior`; the commit
   rule in `domain-ai-behavior`), not sourced.

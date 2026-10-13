@@ -13,8 +13,8 @@ bodies. The pieces: `projectile.gd` (the bullet), `character.gd` and `character_
 **H1. A bullet flies at one height.** Each bullet draws a height uniformly from 0 to 100 when it is fired and
 keeps it for its whole flight, through ricochets and penetrations. It strikes every collider whose coverage
 is above that height and flies over every collider at or below it. A collider of coverage C is therefore
-cleared with chance (100 − C) / 100 (coverage 30 is cleared 70% of the time, coverage 100 never), the same
-rate as before, but the same height now serves everything along the path.
+cleared with chance (100 − C) / 100 (coverage 30 is cleared 70% of the time, coverage 100 never), and the same height
+serves everything along the path.
 `BallisticsConfig.bullet_height` pins it (0 to 100) for tests; negative is random. `cover_flyover_scale`
 scales how much is flown over (0: nothing is, every shot meets what it reaches).
 Tests: `cover_shared_bullet_height`, `posture_hit_chance`.
@@ -90,6 +90,6 @@ Tests: `posture_in_von_state`.
 
 ## Not modelled
 
-Sight is unchanged: a low body is seen exactly as a standing one (`see_over_coverage` is still 60). A
+Sight does not depend on posture: a low body is seen exactly as a standing one (`see_over_coverage` is 60). A
 shooter's posture does not change the height its bullets leave at, and a long gun against low furniture
-still raises as before.
+raises as it does standing.

@@ -31,7 +31,7 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 | **Perception** | `ai/perception/` | `domain-ai-perception` (+ `domain-ai-snapshot` for the snapshot: `agent_snapshot.gd`, `perception/snapshot/`) | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
 | **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
-| **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck). |
+| **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck, the entry plan, the entry team and guard). |
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
@@ -45,6 +45,7 @@ the running primitive.
 
 ```
 root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
+      │                             ├─ RELOAD  → swap in a magazine             (reload)
       │                             ├─ FLANK   → a side, route clear of hostiles (engage)
       │                             ├─ ADVANCE → halfway / close / rush         (move)
       │                             ├─ MELEE   → punch, only when point-blank   (melee)
@@ -54,6 +55,7 @@ root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spo
       │               └─ STAY → hold, when a lead is outside the house          (hold)
       ├─ SEARCH ─┬─ ENTER → a doorway into a room left to search              (entry)
       │          └─ a room / unexplored area / the entrance                     (move)
+      ├─ RELOAD_QUIET → top up with nobody about                                (reload)
       └─ IDLE ─┬─ USE → an object · GO → a room · WAIT                           (interact / move / hold)
 ```
 
@@ -99,7 +101,8 @@ The AI's external surface is all the orchestrator's:
 - **Character ↔ Controller** (interface 7): the controller is any node with `control(character,
   delta)`; it writes `move_input` / `aim_point` and calls `melee()`, `shoot()`, `select_slot(id)`,
   `interact_with(object, id)` / `end_interaction()`; reads `damage_taken()`, `faction`,
-  `current_item()`, `has_item()` — and, for a character it can SEE, `facing` and `damage_taken()`.
+  `current_item()`, `has_item()` — and, for a character it can SEE, `facing`, `damage_taken()`, `is_reloading()`, `posture()`,
+  `current_item()` and `faction`.
   Main injects only `rooms` and `openings` (and `entry_point`). For observers the controller exposes
   `current_act()` (the decision path as ids), `debug_status()` (the full path as labels, every level —
   `COMBAT - Intruder - FLANK - their left side (kitchen)` — plus progress) and `debug_state() ->
@@ -108,8 +111,8 @@ The AI's external surface is all the orchestrator's:
   dev command server's `ai` verb dumps it; `tools/von_probe.py` replays captured levels against Von.
   `debug_zones() -> Array` flattens the last snapshot's option groups to world points (each with its
   `label` + `desc`, for an inspector to expose a clicked point) tagged by zone kind (fire / flank /
-  advance / retreat / lead / search / room / interaction, plus waypoint for the non-room go-to points —
-  post / entrance / approach), and `debug_room_zones()
+  advance / retreat / lead / search / room / interaction / entry, plus waypoint for the non-room go-to points —
+  post / entrance / approach; each entry also carries the option's `tags`), and `debug_room_zones()
   -> Array` returns each room `{ rect, type, status }` tagged by how the NPC regards it (current /
   searched / unsearched / unknown) — both for the tactics overlay.
 - **AI → Navigation** (interface 9): the behaviour's locomotion sets a `NavigationAgent2D`'s

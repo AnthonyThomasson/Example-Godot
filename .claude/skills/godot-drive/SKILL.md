@@ -83,12 +83,12 @@ python3 tools/gcmd.py "aim 700 300"         # windowed runs only (needs a real c
 python3 tools/gcmd.py 'player().speed'      # arbitrary GDScript; helpers: player(), scene(), node(path)
 ```
 
-Verbs: `help, pos, tp X Y, slot N, move up|down|left|right [off], stop, fire, punch, interact,
+Verbs: `help, pos, tp X Y, slot N, move up|down|left|right [off], stop, fire, punch, interact, reload, crouch,
 aim X Y, match, ai, restart [seed], menu, eval EXPR`. Port resolves as `--port` →
 `$GODOT_CMD_PORT` → `9080`.
 
 **`ai` is the AI diagnostic verb**: it dumps every NPC's full brain state as JSON — the state text
-Von was actually shown, the act/move menus it chose from, its raw pick vs. any policy override, the
+Von was actually shown, the act/move menus it chose from, its pick, the
 known contacts (hostile + why + visible + distance), the commitment timers, and the pathing state
 (nav target, reachable, path index). Prefer it over guessing from log lines when an NPC misbehaves.
 

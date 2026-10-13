@@ -1,8 +1,8 @@
 extends RefCounted
 
 ## UI domain: the ONE table of debug overlays — which toggle each is, how it is labelled and grouped, and
-## whether it starts on (all start off). The in-game toggle bar (`overlay_toggles.gd`), the pre-game setup window
-## (`setup_menu.gd`) and Main all read it, so adding an overlay is one row here plus its draw script.
+## whether it starts on (all start off). The in-game toggle bar (`overlay_toggles.gd`), Main, the test runner and the
+## Testing world all read it, so adding an overlay is one row here plus its draw script.
 ##
 ## `flag` is the overlay node's `show_<x>` property name (found by duck-typed property, like Main's
 ## `_configure_debug` and the spectator inspector's `_flags`), except the GLOBAL flags (not per NPC):

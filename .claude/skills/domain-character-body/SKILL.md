@@ -27,7 +27,7 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   `draw_order` records what the last living draw painted (`weapon`, `torso`, `hands`, `head`) for `tests/character/head_over_gun_test.gd`. Once dead it draws the fallen body instead (below).
   **A standing body is repainted only when its drawing changes.** Each frame `_process` solves the rig once
   (shared by the body's and the shadow's draw) and rounds its inputs to a key: every joint and foot, the
-  shoulder / head / fist / weapon angles, the held slot, and the wound count and damage. The key is rounded
+  shoulder / head / fist / weapon angles, the weapon raise (`REDRAW_RAISE_STEP`), the held slot, and the wound count and damage. The key is rounded
   to `REDRAW_POS_STEP` (0.1 px) and `REDRAW_ANGLE_STEP` (0.02 rad), below a visible pixel at the body's
   size; `queue_redraw()` (body and shadow) runs only when the key changes. A character standing still drifts
   by less than a step most frames (breath, glance), so it repaints about once in 15 frames; a walking one
@@ -221,14 +221,15 @@ would throw the elbow out sideways at one end of the swing.
 **The run's shoulders.** Added over the torso spring (too slow to follow a stride) and scaled by `run_amount()`: the
 shoulders counter-rotate by `pose_run_sway` (the one on the forward-swinging arm's side comes forward), lead the hips by
 `pose_run_lean` along the travel direction, and shift `pose_run_shoulder_shift` px sideways over the planted foot each
-step. All go through `torso_offset`, so the rig, wounds and fall follow. The lean is in `head_offset` (the head
+step. The lean and the side shift go through `torso_offset`, so the rig, wounds and fall follow; the counter-rotation is
+added to `torso_angle`. The lean is in `head_offset` (the head
 leads); the side shift is added after it, so the head stays steady over the rocking shoulders.
 Test: `tests/character/run_pose_test.gd`.
 
 ## Pixel art
 
 The character is top-down pixel art rendered through the Art domain (interface 12):
-- Four private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
+- Five private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
   (`body_color`) with sleeve seams, the dark neck ring and an optional backpack with straps;
   `head_painter.gd` — skin with ears and a nose toward the front under a `hair_style` (`short` /
   `long` / `buzz` / `beanie` / `cap`) in `hair_color`, on its own canvas (`radius_for(width)`,

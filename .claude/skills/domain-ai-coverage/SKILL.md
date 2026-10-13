@@ -21,6 +21,6 @@ coverage starts.
   It is done when `unseen` has shrunk to `1 − target_fraction` of the points or the budget (`budget_max`) is spent. So a searcher actively looks
   throughout the room until it has SEEN all of it, rather than looking from one spot.
 - **Debug:** `debug()` → `{ points, unseen, target, budget }`; `Behavior.debug_coverage()` adds `active` (a look-around move that has arrived and is not
-  resolved), which the search overlay (`domain-ai-debug`) draws.
+  resolved, or an entry in its `clear` phase), which the search overlay (`domain-ai-debug`) draws.
 - **Tunables** (controller exports copied in by `Behavior.apply_config()`): `search_coverage_spacing`, `_margin`, `_target`, `_budget`, `_approach`,
   `search_look_rate`.

@@ -5,8 +5,8 @@ description: Deep implementation detail for the Items domain (scenes/items/) —
 
 # Items domain
 
-Owns the things the character holds and the actions they perform. Alternation/reload/aim state
-lives in the item, not the character.
+Owns the things the character holds and the actions they perform. Fire-rate and alternation state
+lives in the item; the reload clock and the aim are the character's.
 
 ## Slots
 
@@ -105,7 +105,7 @@ A gun's `draw_weapon` draws its painter (`pistol_painter.gd`, `smg_painter.gd`, 
 `weapon_facing()` (which trails the aim a touch as it turns) with its butt `grip_back()` px behind the weapon hand. Painters draw in the
 canonical frame — muzzle toward +y, butt at y = 0 — and scale their parts from `c.w` / `c.h`, so the same painter renders the shortened raised
 barrel. The weapon hand's stance is steady (arm reaching out, steady while walking) and the other hand's holds the gun forward: a two-handed hold.
-The character visuals draw the weapon under the torso and before the fists, so its butt tucks behind the shoulder and the fists grip it. The weapon hand is hand 0 (the character's right as drawn). Firing calls `user.kick(WEAPON_HAND, recoil)`, so the weapon hand
+The character visuals draw the weapon under the torso and before the fists, so its butt tucks behind the shoulder and the fists grip it. The weapon hand is hand 0 (the character's right as drawn). Firing calls `user.kick(weapon_hand(), recoil)`, so the weapon hand
 (and the gun in it) recoils, and the supporting hand with it by its stance's `recoil_share`.
 
 ## Dropping on death

@@ -1,6 +1,6 @@
 # Gaze and fire
 
-Where an NPC looks and when it takes the shot (issue #46, "Fix AI behaviour": an NPC turned its back on a known threat, looked at
+Where an NPC looks and when it takes the shot (the faults ruled out: an NPC turned its back on a known threat, looked at
 a wall, or saw an enemy and did not shoot). The tests named under each behaviour assert this document
 (`tools/run_tests.sh gaze`). The code is `scenes/ai/behavior/watch.gd` and the *watch stage* of `behavior.gd`
 (`_apply_watch`); see the `domain-ai-watch`, `domain-ai-behavior` and `domain-ai-combat` skills.
@@ -34,7 +34,7 @@ cover phase reloads), not after a refused one.
 Tests: `entry_guard_fires_from_outside`, `gaze_search_turns_to_threat`, `combat_waits_for_facing`.
 
 **W3. An empty gun is reloaded.** With a threat in view and a spare magazine, an empty gun is reloaded at once, not carried
-on a walk (`auto_reload`; not mid-crossing, E4). A gun with no spare is not reloaded and not clicked.
+on a walk (`auto_reload`; not mid-crossing, E4). A gun with no spare is not reloaded and not fired.
 Tests: `fire_dry_gun_on_move_reloads`, `empty_pistol_no_spares`.
 
 **W4. With no threat: look where you are going, or watch the doors.** A walking NPC looks along its path as far as it has a
