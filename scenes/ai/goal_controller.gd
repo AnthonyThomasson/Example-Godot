@@ -31,6 +31,7 @@ extends Node
 const AgentPerception := preload("res://scenes/ai/perception/agent_perception.gd")
 const DecisionClient := preload("res://scenes/ai/decision/decision_client.gd")
 const DecisionPlanner := preload("res://scenes/ai/decision/decision_planner.gd")
+const Budget := preload("res://scenes/ai/decision/decision_budget.gd")  ## The frame's snapshot count (DecisionBudget).
 const Behavior := preload("res://scenes/ai/behavior/behavior.gd")
 const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 
@@ -685,7 +686,7 @@ func _should_decide() -> bool:
 		return false
 	if not _force and not _behavior.wants_decision(_character, _decide_timer <= 0.0):
 		return false
-	return DecisionBudget.claim()
+	return Budget.claim()
 
 
 ## A salient event arrived while a walk is in flight: restart the walk only when the situation now
@@ -693,7 +694,7 @@ func _should_decide() -> bool:
 ## search → straight to COMBAT). Otherwise the walk in flight already fits; let it finish.
 func _maybe_interrupt(character) -> void:
 	if _planner.entry_for(_perception.quick_facts(character)) != _planner.current_entry():
-		if DecisionBudget.claim():  # Else `_force` stays and the restart is tried again next frame.
+		if Budget.claim():  # Else `_force` stays and the restart is tried again next frame.
 			_start_decision(character)
 	else:
 		_force = false
