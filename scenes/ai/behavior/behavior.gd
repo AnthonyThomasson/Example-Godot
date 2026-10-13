@@ -431,7 +431,7 @@ func debug_combat(character) -> Dictionary:
 		"interaction_dwell": interaction_dwell,
 		"watch_pos": _hostiles[0]["pos"] if _primitive == &"hold" and not _hostiles.is_empty() else null,
 		"reachable": _loco.debug_state().get("reachable", true),
-		"timers": { "commit": _commit_timer, "commit_max": max_commit_time, "tactic": _tactic_timer, "tactic_max": tactic_interval },
+		"timers": { "commit": _commit_timer, "tactic": _tactic_timer },
 	}
 
 

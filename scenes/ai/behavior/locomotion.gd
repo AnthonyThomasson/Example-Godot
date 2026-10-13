@@ -119,13 +119,10 @@ func debug_state() -> Dictionary:
 	# pixel precision is ample for diagnosis.
 	return {
 		"agent": true,
-		"around_bodies": _around_bodies,
 		"target": _point(_agent.target_position),
 		"reachable": _agent.is_target_reachable(),
 		"finished": _agent.is_navigation_finished(),
 		"next": _point(path[idx]) if idx < path.size() else [],
-		"path_points": path.size(),
-		"path_index": idx,
 	}
 
 

@@ -169,5 +169,5 @@ straight-line steering with no agent. **Bodies at rest:** the Navigation domain 
 rest carved out. `_choose_map` (called by `move_to` / `reached`) puts the agent on it only for a walk that goes round such a body
 (a route at most `DETOUR_RATIO` x the plain one + `DETOUR_SLACK` px, ending where the plain one does, with neither the NPC nor `dest`
 standing in a hole); every other walk, including one a body seals, stays on the plain map and shoves through.
-`reachable` / `on_navmesh` always use the plain map. `debug_state()["around_bodies"]` says which map the last walk took. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
+`reachable` / `on_navmesh` always use the plain map. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
 `inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules.
