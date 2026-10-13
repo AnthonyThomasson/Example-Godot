@@ -6,8 +6,8 @@ class_name RifleItem extends GunItem
 ## its hold. Its barrel is too long for a wall: touching one, it comes up off the aim, pointing up with the butt
 ## still on the shoulder, and cannot fire.
 
-const RiflePainter = preload("res://scenes/items/rifle_painter.gd")
-const RifleFlatPainter = preload("res://scenes/items/rifle_flat_painter.gd")
+const RiflePainter = preload("res://scenes/items/art/rifle_painter.gd")
+const RifleFlatPainter = preload("res://scenes/items/art/rifle_flat_painter.gd")
 ## The rifle's footprint lying flat on its side (px): its profile across, its length along.
 const FLAT_SIZE := Vector2(12.0, 38.0)
 ## Rifle sprite footprint (px): width across, length from butt to muzzle.

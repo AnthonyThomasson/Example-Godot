@@ -5,8 +5,8 @@ class_name SmgItem extends GunItem
 ## by the SMG's `GunConfig` row (fast, light rounds, a wide spread); this supplies its look and its hold. Its
 ## barrel is too long for a wall: touching one, it points up and cannot fire.
 
-const SmgPainter = preload("res://scenes/items/smg_painter.gd")
-const SmgFlatPainter = preload("res://scenes/items/smg_flat_painter.gd")
+const SmgPainter = preload("res://scenes/items/art/smg_painter.gd")
+const SmgFlatPainter = preload("res://scenes/items/art/smg_flat_painter.gd")
 ## The SMG's footprint lying flat on its side (px): its profile across, its length along.
 const FLAT_SIZE := Vector2(11.0, 22.0)
 ## SMG sprite footprint (px): width across, length from butt to muzzle.
