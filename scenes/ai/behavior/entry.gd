@@ -14,6 +14,7 @@ extends RefCounted
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
 ##              `in` once it is in the room and off the door's axis
 ##   corner   — holds the corner looking across the room, then clears the rest by sight (`search_coverage.gd`)
+##              A pass-by (`secure`, E15) stops here: it slices one side of the pie from beside the jamb and walks on.
 ##   cover    — once the room is clear, each member covers a different doorway on into a room not yet cleared, its gun
 ##              through it, until a teammate moves on (E8); alone, it looks through each such doorway in turn
 ##   rear     — a member left over (no such doorway free) that was the last of the team in holds the doorway it came
@@ -76,6 +77,8 @@ var solo := true                   ## Nobody else claims the doorway: no barrier
 var seen_fraction := 0.0           ## Share of the room's sample points seen from outside during the pie.
 var pie_sides := 0                 ## How many sides of the door the pie was sliced from.
 var corner := Vector2.INF          ## The corner this NPC enters to.
+var secure := false                ## A pass-by (E15): the doorway is only secured, from one side of its pie, never crossed or radioed.
+var secured := false               ## A secure entry got to the end of its pie.
 var covering := ""                 ## The doorway on (its id) this NPC covers once the room is clear ("" = none).
 
 var _loco: Node                    ## The Locomotion child (pathing, rooms).
@@ -137,11 +140,12 @@ func begin(character, params: Dictionary) -> bool:
 	reset()
 	opening = str(params.get("opening", ""))
 	into = str(params.get("into", ""))
+	secure = bool(params.get("secure", false))
 	_geo = _perception.entry_geometry(character, opening, into)
 	if _geo.is_empty():
 		phase = "done"
 		return false
-	var team: Array = _perception.entry_team(opening)
+	var team: Array = [] if secure else _perception.entry_team(opening)
 	slot = _perception.entry_free_slot(team, character.get_instance_id(), int(params.get("slot", 0)))
 	side = _perception.entry_stack_side(_geo, team, character.global_position)
 	solo = team.is_empty()
@@ -162,6 +166,8 @@ func reset() -> void:
 	slot = 0
 	side = 0
 	solo = true
+	secure = false
+	secured = false
 	seen_fraction = 0.0
 	pie_sides = 0
 	corner = Vector2.INF
@@ -227,7 +233,7 @@ func debug() -> Dictionary:
 		if not _corners_seen.get(i, false):
 			hidden.append(_geo["corners"][i]["pos"])
 	return {
-		"opening": opening, "into": into, "slot": slot, "side": side, "solo": solo, "phase": phase,
+		"opening": opening, "into": into, "slot": slot, "side": side, "solo": solo, "phase": phase, "secure": secure,
 		"seen_fraction": seen_fraction, "pie_sides": pie_sides, "hidden_corners": hidden, "corner": corner,
 		"stack_point": _stack_point() if not _geo.is_empty() else Vector2.INF, "team": _team_size,
 		"covering": covering, "watch_doors": _watch.map(func(w): return w["id"]),
@@ -281,7 +287,7 @@ func step(character, delta: float) -> bool:
 		return true
 	_time += delta
 	_clock += delta
-	var team: Array = _perception.entry_team(opening)
+	var team: Array = [] if secure else _perception.entry_team(opening)
 	if team.size() > _team_size:
 		_team_grew_at = _time  # Someone joined: the point gives the newcomer the full wait.
 	_team_size = team.size()
@@ -485,6 +491,10 @@ func _tick_pie(character, team: Array, delta: float) -> void:
 	if _pie_queue.is_empty():
 		character.move_input = Vector2.ZERO
 		_look_toward(character, _geo["pos"] - (_geo["out"] as Vector2) * 300.0, delta)
+		if secure:
+			secured = true  # Seen from beside the jamb and covered: on its way, nothing left behind it.
+			phase = "done"
+			return
 		if solo and pie_sides < 2:
 			_pie_other_side()
 			return
@@ -823,6 +833,8 @@ func _stack_point() -> Vector2:
 
 ## Queue step `what` for the radio (and remember it, with its extra fields, for the heartbeat).
 func _radio(what: String, extra := {}) -> void:
+	if secure:
+		return  # A pass-by joins no stack and claims nothing on the radio.
 	var msg := { "step": what }
 	msg.merge(extra)
 	_calls.append(msg)

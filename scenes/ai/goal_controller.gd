@@ -223,6 +223,9 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_guard_range: float = 300.0
 ## Seconds a doorway whose entry was given up (a fight, a failed start) is left alone before the guard may try it again.
 @export var entry_guard_rearm: float = 6.0
+## Seconds a doorway the NPC secured as it passed (E15: a doorway on its walk in a corridor, not crossed) is left alone before
+## the guard may secure it again.
+@export var entry_secure_time: float = 30.0
 
 @export_group("Watch")
 ## How far (px) down its path a walking NPC looks: through the doorway it is lining up, not at the wall beside it.
@@ -450,6 +453,7 @@ func _apply_config() -> void:
 	_behavior.entry_guard = entry_guard
 	_behavior.entry_guard_range = entry_guard_range
 	_behavior.entry_guard_rearm = entry_guard_rearm
+	_behavior.entry_secure_time = entry_secure_time
 	_behavior.watch_look_ahead = watch_look_ahead
 	_behavior.watch_door_dwell = watch_door_dwell
 	_behavior.watch_lost_gaze = watch_lost_gaze

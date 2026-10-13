@@ -23,6 +23,8 @@ const SHORT_ROOM_CAPACITY := 2
 const THRESHOLD_EXTEND := 30.0
 ## How far (px) past the doorway's width a step may cross the wall plane and still count as through it.
 const THRESHOLD_SLACK := 8.0
+## How far (px) out from a doorway's wall a walk may pass it and still count as passing it: a corridor's width, not a room's.
+const PASS_DEPTH := 150.0
 
 var vision: RefCounted                ## The perception's sight sense (sight rays over low cover).
 var stack_spacing: float = 34.0       ## Distance (px) between neighbouring stack slots: a body's width and a little.
@@ -135,6 +137,82 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 		if walked > max_dist:
 			break
 	return {}
+
+
+## The first doorway a walk passes without entering (E15): the walk, as for `threshold_ahead`, crosses the doorway's axis (the line
+## out from its centre, at right angles to its wall) within `PASS_DEPTH` px of the wall, on the outside, so it goes by the opening at a
+## walk's distance of `max_dist` px at most, and the room behind it is not the one the NPC is in, is not cleared and is not entered by
+## the walk anywhere ahead (that doorway is `threshold_ahead`'s). Only doors between two rooms of the house, from inside it: a
+## corridor's doors, not the back door seen from the garden. `{ opening, into, dist }` (`dist` = px of walking until abreast of it),
+## or {}. The behaviour's entry guard sends the NPC to secure it before it gets there.
+func passing_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2, is_cleared: Callable, max_dist: float) -> Dictionary:
+	var pts: Array = [from_pos]
+	for i in range(maxi(from_idx, 0), path.size()):
+		pts.append(path[i])
+	if pts.size() < 2:
+		return {}
+	var here := str(SnapshotVocab.room_at(from_pos, _rooms).get("key", ""))
+	if here == "":
+		return {}
+	var candidates: Array = []
+	for o in _openings:
+		var joins: Array = o.get("rooms", [])
+		if joins.size() != 2:
+			continue
+		for key in joins:
+			var into := str(key)
+			if into == here or is_cleared.call(into):
+				continue
+			var room := _room_rect(into)
+			if room.size == Vector2.ZERO:
+				continue
+			var pos: Vector2 = o["pos"]
+			var inward := _inward(room, pos)
+			if _walk_enters(pts, pos, inward, float(o.get("width", 80.0))):
+				continue
+			candidates.append({ "opening": opening_id(o), "into": into, "pos": pos, "out": -inward })
+	var walked := 0.0
+	for i in range(1, pts.size()):
+		var a: Vector2 = pts[i - 1]
+		var b: Vector2 = pts[i]
+		var best := {}
+		for c in candidates:
+			var pos: Vector2 = c["pos"]
+			var out: Vector2 = c["out"]
+			var along := out.orthogonal()
+			var la := (a - pos).dot(along)
+			var lb := (b - pos).dot(along)
+			if la * lb >= 0.0:
+				continue  # Not a step across the doorway's axis.
+			var q := a + (b - a) * (la / (la - lb))
+			var depth := (q - pos).dot(out)
+			if depth <= 0.0 or depth > PASS_DEPTH:
+				continue
+			var d := walked + a.distance_to(q)
+			if best.is_empty() or d < best["dist"]:
+				best = { "opening": c["opening"], "into": c["into"], "dist": d }
+		if not best.is_empty():
+			return best if best["dist"] <= max_dist else {}
+		walked += a.distance_to(b)
+		if walked > max_dist:
+			break
+	return {}
+
+
+## Whether the walk `pts` crosses the wall plane of a doorway at `pos` (into the room that lies along `inward`) within its width:
+## it goes in by it somewhere.
+func _walk_enters(pts: Array, pos: Vector2, inward: Vector2, width: float) -> bool:
+	for i in range(1, pts.size()):
+		var a: Vector2 = pts[i - 1]
+		var b: Vector2 = pts[i]
+		var sa := (a - pos).dot(inward)
+		var sb := (b - pos).dot(inward)
+		if sa >= 0.0 or sb < 0.0:
+			continue
+		var q := a + (b - a) * (-sa / (sb - sa))
+		if absf((q - pos).dot(inward.orthogonal())) <= width * 0.5 + THRESHOLD_SLACK:
+			return true
+	return false
 
 
 ## The rect of room `key`, or an empty Rect2.

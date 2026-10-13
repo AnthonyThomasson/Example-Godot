@@ -1,15 +1,15 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 and E11 to E14 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9 and E11 to E15 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
-`docs/flanking-behavior.md`. They are scripted-Von
-tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. Behaviour E15 is an **open gap**: real-world rules the AI does not follow yet, written here first from the
-sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
-`tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
-(`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
-material for the next round of improvements.
+`docs/flanking-behavior.md`. They are tests on the Terrace house of
+`tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
+E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests; E10 to E15, which came
+in as open gaps (real-world rules the AI did not follow, written here first from the sources, each with a test that was red
+on purpose and tagged `gap`), run the whole pipeline with the real Von server (`requires_von`, `--include-von --require-von`):
+the world gives the AI the situation and the test judges what the shipped AI does with it. No gap is open now; a new one is
+written the same way (`tools/run_tests.sh --include-von --require-von gap` lists them).
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
@@ -197,14 +197,21 @@ the one case left open here.
 Test: `entry_hostile_in_view_holds_outside` (a defender that cannot be killed, in view from the pie arc; real Von,
 `requires_von`).
 
-### Open gap (E15, its test tagged `gap`)
-
 **E15. Doorways passed in a corridor are searched or secured first.** Walking a hallway past an open door into a room
 not yet cleared, the NPC enters it, or at least covers it with its gun from beside the jamb, before it is abreast of it;
-E9 so far enforces this only for the doorways a walk crosses. Why: E8's last sentence; a door left behind is a threat at
-the team's back.
-Test: `entry_corridor_doors_not_passed` (gunfire heard in the far room of the corridor spine draws the invader past two
-open doors).
+without this E9 enforces it only for the doorways a walk crosses. Why: E8's last sentence; a door left behind is a threat at
+the team's back. In the code the entry guard also looks for doorways the walk goes **past**
+(`AgentEntry.passing_ahead`, `Behavior._passing_gate`): one between two rooms of the house, into a room that is not cleared, whose
+axis (the line out from its centre) the walk crosses within 150 px of its wall and within `entry_guard_range` (the walk never
+enters it). The NPC then secures it: an `entry` run in `secure` mode stacks beside the jamb on the side it comes from, slices one
+side of the pie with its gun on the doorway (so it fires at what it sees, E3, and holds on a hostile in view, E14), and walks on,
+the doorway left alone for `entry_secure_time` (30 s). It never crosses and says nothing on the radio (no claim, no going in), and
+it is not started for a doorway a teammate is working. A walk to a doorway's own stack (an ENTER order, `_guard_approach`) secures
+the doors it passes the same way; a member heading for a stack that others have claimed does not (the team goes to its door as
+one, so the point is not left to go in alone). Left open: a team passing a door on the way to its own is not made to secure it.
+Tests: `entry_corridor_doors_not_passed` (gunfire heard in the far room of the corridor spine draws the invader past two open
+doors; real Von, `requires_von`), `entry_guard_secures_passed_doorway` (the same walk as a plain investigation, scripted Von: both
+doors covered from beside the jamb, neither entered, nothing claimed on the radio).
 
 ## Situations
 
@@ -223,7 +230,7 @@ arc, `H` hard corner, `c` soft corner.
             p                                       p
 ```
 
-The two maps the open gaps add (`#` wall, `D` opening): the box room (E13), 140 px square off a corridor, and the
+The two maps E13 and E15 added (`#` wall, `D` opening): the box room (E13), 140 px square off a corridor, and the
 corridor spine (E15), three rooms off one hallway.
 
 ```

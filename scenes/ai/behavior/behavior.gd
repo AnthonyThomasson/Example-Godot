@@ -75,6 +75,7 @@ var entry_approach_time: float = 20.0
 var entry_guard: bool = true
 var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).
 var entry_guard_rearm: float = 6.0 ## Seconds a doorway whose entry was given up is left alone before the guard may start another.
+var entry_secure_time: float = 30.0 ## Seconds a doorway secured in passing (E15) is left alone before the guard may secure it again.
 var watch_look_ahead: float = 150.0 ## A walking NPC looks this far (px) down its path.
 var watch_door_dwell: float = 2.5   ## A resting NPC looks at one doorway this long (s) before the next.
 var watch_lost_gaze: float = 2.0    ## A hostile out of sight keeps the NPC's eyes this long (s) while there is a clear line to where it was.
@@ -904,7 +905,9 @@ func _finish_entry() -> void:
 		_primitive = &"hold"
 		_resolved = true
 		return
-	if not _perception.is_cleared(_entry.into):
+	if _entry.secured:
+		_guard_off[_entry.opening] = _guard_clock + entry_secure_time  # Secured in passing: not again for a while.
+	elif not _perception.is_cleared(_entry.into):
 		_guard_off[_entry.opening] = _guard_clock + entry_guard_rearm
 	_resume_order()
 
@@ -922,6 +925,7 @@ func _resume_order() -> void:
 	_look_around = r["look_around"]
 	_arrive_room = r["arrive_room"]
 	_act_armed = r["act_armed"]
+	_entry_pending = bool(r.get("entry_pending", false))
 	_commit_timer = max_commit_time  # The order's cap runs from here: the entry took the time it took.
 
 
@@ -934,6 +938,8 @@ func _entry_guard(character) -> void:
 	if _primitive == &"entry":
 		if not _resume.is_empty() and not _entry.committed() and _perception.under_fire():
 			_cancel_detour()  # Shot at before it crossed: no time to stack. (Once crossing it finishes the crossing.)
+		elif _resume.is_empty() and not _entry_pending and _entry.phase == "approach":
+			_guard_approach(character)
 		return
 	if not entry_guard or _perception == null or not _perception.entry_enabled:
 		return
@@ -951,9 +957,44 @@ func _entry_guard(character) -> void:
 	if walk.is_empty():
 		return
 	var gate: Dictionary = _perception.threshold_ahead(character, walk["path"], walk["index"], entry_guard_range)
+	var passing := _passing_gate(character, walk, gate)
+	if not passing.is_empty():
+		gate = passing
 	if gate.is_empty() or float(_guard_off.get(gate["opening"], -1.0)) > _guard_clock:
 		return
 	_begin_detour(gate)
+
+
+## An ENTER order's own walk to its stack (E15): a doorway it goes past on the way (in a corridor, not the one it is stacking at) is
+## secured first like any other walk's. The entry pauses (it told the stack it gave its claim up and starts again afterwards). Not
+## for a member heading for a stack that others have claimed: the team goes to its door as one, and a member that left it to cover a
+## door on the way would leave the point to go in alone.
+func _guard_approach(character) -> void:
+	if not entry_guard or not _perception.entry_enabled or (character.move_input as Vector2).length() < 0.1 or _perception.under_fire():
+		return
+	if not _perception.entry_team(_entry.opening).is_empty():
+		return
+	var walk: Dictionary = _loco.path_ahead()
+	if walk.is_empty():
+		return
+	var passing := _passing_gate(character, walk, {})
+	if passing.is_empty() or passing["opening"] == _entry.opening:
+		return
+	_entry.abandon()
+	_begin_detour(passing)
+
+
+## The doorway the walk goes past before it reaches `gate` (the doorway it crosses, {} for none), as a gate to secure (E15), or {}:
+## one in a room not cleared, nearer along the walk than the crossing, that no teammate is working (an ally on its radio is
+## entering it) and that was not just secured or given up.
+func _passing_gate(character, walk: Dictionary, gate: Dictionary) -> Dictionary:
+	var passing: Dictionary = _perception.passing_ahead(character, walk["path"], walk["index"], entry_guard_range)
+	if passing.is_empty() or (not gate.is_empty() and float(passing["dist"]) >= float(gate["dist"])):
+		return {}
+	if float(_guard_off.get(passing["opening"], -1.0)) > _guard_clock or not _perception.entry_team(passing["opening"]).is_empty():
+		return {}
+	passing["secure"] = true
+	return passing
 
 
 ## Pause the running order and go through doorway `gate` (`{ opening, into }`) by tactical entry first. The order is kept
@@ -962,7 +1003,7 @@ func _entry_guard(character) -> void:
 func _begin_detour(gate: Dictionary) -> void:
 	_stash_order()
 	_primitive = &"entry"
-	_params = { "opening": gate["opening"], "into": gate["into"] }
+	_params = { "opening": gate["opening"], "into": gate["into"], "secure": bool(gate.get("secure", false)) }
 	_entry_pending = true
 
 
@@ -979,6 +1020,7 @@ func _stash_order() -> void:
 	_resume = {
 		"primitive": _primitive, "params": _params, "path": _path, "labels": _labels, "point": _point, "arrived": _arrived,
 		"look_around": _look_around, "arrive_room": _arrive_room, "act_armed": _act_armed,
+		"entry_pending": _primitive == &"entry",  # An ENTER order that is paused starts afresh when it comes back.
 	}
 
 

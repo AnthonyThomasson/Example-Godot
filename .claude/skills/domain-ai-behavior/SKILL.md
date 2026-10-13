@@ -73,8 +73,7 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11 to E14) and `tests/ai/entry/`; the spec's E15 is an open gap
-(doorways passed in a corridor; E10, the clear-time benchmark, is met), specified with red `gap` tests and not implemented here. `Behavior` adopts an
+The spec and the tests are `docs/tactical-entry.md` (E1 to E15; E10 to E15 began as `gap` tests and are all green) and `tests/ai/entry/`. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
 `approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a
@@ -147,7 +146,16 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   committed to its own ENTER crossing is ignored (`set_leaf` returns) and the entry's end re-decides. `fallback()` (no decision to
   be had) abandons any entry. Tests: `tests/ai/entry/entry_guard_*_test.gd`, `entry_fallback_aborts`,
   `entry_decision_in_flight_during_cross`.
-- **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides, covering, watch_doors,
+- **Doorways passed in a corridor (E15).** The same guard also looks for a doorway the walk goes **past** (`Perception.passing_ahead`:
+  between two rooms of the house, into a room not cleared, the walk crosses its axis within 150 px of the wall and never enters it)
+  nearer than any doorway it crosses, via `_passing_gate`, skipping one a teammate is working or that was just secured or given up.
+  The detour is an `entry` with `secure: true`: `entry.gd` takes no team and radios nothing, stacks beside the jamb, slices one side of
+  the pie (the watch stage fires at what it sees, E14 holds it on a hostile in view) and ends `secured` without crossing; `_finish_entry`
+  then leaves the doorway alone for `entry_secure_time` (30 s, controller export). An ENTER order's own approach walk is guarded the same way
+  (`_guard_approach`: the entry is abandoned, the doorway secured, the order restarts from `approach`), but not for a member heading for a
+  stack others have claimed (`entry_team(opening)` is not empty): the team goes to its door as one. `_stash_order` keeps `entry_pending`
+  so a paused ENTER starts afresh. Tests: `entry_guard_secures_passed_doorway` (scripted), `entry_corridor_doors_not_passed` (real Von).
+- **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, secure, phase, seen_fraction, pie_sides, covering, watch_doors,
   hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`;
   `Behavior.debug_entry_view(character)` (world-space: entry.gd `debug_view` — doorway frame, slots, pie arc and queue,
   corners with what the pie saw, role, waypoints, gaze, timers, the team off the radio, the doorways covered — plus the
