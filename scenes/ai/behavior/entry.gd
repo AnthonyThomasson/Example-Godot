@@ -220,7 +220,7 @@ func debug() -> Dictionary:
 ## The entry as world-space data for the entry debug overlays (observation only): the doorway's frame, slots, pie
 ## arc and corners (with what the pie saw), this NPC's role, slot, approach and gaze, the ready-barrier timers, the
 ## team off the radio, and once the room is clear the doorways on it covers. {} when no entry is running.
-func debug_view(character) -> Dictionary:
+func debug_view() -> Dictionary:
 	if phase in ["", "done"] or _geo.is_empty():
 		return {}
 	var team: Array = _perception.entry_team(opening)
@@ -240,7 +240,7 @@ func debug_view(character) -> Dictionary:
 		hold_left = maxf(rear_time - _clock, 0.0)
 	return {
 		"door": { "pos": _geo["pos"], "width": _geo["width"], "out": _geo["out"], "along": _geo["along"], "room": _geo["room"] },
-		"opening": opening, "into": into, "phase": phase, "clock": _clock, "role": role, "slot": slot, "side": side,
+		"opening": opening, "into": into, "phase": phase, "role": role, "slot": slot, "side": side,
 		"slots": _geo["slots"], "my_slot": _stack_point(), "pie": _geo["pie"], "pie_queue": _pie_queue.duplicate(),
 		"pie_side": _pie_side, "pie_sides": pie_sides, "corners": corners, "corner": corner,
 		"waypoints": _waypoints.duplicate(), "unseen": _unseen.duplicate() if phase == "pie" else [],
@@ -249,10 +249,9 @@ func debug_view(character) -> Dictionary:
 		"waiting_for": team.filter(func(m): return m["step"] == "claim").map(func(m): return str(m["name"])),
 		"team": team.map(func(m): var d: Dictionary = m.duplicate(); d["through"] = THROUGH.has(m["step"]); return d),
 		"watch": _watch.map(func(w): return { "id": w["id"], "pos": w["pos"], "spot": w["spot"], "aim": w["aim"] }),
-		"covering": covering, "cover_spot": _cover_spot, "cover_aim": _cover_aim,
+		"covering": covering,
 		"sweep": _sweep.map(func(w): return w["id"]), "rear_spot": _rear_spot, "hold_left": hold_left,
 		"ready_total": ready_timeout, "follow_total": follow_gap, "hold_total": rear_time if phase == "rear" else cover_time,
-		"self_pos": character.global_position,
 	}
 
 

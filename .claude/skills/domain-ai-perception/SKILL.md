@@ -90,7 +90,7 @@ The NPC perceives characters, not "the player". The hostility rules categorize e
 
 `agent_vision.gd` reuses one `PhysicsRayQueryParameters2D` for every cast, and `can_see_node` tests the cone before building
 the ray's exclude list. `agent_vision.gd.can_see` is true within `view_distance`, AND within the `awareness_radius` bubble or
-the forward cone (`fov_degrees`), AND with a clear SIGHT line on `QUERY_MASK = 1` (walls + solid
+the forward cone (`fov_degrees`), AND with a clear SIGHT line on `QUERY_MASK = PhysicsLayers.SOLID` (walls + solid
 furniture). The sight line looks OVER low cover: it walks the ray, skipping any collider whose
 `coverage` (the Objects height proxy) is at or below `see_over_coverage` (default 60 — tables, beds,
 islands, counters) and continuing past it, so only walls (coverage 100) and tall furniture (cabinets,

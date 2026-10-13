@@ -81,6 +81,16 @@ Any `NavigationAgent2D` (the NPC's) then pathfinds against the global map automa
 locomotion sets `target_position` and steers at `get_next_path_position()`; it does **not** turn on
 the agent's RVO avoidance.
 
+## Map queries (`ready` / `snap` / `route` / `path_length`)
+
+The AI weighs points and routes against the planning map many times a decision, and every such read has to cope with
+the first frames before a bake, when the map is valid but has never synchronized. `NavBuilder.ready(map)` is that one
+rule (`map.is_valid()` and `map_get_iteration_id(map) != 0`); `snap(map, p)` returns `p` unchanged until then, else the
+closest navmesh point (a room's geometric centre is often inside furniture); `route(map, from, to)` returns a straight
+`[from, to]` until then — and when the server finds no path — else the waypoints; `path_length(path)` sums a path.
+The AI's `Locomotion` (`reachable`, `on_navmesh`, the steering-map choice), `agent_tactics.gd`, `agent_entry.gd`,
+`snapshot_options.gd` and `routes_debug.gd` all call these rather than keeping their own copy of the guard.
+
 ## Debug overlay (`nav_debug.gd`)
 
 `nav_debug.gd` is an optional, draw-only overlay (a single world-space `Node2D`, since the map is
@@ -103,3 +113,5 @@ to its current positions. The characters' holes are drawn too, in another colour
   `NavBuilder.furniture_holes(house) -> Array` is the debug read Main snapshots for the
   `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(world_map) -> RID` (invalid when the world has none),
   `steering_region(region)` and `rebake_steering(region, house, rooms)` are the characters-at-rest side (above).
+  `NavBuilder.ready(map)`, `snap(map, p)`, `route(map, from, to)` and `path_length(path)` are the map queries the AI
+  reads a baked map through (above).

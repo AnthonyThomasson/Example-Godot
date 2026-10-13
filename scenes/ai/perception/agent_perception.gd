@@ -295,7 +295,7 @@ func memory_size() -> int:
 
 ## Debug read: what the NPC has heard and been told, for the hearing/contacts overlays — gunfire heard
 ## (`pos`, `age`), the live under-fire event (`from` direction, `hit`, seconds `left`), ally callouts
-## heard (`pos`, `point`, `label`, `name`, `age`), the engaged window's seconds left, checked leads, the
+## heard (`pos`, `point`, `label`, `name`, `age`), checked leads, the
 ## hostiles it has lost track of, and the hearing/awareness radii. A pure read of memory; never writes it.
 func debug_memory() -> Dictionary:
 	var now := Time.get_ticks_msec()
@@ -303,7 +303,6 @@ func debug_memory() -> Dictionary:
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		gunfire.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "age": rec["age"] })
 	var under := {}
-	var engaged_left := 0.0
 	var checked: Array = []
 	for e in _memory.fresh():
 		var left: float = maxf((e["ttl"] - (now - e["at"]) / 1000.0), 0.0) if e["ttl"] > 0.0 else 0.0
@@ -311,8 +310,6 @@ func debug_memory() -> Dictionary:
 			&"under_fire":
 				if under.is_empty():
 					under = { "from": e["data"].get("from", Vector2.ZERO), "hit": e["data"].get("hit", false), "left": left }
-			&"engaged":
-				engaged_left = maxf(engaged_left, left)
 			&"checked_lead":
 				checked.append(str(e["data"].get("id", "")))
 	var callouts: Array = []
@@ -327,7 +324,6 @@ func debug_memory() -> Dictionary:
 	return {
 		"gunfire": gunfire,
 		"under_fire": under,
-		"engaged_left": engaged_left,
 		"callouts": callouts,
 		"checked_leads": checked,
 		"lost": lost,

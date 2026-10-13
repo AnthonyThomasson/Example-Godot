@@ -160,7 +160,7 @@ func geometry(id: String, into: String, map: RID, space) -> Dictionary:
 	if opening.is_empty() or room.is_empty():
 		return {}
 	var g := _build(opening, room, map, space)
-	if map.is_valid() and NavigationServer2D.map_get_iteration_id(map) != 0:
+	if NavBuilder.ready(map):
 		_cache[key] = g  # Only keep what was snapped onto a baked map.
 	return g
 
@@ -183,14 +183,14 @@ func _build(opening: Dictionary, room: Dictionary, map: RID, space) -> Dictionar
 		var row: Array = []
 		for k in MAX_SLOTS:
 			var lateral := width * 0.5 + 18.0 + k * stack_spacing
-			row.append(_snap(map, pos + out * wall_standoff + along * s * lateral))
+			row.append(NavBuilder.snap(map, pos + out * wall_standoff + along * s * lateral))
 		slots[s] = row
 		var arc: Array = []
 		var steps := maxi(pie_steps, 2)
 		for i in steps:
 			# From 55° off the door's axis (clear of the stack against the wall) toward it (25° off), on side `s`.
 			var theta := deg_to_rad(lerpf(55.0, 25.0, float(i) / float(steps - 1)))
-			arc.append(_snap(map, pos + out * cos(theta) * pie_radius + along * s * sin(theta) * pie_radius))
+			arc.append(NavBuilder.snap(map, pos + out * cos(theta) * pie_radius + along * s * sin(theta) * pie_radius))
 		pie[s] = arc
 	var inset := minf(corner_inset, minf(rect.size.x, rect.size.y) * 0.25)
 	var inner := rect.grow(-inset)
@@ -201,7 +201,7 @@ func _build(opening: Dictionary, room: Dictionary, map: RID, space) -> Dictionar
 	for c in raw:
 		depth_max = maxf(depth_max, (c - pos).dot(out))
 	for c in raw:
-		var p := _snap(map, c)
+		var p := NavBuilder.snap(map, c)
 		corners.append({
 			"pos": p,
 			"near": absf((c - pos).dot(out) - depth_max) < 1.0,  # On the door's own wall.
@@ -234,13 +234,6 @@ func _wall_length(rect: Rect2, pos: Vector2, dir: Vector2) -> float:
 ## Whether the line `from` → `to` is clear for sight (over low cover; walls and tall furniture block it).
 func _sees(space, from: Vector2, to: Vector2) -> bool:
 	return vision == null or space == null or vision.can_see(from, to - from, to, space, [])
-
-
-## `p` snapped onto the nav map (unchanged before the map is baked).
-func _snap(map: RID, p: Vector2) -> Vector2:
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
-		return p
-	return NavigationServer2D.map_get_closest_point(map, p)
 
 
 # --- The team, off the radio -------------------------------------------------------------------

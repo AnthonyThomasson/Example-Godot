@@ -84,8 +84,8 @@ clicked NPC (it is one of the `_flags`), and in player mode `main.gd`'s `show_se
 From the controller's `debug_search_coverage()` (`{ active, points, unseen, target, budget }`) it
 draws, **only while the NPC is actively covering a room** (`active`): every room sample point dim,
 the still-UNSEEN ones bright gold on top (so coverage visibly fills in as they wink out), a red line +
-ring to the point the NPC is looking at / walking to right now (`target`), and a `searched N/total`
-count beside the NPC. Nothing is drawn once the room is covered (the move resolves) or when the NPC
+ring to the point the NPC is looking at / walking to right now (`target`), and a `searched N/total  Ss left`
+readout beside the NPC (`budget`: the seconds before the search gives up on the room). Nothing is drawn once the room is covered (the move resolves) or when the NPC
 isn't searching. Like the others it draws on its own child Node2D, reads only the controller's public
 API, and runs `PROCESS_MODE_ALWAYS`.
 

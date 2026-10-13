@@ -139,7 +139,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 (`deform_depth_per_damage`, `deform_max_depth`, `deform_chunk_damage`, `deform_max_impacts`,
 	 `deform_update_collider`) that Objects reads directly when recording damage, and the ragdoll
 	 solver's `ragdoll_*` tuning (read only by `Ragdoll` itself).
-   Physics imports nothing from other domains.
+   Physics imports nothing from other domains but General's infrastructure (`Despawner` for debris and casings,
+   `PhysicsLayers` for `PhysicsConfig.wall_mask`).
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v)` + `get_mass()`.
    Furniture is a `RigidBody2D`, so its native methods serve the contract; the character
@@ -245,6 +246,11 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
 	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
 	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
+   - **Map queries**, what the AI asks of a baked map when it weighs a point or a route: `NavBuilder.ready(map) -> bool`
+	 (valid and synchronized at least once), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),
+	 `route(map, from, to) -> PackedVector2Array` (the navigated waypoints; a straight segment before the bake or with no
+	 path) and `path_length(path) -> float`. The AI's locomotion, tactics geometry, entry geometry, snapshot options and
+	 routes overlay all go through these, so the "is the map baked yet" rule lives in one place.
    `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay and the
    `nav_updater.gd` re-baker right after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
@@ -325,7 +331,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
     Navigation domain's draw-only `nav_debug.gd` (via the world, kept current by `nav_updater.gd`) and the
     UI's `PerformanceOverlay` for the overlay bar's global toggles. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
     `PhysicsConfig.debris_enabled` master switches and the Audio domain's `audio.sound` switch; statics are restored after each test. Main
-    reaches it only by changing scene to `testing/test_browser.tscn`; the UI widgets it shows
+    reaches it only by changing scene to `testing/test_browser.tscn`, and the browser's Back changes scene back to
+    `main.tscn` (the one thing Testing knows of Main); the UI widgets it shows
     (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
     depends on Testing.
 
@@ -376,14 +383,15 @@ Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
-Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing)
+Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 ```
 
-Physics, Navigation, Art, Audio and World-Gen are leaves (World-Gen's only outward code dep is
+Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
+`Despawner`, `PhysicsLayers`), which every domain may use (World-Gen's only outward code dep is
 the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
 only on Godot's `Image`). Tuning is split into ten `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking

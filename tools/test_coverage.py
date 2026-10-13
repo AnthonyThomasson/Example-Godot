@@ -31,7 +31,8 @@ print("  " + (", ".join(unused) if unused else "(all used)"))
 print("\n== Interfaces never called by a test ==")
 arch = (ROOT / ".claude/skills/architecture/SKILL.md").read_text()
 section = arch.split("## The vital interfaces", 1)[1].split("### Dependency graph", 1)[0]
-names = sorted(set(re.findall(r"`([A-Z][A-Za-z]+\.[a-z_]+)\b", section)))
+# A public member only: `Keybinds._ready` is named in the skill as what Main does NOT call.
+names = sorted(set(re.findall(r"`([A-Z][A-Za-z]+\.[a-z][a-z_]*)\b", section)))
 missing = []
 for full in names:
     cls, method = full.split(".")
