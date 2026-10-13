@@ -8,7 +8,7 @@ description: Deep implementation detail for the AI DEBUG sub-domain (scenes/ai/d
 Optional, draw-only overlays that visualize an NPC's brain. They follow the "draw on their own child
 `Node2D`" convention, read only the sibling controller's / nav agent's PUBLIC API, sense nothing and
 feed nothing back — so they can never affect behaviour. They are added as children of the NPC in the
-preset scene (`character/npc.tscn`).
+preset scene (`ai/npc.tscn`).
 
 Files:
 - `vision_debug.gd` — the NPC's actual visible area.
@@ -99,7 +99,7 @@ so these overlays need no reference into the perception/behaviour internals.
 
 ## The behaviour overlays (all default off; toggled from the UI toggle bar / setup window)
 
-Each is a child of the NPC in `npc.tscn`, found by its `show_<x>` property (registry in
+Each is a child of the NPC in `ai/npc.tscn`, found by its `show_<x>` property (registry in
 `scenes/ui/overlays/overlay_registry.gd`), and reads only the controller's public `debug_*` getters:
 
 | Overlay (flag) | Draws | Controller getter(s) |

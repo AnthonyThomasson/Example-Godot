@@ -61,8 +61,10 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - Combat geometry for the behaviour: `has_line_to`, `combat_spots`,
   `note_engaged` / `engaged_fresh` / `under_fire`; `memory_size()` and
   `room_status(rooms, self_pos)` (each room tagged current / searched / unsearched / unknown) for debug.
-- Entry geometry for the behaviour: `entry_geometry(character, opening_id, into)` and `entry_team(opening_id)`
-  (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
+- Entry geometry for the behaviour: `entry_geometry(character, opening_id, into)`, `entry_team(opening_id)` and the shared
+  stack rules `entry_free_slot(team, self_id, current)`, `entry_stack_side(geometry, team, self_pos)` and
+  `entry_slot_point(geometry, side, slot)` (wrappers on `AgentEntry`'s statics, which the snapshot's `entries` group also uses; the
+  behaviour never reaches into `agent_entry.gd` itself) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).
@@ -162,7 +164,7 @@ and `along` (the wall's axis), `wall` (wall length either side), `side` (the sid
 room's four corners inset `corner_inset`, each `near` (on the door's wall), `side` and `hard` (no sight line from 24 px
 outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step, covering; `abort` and `done` drop one), `free_slot(team,
 self_id, current)` (the lowest free slot; a tie goes to the lower instance id), `stack_side(g, team, self_pos)` and
-`slot_point(g, side, slot)` are shared with the snapshot's `entries` group. Tunables: the controller's `entry_*` exports.
+`slot_point(g, side, slot)` are shared with the snapshot's `entries` group and, through the `AgentPerception` wrappers, with the behaviour's `entry.gd`. Tunables: the controller's `entry_*` exports.
 
 **Cleared rooms and the entry guard (E9).** `cleared_room` (keyed per room, ttl `search_memory_ttl`) is not `visited_room`:
 standing in a room visits it, but a room is *cleared* only by `mark_cleared(key)`: the behaviour calls it when an entry

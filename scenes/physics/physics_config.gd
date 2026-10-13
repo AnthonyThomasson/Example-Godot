@@ -10,7 +10,7 @@ class_name PhysicsConfig
 
 ## Physics layer mask walls and furniture live on: the ragdoll's wall sweep and the blood pools' and
 ## flows' collision queries all test against it.
-static var wall_mask: int = 1
+static var wall_mask: int = PhysicsLayers.SOLID
 
 ## Master switch for debris: off = hits spray no chips (Physics.spawn_debris spawns nothing).
 static var debris_enabled: bool = true

@@ -33,8 +33,8 @@ var _current_reach := 28.0
 ## rest against walls/objects instead of clipping through. Read via hand_position().
 var _hand_pos := [Vector2.ZERO, Vector2.ZERO]
 
-## Physics layers the hands collide with (walls + solid furniture default to layer 1).
-const HAND_MASK := 1
+## Physics layers the hands collide with: the solid layer, where walls, furniture and bodies sit.
+const HAND_MASK := PhysicsLayers.SOLID
 
 ## Punch tween durations (s): the fist extends, then retracts. The extend time also
 ## normalizes the swing-speed factor, so a full-speed extend counts as a full-power hit.

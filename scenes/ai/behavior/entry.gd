@@ -24,8 +24,6 @@ extends RefCounted
 ## NPC goes alone; an ally that claims a slot before it commits joins the stack (E7). Owns that state and nothing
 ## else: `Behavior` calls `begin()` on adopting an ENTER leaf and `step()` every tick until it reports done.
 
-const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
-
 ## A member whose latest call is one of these is through the doorway.
 const THROUGH := ["in", "clear", "cover", "rear"]
 ## A member whose latest call is one of these has called the room clear (`clear`, then the watch it keeps after).
@@ -128,8 +126,8 @@ func begin(character, params: Dictionary) -> bool:
 		phase = "done"
 		return false
 	var team: Array = _perception.entry_team(opening)
-	slot = AgentEntry.free_slot(team, character.get_instance_id(), int(params.get("slot", 0)))
-	side = AgentEntry.stack_side(_geo, team, character.global_position)
+	slot = _perception.entry_free_slot(team, character.get_instance_id(), int(params.get("slot", 0)))
+	side = _perception.entry_stack_side(_geo, team, character.global_position)
 	solo = team.is_empty()
 	_team_size = team.size()
 	_points = _coverage.sample_room(into)
@@ -302,7 +300,7 @@ func step(character, delta: float) -> bool:
 ## stands: a lone entrant crosses in front of the door to slice its other side). A change is radioed as a new claim.
 func _keep_slot(character, team: Array) -> void:
 	var was := slot
-	slot = AgentEntry.free_slot(team, character.get_instance_id(), slot)
+	slot = _perception.entry_free_slot(team, character.get_instance_id(), slot)
 	var new_side := side
 	for m in team:
 		if slot != 1 and m["slot"] == 1 and m["side"] != 0:
@@ -742,7 +740,7 @@ func _at(character, p: Vector2) -> bool:
 
 ## This NPC's stack slot on the team's side.
 func _stack_point() -> Vector2:
-	return AgentEntry.slot_point(_geo, side, slot)
+	return _perception.entry_slot_point(_geo, side, slot)
 
 
 ## Queue step `what` for the radio (and remember it, with its extra fields, for the heartbeat).

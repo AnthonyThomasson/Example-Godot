@@ -73,15 +73,20 @@ static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNu
 static func _openings_world(rooms: Array, openings: Array, origin: Vector2) -> Array:
 	var result: Array = []
 	for opening in openings:
-		var keys: Array = []
-		for room in rooms:
-			if not _openings_for(room["rect"], [opening]).is_empty():
-				keys.append(room["key"])
 		result.append({
 			"pos": origin + (opening["pos"] as Vector2), "width": opening["width"],
-			"front": opening.get("front", false), "exit": opening.get("exit", false), "rooms": keys,
+			"front": opening.get("front", false), "exit": opening.get("exit", false), "rooms": room_keys_on(rooms, opening),
 		})
 	return result
+
+
+## The keys of the rooms whose wall `opening` (`{ pos, width }`) lies on.
+static func room_keys_on(rooms: Array, opening: Dictionary) -> Array:
+	var keys: Array = []
+	for room in rooms:
+		if not _openings_for(room["rect"], [opening]).is_empty():
+			keys.append(room["key"])
+	return keys
 
 
 ## Author-error checks (warnings only): overlapping rooms, an opening not on the wall(s) it should be on, and

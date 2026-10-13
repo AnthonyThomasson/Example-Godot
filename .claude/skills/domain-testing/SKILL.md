@@ -429,8 +429,8 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
 | `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
-| `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`. |
-| `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, `rooms` / `openings` metas like a house. |
+| `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`, annotated with `WorldGen.annotate_layout`. |
+| `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, annotated with `WorldGen.annotate_layout` like a house. |
 | `scripted_controller.gd` | The puppet controller. |
 | `test_switches.gd` | The switch table. |
 | (AI) `decision_stub.gd` | `DecisionStub`: the scripted-Von statics a TestSetup turns on (restored after each test); `DecisionBudget.per_frame` (`decision_budget.gd`) is set with `set_static` the same way. |

@@ -19,8 +19,8 @@ const NAV_SYNC_MS := 5000
 const ACTOR_SCENES := {
 	&"puppet": "res://scenes/character/character_base.tscn",
 	&"player": "res://scenes/character/character_base.tscn",
-	&"defender": "res://scenes/character/npc_defender.tscn",
-	&"invader": "res://scenes/character/npc_invader.tscn",
+	&"defender": "res://scenes/ai/npc_defender.tscn",
+	&"invader": "res://scenes/ai/npc_invader.tscn",
 }
 
 ## The house or arena root, its rooms, and the placed actors/objects by id.

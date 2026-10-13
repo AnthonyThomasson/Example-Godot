@@ -11,9 +11,10 @@ HUDs and menus have moved to the **UI domain** (`scenes/ui/`) — see the `domai
 
 `physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
 `class_name` static holders) names physics-layer bits so they aren't redefined as magic numbers
-per caller. `SOLID := 1` is "walls + solid furniture" — read by Interaction's reach query
+per caller. `SOLID := 1` is the layer walls, solid furniture and bodies sit on — read by Interaction's reach query
 (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and its
-debug mirror (`ai/debug/vision_debug.gd`).
+debug mirror (`ai/debug/vision_debug.gd`), the character's hand queries and leg sweeps (`character/body/`), a dropped
+item's glance (`items/dropped_item.gd`), the bullet (`projectile/projectile.gd`) and `PhysicsConfig.wall_mask`.
 
 ## Input architecture
 

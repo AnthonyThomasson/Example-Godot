@@ -1,9 +1,7 @@
-[gd_scene load_steps=13 format=3 uid="uid://6ws06w1cxad1"]
+[gd_scene load_steps=11 format=3 uid="uid://6ws06w1cxad1"]
 
 [ext_resource type="Script" uid="uid://qn373ge4rrj2" path="res://scenes/main.gd" id="1_main"]
-[ext_resource type="Script" uid="uid://ct433mw32nldp" path="res://scenes/character/character.gd" id="4_player"]
-[ext_resource type="Script" uid="uid://cv6ai4fumffh4" path="res://scenes/character/body/character_hands.gd" id="5_player_animator"]
-[ext_resource type="Script" uid="uid://o48x855dcweq" path="res://scenes/character/body/character_visuals.gd" id="6_player_visuals"]
+[ext_resource type="PackedScene" path="res://scenes/character/character_base.tscn" id="4_player"]
 [ext_resource type="Script" uid="uid://cfsgcam8gj2md" path="res://scenes/character/player_controller.gd" id="7_controller"]
 [ext_resource type="Script" uid="uid://duwls7ja25j7a" path="res://scenes/general/camera_controller.gd" id="9_camera"]
 [ext_resource type="Script" uid="uid://bmv52k3wmsx44" path="res://scenes/ui/hud/debug_ui.gd" id="10_debug"]
@@ -44,17 +42,8 @@ offset_right = 800.0
 offset_bottom = 60.0
 text = "Top-down demo — use WASD to move the circle"
 
-[node name="Player" type="CharacterBody2D" parent="."]
+[node name="Player" parent="." instance=ExtResource("4_player")]
 position = Vector2(440, 420)
-script = ExtResource("4_player")
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Player"]
 
 [node name="PlayerController" type="Node" parent="Player"]
 script = ExtResource("7_controller")
-
-[node name="Hands" type="Node2D" parent="Player"]
-script = ExtResource("5_player_animator")
-
-[node name="Visuals" type="Node2D" parent="Player"]
-script = ExtResource("6_player_visuals")

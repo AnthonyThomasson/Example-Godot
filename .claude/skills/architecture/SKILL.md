@@ -61,6 +61,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
 	 `WorldGen.wall_style() -> Dictionary` (the house wall `style` for `WallFactory.spawn`).
+   - `WorldGen.annotate_layout(root, rooms, doors = [])` — for the Testing domain's hand-built arenas and layouts: stores the
+	 same `rooms` / `openings` metadata a generated house carries (a door on one room's wall only is the front entrance), so
+	 `get_rooms`, `get_openings` and `NavBuilder` read them unchanged. No other caller writes those keys.
    `main.gd` positions the front entrance, fixes draw order and builds the nav map from the rooms (interface 9); its
    `match_spawner.gd` drops each defender at a clear spot in a random room (its centre unless solid furniture or another
    combatant is within `spawn_clearance` — read off `NavBuilder.furniture_holes` — else a random clear point) and each invader
@@ -153,14 +156,14 @@ interface(s) and describes how they're implemented; this list is authoritative f
    as its user dies: a gun leaves a skidding `DroppedItem` in the world, the default leaves
    nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
    is which side landed up). The character
-   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` /
+   calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` / the slot ids `UNARMED_SLOT`, `FISTS_SLOT` and `KEY_SLOT` (the AI selects its fists with `ItemRegistry.FISTS_SLOT`; an interaction's `requires_item` is a slot id, the key's) /
    `default_inventory()` / `inventory_for(slots, rounds, magazine)` (an optional `magazine` type the gun starts loaded with) /
    `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. `LoadoutConfig` (static holder) is what Main
    hands a character: `options()` (plain dicts for the setup window: `RANDOM`, then every `GunConfig` gun with its magazines),
    `normalize(loadout)`, `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout`) and `random(rng)`. The
    character API an item may call: `facing`, `punch(hand)`,
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
-   `world_root()`, `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
+   `world_root()` (also read by the AI to find the world's characters), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
    `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`) and `weapon_raise()` (0..1, how far
    a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
    `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
@@ -189,8 +192,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
    `is_automatic()`, `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` (carry only those slots, holding one, with those spare
    magazines, the gun loaded with that type when it fits: how Main arms a spawn with its side's loadout) and `faction` (allegiance tag, for AI hostility). The AI also reads
-   another character's `facing`, `damage_taken()` and `is_reloading()` — but only while it can SEE that character
-   (aim, visible wounds and a reload in progress are things it perceives).
+   another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
+   (aim, visible wounds, a reload in progress and the posture are things it perceives). A node is a character if it exposes `current_item()`:
+   that is the one probe the AI uses to find characters in the world, so it is part of this interface and is not renamed lightly.
    `player_controller.gd` is the human one and
    is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main / the test runner `MENU`,
    the spectator inspector `PAUSE`, the camera its pan and zoom actions). Signals:
@@ -201,8 +205,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
    side (kitchen)`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Every NPC is the same generic goal-driven agent
-   driven by `ai/goal_controller.gd`; the defender (`character/npc_defender.tscn`) and the invader
-   (`character/npc_invader.tscn`, an inherited scene) differ only in data authored on the scene —
+   driven by `ai/goal_controller.gd`; the defender (`ai/npc_defender.tscn`) and the invader
+   (`ai/npc_invader.tscn`), both inherited from `ai/npc.tscn` (itself an inherited scene of the controller-less
+   `character/character_base.tscn`), differ only in data authored on the scene —
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
    decision-tree config. Main injects only `rooms` and `openings` (and `entry_point`); the AI finds and categorizes
    the characters it perceives by sight. Von walks a data-driven DECISION TREE ranked against the
@@ -282,7 +287,9 @@ interface(s) and describes how they're implemented; this list is authoritative f
 	  the physics layer bit (1) that "walls + solid furniture" live on. Interaction's reach query
 	  (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and
 	  its debug mirror (`ai/debug/vision_debug.gd`) all raycast on this one shared constant instead
-	  of each redefining the same magic number — the single point of truth for that layer id.
+	  of each redefining the same magic number — the single point of truth for that layer id. The character's
+	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), the
+	  bullet's `collision_mask` (`projectile/projectile.gd`) and Physics' `PhysicsConfig.wall_mask` read it too.
 
 12. **Objects / Character / Items → Art** (leaf: the pixel-art engine; each domain owns its painters)
     - `PixelArt.render(painter, size, color, facing, material, opts) -> Texture2D` — a painter's art

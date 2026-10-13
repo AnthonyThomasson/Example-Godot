@@ -104,7 +104,9 @@ furnisher warns "no room for required zone" and the doorway test fails.
 - **Main → World Generation** (interface 1): `WorldGen.generate(seed, force_plan,
   front_entrance_world, parent) -> Node2D` seeds one RNG for the whole run (plan
   pick is its first draw), prints `House: <plan>  seed: N`, builds the house; every doorway is an
-  open archway. `WorldGen.get_openings(house) -> Array`
+  open archway. `WorldGen.annotate_layout(root, rooms, doors)` writes the same `rooms` / `openings` metadata onto a hand-built
+  root (the Testing domain's arenas and layouts; `HouseSpawner.room_keys_on` derives the room keys a door joins).
+  `WorldGen.get_openings(house) -> Array`
   returns the doorways as `{ pos, width, front, exit, rooms }` (world space; `rooms` = the room keys it joins).
   `WorldGen.get_rooms(house) -> Array`
   returns rooms as `{ key, type, rect }` dicts (world-space `rect`), read from the house's

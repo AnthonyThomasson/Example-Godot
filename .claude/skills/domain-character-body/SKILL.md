@@ -9,8 +9,8 @@ Everything that gives the character a body: `character_rig, character_legs, char
 (animate) and `character_visuals` plus the `body / head / hand / limb / torso` painters (draw). `character.gd` (the root body, see
 `domain-character`) owns state and physics and steps these each frame; nothing here decides what the character *does*. Cross-domain
 edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), and
-`CharacterConfig` (this domain's tuning holder, in `character/`). The scenes (`character_base.tscn`, `npc.tscn`, `main.tscn`) attach
-`character_hands.gd` and `character_visuals.gd` as the `Hands` / `Visuals` children; the rest are `RefCounted` helpers the character owns.
+`CharacterConfig` (this domain's tuning holder, in `character/`). `character_base.tscn` attaches
+`character_hands.gd` and `character_visuals.gd` as the `Hands` / `Visuals` children (the NPC scenes and `main.tscn`'s `Player` inherit or instance it); the rest are `RefCounted` helpers the character owns.
 
 ## Animate and draw
 

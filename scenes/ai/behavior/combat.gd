@@ -11,8 +11,6 @@ extends RefCounted
 ## The gun is empty: the shot was not taken (a click is not a shot), so the caller should re-decide.
 signal dry
 
-## Inventory slot of the fists (ItemRegistry id). The gun it shoots is whatever the character fights with.
-const FISTS_SLOT := 2
 ## Facing error (radians) within which a shot is taken — aim settles a frame after it is set.
 const AIM_TOLERANCE := 0.15
 
@@ -174,7 +172,7 @@ func shoot(character) -> bool:
 func punch(character) -> void:
 	_perception.note_engaged()
 	fire_timer = fire_cooldown
-	character.select_slot(FISTS_SLOT)
+	character.select_slot(ItemRegistry.FISTS_SLOT)
 	character.melee()
 
 

@@ -6,9 +6,9 @@ extends RefCounted
 ## NPC scenes and the Navigation domain's `furniture_holes`; the placement rules live here so the root only wires domains.
 
 ## The house defender, dropped into one of the generated rooms.
-const DEFENDER_SCENE := preload("res://scenes/character/npc_defender.tscn")
+const DEFENDER_SCENE := preload("res://scenes/ai/npc_defender.tscn")
 ## The house invader, dropped just outside the house. Same AI, different data.
-const INVADER_SCENE := preload("res://scenes/character/npc_invader.tscn")
+const INVADER_SCENE := preload("res://scenes/ai/npc_invader.tscn")
 ## Random points tried in a room, after its centre, before `clear_spot` gives up.
 const SPAWN_TRIES := 32
 
