@@ -252,7 +252,7 @@ func lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 				_v.route_band(_route_len(ctx, c["pos"])), ("; they were moving %s" % _v.compass(c["vel"])) if moving else ""],
 			"point": c["pos"] })
 		if moving:
-			var ahead: Vector2 = _tactics.snap(ctx["map"], c["pos"] + c["vel"] * minf(c["age"], _v.extrapolate_cap))
+			var ahead: Vector2 = NavBuilder.snap(ctx["map"], c["pos"] + c["vel"] * minf(c["age"], _v.extrapolate_cap))
 			leads.append({ "age": c["age"] + 0.01, "id": "lead_heading_%d" % c["id"], "label": "where %s was heading" % c["name"],
 				"desc": "where %s was heading, %s — %s of where you last saw them — %s route" % [c["name"], _v.place(ahead),
 					_v.compass(c["vel"]), _v.route_band(_route_len(ctx, ahead))],
@@ -263,7 +263,7 @@ func lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 			"label": "gunfire to the %s" % _v.compass(pos - self_pos),
 			"desc": "gunfire heard to the %s, %s — %s — %s route" % [_v.compass(pos - self_pos), _v.place(pos),
 				_v.recency(rec["age"]), _v.route_band(_route_len(ctx, pos))],
-			"point": _tactics.snap(ctx["map"], pos) })
+			"point": NavBuilder.snap(ctx["map"], pos) })
 	if _under_fire() and hostiles.is_empty():
 		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
 		var origin: Vector2 = _shot_origin(ctx)
@@ -277,7 +277,7 @@ func lead_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
 		leads.append({ "age": c["age"], "id": "lead_ally_%d" % c["id"], "label": "support %s" % c["name"],
 			"desc": "support %s, %s — %s, %s of you — radio %s%s" % [c["name"], _v.place(at), c.get("label", "fighting"),
 				_v.compass(at - self_pos), _v.recency(c["age"]), ("; " + status) if status != "" else ""],
-			"point": _tactics.snap(ctx["map"], at) })
+			"point": NavBuilder.snap(ctx["map"], at) })
 	# A lead checked more recently than the event behind it is spent (fresh news there is offered again).
 	leads = leads.filter(func(l): return not _memory.age_of(&"checked_lead", "id", l["id"]) < l["age"])
 	leads.sort_custom(func(x, y): return x["age"] < y["age"])
@@ -317,7 +317,7 @@ func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array, entered := 
 		if (not here.is_empty() and room["key"] == here["key"]) or entered.has(str(room["key"])):
 			continue
 		var age: float = _memory.age_of(&"visited_room", "key", room["key"])
-		var point: Vector2 = _tactics.snap(ctx["map"], (room["rect"] as Rect2).get_center())
+		var point: Vector2 = NavBuilder.snap(ctx["map"], (room["rect"] as Rect2).get_center())
 		var stale := age > _v.search_memory_ttl
 		if stale:
 			unsearched += 1
@@ -336,7 +336,7 @@ func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array, entered := 
 			var centre := _v.house_centre()
 			options.append({ "id": "approach", "label": "the house",
 				"desc": "head for the house and find a way in — %s route" % _v.route_band(_route_len(ctx, centre)),
-				"params": { "point": _tactics.snap(ctx["map"], centre) }, "tags": { "inside": false } })
+				"params": { "point": NavBuilder.snap(ctx["map"], centre) }, "tags": { "inside": false } })
 	for c in candidates:
 		if options.size() >= _v.max_options_per_level:
 			break
@@ -414,7 +414,7 @@ func explore_group(ctx: Dictionary, rooms: Array, entered := {}) -> Dictionary:
 	for room in rooms:
 		if known.has(room["key"]) or entered.has(str(room["key"])):
 			continue
-		var point: Vector2 = _tactics.snap(ctx["map"], (room["rect"] as Rect2).get_center())
+		var point: Vector2 = NavBuilder.snap(ctx["map"], (room["rect"] as Rect2).get_center())
 		var dir := _v.compass(point - self_pos)
 		var dist := self_pos.distance_to(point)
 		if not by_dir.has(dir) or dist < by_dir[dir]["dist"]:
@@ -464,7 +464,7 @@ func room_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary
 	for room in known_rooms:
 		if not here.is_empty() and room["key"] == here["key"]:
 			continue
-		var point: Vector2 = _tactics.snap(ctx["map"], (room["rect"] as Rect2).get_center())
+		var point: Vector2 = NavBuilder.snap(ctx["map"], (room["rect"] as Rect2).get_center())
 		options.append({ "id": "room_%s" % room["key"], "label": "the %s" % _v.room_name(room["type"]), "desc": "the %s" % _v.room_name(room["type"]),
 			"params": { "point": point, "arrive_room": room["key"] }, "tags": { "inside": true } })
 	options.append({ "id": "post", "label": "your starting position", "desc": "your starting position",
@@ -547,12 +547,12 @@ func _retreat_summary(options: Array, dmg: float) -> String:
 func _shot_origin(ctx: Dictionary, snap_to_navmesh := true) -> Vector2:
 	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
 	var p: Vector2 = (ctx["self_pos"] as Vector2) + from.normalized() * _v.investigate_distance
-	return _tactics.snap(ctx["map"], p) if snap_to_navmesh else p
+	return NavBuilder.snap(ctx["map"], p) if snap_to_navmesh else p
 
 
 ## The navigated route length (px) from the NPC to `p`.
 func _route_len(ctx: Dictionary, p: Vector2) -> float:
-	return _tactics.path_length(_tactics.route(ctx["map"], ctx["self_pos"], p))
+	return NavBuilder.path_length(NavBuilder.route(ctx["map"], ctx["self_pos"], p))
 
 
 ## The ally (perceived near the target, or calling it on the radio) already fighting hostile `t`.

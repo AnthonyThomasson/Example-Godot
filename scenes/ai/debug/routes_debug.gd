@@ -57,7 +57,7 @@ func _paint() -> void:
 		var exposed: bool = tags["route_exposed"]
 		var col := EXPOSED if exposed else HIDDEN
 		if not _cache.has(p):
-			_cache[p] = _route(map, me, p)
+			_cache[p] = NavBuilder.route(map, me, p)
 		var path: PackedVector2Array = _cache[p]
 		for i in range(1, path.size()):
 			_line(path[i - 1], path[i], Color(col, 0.55), 1.5)
@@ -76,14 +76,6 @@ func _paint() -> void:
 			notes.append("in %s's line of fire" % tags["ally_lane"])
 		_ring(p, 10.0, edge, 2.0)
 		_label(p, " · ".join(notes), edge, Vector2(12, 14))
-
-
-## The navigated route `from`→`to` (a straight segment while the map isn't ready).
-func _route(map: RID, from: Vector2, to: Vector2) -> PackedVector2Array:
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
-		return PackedVector2Array([from, to])
-	var path := NavigationServer2D.map_get_path(map, from, to, true)
-	return path if path.size() >= 2 else PackedVector2Array([from, to])
 
 
 ## A hostile's watch cone: two edge lines and an arc of `half` radians either side of `front`.

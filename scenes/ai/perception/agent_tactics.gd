@@ -67,34 +67,11 @@ func object_label(obj: Object) -> String:
 	return "wall"
 
 
-## `p` snapped onto the navmesh (unchanged while the map isn't ready).
-func snap(map: RID, p: Vector2) -> Vector2:
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
-		return p
-	return NavigationServer2D.map_get_closest_point(map, p)
-
-
-## The navigated route `from`→`to` (a straight segment while the map isn't ready).
-func route(map: RID, from: Vector2, to: Vector2) -> PackedVector2Array:
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
-		return PackedVector2Array([from, to])
-	var path := NavigationServer2D.map_get_path(map, from, to, true)
-	return path if path.size() >= 2 else PackedVector2Array([from, to])
-
-
-## Total length (px) of a route.
-func path_length(path: PackedVector2Array) -> float:
-	var total := 0.0
-	for i in range(1, path.size()):
-		total += path[i - 1].distance_to(path[i])
-	return total
-
-
 ## Whether most of a route lies in the open from `threat` (a clear line from it to most samples). With a
 ## `front` (the threat's facing, radians) a sample also has to lie inside its view cone (`watch_arc`): a
 ## route behind the threat's back is not in its view, however clear the line. Without one, only the line counts.
 func route_exposed(space, path: PackedVector2Array, threat: Vector2, exclude: Array, front := NAN) -> bool:
-	var total := path_length(path)
+	var total := NavBuilder.path_length(path)
 	if total <= 0.0:
 		return false
 	var half := deg_to_rad(watch_arc) * 0.5
@@ -244,7 +221,7 @@ func watched_in_open(ctx: Dictionary, p: Vector2, path: PackedVector2Array = Pac
 		if _looking_at(hpos, front, p, half) and hpos.distance_to(p) <= shoot_range * 1.5 \
 				and not blocked(ctx["space"], hpos, p, ex) and cover_near(ctx["space"], p, hpos, ex) == "":
 			return h["name"]
-		if path.size() >= 2 and _looking_at(hpos, front, _along(path, path_length(path) * 0.5), half):
+		if path.size() >= 2 and _looking_at(hpos, front, _along(path, NavBuilder.path_length(path) * 0.5), half):
 			# Whether this NPC is hidden from `h` where it stands does not depend on the spot judged, so it is worked out
 			# once per hostile for the whole snapshot (`ctx.covered_from`) rather than for every candidate spot.
 			var covered_from: Dictionary = ctx.get("covered_from", {})
@@ -280,14 +257,14 @@ func flank_sides(ctx: Dictionary, target: Dictionary, front: float) -> Array:
 		var p = _flank_point(ctx, tpos, front, side, ex)
 		if p == null:
 			continue
-		var path := route(ctx["map"], ctx["self_pos"], p)
+		var path := NavBuilder.route(ctx["map"], ctx["self_pos"], p)
 		var vel: Vector2 = target.get("vel", Vector2.ZERO)
 		out.append({
 			"side": side,
 			"point": p,
 			"clear_shot": not blocked(ctx["space"], p, tpos, ex),
 			"cover": cover_near(ctx["space"], p, tpos, ex),
-			"route_len": path_length(path),
+			"route_len": NavBuilder.path_length(path),
 			"route_exposed": route_exposed(ctx["space"], path, tpos, ex, front),
 			"crosses": route_crosses(path, ctx["hostiles"]),
 			"held_by": side_holder(target, front, side, ctx["allies"], ctx["callouts"]),
@@ -306,7 +283,7 @@ func _flank_point(ctx: Dictionary, tpos: Vector2, front: float, side: String, ex
 	for dist in [flank_distance, flank_distance * 0.65]:
 		for k in [0.0, -0.5, 0.5]:
 			var raw: Vector2 = tpos + Vector2.from_angle(base + deg_to_rad(flank_arc) * k) * dist
-			var p := snap(ctx["map"], raw)
+			var p := NavBuilder.snap(ctx["map"], raw)
 			if p.distance_to(raw) > SNAP_TOLERANCE or side_of(tpos, front, p) != side:
 				continue
 			if not blocked(ctx["space"], p, tpos, ex):
@@ -337,7 +314,7 @@ func fire_positions(ctx: Dictionary, target: Dictionary) -> Dictionary:
 	for dist in fire_spot_distances:
 		for i in combat_ring_count:
 			var raw: Vector2 = tpos + Vector2.RIGHT.rotated(TAU * i / combat_ring_count) * dist
-			var p := snap(ctx["map"], raw)
+			var p := NavBuilder.snap(ctx["map"], raw)
 			if p.distance_to(raw) <= SNAP_TOLERANCE and not blocked(ctx["space"], p, tpos, ex):
 				candidates.append(p)
 	# Cheap facts first (range, sector, cover); the route checks run only until a sector has its spot.
@@ -382,7 +359,7 @@ func fire_positions(ctx: Dictionary, target: Dictionary) -> Dictionary:
 ## when the route there passes a known hostile or a hostile would catch the NPC in the open on the way
 ## or once there.
 func _safe_spot(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array):
-	var path := route(ctx["map"], ctx["self_pos"], p)
+	var path := NavBuilder.route(ctx["map"], ctx["self_pos"], p)
 	if route_crosses(path, ctx["hostiles"]) != "" or watched_in_open(ctx, p, path) != "":
 		return null
 	var a := _annotate(ctx, target, p, ex, path)
@@ -395,16 +372,16 @@ func _safe_spot(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array):
 func advance_positions(ctx: Dictionary, target: Dictionary) -> Array:
 	var tpos: Vector2 = target["pos"]
 	var ex: Array = ctx["exclude"] + body_rid(target)
-	var path := route(ctx["map"], ctx["self_pos"], tpos)
-	var total := path_length(path)
+	var path := NavBuilder.route(ctx["map"], ctx["self_pos"], tpos)
+	var total := NavBuilder.path_length(path)
 	var out: Array = []
 	if total > 160.0:
 		for frac in [0.5, 0.75]:
-			var p := snap(ctx["map"], _along(path, total * frac))
+			var p := NavBuilder.snap(ctx["map"], _along(path, total * frac))
 			var a := _annotate(ctx, target, p, ex)
 			a["fraction"] = frac
 			out.append(a)
-	var rush := _annotate(ctx, target, snap(ctx["map"], tpos), ex)
+	var rush := _annotate(ctx, target, NavBuilder.snap(ctx["map"], tpos), ex)
 	rush["rush"] = true
 	rush["route_exposed"] = route_exposed(ctx["space"], path, tpos, ex)
 	out.append(rush)
@@ -426,13 +403,13 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 		var rect: Rect2 = room["rect"]
 		if rect.has_point(self_pos):
 			continue
-		candidates.append({ "point": snap(ctx["map"], rect.get_center()), "room": str(room.get("type", "room")).replace("_", " ") })
+		candidates.append({ "point": NavBuilder.snap(ctx["map"], rect.get_center()), "room": str(room.get("type", "room")).replace("_", " ") })
 	if not threats.is_empty():
 		var nearest: Vector2 = threats[0]
 		for p in combat_spots(ctx["space"], self_pos, nearest, ex, combat_ring_radius * 2.0, combat_ring_count)["cover"]:
 			candidates.append({ "point": p, "room": "" })
 	for a in ctx["allies"]:
-		candidates.append({ "point": snap(ctx["map"], a["pos"]), "room": "", "ally": a["name"] })
+		candidates.append({ "point": NavBuilder.snap(ctx["map"], a["pos"]), "room": "", "ally": a["name"] })
 	var out: Array = []
 	for c in candidates:
 		var p: Vector2 = c["point"]
@@ -444,13 +421,13 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 		var gap := _nearest_gap(p, threats)
 		if not hidden and gap <= here_gap:
 			continue  # Neither out of sight nor farther away: not a retreat.
-		var path := route(ctx["map"], self_pos, p)
+		var path := NavBuilder.route(ctx["map"], self_pos, p)
 		var cover := ""
 		if not threats.is_empty():
 			cover = cover_near(ctx["space"], p, threats[0], ex)
 		c["hidden"] = hidden
 		c["cover"] = cover
-		c["route_len"] = path_length(path)
+		c["route_len"] = NavBuilder.path_length(path)
 		c["route_exposed"] = not threats.is_empty() and route_exposed(ctx["space"], path, threats[0], ex)
 		out.append(c)
 	return out
@@ -461,12 +438,12 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 func _annotate(ctx: Dictionary, target: Dictionary, p: Vector2, ex: Array, path := PackedVector2Array()) -> Dictionary:
 	var tpos: Vector2 = target["pos"]
 	if path.is_empty():
-		path = route(ctx["map"], ctx["self_pos"], p)
+		path = NavBuilder.route(ctx["map"], ctx["self_pos"], p)
 	return {
 		"point": p,
 		"clear_shot": not blocked(ctx["space"], p, tpos, ex),
 		"cover": cover_near(ctx["space"], p, tpos, ex),
-		"route_len": path_length(path),
+		"route_len": NavBuilder.path_length(path),
 		"route_exposed": false,
 		"exposed_to": exposed_to(ctx["space"], p, ctx["hostiles"], target["id"], ctx["exclude"]),
 	}

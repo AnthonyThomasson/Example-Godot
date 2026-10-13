@@ -90,10 +90,7 @@ func setup(agent: NavigationAgent2D) -> void:
 func reachable(p: Vector2) -> Vector2:
 	if _agent == null:
 		return p
-	var map: RID = _plan_map
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
-		return p  # Nav map not synchronized yet (very first frames); snap once it is baked.
-	return NavigationServer2D.map_get_closest_point(map, p)
+	return NavBuilder.snap(_plan_map, p)
 
 
 ## Whether world point `p` lies ON the baked navmesh — i.e. walkable floor, not inside a carved
@@ -104,10 +101,9 @@ func reachable(p: Vector2) -> Vector2:
 func on_navmesh(p: Vector2, tol: float = 8.0) -> bool:
 	if _agent == null:
 		return true
-	var map: RID = _plan_map
-	if not map.is_valid() or NavigationServer2D.map_get_iteration_id(map) == 0:
+	if not NavBuilder.ready(_plan_map):
 		return true
-	return NavigationServer2D.map_get_closest_point(map, p).distance_to(p) <= tol
+	return NavBuilder.snap(_plan_map, p).distance_to(p) <= tol
 
 
 ## Read-only: the pathing state behind the current move, for the AI's `debug_state()` snapshot. Uses
@@ -174,14 +170,6 @@ func debug_progress() -> Dictionary:
 	return { "speed": _stall_speed, "stalled_for": _stalled_for, "stall_window": STALL_WINDOW, "trail": _trail }
 
 
-## The length (px) of a path.
-func _length(path: PackedVector2Array) -> float:
-	var total := 0.0
-	for i in range(1, path.size()):
-		total += path[i - 1].distance_to(path[i])
-	return total
-
-
 ## A world point as a JSON-safe [x, y] int pair.
 func _point(p: Vector2) -> Array:
 	return [int(p.x), int(p.y)]
@@ -211,16 +199,16 @@ func _choose_map(character, dest: Vector2) -> void:
 	if not _steering_map.is_valid() or not _plan_map.is_valid():
 		return
 	_around_bodies = false
-	if NavigationServer2D.map_get_iteration_id(_steering_map) > 0 and NavigationServer2D.map_get_iteration_id(_plan_map) > 0:
+	if NavBuilder.ready(_steering_map) and NavBuilder.ready(_plan_map):
 		var from: Vector2 = character.global_position
-		var plain_dest := NavigationServer2D.map_get_closest_point(_plan_map, dest)
-		var plain_from := NavigationServer2D.map_get_closest_point(_plan_map, from)
-		var in_hole := NavigationServer2D.map_get_closest_point(_steering_map, from).distance_to(plain_from) > IN_HOLE_DISTANCE \
-				or NavigationServer2D.map_get_closest_point(_steering_map, dest).distance_to(plain_dest) > IN_HOLE_DISTANCE
+		var plain_dest := NavBuilder.snap(_plan_map, dest)
+		var plain_from := NavBuilder.snap(_plan_map, from)
+		var in_hole := NavBuilder.snap(_steering_map, from).distance_to(plain_from) > IN_HOLE_DISTANCE \
+				or NavBuilder.snap(_steering_map, dest).distance_to(plain_dest) > IN_HOLE_DISTANCE
 		if not in_hole:
 			var path := NavigationServer2D.map_get_path(_steering_map, from, dest, true)
-			var plain_length := _length(NavigationServer2D.map_get_path(_plan_map, from, dest, true))
-			var length := _length(path)
+			var plain_length := NavBuilder.path_length(NavigationServer2D.map_get_path(_plan_map, from, dest, true))
+			var length := NavBuilder.path_length(path)
 			_around_bodies = not path.is_empty() and path[path.size() - 1].distance_to(plain_dest) <= BLOCKED_DISTANCE \
 					and length > plain_length + MIN_DETOUR and length <= plain_length * DETOUR_RATIO + DETOUR_SLACK
 	var want := _steering_map if _around_bodies else _plan_map

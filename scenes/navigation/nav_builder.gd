@@ -516,3 +516,35 @@ static func _rect_outline(rect: Rect2) -> PackedVector2Array:
 		rect.position + rect.size,
 		rect.position + Vector2(0, rect.size.y),
 	])
+
+
+# --- Map queries ---------------------------------------------------------------------------------
+# What the AI asks of a baked map (interface 9) when it weighs a point or a route: one home for the
+# "is the map baked yet" guard, so every caller treats the first frames before the bake the same way.
+
+## Whether `map` is a baked map: valid, and synchronized at least once. Before that a query would return nothing useful.
+static func ready(map: RID) -> bool:
+	return map.is_valid() and NavigationServer2D.map_get_iteration_id(map) != 0
+
+
+## `p` snapped onto the navmesh (a room's geometric centre is often inside furniture); unchanged before the map is baked.
+static func snap(map: RID, p: Vector2) -> Vector2:
+	if not ready(map):
+		return p
+	return NavigationServer2D.map_get_closest_point(map, p)
+
+
+## The navigated route `from` → `to` as its waypoints; a straight segment before the map is baked or when no path exists.
+static func route(map: RID, from: Vector2, to: Vector2) -> PackedVector2Array:
+	if not ready(map):
+		return PackedVector2Array([from, to])
+	var path := NavigationServer2D.map_get_path(map, from, to, true)
+	return path if path.size() >= 2 else PackedVector2Array([from, to])
+
+
+## The length (px) of a path.
+static func path_length(path: PackedVector2Array) -> float:
+	var total := 0.0
+	for i in range(1, path.size()):
+		total += path[i - 1].distance_to(path[i])
+	return total
