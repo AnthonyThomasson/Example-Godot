@@ -192,3 +192,11 @@ static func room_at(p: Vector2, list: Array) -> Dictionary:
 		if (room["rect"] as Rect2).has_point(p):
 			return room
 	return {}
+
+
+## The room of `list` (`{ key, type, rect }` dicts) with key `key`, or {}.
+static func room_by_key(list: Array, key: String) -> Dictionary:
+	for room in list:
+		if str(room["key"]) == key:
+			return room
+	return {}

@@ -93,10 +93,7 @@ func set_overlay(flag: String, on: bool) -> void:
 	for id in actors:
 		var a: Node = actors[id]
 		if is_instance_valid(a):
-			for child in a.get_children():
-				if flag in child:
-					child.set(flag, on)
-					child.queue_redraw()
+			OVERLAY_REGISTRY.apply(a, { flag: on })
 
 
 ## Apply the switch rows' static knobs, then the explicit `set_static` overrides.

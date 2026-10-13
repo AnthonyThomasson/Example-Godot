@@ -401,10 +401,7 @@ static func entry_rooms(entries: Dictionary) -> Dictionary:
 
 ## The room with key `key` in `rooms`, or {}.
 func _room(rooms: Array, key: String) -> Dictionary:
-	for r in rooms:
-		if str(r["key"]) == key:
-			return r
-	return {}
+	return SnapshotVocab.room_by_key(rooms, key)
 
 
 ## Unexplored parts of the house (rooms not yet seen), named by direction only — the NPC doesn't know

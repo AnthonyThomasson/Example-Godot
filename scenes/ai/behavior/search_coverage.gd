@@ -19,6 +19,8 @@ var target := Vector2.ZERO        ## The unseen point currently being looked at 
 var room := ""                    ## Key of the room being covered, locked on arrival.
 var budget := 0.0                 ## Seconds left before the coverage gives up on unseeable nooks.
 
+const Watch := preload("res://scenes/ai/behavior/watch.gd")
+
 var _loco: Node                   ## The Locomotion child (pathing, rooms, navmesh test).
 var _perception: Node             ## The perception sub-domain (what is in sight).
 
@@ -59,10 +61,7 @@ func step(character, delta: float) -> bool:
 		return true
 	var self_pos: Vector2 = character.global_position
 	target = _nearest(self_pos, unseen)
-	var desired := (target - self_pos).angle()
-	# Eased from where it looks now (a threat may have held its eyes meanwhile), so looking is smooth.
-	var look_angle := rotate_toward((character.facing as Vector2).angle(), desired, look_rate * delta)
-	character.aim_point = self_pos + Vector2.from_angle(look_angle) * 100.0
+	Watch.ease_gaze(character, target, look_rate, delta)
 	if self_pos.distance_to(target) > approach or not _perception.has_line_to(character, null, target):
 		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
 	else:

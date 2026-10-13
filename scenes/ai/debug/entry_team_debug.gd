@@ -17,8 +17,6 @@ const WAITING := Color(1.0, 0.75, 0.3)
 const GUARD := Color(0.3, 0.9, 1.0)
 const BEYOND := Color(0.7, 0.7, 0.7)
 const PAUSED := Color(0.85, 0.6, 1.0)
-## Radio steps after which a member is through the doorway (entry.gd `THROUGH`).
-const THROUGH_STEPS := ["in", "clear", "cover", "rear"]
 
 
 ## Whether this overlay's toggle is on.
@@ -46,7 +44,7 @@ func _team(e: Dictionary) -> void:
 		doors[w["id"]] = w["pos"]
 	for m in e["team"]:
 		var step := str(m["step"])
-		var col := THROUGH if THROUGH_STEPS.has(step) else (WAITING if step == "claim" else ALLY)
+		var col := THROUGH if m.get("through", false) else (WAITING if step == "claim" else ALLY)
 		var at: Vector2 = m["pos"]
 		var side: int = m["side"] if int(m["side"]) != 0 else int(e["side"])
 		var row: Array = slots.get(side, slots.get(int(e["side"]), []))

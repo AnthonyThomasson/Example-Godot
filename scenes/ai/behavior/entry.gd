@@ -24,6 +24,8 @@ extends RefCounted
 ## NPC goes alone; an ally that claims a slot before it commits joins the stack (E7). Owns that state and nothing
 ## else: `Behavior` calls `begin()` on adopting an ENTER leaf and `step()` every tick until it reports done.
 
+const Watch := preload("res://scenes/ai/behavior/watch.gd")
+
 ## A member whose latest call is one of these is through the doorway.
 const THROUGH := ["in", "clear", "cover", "rear"]
 ## A member whose latest call is one of these has called the room clear (`clear`, then the watch it keeps after).
@@ -245,7 +247,7 @@ func debug_view(character) -> Dictionary:
 		"seen_fraction": seen_fraction, "gaze": Vector2.from_angle(_look_angle),
 		"ready_left": ready_left, "follow_left": maxf(follow_gap - (_time - _turn_at), 0.0) if _turn_at >= 0.0 and phase == "stack" else -1.0,
 		"waiting_for": team.filter(func(m): return m["step"] == "claim").map(func(m): return str(m["name"])),
-		"team": team,
+		"team": team.map(func(m): var d: Dictionary = m.duplicate(); d["through"] = THROUGH.has(m["step"]); return d),
 		"watch": _watch.map(func(w): return { "id": w["id"], "pos": w["pos"], "spot": w["spot"], "aim": w["aim"] }),
 		"covering": covering, "cover_spot": _cover_spot, "cover_aim": _cover_aim,
 		"sweep": _sweep.map(func(w): return w["id"]), "rear_spot": _rear_spot, "hold_left": hold_left,
@@ -764,9 +766,6 @@ func _aim_travel(character) -> void:
 
 ## Turn the gaze toward `point` at `look_rate` (× `speed`); true once it is there.
 func _look_toward(character, point: Vector2, delta: float, speed := 1.0) -> bool:
-	var self_pos: Vector2 = character.global_position
-	var desired := (point - self_pos).angle()
-	_look_angle = (character.facing as Vector2).angle()  # From where it looks now: something else may have held its eyes meanwhile.
-	_look_angle = rotate_toward(_look_angle, desired, look_rate * speed * delta)
-	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
+	_look_angle = Watch.ease_gaze(character, point, look_rate * speed, delta)
+	var desired := (point - (character.global_position as Vector2)).angle()
 	return gaze_held or absf(angle_difference(_look_angle, desired)) <= GAZE_SETTLED

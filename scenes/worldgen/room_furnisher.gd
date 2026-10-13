@@ -149,18 +149,8 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 	var mirror := rng.randf() < 0.5
 
 	if arrangement.get("placement", "wall") == "center":
-		for i in range(CENTER_TRIES):
-			var orient: int = rng.randi_range(Orient.TOP, Orient.RIGHT)
-			var size := _oriented_size(fp, orient)
-			var slack := interior.size - size
-			if slack.x < 0.0 or slack.y < 0.0:
-				continue
-			# First try dead center, then random spots.
-			var t := Vector2(0.5, 0.5) if i == 0 else Vector2(rng.randf(), rng.randf())
-			var rect := Rect2(interior.position + slack * t, size)
-			if _fits(rect, interior, occupied) and _leaves_no_slot(rect, walk) and _keeps_walkable(rect, walk):
-				return { "rect": rect, "orient": orient, "mirror": mirror }
-		return {}
+		return _centre_spot(fp, interior, mirror, rng,
+			func(rect: Rect2) -> bool: return _fits(rect, interior, occupied) and _leaves_no_slot(rect, walk) and _keeps_walkable(rect, walk))
 
 	for orient in _shuffled([Orient.TOP, Orient.BOTTOM, Orient.LEFT, Orient.RIGHT], rng):
 		var wall_length := interior.size.x if orient in [Orient.TOP, Orient.BOTTOM] else interior.size.y
@@ -177,8 +167,13 @@ static func _find_spot(arrangement: Dictionary, interior: Rect2, occupied: Array
 ## Like a free-standing spot, but for a "ground" arrangement: dead center first, then random, rejecting only an
 ## overlap with another ground piece. Returns { rect, orient, mirror }, or {} if none fits.
 static func _find_ground_spot(arrangement: Dictionary, interior: Rect2, ground: Array, rng: RandomNumberGenerator) -> Dictionary:
-	var fp: Vector2 = arrangement["footprint"]
-	var mirror := rng.randf() < 0.5
+	return _centre_spot(arrangement["footprint"], interior, rng.randf() < 0.5, rng,
+		func(rect: Rect2) -> bool: return ground.all(func(other: Rect2) -> bool: return not rect.intersects(other)))
+
+
+## A free-standing spot for a footprint `fp` in `interior`: dead centre first, then up to `CENTER_TRIES` random spots,
+## in a random orientation each, the first that `accepts` taken. Returns { rect, orient, mirror }, or {} if none fits.
+static func _centre_spot(fp: Vector2, interior: Rect2, mirror: bool, rng: RandomNumberGenerator, accepts: Callable) -> Dictionary:
 	for i in range(CENTER_TRIES):
 		var orient: int = rng.randi_range(Orient.TOP, Orient.RIGHT)
 		var size := _oriented_size(fp, orient)
@@ -187,7 +182,7 @@ static func _find_ground_spot(arrangement: Dictionary, interior: Rect2, ground: 
 			continue
 		var t := Vector2(0.5, 0.5) if i == 0 else Vector2(rng.randf(), rng.randf())
 		var rect := Rect2(interior.position + slack * t, size)
-		if ground.all(func(other: Rect2) -> bool: return not rect.intersects(other)):
+		if accepts.call(rect):
 			return { "rect": rect, "orient": orient, "mirror": mirror }
 	return {}
 

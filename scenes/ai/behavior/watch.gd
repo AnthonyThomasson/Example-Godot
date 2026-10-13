@@ -22,6 +22,16 @@ const DOOR_MIN_DISTANCE := 60.0
 const PATH_STEP := 30.0
 
 var _loco: Node                   ## The Locomotion child (which room the NPC stands in).
+
+
+## Ease `character`'s gaze from where it looks now toward `point`, by at most `rate` rad/s over `delta`, and aim it there
+## (100 px out); returns the new gaze angle. From the current facing, not a stored angle: something else (a threat) may have
+## held its eyes meanwhile. The one way a gaze is turned: the doors here, a searcher's unseen points, an entry's pie and corners.
+static func ease_gaze(character, point: Vector2, rate: float, delta: float) -> float:
+	var self_pos: Vector2 = character.global_position
+	var angle := rotate_toward((character.facing as Vector2).angle(), (point - self_pos).angle(), rate * delta)
+	character.aim_point = self_pos + Vector2.from_angle(angle) * 100.0
+	return angle
 var _perception: Node             ## The perception sub-domain (the room's doorways, the clear-line test).
 var _room := ""                   ## The room whose doorways are being watched.
 var _doors: Array = []            ## That room's doorway points worth watching, in a turn around the room.
@@ -100,9 +110,7 @@ func idle_gaze(character, delta: float) -> void:
 	_dwell -= delta
 	if _doors.is_empty():
 		return
-	var desired: float = ((_doors[_door] as Vector2) - here).angle()
-	var angle := rotate_toward((character.facing as Vector2).angle(), desired, look_rate * delta)
-	character.aim_point = here + Vector2.from_angle(angle) * 100.0
+	ease_gaze(character, _doors[_door], look_rate, delta)
 
 
 ## Forget the doorway being watched (a new order is taken): the next resting NPC starts again from the nearest.
