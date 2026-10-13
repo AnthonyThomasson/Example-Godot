@@ -19,7 +19,6 @@ var target := Vector2.ZERO        ## The unseen point currently being looked at 
 var room := ""                    ## Key of the room being covered, locked on arrival.
 var budget := 0.0                 ## Seconds left before the coverage gives up on unseeable nooks.
 
-var _look_angle := 0.0            ## Current gaze angle (rad), eased toward the nearest unseen point so looking is smooth.
 var _loco: Node                   ## The Locomotion child (pathing, rooms, navmesh test).
 var _perception: Node             ## The perception sub-domain (what is in sight).
 
@@ -47,7 +46,6 @@ func begin(character) -> void:
 	unseen = points.duplicate()
 	target = character.global_position
 	budget = budget_max
-	_look_angle = character.facing.angle()
 
 
 ## One tick of coverage: drop every sample point now in sight, then — if the room isn't covered yet and the budget holds —
@@ -62,8 +60,9 @@ func step(character, delta: float) -> bool:
 	var self_pos: Vector2 = character.global_position
 	target = _nearest(self_pos, unseen)
 	var desired := (target - self_pos).angle()
-	_look_angle = rotate_toward((character.facing as Vector2).angle(), desired, look_rate * delta)  # From where it looks now: a threat may have held its eyes meanwhile.
-	character.aim_point = self_pos + Vector2.from_angle(_look_angle) * 100.0
+	# Eased from where it looks now (a threat may have held its eyes meanwhile), so looking is smooth.
+	var look_angle := rotate_toward((character.facing as Vector2).angle(), desired, look_rate * delta)
+	character.aim_point = self_pos + Vector2.from_angle(look_angle) * 100.0
 	if self_pos.distance_to(target) > approach or not _perception.has_line_to(character, null, target):
 		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
 	else:

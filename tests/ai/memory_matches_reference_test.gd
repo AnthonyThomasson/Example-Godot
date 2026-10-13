@@ -31,7 +31,6 @@ func run(t: TestContext) -> void:
 	var plain := PlainLog.new()
 	for m in [real, plain]:
 		m.capacity = 18
-		m.default_ttl = 3600.0
 	var mismatches := 0
 	var checked := 0
 	for batch in ROUNDS:
@@ -100,19 +99,18 @@ func _compare(real: RefCounted, plain: RefCounted, rng: RandomNumberGenerator) -
 class PlainLog:
 	extends RefCounted
 
-	var default_ttl: float = 0.0
 	var capacity: int = 64
 	var _entries: Array = []
 	var _earliest_expiry := INF
 
-	func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0, key: String = "") -> void:
+	func remember(topic: StringName, data: Dictionary, ttl: float, key: String = "") -> void:
 		if key != "":
 			for i in range(_entries.size() - 1, -1, -1):
 				var old: Dictionary = _entries[i]
 				if old["topic"] == topic and old["key"] == key:
 					_entries.remove_at(i)
 		var at := Time.get_ticks_msec()
-		var life: float = ttl if ttl >= 0.0 else default_ttl
+		var life: float = ttl
 		_entries.append({ "topic": topic, "key": key, "data": data, "at": at, "ttl": life })
 		if life > 0.0:
 			_earliest_expiry = minf(_earliest_expiry, at + life * 1000.0 - 1.0)

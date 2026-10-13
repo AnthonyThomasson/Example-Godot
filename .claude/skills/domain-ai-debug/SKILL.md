@@ -123,6 +123,6 @@ reacts to a stall), `debug_sent_callout()` and `debug_entry_view()` (behaviour `
 world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`; the guard's
 look-ahead along the walk is computed only when asked). `debug_zones()` entries now also carry the option's `tags`
 (`inside`, `held`, `crosses`/`crosses_name`, `no_shot`, `heading`, `lane`, `hidden`, plus `clear_shot`,
-`route_exposed`, `cover`, `route_len`, `exposed_to`, `ally_lane`, `held_by` added by the snapshot's
+`route_exposed`, `cover`, `ally_lane`, `held_by` added by the snapshot's
 `_geo_tags()`; the planner reads only the booleans (`inside`, `held`, `crosses`, `no_shot`, `heading`,
 `lane`, `hidden`), so the extras don't affect decisions).

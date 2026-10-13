@@ -326,11 +326,6 @@ func posture() -> StringName:
 	return _posture
 
 
-## Whether the body is crouching.
-func is_crouching() -> bool:
-	return _posture == &"crouch"
-
-
 ## Where side `i`'s ankle rests (local x/y px) against a wall or piece of furniture its leg has met, or null when
 ## nothing is in its way. The rig draws the leg there (see character_legs.gd).
 func foot_clamp(i: int) -> Variant:

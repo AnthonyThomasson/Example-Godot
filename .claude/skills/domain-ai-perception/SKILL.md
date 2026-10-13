@@ -80,7 +80,7 @@ fact / section / option reference and the Von wording rules — is the **`domain
 ## Contacts and hostility
 
 The NPC perceives characters, not "the player". The hostility rules categorize each sighting: allies
-(same faction or `allied_factions`) are never hostile; `on_sight` / `trespass` (seen inside the house)
+(the same faction) are never hostile; `on_sight` / `trespass` (seen inside the house)
 / `retaliate` (attacked it, via `process_hit`). A verdict is remembered as `&"hostile"` with ttl
 `hostility_ttl` (≤ 0 = permanent grudge).
 
@@ -110,8 +110,7 @@ of events of that topic, not of everything remembered (a familiar NPC holds a pe
 furniture piece). `seq` keeps the promised order: newest first for readers and `fresh()`, oldest expirable first for volume eviction.
 `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every reader takes the clock
 once. `tests/ai/memory_matches_reference_test.gd` runs random writes through the memory and a plain ordered log and compares every reader. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
-`cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`. An event whose `data`
-carries a `note` string is surfaced to Von.
+`cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`.
 
 ## Tactics (`agent_tactics.gd`)
 

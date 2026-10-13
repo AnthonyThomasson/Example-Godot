@@ -2,7 +2,7 @@ extends Node
 
 ## Audio domain: the sound service, autoloaded as `Sound`. It listens to the EventBus and turns the events other
 ## domains post into positional sound, so emitters never reference it (and it never references them):
-##   &"shot"      a gun fired        { position, gun, attacker, automatic, damage, power }
+##   &"shot"      a gun fired        { position, gun, attacker, power }
 ##   &"hit"       a bullet or punch landed (only those carrying an `outcome`: blocked / penetrate / ricochet /
 ##                punch)             { position, outcome, material, power, speed_factor, damage, … }
 ##   &"footfall"  a foot landed      { position, foot, speed, running }

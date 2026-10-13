@@ -24,8 +24,6 @@ var muzzle_speed: float = BallisticsConfig.projectile_speed
 ## Power to punch through what it hits (1 = a pistol round): it divides the speed lost to a surface and the
 ## deflection, and lowers the speed it needs to get through at all.
 var penetration_power: float = 1.0
-## The id of the gun that fired it (&"" when none), carried on its `hit` events so a listener can tell the rounds apart.
-var gun: StringName = &""
 
 ## How high the bullet flies, 0..100: the same scale as an object's `coverage` (its height). One number for the
 ## whole flight, drawn once at spawn (see `BallisticsConfig.bullet_height`), so it clears or meets everything it
@@ -231,8 +229,8 @@ func _find_exit(info: HitInfo, entry: Vector2, rid: RID, travel: Vector2) -> voi
 ## Hand the hit to the object (if hittable), re-emit `hit`, and post a world `&"hit"` event so
 ## decoupled listeners (the AI's combat awareness) learn that something was struck, where, and by
 ## whom (`attacker` = the shooter, or null). The event also says how the round met the surface: `outcome`
-## (&"ricochet" / &"blocked" / &"penetrate"), the struck `material` ("" for a wall), the surface `normal`, the
-## `speed_factor` it hit at and the firing `gun` and its penetration `power`.
+## (&"ricochet" / &"blocked" / &"penetrate"), the struck `material` ("" for a wall), the `speed_factor` it hit at and
+## the round's penetration `power`.
 func _deal(body: Node, info: HitInfo, outcome: StringName, surface: Dictionary) -> void:
 	if body.has_method("take_hit"):
 		body.take_hit(info)
@@ -241,6 +239,6 @@ func _deal(body: Node, info: HitInfo, outcome: StringName, surface: Dictionary) 
 		"position": info.position, "victim": body, "source": info.source,
 		"direction": info.direction, "damage": info.damage,
 		"attacker": ignore if is_instance_valid(ignore) else null,
-		"outcome": outcome, "material": String(surface.get("material", "")), "normal": info.normal,
-		"speed_factor": info.speed_factor, "gun": gun, "power": penetration_power,
+		"outcome": outcome, "material": String(surface.get("material", "")),
+		"speed_factor": info.speed_factor, "power": penetration_power,
 	})

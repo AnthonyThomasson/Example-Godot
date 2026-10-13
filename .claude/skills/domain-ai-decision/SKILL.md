@@ -125,7 +125,7 @@ each hearing the other's radio first. A test raises `per_frame` with `set_static
 ## `decision_client.gd` — the transport
 
 `configure(url, model, timeout)`; `ask(state_text, instructions, options) -> bool` POSTs ONE `choice`
-question (`pick`) to `/v1/systemone`; `cancel()`; `is_pending()`.
+question (`pick`) to `/v1/systemone`; `cancel()`.
 - `signal answered(pick, probabilities)` — Von's top pick: the argmax `choice` when it is one of the
   offered ids, else the highest-probability offered id (a stale/foreign id can never be chosen). Von's
   distributions are flat, so taking the top pick — not sampling — keeps the NPC decisive.

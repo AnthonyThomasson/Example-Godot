@@ -7,8 +7,7 @@ extends RefCounted
 ## decisions; the perception renders fresh events into the decision state. It holds NO policy — it
 ## does not know what any topic means.
 ##
-## Cleanup is a configurable policy, not a per-topic limit. `default_ttl` sets a fallback lifetime
-## for events remembered without an explicit one, and `capacity` caps the total stored. Eviction
+## Cleanup is a configurable policy, not a per-topic limit: `capacity` caps the total stored. Eviction
 ## runs on every write: age-expired events are dropped first, then, if still over capacity, the
 ## oldest EXPIRABLE event (one with a positive ttl). Permanent events (ttl <= 0 — long-term facts
 ## like learned house knowledge) never age out and are never volume-evicted. So memory self-cleans
@@ -23,8 +22,6 @@ extends RefCounted
 ## its write order across topics (`seq`). A write or a read touches only the lists of the topic it names, not
 ## every event stored, and the order the log promises (newest first, oldest evicted first) is the `seq` order.
 
-## Fallback lifetime (seconds) for events remembered without an explicit ttl; <= 0 = no age expiry.
-var default_ttl: float = 0.0
 ## Hard cap on total stored events; the oldest are evicted past it. <= 0 = unlimited.
 var capacity: int = 64
 
@@ -40,11 +37,10 @@ var _next_seq := 0
 var _earliest_expiry := INF
 
 
-## Record that something happened: append an event under `topic` with optional `data` (which may
-## carry a `note` string for the decision state). `ttl` is its lifetime in seconds; a negative ttl
-## falls back to `default_ttl`. A non-empty `key` supersedes any earlier event with the same topic +
-## key (see the class note). Evicts expired/overflow events afterward.
-func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0, key: String = "") -> void:
+## Record that something happened: append an event under `topic` with `data`. `ttl` is its lifetime in seconds
+## (<= 0 = permanent). A non-empty `key` supersedes any earlier event with the same topic + key (see the class
+## note). Evicts expired/overflow events afterward.
+func remember(topic: StringName, data: Dictionary, ttl: float, key: String = "") -> void:
 	var list: Array = _by_topic.get(topic, [])
 	if list.is_empty():
 		_by_topic[topic] = list
@@ -54,7 +50,7 @@ func remember(topic: StringName, data: Dictionary = {}, ttl: float = -1.0, key: 
 				list.remove_at(i)
 				_count -= 1
 	var at := Time.get_ticks_msec()
-	var life: float = ttl if ttl >= 0.0 else default_ttl
+	var life: float = ttl
 	list.append({
 		"topic": topic,
 		"key": key,

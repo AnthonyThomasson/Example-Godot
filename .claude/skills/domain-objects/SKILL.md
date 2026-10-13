@@ -101,8 +101,8 @@ art instead of a flat shape with its name label (the flat path stays for any def
   and `wall` (plaster / brick cap, symmetric across the thickness). Each knob reads
   `opts.get(key, ObjectArtConfig.<painter>_<key>)`, so a catalogue `art_opts` picks the variant
   or overrides it for one piece. Round footprints keep their art inside the inscribed circle.
-- `props.gd` — small props dressing a surface (monitor, keyboard, laptop, mug, papers, book,
-  clock, bowl, fruit bowl, vase, cutting board, tools, vise, crayons, plate, lamp, toys, phone),
+- `props.gd` — small props dressing a surface (monitor, keyboard, mug, papers, book,
+  clock, bowl, fruit bowl, vase, cutting board, tools, vise, crayons, plate),
   drawn by `table` / `cabinet` / `counter` from `art_opts.props` (`{ kind, at }`, `at` relative
   to the surface), raised so they cast shadows; colors from `ObjectArtConfig.prop_colors`.
 - `object_art_config.gd` — `ObjectArtConfig`, the Objects painters' tuning: per-painter

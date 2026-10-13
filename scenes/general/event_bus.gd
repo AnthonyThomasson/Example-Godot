@@ -8,7 +8,7 @@ extends Node
 ## attacker }` plus `outcome`, `material` and, for bullets, `normal`, `speed_factor`, `gun`, `power`),
 ## consumed by the AI for combat awareness, by the match HUD and by Audio for impacts; &"shot" (a gun
 ## fired), &"footfall" (a foot landed) and &"reload" (a reload started or finished), consumed by Audio;
-## &"casing" (a casing landed), which nothing consumes; &"sound" —
+## &"sound" —
 ## what Audio posts for each sound it makes; and &"callout" — an AI controller's team radio when it
 ## adopts a combat or investigation decision, consumed by allied AIs.
 

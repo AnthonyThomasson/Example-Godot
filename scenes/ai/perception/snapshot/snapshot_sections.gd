@@ -150,8 +150,8 @@ func flanks_text(t: Dictionary, a: Dictionary) -> String:
 	return "Flanks on %s (you are on %s): %s." % [t["name"], SnapshotVocab.SIDE_WORDS[a["own_side"]], "; ".join(parts)]
 
 
-## Being shot at or hit (and from where), gunfire heard nearby (only while no hostile is known — in a
-## fight it is just the fight), and any remembered event with a note.
+## Being shot at or hit (and from where), and gunfire heard nearby (only while no hostile is known — in a
+## fight it is just the fight).
 func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 	var out: Array = []
 	if _under_fire():
@@ -162,15 +162,6 @@ func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 		if not fighting and rec["age"] <= _v.recency_bands.y:
 			out.append("Gunfire heard to the %s, %s, %s." % [_v.compass(rec["data"]["pos"] - self_pos), _v.place(rec["data"]["pos"]), _v.recency(rec["age"])])
 			break
-	var seen := { &"under_fire": true }
-	for entry in _memory.fresh():
-		var topic = entry["topic"]
-		if seen.has(topic):
-			continue
-		seen[topic] = true
-		var note = entry["data"].get("note", "")
-		if note != "":
-			out.append(note)
 	return "\n".join(out)
 
 

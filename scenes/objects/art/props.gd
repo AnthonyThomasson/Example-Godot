@@ -21,7 +21,6 @@ static func draw(c: PixelCanvas, kind: String, o: Vector2i) -> void:
 	match kind:
 		"monitor": _monitor(c, o)
 		"keyboard": _keyboard(c, o)
-		"laptop": _laptop(c, o)
 		"mug": _mug(c, o)
 		"papers": _papers(c, o)
 		"book": _book(c, o)
@@ -34,9 +33,6 @@ static func draw(c: PixelCanvas, kind: String, o: Vector2i) -> void:
 		"vise": _vise(c, o)
 		"crayons": _crayons(c, o)
 		"plate": _plate(c, o)
-		"lamp": _lamp(c, o)
-		"toys": _toys(c, o)
-		"phone": _phone(c, o)
 		_:
 			push_warning("Props: unknown prop '%s'" % kind)
 
@@ -95,21 +91,6 @@ static func _keyboard(c: PixelCanvas, o: Vector2i) -> void:
 		for x in range(r.position.x + 1 + (y % 2), r.end.x - 1, 2):
 			c.px(x, y, _col("plastic_light").darkened(0.22))
 
-
-## An open laptop: a keyboard deck and trackpad, the screen's hinge bar along the back.
-static func _laptop(c: PixelCanvas, o: Vector2i) -> void:
-	var r := _box(o, 20, 14)
-	var s := _block(c, r, 1, _col("metal"))
-	c.outline(s, _col("metal").darkened(0.45))
-	var keys := Rect2i(r.position.x + 2, r.position.y + _u(4), r.size.x - 4, _u(5))
-	c.fill(PixelCanvas.rounded(keys, 0), _col("plastic_dark"))
-	for x in range(keys.position.x, keys.end.x, 2):
-		c.px(x, keys.position.y + 1, _col("plastic_dark").lightened(0.2))
-		c.px(x + 1, keys.position.y + 3, _col("plastic_dark").lightened(0.2))
-	c.fill(PixelCanvas.rounded(Rect2i(o.x - _u(3), r.end.y - _u(4), _u(6), _u(3)), 0), _col("metal").darkened(0.12))
-	var hinge := Rect2i(r.position.x, r.position.y, r.size.x, _u(2))
-	c.fill(PixelCanvas.rounded(hinge, 0), _col("plastic_dark").darkened(0.2), _HEIGHT + 1)
-	c.line(Vector2i(hinge.position.x + 1, hinge.end.y - 1), Vector2i(hinge.end.x - 2, hinge.end.y - 1), _col("glow"))
 
 
 ## A mug of coffee with its handle.
@@ -237,26 +218,3 @@ static func _plate(c: PixelCanvas, o: Vector2i) -> void:
 	c.outline(PixelCanvas.disc(o, _u(3)), _col("ceramic").darkened(0.12))
 
 
-## A small lamp shade with a glowing bulb.
-static func _lamp(c: PixelCanvas, o: Vector2i) -> void:
-	var shade := PixelCanvas.disc(o, _u(4))
-	c.fill(shade, _col("shade"), _HEIGHT + 2)
-	c.outline(shade, _col("shade").darkened(0.3))
-	c.fill(PixelCanvas.disc(o, _u(1)), _col("glow").lightened(0.6))
-
-
-## A striped ball and a toy block.
-static func _toys(c: PixelCanvas, o: Vector2i) -> void:
-	var ball := o + Vector2i(-_u(3), 0)
-	c.fill(PixelCanvas.disc(ball, _u(3)), pick(c, "flowers"), _HEIGHT)
-	c.line(ball + Vector2i(-_u(2), 0), ball + Vector2i(_u(2), 0), _col("paper"), _HEIGHT)
-	var block := Rect2i(o + Vector2i(_u(2), -_u(2)), Vector2i(_u(4), _u(4)))
-	_block(c, block, 0, pick(c, "books"))
-
-
-## A phone with a lit screen.
-static func _phone(c: PixelCanvas, o: Vector2i) -> void:
-	var r := _box(o, 5, 8)
-	var s := _block(c, r, 1, _col("plastic_dark"))
-	c.fill(PixelCanvas.rounded(r.grow(-1), 0), _col("glow").darkened(0.3))
-	c.outline(s, _col("plastic_dark").darkened(0.4))

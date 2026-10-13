@@ -37,5 +37,5 @@ func run(t: TestContext) -> void:
 	gunman.aim_at(pinned)
 	await t.seconds(0.5)
 	gunman.shoot()
-	t.check(await t.until(func(): return pinned.is_crouching(), 5.0), "shot at in the open, the defender crouches (%s)" % pinned.posture())
+	t.check(await t.until(func(): return pinned.posture() == &"crouch", 5.0), "shot at in the open, the defender crouches (%s)" % pinned.posture())
 	t.expect_eq(bystander.posture(), &"stand", "the defender out of the fire stays on its feet")

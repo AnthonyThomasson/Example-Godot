@@ -97,12 +97,11 @@ cross-domain notifications: `post(topic, data)` broadcasts and the `posted(topic
 delivers to any listener, which filters by `topic`. Emitters and listeners never reference each
 other. Topics in use: `&"hit"`, posted by the Projectile System for each damaging hit and
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`, plus
-`outcome` / `material` and, for bullets, `normal`, `speed_factor`, `gun`, `power`)
+`outcome` / `material` and, for bullets, `speed_factor`, `power`)
 and consumed by the AI for combat awareness, hostility and gunfire heard, and by Audio for impacts;
 `&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
-Items and Character and consumed only by Audio; `&"casing"` (a casing landed), posted by Projectile, which nothing
-consumes; `&"sound"`, which Audio posts for every sound it
+Items and Character and consumed only by Audio; `&"sound"`, which Audio posts for every sound it
 makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
 consumed by allied AIs.

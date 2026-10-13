@@ -82,10 +82,6 @@ static var ROWS := {
 		"description": "Bullets may fly over partial cover (off = every shot meets what it reaches).",
 		"static": [[BallisticsConfig, &"cover_flyover_scale", 0.0]],
 	},
-	&"physics.wall_collider_deform": {
-		"description": "A dented object's collider follows its deformed shape.",
-		"static": [[PhysicsConfig, &"deform_update_collider"]],
-	},
 }
 
 

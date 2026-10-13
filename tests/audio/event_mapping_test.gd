@@ -100,9 +100,6 @@ func run(t: TestContext) -> void:
 	var right: Dictionary = _post(t, &"footfall", { "position": inside, "foot": 1, "speed": 150.0 })[0]
 	t.check(right["pitch"] > left["pitch"], "the right foot rings a touch higher than the left (%.2f vs %.2f)" % [right["pitch"], left["pitch"]])
 
-	# A casing landing is not a sound.
-	t.expect_eq(_post(t, &"casing", { "position": inside, "gun": &"rifle", "power": 2.2 }).size(), 0, "a casing landing makes no sound")
-
 	# Reloads: the magazine out when it starts, in when it finishes; anything else makes no sound.
 	t.expect_eq(_post(t, &"reload", { "position": at, "gun": &"rifle", "stage": &"start", "power": 2.2 })[0]["profile"], &"reload/rifle/out", "a rifle reload starting")
 	t.expect_eq(_post(t, &"reload", { "position": at, "gun": &"pistol", "stage": &"done" })[0]["profile"], &"reload/pistol/in", "a pistol reload finishing")
