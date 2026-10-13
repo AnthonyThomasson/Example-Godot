@@ -242,7 +242,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
-	 living characters at rest under the region's parent), `NavBuilder.steering_map(world_map) -> RID` (a map of its own, holding
+	 living characters at rest under the region's parent), `NavBuilder.steering_map(planning_map) -> RID` (a map of its own, holding
 	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
 	 `rebake_steering(region, house, rooms)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
 	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.

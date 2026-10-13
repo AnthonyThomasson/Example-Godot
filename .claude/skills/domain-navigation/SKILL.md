@@ -40,7 +40,7 @@ every character is inside its own hole, and a walking one's would seal or split 
 and send its own path the long way round.
 
 These holes live in a **second map**, not the world's: `build` adds a child region `NavSteering` (`steering_region(region)`) on a map of
-its own (`steering_map(world_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
+its own (`steering_map(planning_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
 The world's own map stays furniture-only, because the AI plans on it (flank/fire/retreat spots, route length and exposure, tactical
 entry slots, search coverage) and a body's hole would bend every one of those. Only a `NavigationAgent2D` walks the steering map, and
 the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it; it is baked
@@ -111,7 +111,7 @@ to its current positions. The characters' holes are drawn too, in another colour
   and read `get_next_path_position()`. `NavBuilder.rebake(region, house, rooms, agent_radius)`
   re-carves the holes in place as furniture moves (driven internally by `nav_updater.gd`).
   `NavBuilder.furniture_holes(house) -> Array` is the debug read Main snapshots for the
-  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(world_map) -> RID` (invalid when the world has none),
+  `nav_debug.gd` overlay. `NavBuilder.character_holes(root)`, `steering_map(planning_map) -> RID` (invalid when the world has none),
   `steering_region(region)` and `rebake_steering(region, house, rooms)` are the characters-at-rest side (above).
   `NavBuilder.ready(map)`, `snap(map, p)`, `route(map, from, to)` and `path_length(path)` are the map queries the AI
   reads a baked map through (above).
