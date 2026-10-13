@@ -101,7 +101,7 @@ func _execute(line: String) -> String:
 	match parts[0]:
 		"help":
 			return "verbs: help, pos, tp X Y, slot N, move up|down|left|right [off], stop, " \
-				+ "fire, punch, reload, interact, crouch, aim X Y, match, ai, restart [seed], menu, eval EXPR; " \
+				+ "fire, punch, kick, reload, interact, crouch, aim X Y, match, ai, restart [seed], menu, eval EXPR; " \
 				+ "anything else = GDScript expression"
 		"match":
 			return _match_status()
@@ -161,6 +161,9 @@ func _execute(line: String) -> String:
 			return "ok"
 		"punch":
 			tap(Keybinds.PUNCH)
+			return "ok"
+		"kick":
+			tap(Keybinds.KICK)
 			return "ok"
 		"reload":
 			tap(Keybinds.RELOAD)

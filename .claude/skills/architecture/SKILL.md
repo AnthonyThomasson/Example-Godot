@@ -6,7 +6,7 @@ description: The architecture map for this Godot project (Example_Godot) — the
 # Example_Godot architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
-furnished house, with two "hands" that aim at the mouse, a punch on **F**, a gun (pistol, SMG or
+furnished house, with two "hands" that aim at the mouse, a punch on **F**, a leg kick, a gun (pistol, SMG or
 assault rifle) that fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
 organized into **fourteen isolated domains** so each can be changed on its own.
 
@@ -149,7 +149,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `hand_stance(hand) -> StringName` (how that
    hand is held — the name of a `CharacterConfig.stances` entry: `relaxed`, `guard`, `aim`, `support`;
-   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F),
+   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F), `strike_ahead()` / `strike_turn()` / `strike_swing(amount)` / `strike_end(aim, amount)` (a long gun's punch swings it nearly across the body, butt leading),
    `secondary(user) -> bool` (LMB; true = a round left the barrel), `tick(delta)` (the item's own clocks; the character ticks
    every item it carries each physics frame), `is_automatic()` (holding the trigger keeps firing), `weapon_hand()`,
    `muzzle_ahead()` (px past the weapon hand where bullets leave; negative = the character's `CharacterConfig.muzzle_ahead`),
@@ -163,7 +163,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `random_gun_slot(rng)` / `loadout_for(gun_slot)` / `spares_for(gun_slot)`. `LoadoutConfig` (static holder) is what Main
    hands a character: `options()` (plain dicts for the setup window: `RANDOM`, then every `GunConfig` gun with its magazines),
    `normalize(loadout)`, `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout`) and `random(rng)`. The
-   character API an item may call: `facing`, `punch(hand)`,
+   character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)` (0..1, how far that hand is thrown: a long gun swings round by it),
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
    `world_root()` (also read by the AI to find the world's characters), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
    `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`) and `weapon_raise()` (0..1, how far
@@ -183,7 +183,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `control(character, delta)`. The controller writes `move_input` / `aim_point` / `run_input` (hold run: a
    faster pace that spends stamina while moving, dry = walk until it refills; only a standing character runs) and calls the
    character's action API: `set_posture(p) -> bool` (`stand` / `crouch`; idempotent, so a controller may write it every frame; the player's C calls
-   `toggle_crouch()`), `melee()` (F), `shoot() -> bool` (LMB; true = a round left the barrel; ignored while running, reloading,
+   `toggle_crouch()`), `melee()` (F), `leg_kick() -> bool` (a right-leg kick along the facing, whatever is held; false while dead, crouched, busy or a kick is under way; reads `is_kicking()`; **not** the recoil `kick(hand, strength)` above), `shoot() -> bool` (LMB; true = a round left the barrel; ignored while running, reloading,
    or with a long gun's barrel against a wall or object, and a gun holds back between rounds per its fire rate; a controller re-presses it
    every frame while the trigger is held when `is_automatic()`), `reload()` (R: a timed swap to
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
@@ -200,7 +200,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
    `player_controller.gd` is the human one and
    is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main `MENU`; the test runner `MENU`, `PAUSE` and the camera actions;
    the spectator inspector `PAUSE`; the camera its pan and zoom actions). Signals:
-   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand −1 = shot),
+   `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand 2 = leg kick, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
    exported node path and read only the public API/signals; the controller also exposes
@@ -263,7 +263,7 @@ interface(s) and describes how they're implemented; this list is authoritative f
       character or null). The AI controller consumes it for combat awareness, hostility ("attacked
       me") and gunfire heard farther off; the match HUD for its combat feed. It also says *how* the
       hit met the surface, for the Audio domain: `outcome` (`&"blocked"` / `&"penetrate"` /
-      `&"ricochet"` for a bullet, `&"punch"` for a fist), `material` (the struck surface's, `""` for a
+      `&"ricochet"` for a bullet, `&"punch"` for a fist or a kick), `material` (the struck surface's, `""` for a
       wall), and for bullets `speed_factor` and `power` (its penetration power). A shot
       that flies over cover posts nothing.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the

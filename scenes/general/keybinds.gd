@@ -17,6 +17,8 @@ const RUN := "run"
 ## Crouch (toggle): a smaller target but slower, and only a standing character can run.
 const CROUCH := "crouch"
 const PUNCH := "punch"
+## Kick with a leg, whatever is held.
+const KICK := "kick"
 const FIRE := "fire"
 const INTERACT := "interact"
 ## Reload the held gun from a carried magazine.
@@ -56,6 +58,7 @@ const DEFAULTS := {
 	RUN: KEY_SHIFT,
 	CROUCH: KEY_C,
 	PUNCH: KEY_F,
+	KICK: KEY_V,
 	INTERACT: KEY_SPACE,
 	RELOAD: KEY_R,
 	MENU: KEY_ESCAPE,
@@ -93,6 +96,7 @@ const LABELS := {
 	RUN: "Run (hold)",
 	CROUCH: "Crouch",
 	PUNCH: "Punch",
+	KICK: "Kick",
 	FIRE: "Fire",
 	RELOAD: "Reload",
 	INTERACT: "Interact",
@@ -124,6 +128,7 @@ const GROUPS := {
 	RUN: "Movement",
 	CROUCH: "Movement",
 	PUNCH: "Combat",
+	KICK: "Combat",
 	FIRE: "Combat",
 	RELOAD: "Combat",
 	INTERACT: "Interaction",
@@ -352,6 +357,11 @@ func get_camera_vector() -> Vector2:
 ## action as movement, so rebinding `PUNCH` with `bind()` just works.
 func is_punch_just_pressed() -> bool:
 	return Input.is_action_just_pressed(PUNCH)
+
+
+## True on the frame the kick key is pressed (rebindable through `KICK`).
+func is_kick_just_pressed() -> bool:
+	return Input.is_action_just_pressed(KICK)
 
 
 ## True on the frame the fire button (left-click) is pressed. Rebindable with `bind()`
