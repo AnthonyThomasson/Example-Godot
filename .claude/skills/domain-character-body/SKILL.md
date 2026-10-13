@@ -287,4 +287,18 @@ punch position — which extends into what is hit, unlike the drawn hand that re
 is moving this frame; 1.0 = full-speed extend). It emits `punched(hand, body, damage)` → the
 character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never deforms; walls (no
 `apply_impulse`) take damage without moving. Tuned by `CharacterConfig.punch_impulse` /
-`punch_damage` (walking push tuned by the same holder).
+`punch_damage` (walking push tuned by the same holder). A long gun's butt strike (`domain-items`) shortens the hand's extension by `Item.strike_forward()` + `strike_short()` and queries the hit at the butt (`Item.strike_end`) once it is ahead of the fist; the other hand is placed rigidly on the barrel (`_raw_hand_position`: the weapon hand's place plus `strike_direction` x `strike_support_gap()`, toward the butt, gripping from the first frame of the swing) so both arms follow the turning gun, the swing takes `strike_tempo()` times a fist's extend/retract time (the damage's range of motion is normalised by it), and the redraw key carries both hands' punch amounts, since the gun turns with them.
+
+## The leg kick
+
+`character_kick.gd` (a `RefCounted` the character owns as `_kick`, stepped each physics frame after `move_and_slide` and before
+`pose.update`) is the leg kick, independent of the held item and always with the right leg (side 0). `Character.leg_kick()` starts it (false when dead, crouched, in an interaction or a
+kick is already under way), then a STRIKE (`kick_strike_time`, the foot thrown out) and a RECOVER
+(`kick_recover_time`, drawn back) run; `amount()` is the foot's 0..1 extension, read by the rig through `character.leg_kick_amount(i)`.
+The rig lifts the kicking ankle to `kick_foot_height` (body radii) first and throws it out along `facing` (never past `kick_reach` or the
+leg's length at that height), the knee bent up toward the aim and the toes following; the other leg keeps striding. During the strike a
+circle of `kick_radius` at `kick_reach * amount()` ahead of the body centre is queried on `PhysicsLayers.SOLID`: each body is hit once
+per kick, shoved by `kick_impulse` along `facing` (`apply_impulse`) and dealt `kick_damage` (`take_damage`) at full strength, then
+`kicked(body, damage)` → the character posts `hit_landed(body, damage, 2)` and the `&"hit"` event with outcome `punch` (so it sounds like
+a punch; louder for its damage), like a punch it never deforms. The legs layer rests the thrown foot against walls like any other. Cleared
+on an interaction and on death. Tuning: `CharacterConfig.kick_*`. Tests: `tests/character/kick_*_test.gd`.

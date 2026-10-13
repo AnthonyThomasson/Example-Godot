@@ -24,8 +24,9 @@ exports): `shoot_range`, `punch_range`, `combat_ring_radius` / `combat_ring_coun
 fire on `fire_cooldown`, then duck; in the COVER phase hold behind a shielding spot for `cover_time` (reloading an empty gun
 meanwhile) before peeking again. Positions are committed for `reposition_interval`, not re-picked every frame, so the NPC steers
 smoothly. A peek shoots only once the facing has settled on the contact (`AIM_TOLERANCE`) and ducks only after a shot left the barrel (or on the click
-of an empty gun, where the cover phase reloads it), not after a refused one. **Ambush** holds the covered spot and fires the moment a line opens (facing settled). **Melee** closes to `punch_range` and swings on the
-cooldown (no cover cycle for fists). With `hold_ground` (a territorial NPC fighting a contact outside), spots are restricted to inside
+of an empty gun, where the cover phase reloads it), not after a refused one. **Ambush** holds the covered spot and fires the moment a line opens (facing settled). **Melee** closes to `punch_range` and strikes on the
+cooldown (no cover cycle): `Combat.strike` kicks (`Combat.kick`, `Character.leg_kick()`) while standing with a gun in hand, so the gun stays in hand,
+and otherwise (crouched, or no gun held) equips the fists and punches (`Combat.punch`). With `hold_ground` (a territorial NPC fighting a contact outside), spots are restricted to inside
 the house, the peek fallback holds instead of advancing, and melee won't chase out of the house.
 
 **No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the

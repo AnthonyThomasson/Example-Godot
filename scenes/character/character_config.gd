@@ -66,6 +66,20 @@ static var punch_impulse: float = 900.0
 ## through hit_landed for the HUD; a punch does not deform what it hits.
 static var punch_damage: float = 8.0
 
+# --- The leg kick (the right leg; character_kick.gd): harder than a punch, shorter in reach, and slower to come back ---
+## Central impulse a kick imparts to a pushable object, and the damage it reports (both at full strength: a kick
+## lands only while the foot is being thrown out).
+static var kick_impulse: float = 2200.0
+static var kick_damage: float = 14.0
+## How far (px) from the body centre the foot is thrown along the facing, and the radius of the circle that strikes.
+static var kick_reach: float = 44.0
+static var kick_radius: float = 6.0
+## Seconds the foot takes to be thrown out (the strike) and to be drawn back (no other kick starts meanwhile).
+static var kick_strike_time: float = 0.09
+static var kick_recover_time: float = 0.22
+## How high (body radii) the thrown foot is held off the floor: it must stay within the leg's length of the hip.
+static var kick_foot_height: float = 2.1
+
 # --- Flesh: how a character reacts to being shot (the "hittable" contract) --------------
 # Every value here is a tuning knob; a character reads them in _ready() / its visuals, so
 # adjusting flesh damage response is a one-line change and needs no code edits.

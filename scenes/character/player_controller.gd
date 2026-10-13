@@ -25,6 +25,8 @@ func control(character, _delta: float) -> void:
 
 	if Keybinds.is_punch_just_pressed():
 		character.melee()
+	if Keybinds.is_kick_just_pressed():
+		character.leg_kick()
 	# A click on a HUD control (the overlay bar, a panel) belongs to the UI, not the gun. Input polling
 	# ignores GUI mouse filters, so ask the viewport what the pointer is over. A press that began on the UI
 	# stays the UI's however far it is dragged.

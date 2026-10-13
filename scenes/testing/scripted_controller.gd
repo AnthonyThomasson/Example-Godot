@@ -111,6 +111,11 @@ func punch() -> void:
 	_pending.append(func(c): c.melee())
 
 
+## Kick with a leg (V), whatever is held.
+func kick() -> void:
+	_pending.append(func(c): c.leg_kick())
+
+
 ## Use the held item's secondary action once (a click of LMB: fire a round).
 func shoot() -> void:
 	_pending.append(func(c): c.shoot())
