@@ -73,9 +73,8 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11 to E13) and `tests/ai/entry/`; the spec's E14 and E15 are open gaps
-(no crossing on a hostile in view,
-doorways passed in a corridor; E10, the clear-time benchmark, is met), specified with red `gap` tests and not implemented here. `Behavior` adopts an
+The spec and the tests are `docs/tactical-entry.md` (E1 to E9, E11 to E14) and `tests/ai/entry/`; the spec's E15 is an open gap
+(doorways passed in a corridor; E10, the clear-time benchmark, is met), specified with red `gap` tests and not implemented here. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
 `approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a
@@ -112,6 +111,13 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   facing back (E12), until the room is called clear by the team and a teammate that held it moves on (`_team_moved`) or
   `rear_time` has run out since, then radios `done`. It never crosses. Not held back once nobody ahead of it is on the radio and
   the room is not called clear (it takes the lead); gives up (`abort`) after `SECURITY_CAP` (30 s) with no clear call.
+- **No crossing on a hostile in view (E14).** `Behavior._apply_entry` hands the entry `hostile_in_view` (`_hostile_in_view`: the watch
+  stage's threat is seen now, or was within `watch_lost_gaze`, and `Combat.has_line_of_fire` holds: in range on a clear line, so it
+  can be engaged from outside; a hostile seen over low cover with no line of fire holds nothing). While it is set the pie holds where it stands
+  (no next step, no crossing; the watch stage fires), a follower does not cross after the member ahead, and nothing else changes: it
+  crosses once the hostile is out of view. Whatever order brought the NPC to the doorway (ENTER, or a COMBAT advance / engage the
+  entry guard sent through an entry) meets the same rule, because it is the entry's, not the order's. An NPC under fire still drops
+  a detour and walks in (the guard's exemption).
 - **Barrier and order.** The point crosses when every other claimant has radioed past `claim`, or `entry_ready_timeout`
   after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
   it radioed `in`. A member still at `claim` once the one behind has waited the timeout is dropped from the order.

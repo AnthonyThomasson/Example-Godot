@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (E14): a hostile seen through the door is fought from outside, and nobody crosses while it stands in view.
+## E14: a hostile seen through the door is fought from outside, and nobody crosses while it stands in view.
 ## A defender in the kitchen, out of sight of the stack but in view of the pie, is seen and shot at from outside; it
 ## cannot be killed and does not move, so the invader must never go in: not by the entry, and not by whatever fight Von
 ## chooses once it has engaged. Real Von: the invader stands in the back garden and decides for itself.
@@ -13,7 +13,7 @@ func describe() -> Dictionary:
 	return {
 		"name": "Entry holds outside while a hostile is in view",
 		"description": "An invader that sees a defender through the back door engages it from outside and does not cross while it stands.",
-		"tags": ["ai", "entry", "gap", "von"],
+		"tags": ["ai", "entry", "von"],
 		"requires_von": true,
 		"timeout": 70.0,
 	}

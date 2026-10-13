@@ -57,12 +57,19 @@ func tick(delta: float) -> void:
 	fire_timer -= delta
 
 
-## Whether `target` (a known-contact dict) can be shot at now: a loaded gun not mid-reload, the target within range, and a clear
-## line to where it is known to be. The cooldown, the facing and a run are not counted: they pass in a moment, this says
-## the NPC is in a position to fire.
+## Whether `target` (a known-contact dict) can be shot at now: a loaded gun not mid-reload, and `has_line_of_fire`. The cooldown, the
+## facing and a run are not counted: they pass in a moment, this says the NPC is in a position to fire.
 func can_fire_at(character, target: Dictionary) -> bool:
 	var gun: int = character.gun_slot()
 	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading() or target.is_empty():
+		return false
+	return has_line_of_fire(character, target)
+
+
+## Whether `target` (a known-contact dict) stands within range on a clear line to where it is known to be: a shot at it is possible
+## from here whatever the gun's state (the entry reads it as "engaged from outside", docs/tactical-entry.md E14).
+func has_line_of_fire(character, target: Dictionary) -> bool:
+	if target.is_empty():
 		return false
 	var pos: Vector2 = target["pos"]
 	return character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(character, target["node"], pos)

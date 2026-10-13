@@ -878,6 +878,7 @@ func _apply_melee(character) -> void:
 ## sight in every one of them). Done (the room clear, or the entry given up) → re-decide.
 func _apply_entry(character, delta: float) -> void:
 	_entry.gaze_held = not _threat.is_empty()
+	_entry.hostile_in_view = _hostile_in_view(character)
 	if _entry_pending:
 		_entry_pending = false
 		if not _entry.begin(character, _params):
@@ -885,6 +886,14 @@ func _apply_entry(character, delta: float) -> void:
 			return
 	if _entry.step(character, delta):
 		_finish_entry()
+
+
+## Whether a hostile stands in view for the entry's purposes (E14): the threat holding the NPC's eyes is seen now, or was a moment ago
+## (`watch_lost_gaze` s), and there is a line of fire to it from here, so it can be engaged from outside. A hostile remembered from
+## longer ago, or one seen but behind a wall or out of range (nothing to engage it with from outside), does not hold an entry outside.
+func _hostile_in_view(character) -> bool:
+	return not _threat.is_empty() and (bool(_threat["visible"]) or float(_threat["age"]) <= watch_lost_gaze) \
+		and _combat.has_line_of_fire(character, _threat)
 
 
 ## The entry is over, or could not start. As the NPC's own order (ENTER) it resolves and the NPC re-decides. As a detour

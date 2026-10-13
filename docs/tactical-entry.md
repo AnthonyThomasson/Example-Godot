@@ -1,11 +1,11 @@
 # Tactical entry
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
-that rule is modelled on. Behaviours E1 to E9 and E11 to E13 are enforced; each has its tests
+that rule is modelled on. Behaviours E1 to E9 and E11 to E14 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. Behaviours E14 and E15 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
+E10 (the clear-time benchmark) is met and its test is green. Behaviour E15 is an **open gap**: real-world rules the AI does not follow yet, written here first from the
 sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
 `tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
 (`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
@@ -83,7 +83,7 @@ outside, and it notes the share of the room seen and which corners are still hid
 to learn the room, and the farthest the entrant ever is from a threat. Built on `visible_points` and the
 search-coverage sweep.
 It fires in every phase, the approach and the stack as much as the pie (`docs/gaze-and-fire.md` W2); a threat in sight holds the
-entrant's eyes there, and a pie step the gaze cannot settle on because of it counts as settled, so the entry still goes in.
+entrant's eyes there, and a pie step the gaze cannot settle on because of it counts as settled; with a line of fire to the hostile the pie then holds and nobody crosses (E14), and without one the entry goes on.
 Tests: `entry_pie_sees_room_from_outside`, `entry_pie_engages_from_outside`, `entry_guard_fires_from_outside`.
 
 **E4. Never stop in the funnel.** Once an invader commits to crossing, it keeps moving until it is
@@ -183,13 +183,21 @@ and it gives up after 30 s with the room never called clear.
 Test: `entry_short_room_two_go_in` (the box room of `flank_maps.gd`; three invaders in its corridor, real Von,
 `requires_von`).
 
-### Open gaps (E14 and E15, tests tagged `gap`)
-
 **E14. Engage from outside; no crossing on a hostile in view.** A hostile seen through the door is fought from outside,
 and nobody crosses while it stands in view, whatever tactic is chosen for the fight. Why: what is visible is engaged
 from outside, a room that can be cleared without entering is not entered, and a known gun on the door is the funnel at
-its worst (E3, E7's "if nothing is hostile in view").
-Test: `entry_hostile_in_view_holds_outside` (a defender that cannot be killed, in view from the pie arc).
+its worst (E3, E7's "if nothing is hostile in view"). In the code, `Behavior` tells the entry when a hostile is in view (the
+threat holding the NPC's eyes is seen now, or was within `watch_lost_gaze`, 2 s, and there is a line of fire to it, within
+range and with a clear line, so it can be engaged from outside: `Entry.hostile_in_view`; a hostile seen over low cover with no
+line of fire gives nothing to engage from outside, and does not hold the entry). The pie then stops where it is (the point neither walks on to the next step nor crosses), a follower
+does not cross after the member ahead, and the watch stage fires; the entry goes on, and crosses, once the hostile is out
+of view. This holds whatever order brought the NPC to the door: the ENTER tactic, or a COMBAT advance or engage whose walk the
+entry guard (E9) turns into an entry. An NPC already under fire still gives a detour up and walks straight in (E9's exemption):
+the one case left open here.
+Test: `entry_hostile_in_view_holds_outside` (a defender that cannot be killed, in view from the pie arc; real Von,
+`requires_von`).
+
+### Open gap (E15, its test tagged `gap`)
 
 **E15. Doorways passed in a corridor are searched or secured first.** Walking a hallway past an open door into a room
 not yet cleared, the NPC enters it, or at least covers it with its gun from beside the jamb, before it is abreast of it;
@@ -287,6 +295,12 @@ Interpretations and the game's own rules, where the sources leave a choice:
   room with two of them covers both and leaves the way it came unwatched (E8). A hold lasts until a teammate who was
   holding moves on, or at most `entry_cover_time` (8 s) on a doorway and `rear_security_time` (10 s) on the rear; a
   lone entrant looks through each doorway on for `entry_watch_dwell` (0.8 s) and has nobody to leave behind.
+- E14 applies whatever tactic the fight takes: a rush, an advance or a flank into a room whose hostile is in view with a line of
+  fire first clears the gun on the door from outside (kills it, or loses sight of it), and goes in after. The tests that used
+  an unkillable target in plain view to get through a door anyway were re-premised: the rush tests (`entry_guard_advance`,
+  `entry_guard_fires_from_outside`) give the target normal health and assert it was shot dead from outside before the invader
+  went in, and `flank_walks_to_chosen_side` puts a low coffee table across the lines from the hall (sight looks over it, a bullet
+  does not), so the flank is the only way to a shot.
 - A room crossed in a retreat or under fire is visited, not cleared: ENTER offers it again once the NPC is outside, and an
   entry the guard began there and gave up is not started again for `entry_guard_rearm` s. Search ranking still goes by
   `visited_room` (stood in it lately); the guard and ENTER go by `cleared_room`.

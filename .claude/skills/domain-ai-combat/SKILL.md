@@ -13,7 +13,7 @@ the world only through the perception (`has_line_to`, `combat_spots`, `note_enga
 
 API (all take the `character`): `tick(delta)` (cooldown), `begin_fight()` (reset to the peek phase), `can_fire_at(character, target)` (a
 loaded gun, the known contact in range on a clear line: a shot is on), `fire_at_will(character, target)`
-(shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due(character)`, `top_off(character) -> bool` (a tactical reload of a part-spent gun, called by the entry at the stack: starts it, true while it runs or is wanted; `docs/tactical-entry.md` E11), `ambush(character, node, pos)`,
+(shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due(character)`, `has_line_of_fire(character, target) -> bool` (in range on a clear line, whatever the gun's state; what `can_fire_at` adds a loaded gun to, and the entry reads for E14), `top_off(character) -> bool` (a tactical reload of a part-spent gun, called by the entry at the stack: starts it, true while it runs or is wanted; `docs/tactical-entry.md` E11), `ambush(character, node, pos)`,
 `peek_cover(character, delta, node, pos, hold_ground)`, `melee(character, pos, hold_ground)`, `shoot(character) -> bool`,
 `punch(character)`, `continue_burst(character)`, `apply_back_off(character, delta)`, `reload_if_dry(character)`; `signal dry`
 (an empty gun was pulled on — `Behavior` flags the task resolved so the controller re-decides). Tunables (copied from the controller

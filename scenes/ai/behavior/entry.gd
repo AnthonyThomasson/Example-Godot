@@ -6,9 +6,11 @@ extends RefCounted
 ##
 ##   approach — to its stack slot beside the door, stepping off the door's axis while still well out and
 ##              arriving along the wall (E1)
-##   stack    — in the slot, facing the door (a member past a short room's two holds here as security, E13) (the last of three or more faces back along the line instead, E12); radios `ready` (E2)
+##   stack    — in the slot, facing the door (the last of three or more faces back along the line instead, E12; a member
+##              past a short room's two holds here as security, E13); radios `ready` (E2)
 ##   pie      — the point (or a lone entrant) sweeps the arc beside the door in angle steps, looking through it,
 ##              and notes the share of the room seen and the corners still hidden (E3); alone, both sides (E7)
+##              Nobody crosses while a hostile stands in view (E14): the pie stops where it is and the watch stage fires.
 ##   cross    — committed: through the threshold without stopping, to its corner (E4, E5); radios `going_in`, then
 ##              `in` once it is in the room and off the door's axis
 ##   corner   — holds the corner looking across the room, then clears the rest by sight (`search_coverage.gd`)
@@ -114,6 +116,9 @@ var _security_held_at := -1.0      ## `_security_clock` the room was first calle
 ## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
 ## for a gaze the hostile will not let go of.
 var gaze_held := false
+## A hostile stands in view this tick (set by `Behavior`: seen now, or a moment ago with a clear line to where it stood): nobody
+## crosses (E14). The entry holds where it is, outside, and the watch stage fires; it goes in once the hostile is gone.
+var hostile_in_view := false
 
 
 ## Capture the locomotion, the perception, the room coverage, the watch module (where a walker looks) and the combat module
@@ -397,7 +402,7 @@ func _tick_stack(character, team: Array, delta: float) -> void:
 	if THROUGH.has(ahead[-1]["step"]):
 		if _turn_at < 0.0:
 			_turn_at = _time
-		if _time - _turn_at >= follow_gap:
+		if _time - _turn_at >= follow_gap and not hostile_in_view:
 			_start_cross(character, team)
 
 
@@ -473,13 +478,17 @@ func _tick_pie(character, team: Array, delta: float) -> void:
 	_note_seen(character)
 	if not team.is_empty():
 		solo = false  # An ally claimed a slot: no second side, it joins the stack.
+	if hostile_in_view:
+		character.move_input = Vector2.ZERO  # E14: what is in view is fought from where it stands, not walked past or into.
+		_clock = 0.0
+		return
 	if _pie_queue.is_empty():
 		character.move_input = Vector2.ZERO
 		_look_toward(character, _geo["pos"] - (_geo["out"] as Vector2) * 300.0, delta)
 		if solo and pie_sides < 2:
 			_pie_other_side()
 			return
-		if _stack_ready(team):
+		if _stack_ready(team) and not hostile_in_view and not _topping_off(character, delta):
 			_start_cross(character, team)
 		return
 	var spot: Vector2 = _pie_queue[0]
