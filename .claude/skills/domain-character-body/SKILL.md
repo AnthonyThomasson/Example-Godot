@@ -6,7 +6,7 @@ description: Deep implementation detail for the Character body sub-domain (scene
 # Character · Body sub-domain (`scenes/character/body/`)
 
 Everything that gives the character a body: `character_rig, character_legs, character_pose, character_ragdoll, character_hands`
-(animate) and `character_visuals` plus the `body / head / hand / limb / torso` painters (draw). `character.gd` (the root body, see
+(animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso` painters (draw). `character.gd` (the root body, see
 `domain-character`) owns state and physics and steps these each frame; nothing here decides what the character *does*. Cross-domain
 edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), and
 `CharacterConfig` (this domain's tuning holder, in `character/`). `character_base.tscn` attaches
@@ -199,7 +199,7 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   chest. **A long gun at a wall:** `_blocked` is judged in every posture and the gun is raised (`raised_stance`) whatever the posture. A pistol is
   never blocked: the wall pushes its hand back.
 - **Legs** (`character_legs.gd`, a `RefCounted` stepped after the pose; spec P5): each ankle is swept from the body centre to where the unobstructed rig
-  (`CharacterRig.new(self, false)`) would put it (a `leg_radius` circle, like `CharacterHands._resolve_hand`) and rests at the first wall, solid piece
+  (`CharacterRig.new(self, false)`) would put it (a `leg_radius` circle through `body_sweep.gd`, as the hands are) and rests at the first wall, solid piece
   or character it meets, sliding the leftover; a knee that would pass through something moves the foot back (`KNEE_TRIES`); the rig reads the result
   through `foot_clamp(i)` (null = unobstructed) and re-solves the knee (`CharacterRig.knee_at`). A foot or knee swinging into a pushable
   (`apply_impulse` + `get_mass`, never another character) shoves it by `leg_push_impulse` scaled by its world speed into the piece and how far it wanted

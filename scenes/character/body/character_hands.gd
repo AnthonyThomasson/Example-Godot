@@ -35,6 +35,8 @@ var _hand_pos := [Vector2.ZERO, Vector2.ZERO]
 
 ## Physics layers the hands collide with: the solid layer, where walls, furniture and bodies sit.
 const HAND_MASK := PhysicsLayers.SOLID
+## The collide-and-slide a hand makes toward where the pose wants it (shared with the legs).
+const Sweep = preload("res://scenes/character/body/body_sweep.gd")
 
 ## Punch tween durations (s): the fist extends, then retracts. The extend time also
 ## normalizes the swing-speed factor, so a full-speed extend counts as a full-power hit.
@@ -134,45 +136,11 @@ func _raw_hand_position(hand: int) -> Vector2:
 	return rest + facing * (swing * _punch[hand])
 
 
-## Collide-and-slide the hand from the body center toward its raw target: stop at the first
-## wall/solid object, then slide the leftover motion along the surface. Returns a local offset.
+## Where the hand rests, as a local offset: its raw target when the way from the body centre is clear, else
+## against the first wall or solid object, slid along it for what is left (`body_sweep.gd`).
 func _resolve_hand(hand: int) -> Vector2:
-	var center: Vector2 = _character.global_position
-	var raw_world := center + _raw_hand_position(hand)
-	var motion := raw_world - center
-	if motion.length_squared() < 0.0001:
-		return _raw_hand_position(hand)
-
 	var space := get_world_2d().direct_space_state
-	var circle := CircleShape2D.new()
-	circle.radius = hand_radius
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = circle
-	params.collision_mask = HAND_MASK
-	params.exclude = [_character.get_rid()]
-	params.transform = Transform2D(0.0, center)
-	params.motion = motion
-
-	var res := space.cast_motion(params)  # [safe, unsafe] fractions of motion.
-	var safe: float = res[0]
-	if safe >= 1.0:
-		return motion  # Clear path — full extension.
-
-	# Pushed back toward the body: rest where the hand first touches the surface.
-	var rest := center + motion * safe
-
-	# Surface normal from a ray along the approach (mirrors projectile._sweep).
-	var ray := PhysicsRayQueryParameters2D.create(center, raw_world, HAND_MASK)
-	ray.exclude = [_character.get_rid()]
-	var hit := space.intersect_ray(ray)
-	var normal: Vector2 = hit.normal if hit and hit.normal.length() > 0.001 else (center - raw_world).normalized()
-
-	# Slide the leftover motion along the surface — the "to the side a bit".
-	var slide := (motion * (1.0 - safe)).slide(normal)
-	params.transform = Transform2D(0.0, rest)
-	params.motion = slide
-	var res2 := space.cast_motion(params)
-	return (rest + slide * res2[0]) - center
+	return Sweep.circle(space, _character.global_position, _raw_hand_position(hand), hand_radius, [_character.get_rid()])
 
 
 ## Throw the given hand forward, then retract it. The Item decides which hand and gates it.

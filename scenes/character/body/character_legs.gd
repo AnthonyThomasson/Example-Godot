@@ -5,7 +5,7 @@ extends RefCounted
 ## stride's toes, a crouch's leading knees), so this layer, stepped by
 ## character.gd each physics frame after the pose, finds where each leg would stop and keeps the drawn leg there:
 ## - each ankle is swept from the body centre toward where the rig would put it (a foot-sized circle, like the
-##   hands layer's `_resolve_hand`) and rests at the first wall or solid piece it meets, sliding the leftover
+##   hands, `body_sweep.gd`) and rests at the first wall or solid piece it meets, sliding the leftover
 ##   along the surface; the rig reads it back through `character.foot_clamp(i)`;
 ## - the knee is judged the same way from the leg the ankle leaves: a knee that would pass through something
 ##   moves the foot back by what it overshot (a crouch facing a wall keeps its knees off it), up to `KNEE_TRIES`;
@@ -16,6 +16,8 @@ extends RefCounted
 ## nothing is near. Tuning: CharacterConfig.leg_*.
 
 const Rig = preload("res://scenes/character/body/character_rig.gd")
+## The collide-and-slide a leg makes toward where the rig wants it (shared with the hands).
+const Sweep = preload("res://scenes/character/body/body_sweep.gd")
 
 ## Physics layer a leg meets: walls, solid furniture and living characters (the hands' mask).
 const MASK := PhysicsLayers.SOLID
@@ -94,30 +96,7 @@ func _rest_leg(space: PhysicsDirectSpaceState2D, character, rig, i: int, delta: 
 ## The place `target` (local px) can be reached from the body centre by a foot-sized circle: `target` itself when
 ## the way is clear, else where it first touches a wall or solid piece, slid along the surface for what is left.
 func _sweep(space: PhysicsDirectSpaceState2D, character, target: Vector2) -> Vector2:
-	var centre: Vector2 = character.global_position
-	var motion := target
-	if motion.length_squared() < 0.0001:
-		return target
-	var circle := CircleShape2D.new()
-	circle.radius = CharacterConfig.leg_radius
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = circle
-	params.collision_mask = MASK
-	params.exclude = [character.get_rid()]
-	params.transform = Transform2D(0.0, centre)
-	params.motion = motion
-	var safe: float = space.cast_motion(params)[0]
-	if safe >= 1.0:
-		return target
-	var rest := motion * safe
-	var ray := PhysicsRayQueryParameters2D.create(centre, centre + motion, MASK)
-	ray.exclude = [character.get_rid()]
-	var hit := space.intersect_ray(ray)
-	var normal: Vector2 = hit.normal if not hit.is_empty() and hit.normal.length() > 0.001 else -motion.normalized()
-	var slide := (motion * (1.0 - safe)).slide(normal)
-	params.transform = Transform2D(0.0, centre + rest)
-	params.motion = slide
-	return rest + slide * float(space.cast_motion(params)[0])
+	return Sweep.circle(space, character.global_position, target, CharacterConfig.leg_radius, [character.get_rid()])
 
 
 ## Shove the light piece (if any) that a point wanted at `wanted` but rested at `rested` (local px) is pressing
