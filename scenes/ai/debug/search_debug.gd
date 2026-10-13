@@ -2,10 +2,11 @@ extends Node2D
 
 ## AI domain: an optional debug overlay for how an NPC is searching a room — the line-of-sight COVERAGE
 ## a `look_around` search move performs. It reads the sibling GoalController's `debug_search_coverage()`
-## (all the room's sample points, which are still unseen, and the one being looked at now) and draws,
-## while the NPC is covering a room: every sample point dim, the still-UNSEEN ones bright, a line + ring
-## to the current target, and a "seen / total" readout. So you can watch the NPC turn and relocate until
-## the whole room has been seen. Senses nothing, feeds nothing back (the "draw on its own child Node2D"
+## (all the room's sample points, which are still unseen, the one being looked at now and the seconds left in
+## the search's time budget) and draws, while the NPC is covering a room: every sample point dim, the
+## still-UNSEEN ones bright, a line + ring to the current target, and a "seen / total" readout with the
+## seconds left. So you can watch the NPC turn and relocate until the whole room has been seen, or the budget
+## run out on it. Senses nothing, feeds nothing back (the "draw on its own child Node2D"
 ## convention, like tactics_debug.gd / vision_debug.gd).
 
 const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
@@ -41,7 +42,7 @@ func _process(_delta: float) -> void:
 
 
 ## Draw the sample points (dim = seen, bright = unseen), the current target with a line from the NPC,
-## and a seen/total count — but only while the NPC is actively covering a room.
+## and a seen/total count with the budget's seconds left — but only while the NPC is actively covering a room.
 func _draw() -> void:
 	if not show_search or _controller == null or _character == null or _character.get("is_dead") == true:
 		return
@@ -63,7 +64,7 @@ func _draw() -> void:
 	var target := to_local(cov.get("target", _character.global_position) as Vector2)
 	draw_line(Vector2.ZERO, target, Color(TARGET_COLOR, 0.6), 1.5)
 	draw_arc(target, TARGET_RADIUS, 0.0, TAU, 16, TARGET_COLOR, 2.0)
-	# A seen / total readout beside the NPC.
+	# A seen / total readout beside the NPC, with the seconds the search has left before it gives up.
 	var seen: int = points.size() - unseen.size()
 	DebugText.string(self, ThemeDB.fallback_font, Vector2(TARGET_RADIUS, -TARGET_RADIUS),
-		"searched %d/%d" % [seen, points.size()], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, UNSEEN_COLOR)
+		"searched %d/%d  %.1fs left" % [seen, points.size(), cov.get("budget", 0.0)], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, UNSEEN_COLOR)

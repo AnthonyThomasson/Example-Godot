@@ -39,7 +39,6 @@ const ENTRIES := [
 ]
 
 
-## Whether `flag` drives a single global overlay instead of each NPC's.
 ## Set each entry of `flags` (`show_<x>` -> on/off) on every child of `npc` that has that property, and redraw the ones
 ## touched (a paused overlay's own `_process` may not run). The one way a composer applies the table to an NPC: Main at
 ## spawn, the spectator inspector on a selection, the Testing world on a toggle.
@@ -54,6 +53,7 @@ static func apply(npc: Node, flags: Dictionary) -> void:
 			child.queue_redraw()
 
 
+## Whether `flag` drives a single global overlay instead of each NPC's.
 static func is_global(flag: String) -> bool:
 	return GLOBAL.has(flag)
 

@@ -360,7 +360,7 @@ func debug_entry_view(character) -> Dictionary:
 				if not geo.is_empty():
 					gate["pos"] = geo["pos"]
 					guard["ahead"] = gate
-	return { "entry": _entry.debug_view(character) if _primitive == &"entry" else {}, "guard": guard }
+	return { "entry": _entry.debug_view() if _primitive == &"entry" else {}, "guard": guard }
 
 
 ## Whether the NPC is committed to crossing a doorway: the controller holds every re-decision until it is through.
