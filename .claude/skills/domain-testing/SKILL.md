@@ -217,6 +217,7 @@ selector. They are ordinary tests that load other domains, so they live apart fr
 | Test | Load |
 |---|---|
 | `perf/match_5v5_stress` | the whole-match case: a generated house, five defenders and five invaders placed by `MatchSpawner`, default loadouts, debug overlays off as in Main, nav re-baker, blood, debris, sound and radio on, scripted Von |
+| `perf/match_10v10_stress` | the same with ten a side: the largest match the game means to carry, held to the same standard |
 | `perf/npc_crowd_stress` | twelve scripted-Von NPCs sensing, deciding and shooting in one open furnished arena (everyone sees everyone: the decision snapshot's worst case) |
 | `perf/automatic_fire_stress` | SMGs and rifles on the trigger plus pistols clicking into furniture: one run covers the single-shot and the automatic path |
 | `perf/hit_overload_stress` | hundreds of hits on one chair and one character: deformation, debris, blood and their caps |
@@ -235,10 +236,10 @@ functional tests of their domain.
 - **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
   outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms
   (`Perf.time_ms`), and exact counts (`Perf.nodes()`, `Despawner.count()`, dent / blood-pool caps).
-- **The standard:** a 5v5 match runs without frame loss, so every frame-based test holds `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps
+- **The standard:** a match runs without frame loss, so every frame-based test holds `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps
   frame, the Performance overlay's target), `SMOOTH_P95_MS` (20) and `SMOOTH_MAX_MS` (33.4, two frames) through
-  `Perf.within_frames`, at the scale of one match (ten characters). A test whose load is beyond a match and still has a
-  known hitch states its own looser tail in its header (`npc_crowd_stress`: the decision snapshot). One-shot work
+  `Perf.within_frames`, at the scale of the largest match (twenty characters, `match_10v10_stress`), with no looser tail.
+  One-shot work
   (`Perf.time_ms`) keeps a `const` budget at the top of its test, about 4x the baseline stated in the comment above it.
   `Perf.within` prints `PERF <label> <value> (budget <limit>)`, traces it, and fails the check with the value. Counts
   (nodes, dents, pools) are asserted tightly.
