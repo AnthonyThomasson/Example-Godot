@@ -9,6 +9,8 @@ extends RefCounted
 const DEFENDER_SCENE := preload("res://scenes/ai/npc_defender.tscn")
 ## The house invader, dropped just outside the house. Same AI, different data.
 const INVADER_SCENE := preload("res://scenes/ai/npc_invader.tscn")
+## The human's side of the entry radio: it reserves the human a slot in an AI stack near it (`docs/tactical-entry.md` E10).
+const PLAYER_STACK := preload("res://scenes/ai/team/player_stack.gd")
 ## Random points tried in a room, after its centre, before `clear_spot` gives up.
 const SPAWN_TRIES := 32
 
@@ -134,3 +136,9 @@ func bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> v
 			if "entry_point" in child and entry_point != Vector2.ZERO:
 				child.entry_point = entry_point
 			return
+
+
+## Give the human the stack radio, as `bind_npc` hands an NPC its doorways: a `PlayerStack` child of `player` that knows the
+## house's `rooms` and `openings`. Returned, for the stack markers to watch.
+func bind_player(player: Node, rooms: Array) -> Node:
+	return PLAYER_STACK.attach(player, rooms, openings)

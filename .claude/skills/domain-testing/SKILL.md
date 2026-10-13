@@ -281,6 +281,17 @@ callouts carry `entry_step`). The brain is read through `debug_entry()` and `deb
 - A defender meant to be unseen from outside has to be behind the jamb from every spot the entrant visits (stack,
   arc, the walk there), e.g. tucked against the door's wall well along from it.
 
+## Stack tests (tag `stack`)
+
+`tests/ai/stack_*_test.gd` pin down the human's place in an AI stack (E10 in `docs/tactical-entry.md`), on the Terrace house and the back
+door like the entry tests. A **puppet with the invader faction** stands in for the human, and the test gives it the stack radio the way Main
+does, in `run`: `Stack.attach(t, id)` (`tests/_ai/stack_probe.gd`, `const Stack := preload(...)`, which loads `PlayerStack` by path and calls
+`attach(character, rooms, t.world.openings)`; null before the feature exists). The stack is read through `view()` (`Stack.mine`,
+`Stack.slot_point`) and the human's radio through the usual `Entry.calls(t, step, &"me")`; `Stack.walk` takes the puppet through points
+(`Stack.crossing(door)` goes in through a door). A late AI joiner is held back like in `entry_ally_joins_stack` (`entry_enabled` false, speed 0)
+until the human has its slot. `stack_player_slot_von` runs the whole thing with the real Von server (`requires_von`). The UI half is
+`tests/ui/stack_markers_draw_test.gd` (a fake stack with a `view()`), the wiring `tests/general/stack_player_wiring_test.gd`.
+
 ## Investigation tests (tag `investigate`)
 
 `tests/ai/*investigate*` and `defender_stays_in_house_von` pin down how gunfire heard outside or inside the house is worded for Von

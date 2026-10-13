@@ -368,12 +368,12 @@ func committed() -> bool:
 	return _primitive == &"entry" and _entry.committed()
 
 
-## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, slot and side they are
-## about; the controller posts them as callouts.
+## The entry steps to radio since the last call (`{ step, cleared_room?, covering? }`), with the doorway, the room it leads into, slot and
+## side they are about; the controller posts them as callouts.
 func take_entry_calls() -> Array:
 	var out: Array = []
 	for c in _entry.take_calls():
-		c.merge({ "opening": _entry.opening, "slot": _entry.slot, "side": _entry.side })
+		c.merge({ "opening": _entry.opening, "into": _entry.into, "slot": _entry.slot, "side": _entry.side })
 		out.append(c)
 	return out
 

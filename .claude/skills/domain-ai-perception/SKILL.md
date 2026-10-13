@@ -64,7 +64,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - Entry geometry for the behaviour: `entry_geometry(character, opening_id, into)`, `entry_team(opening_id)` and the shared
   stack rules `entry_free_slot(team, self_id, current)`, `entry_stack_side(geometry, team, self_pos)` and
   `entry_slot_point(geometry, side, slot)` (wrappers on `AgentEntry`'s statics, which the snapshot's `entries` group also uses; the
-  behaviour never reaches into `agent_entry.gd` itself) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
+  behaviour never reaches into `agent_entry.gd` itself; the one other consumer is the human's `PlayerStack` in `ai/team/`, which uses `AgentEntry` directly through its published seam: `set_house`, `geometry` and the statics `claims`, `free_slot`, `stack_side`, `slot_point`) (below). `openings` (the house's doorways, set by the controller each tick from Main's inject) and `entry_enabled`.
 - `all_seen_characters()` (every character seen, allies included), `debug_memory()` (the event log for the brain overlay and
   gcmd) and `fill_goal(goal, character)` (the goal with `{gun}` filled in).
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view

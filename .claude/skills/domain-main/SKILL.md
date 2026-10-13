@@ -38,7 +38,8 @@ Everything one match builds lives under a fresh `World` node (group `match_world
 2. `NavBuilder.build` the nav map, the `nav_debug.gd` overlay and the `nav_updater.gd` re-baker (interface 9);
 3. a `match_spawner.gd` instance places the NPCs from one RNG seeded with the house seed (see below);
 4. a human, when there is one, joins its side (`_join_player`: a clear spot for a defender, the scene anchor for an invader) and is reparented
-   under `World` (draw order house < player < NPCs);
+   under `World` (draw order house < player < NPCs), is handed the stack radio (`MatchSpawner.bind_player` attaches a `PlayerStack` with the
+   house's rooms and openings) and `_build_stack_markers` adds the floor markers (`StackMarkers`, `watch`ing it) under `World` (`docs/tactical-entry.md` E10);
 5. `_arm_characters`: every character gets its side's loadout through `LoadoutConfig.apply` → `Character.set_loadout` — a chosen gun with its
    magazine and spares, or by default one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins
    the loadouts without shifting placement. Tests and sandboxes never come through here and keep the weapon they ask for;
@@ -64,7 +65,7 @@ inspector and overlays observe.
 - `add_npc` instances the scene, sets its position and only THEN adds it under `world` (a body added at the world origin and moved afterwards
   overlaps whatever stands there for a frame, and the physics launches that piece across the map), hands its controller the house `rooms`, its `openings` (the spawner's field, which `main.gd` sets from
   `WorldGen.get_openings` before spawning; for tactical entry) and `entry_point` through the `control` duck-type (`bind_npc`), and appends it to
-  `combatants`; the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
+  `combatants`; `bind_player(player, rooms)` does the human's equivalent (a `PlayerStack`); the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
 - Test: `tests/general/match_spawn_clear_test.gd` (two defenders in a room with a bed over its centre start clear and apart);
-  `match_spawn_origin_test.gd` (a counter against the world origin is not launched by a spawn); `match_setup_test.gd`
+  `match_spawn_origin_test.gd` (a counter against the world origin is not launched by a spawn); `stack_player_wiring_test.gd` (`bind_player` attaches the stack with the house's doorways); `match_setup_test.gd`
   covers the setup dicts, loadout arming and the endless randomisation.

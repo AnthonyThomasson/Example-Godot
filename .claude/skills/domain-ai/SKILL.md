@@ -33,6 +33,14 @@ walk the situation has overtaken, and the EventBus intake (hits, allies' callout
 | **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck, the entry plan, the entry team and guard). |
 
+**The human's stack (`ai/team/player_stack.gd`).** Not a fifth sub-domain: one small module, the human's side of the entry radio
+(`docs/tactical-entry.md` E10). A child of the human's character (Main attaches it through `MatchSpawner.bind_player`), it listens to the
+`&"callout"` bus like an NPC and, when an allied team is stacking at a doorway the human is near (`reserve_range` 300 px of walking), radios the
+human's own claim for the first free slot: the same entry fields, with the human as `speaker`, repeated every 2 s. It reads the human's step
+from where it stands (`claim` / `ready` / `going_in` / `in`) and withdraws on leaving, dying, nobody left stacking, or `go_timeout` after the AI
+ahead is through. It reuses perception's `AgentEntry` statics (`claims`, `free_slot`, `stack_side`, `slot_point`) and geometry, and never moves the
+character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
+
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
 when free (or forced) and the frame has a snapshot to spare (`DecisionBudget`: `per_frame` snapshots a physics frame, one by

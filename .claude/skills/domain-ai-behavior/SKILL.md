@@ -105,7 +105,8 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   so a hit or a hostile seen in the doorway is fought once the NPC is through. Posture stands throughout, and it never
   runs, not even under fire: a running character cannot shoot, so a sprint to the stack or through the doorway would
   be a lowered gun at the worst moment (test `entry_never_runs`).
-- **The radio.** Steps are queued (`take_calls()`, via `Behavior.take_entry_calls()`) and the controller posts them;
+- **The radio.** Steps are queued (`take_calls()`, via `Behavior.take_entry_calls()`, which adds `opening`, `into`, `slot` and `side`) and the controller posts them;
+  a human invader's `PlayerStack` (`ai/team/`, `domain-ai`) posts the same steps for the human, so the team counts it like an ally;
   the latest is repeated every 2 s so the claim stays live. Choosing anything else `abandon()`s the entry (radios
   `abort`). Each phase change is a `GameLog` line (`--verbose` in tests).
 - **The entry guard (E9).** Entry is not only for an ENTER order: `Behavior._entry_guard()` runs every tick after the
