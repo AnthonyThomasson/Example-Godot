@@ -1,9 +1,9 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Example_Godot) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Forced-Entry) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
-# Example_Godot architecture
+# Forced-Entry architecture
 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a leg kick, a gun (pistol, SMG or
