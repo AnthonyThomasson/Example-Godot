@@ -40,5 +40,5 @@ killed); comment why on each one and list them in the report.
 
 A new test that fails because another AI system gets in the way is a finding: fix the conflict at its cause, not
 by disabling that system in the test. A red scenario test is tagged `gap` and its behaviour written into the spec in
-`docs/` (the open gaps of `docs/tactical-entry.md` are the pattern): the runner reports its failure as GAP, expected
+`docs/` (`docs/tactical-entry.md` E10 to E15 were written this way; `domain-testing`, "Running tests", covers the tag): the runner reports its failure as GAP, expected
 and not a failure of the run, and fails it the day it passes until the tag is dropped.

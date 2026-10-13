@@ -73,7 +73,7 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E15; E10 to E15 began as `gap` tests and are all green) and `tests/ai/entry/`. `Behavior` adopts an
+The spec and the tests are `docs/tactical-entry.md` (E1 to E15) and `tests/ai/entry/`. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
 `approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a

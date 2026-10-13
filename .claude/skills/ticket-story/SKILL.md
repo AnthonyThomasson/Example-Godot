@@ -5,9 +5,10 @@ description: How to field a standard ticket, one with no `bug` or `spike` label 
 
 # Ticket: story
 
-A story is ordinary work: something to build or change. It runs in six phases, in order, through
-`orchestration` (see the `ticket` skill, "Work in phases"). Phases 1, 2 and 6 talk to the user, so you
-(the coordinator) run them yourself; phases 3 to 5 are build phases you may dispatch to workers.
+A story is ordinary work: something to build or change. It runs in seven phases, in order, through
+`orchestration` (see the `ticket` skill, "Work in phases"). Phases 1, 2 and 7 talk to the user, so you
+(the coordinator) run them yourself; phases 3 to 6 are build phases you may dispatch to workers, and phase 6,
+the audit, is always an agent's.
 
 If the ticket carries the `ai` label as well, also follow `ticket-ai` for the test phase (its §2–4: scenarios
 from the real world, rest of the AI left on, red before code).
@@ -73,9 +74,34 @@ fails is a regression your change caused until shown otherwise.
 Update every skill whose domain changed (and `architecture` for an interface) and the spec in `docs/` if the
 behaviour has one.
 
-## 6. Ask for feedback
+## 6. Audit
 
-Report on the ticket and to the user: what was built against the plan, the tests (red → green), the files
-changed, anything left uncovered or deviating from the plan and why. Then **ask for their feedback** and wait.
+The last gate before the user sees the work: dispatch **one agent** to run the **`audit` skill** over the branch.
+It reads the branch's whole change (commits since `main` plus anything staged), so what phases 3 to 5 produced is
+in scope; commit or stage the work first if the user has asked you to commit, otherwise tell the agent which
+files are only in the working tree (the audit's load check and tests see them, its diff does not). Start it with
+`orca orchestration worker-start --task-title "audit" --spec "<spec>" --worktree current --agent claude`, a
+self-contained spec in the five parts `orchestration` asks for:
+
+- **Target:** the worktree and branch, the ticket number, and the base ref (default `origin/main`).
+- **Change:** invoke the `audit` skill and run it to its checklist. The agent does every step of the audit itself
+  and starts no workers.
+- **Constraints:** report only. It does not fix, edit, stage, commit, push or comment on the ticket, and it
+  starts the worktree editor only when its checks are green.
+- **Ownership:** it owns the audit's scratch directory and one report file, and no file in the tree.
+- **Observable acceptance:** its `worker_done` gives the issue count and the report path, and the report is the
+  audit's checklist with a verdict line.
+
+Read the report yourself; a failed or missing report is a finding, not a pass. Take each item to the right
+place: a real defect in what was built goes back to phase 4 (and its test to phase 3 first when no test would
+have caught it), a stale skill or comment is fixed with the phase 5 wrap-up, a finding you disagree with goes to
+the user with your reasoning. Then rerun the checks, and rerun the audit once more if code changed beyond the
+audit's own list. Go on when it comes back clean or the user has accepted what is left.
+
+## 7. Ask for feedback
+
+Report on the ticket and to the user: what was built against the plan, the tests (red → green), the audit's
+verdict and what was done about each finding, the files changed, anything left uncovered or deviating from the
+plan and why. Then **ask for their feedback** and wait.
 Feedback is a new round: change the plan section on the ticket if the scope moved, add or adjust a test first,
-then change the code. Don't commit or close the ticket unless asked.
+then change the code, and audit again (phase 6) before reporting back. Don't commit or close the ticket unless asked.

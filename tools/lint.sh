@@ -3,7 +3,7 @@
 # editor's Debugger > Errors tab would list (UNUSED_VARIABLE, INTEGER_DIVISION, SHADOWED_GLOBAL_IDENTIFIER, ...),
 # printing them per file; 0 when clean. tools/run_tests.sh runs it first. The warning levels are the project's
 # (Project Settings > GDScript > Warnings). Fix the code; silencing a warning (@warning_ignore, a project setting)
-# is a last resort, see the m-audit skill.
+# is a last resort, see the audit skill.
 #   tools/lint.sh [--quiet] [PATH...]    --quiet prints nothing when clean; PATHs (scenes/x.gd or res://scenes/x.gd)
 #                                        lint only those scripts
 set -uo pipefail

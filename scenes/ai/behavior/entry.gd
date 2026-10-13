@@ -1,7 +1,7 @@
 extends RefCounted
 
 ## AI BEHAVIOUR sub-domain — TACTICAL ENTRY. How an NPC gets through a doorway into a room the way police and
-## soldiers do (`docs/tactical-entry.md`, E1 to E8), as one member of a team or alone. Von only chose the doorway
+## soldiers do (`docs/tactical-entry.md`, E1 to E15), as one member of a team or alone. Von only chose the doorway
 ## (the ENTER tactic); the choreography is this phase machine, so it runs with the server down:
 ##
 ##   approach — to its stack slot beside the door, stepping off the door's axis while still well out and
@@ -134,8 +134,8 @@ func setup(loco: Node, perception: Node, coverage: RefCounted, eyes: RefCounted,
 	_combat = combat
 
 
-## Start an entry from an ENTER leaf's params (`opening`, `into`, `slot`). False when the doorway is unknown
-## (the leaf is then dropped and the NPC re-decides).
+## Start an entry from `params`: `opening`, `into` and `slot` from an ENTER leaf, `secure` from the guard's pass-by detour. False
+## when the doorway is unknown (the leaf is then dropped and the NPC re-decides).
 func begin(character, params: Dictionary) -> bool:
 	reset()
 	opening = str(params.get("opening", ""))

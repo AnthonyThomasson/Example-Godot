@@ -5,11 +5,12 @@ that rule is modelled on. Behaviours E1 to E9 and E11 to E15 are enforced; each 
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are tests on the Terrace house of
 `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
-E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests; E10 to E15, which came
-in as open gaps (real-world rules the AI did not follow, written here first from the sources, each with a test that was red
-on purpose and tagged `gap`), run the whole pipeline with the real Von server (`requires_von`, `--include-von --require-von`):
-the world gives the AI the situation and the test judges what the shipped AI does with it. No gap is open now; a new one is
-written the same way (`tools/run_tests.sh --include-von --require-von gap` lists them).
+E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests. E10 to E15 are tests that run
+the whole pipeline with the real Von server (`requires_von`, `--include-von --require-von`): the world gives the AI the situation
+and the test judges what the shipped AI does with it; E15 also has a scripted test of its mechanism,
+`entry_guard_secures_passed_doorway`. A rule the AI does not follow yet is written the same way before it is built: the
+behaviour here, and a test that is red on purpose and tagged `gap` (`tools/run_tests.sh --include-von --require-von gap`
+lists them; none is open).
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
@@ -211,7 +212,9 @@ the doors it passes the same way; a member heading for a stack that others have 
 one, so the point is not left to go in alone). Left open: a team passing a door on the way to its own is not made to secure it.
 Tests: `entry_corridor_doors_not_passed` (gunfire heard in the far room of the corridor spine draws the invader past two open
 doors; real Von, `requires_von`), `entry_guard_secures_passed_doorway` (the same walk as a plain investigation, scripted Von: both
-doors covered from beside the jamb, neither entered, nothing claimed on the radio).
+doors covered from beside the jamb, neither entered, nothing claimed on the radio), `entry_guard_enter_walk_secures_passed_doorway`
+(an ENTER order for room C: each door secured once, then C stacked and entered) and
+`entry_guard_enter_walk_with_team_keeps_together` (an ally has claimed C's stack: nothing secured on the way).
 
 ## Situations
 
@@ -230,7 +233,7 @@ arc, `H` hard corner, `c` soft corner.
             p                                       p
 ```
 
-The two maps E13 and E15 added (`#` wall, `D` opening): the box room (E13), 140 px square off a corridor, and the
+The two maps of E13 and E15 (`#` wall, `D` opening): the box room (E13), 140 px square off a corridor, and the
 corridor spine (E15), three rooms off one hallway.
 
 ```
@@ -303,10 +306,9 @@ Interpretations and the game's own rules, where the sources leave a choice:
   holding moves on, or at most `entry_cover_time` (8 s) on a doorway and `rear_security_time` (10 s) on the rear; a
   lone entrant looks through each doorway on for `entry_watch_dwell` (0.8 s) and has nobody to leave behind.
 - E14 applies whatever tactic the fight takes: a rush, an advance or a flank into a room whose hostile is in view with a line of
-  fire first clears the gun on the door from outside (kills it, or loses sight of it), and goes in after. The tests that used
-  an unkillable target in plain view to get through a door anyway were re-premised: the rush tests (`entry_guard_advance`,
+  fire first clears the gun on the door from outside (kills it, or loses sight of it), and goes in after. The rush tests (`entry_guard_advance`,
   `entry_guard_fires_from_outside`) give the target normal health and assert it was shot dead from outside before the invader
-  went in, and `flank_walks_to_chosen_side` puts a low coffee table across the lines from the hall (sight looks over it, a bullet
+  went in, and `flank_walks_to_chosen_side` has a low coffee table across the lines from the hall (sight looks over it, a bullet
   does not), so the flank is the only way to a shot.
 - A room crossed in a retreat or under fire is visited, not cleared: ENTER offers it again once the NPC is outside, and an
   entry the guard began there and gave up is not started again for `entry_guard_rearm` s. Search ranking still goes by
@@ -341,7 +343,7 @@ procedure.
   confirms single-officer movement, threshold evaluation and room entry are taught; the public listing has
   titles only, no technique (E7).
 - [Wikipedia, Tactical reload](https://en.wikipedia.org/wiki/Tactical_reload): a partly spent magazine is swapped
-  for a full one and kept; doctrine starts an entry into a building with a full magazine (E10). Tertiary; the
+  for a full one and kept; doctrine starts an entry into a building with a full magazine (E11). Tertiary; the
   [NRA Women piece on when to reload](https://nrawomen.com/content/when-to-reload) names room clearing as a
   situation for a tactical reload. A game-tactics wiki adds that reloading in the fatal funnel is dangerous; not
   relied on.

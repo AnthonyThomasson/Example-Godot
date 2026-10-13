@@ -19,7 +19,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   shadows a member or built-in, a redundant `await` ...), and prints them per file; any warning ends the run with exit 1
   before a test starts. The engine names no line, so the report gives candidate lines, and the exact `line:col` of each
   integer division (it recompiles the script once per `/`). Run `tools/lint.sh scenes/x.gd` for one script. Fix the
-  code: `@warning_ignore` or a lowered level in `project.godot` is a last resort (see `m-audit`).
+  code: `@warning_ignore` or a lowered level in `project.godot` is a last resort (see `audit`).
 - **CLI:** `tools/run_tests.sh [filter words] [--include-von]` runs
   `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. A fresh checkout
   (no `.godot/` class cache) is imported first, since without it every script fails to parse. It prints one
@@ -270,7 +270,7 @@ functional tests of their domain.
 
 ## Tactical entry tests (tag `entry`)
 
-`tests/ai/entry/` pin down `docs/tactical-entry.md` (E1 to E9; each header names its behaviour): staging and
+`tests/ai/entry/` pin down `docs/tactical-entry.md` (E1 to E15; each header names its behaviour): staging and
 the approach, the stack's slots, the pie, the crossing, the corners, the ready barrier and the radio, the solo entry
 and a joining ally, clearing, covering the doorways on and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
 rooms so the geometry is clean), through `tests/_ai/entry_probe.gd` (`const Entry := preload(...)`): `rules(s, door)`
@@ -283,15 +283,17 @@ kitchen or living room, `KITCHEN_HALL`, `LIVING_KITCHEN`, with `out`, `outward`,
 `funnel_entries`, `first_in_funnel`, `longest_pause_in_funnel`, `time_facing_through`, `share_facing`) and the radio (`calls(t, step, id)`, `first_call_time`;
 callouts carry `entry_step`). The brain is read through `debug_entry()` and `debug_room_zones()`.
 
-The entry gaps E10 to E15 are all closed: `entry_clear_within_benchmark` (E10), `entry_reloads_before_crossing` (E11),
-`entry_stack_last_covers_rear` (E12), `entry_short_room_two_go_in` (E13), `entry_hostile_in_view_holds_outside` (E14) and
-`entry_corridor_doors_not_passed` (E15) are green, with no `gap` tag (`tools/run_tests.sh --include-von --require-von entry`
-runs them with the others). A new gap is written the same way: a red test tagged `gap`, the spec in `docs/`. They
+E10 to E15 are covered by `entry_clear_within_benchmark` (E10), `entry_reloads_before_crossing` (E11), `entry_stack_last_covers_rear`
+(E12), `entry_short_room_two_go_in` (E13), `entry_hostile_in_view_holds_outside` (E14) and `entry_corridor_doors_not_passed` (E15), which
+carry no `gap` tag (`tools/run_tests.sh --include-von --require-von entry` runs them with the others). A behaviour not built yet is
+written the same way: a red test tagged `gap`, the spec in `docs/`. E15 has scripted tests of its mechanism too
+(`entry_guard_secures_passed_doorway`, `entry_guard_enter_walk_secures_passed_doorway`,
+`entry_guard_enter_walk_with_team_keeps_together`: one mechanism each, scripted Von). The six real-Von tests
 run the whole pipeline with the **real Von server** (`requires_von`, paced in real time, so their timeouts are wall-clock):
 the actors are plain `invader`s with match defaults (no switch, no timer override, only a premise such as a part-spent magazine), the world is placed so the doorway under test is the natural pick,
 and each test first `require`s that the AI claimed that doorway, so a different Von choice reads in the bundle as a set-up
 finding, not as the doctrine gap. Their maps: the box room (`Maps.box_room`, `Entry.BOX`) and the corridor spine
-(`Entry.SPINE_A/B/C`). When one of them turns green, drop its `gap` tag (the runner fails a passing gap test until you do).
+(`Entry.SPINE_A/B/C`). A `gap` test that turns green gets its tag dropped (the runner fails a passing gap test until then).
 
 - Two invaders that claim a doorway on the same frame settle their slots by instance id: the first actor declared
   gets slot 1 on a tie.

@@ -49,7 +49,9 @@ var _fail_on_warnings := true
 var _concluded := false
 ## Tagged `gap`: failing is the expected verdict (GAP), passing is the failure.
 var _gap := false
+## A gap test passed, which is reported as the failing check "drop the gap tag" (once).
 var _gap_passed := false
+## The test ended by timing out; its verdict stays TIMEOUT whatever the checks say.
 var _timed_out := false
 ## Never emitted: waits park on it once the test has ended.
 signal _never

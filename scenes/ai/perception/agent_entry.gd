@@ -139,12 +139,10 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 	return {}
 
 
-## The first doorway a walk passes without entering (E15): the walk, as for `threshold_ahead`, crosses the doorway's axis (the line
-## out from its centre, at right angles to its wall) within `PASS_DEPTH` px of the wall, on the outside, so it goes by the opening at a
-## walk's distance of `max_dist` px at most, and the room behind it is not the one the NPC is in, is not cleared and is not entered by
-## the walk anywhere ahead (that doorway is `threshold_ahead`'s). Only doors between two rooms of the house, from inside it: a
-## corridor's doors, not the back door seen from the garden. `{ opening, into, dist }` (`dist` = px of walking until abreast of it),
-## or {}. The behaviour's entry guard sends the NPC to secure it before it gets there.
+## The first doorway a walk goes past without entering (E15): the walk crosses its axis (the line out from its centre) within
+## `PASS_DEPTH` px of its wall, outside it, within `max_dist` px of walking. It leads into a room that is not the NPC's own and
+## not cleared, and the walk never crosses its wall plane (that doorway is `threshold_ahead`'s). Only doors between two rooms of
+## the house, from inside it. `{ opening, into, dist }` (`dist` = px of walking until abreast of it), or {}.
 func passing_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2, is_cleared: Callable, max_dist: float) -> Dictionary:
 	var pts: Array = [from_pos]
 	for i in range(maxi(from_idx, 0), path.size()):

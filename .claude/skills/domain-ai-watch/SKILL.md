@@ -48,7 +48,8 @@ place a threat is shot at, whichever primitive or entry phase is running.
 - `Entry`: `gaze_held` (set from `_threat` each tick) makes `_look_toward` report "settled", so a pie step the gaze cannot settle on
   because of a threat does not hold the entry. Every gaze turn goes through one static, `Watch.ease_gaze(character, point, rate, delta)`
   (the doors here, `Entry._look_toward`, `SearchCoverage.step`): it eases from the actual facing, not a private angle, so the gaze
-  does not snap back when a threat lets go.
+  does not snap back when a threat lets go. `hostile_in_view` (set from the same `_threat` plus a line of fire, `Behavior._hostile_in_view`)
+  stops the pie and a follower's crossing while the watch stage fires; the entry crosses once it is false (`domain-ai-behavior`, E14).
 
 ## Exports (`GoalController`, group *Watch*)
 

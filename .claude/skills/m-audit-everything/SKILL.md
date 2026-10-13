@@ -8,7 +8,7 @@ effort: xhigh
 
 # Audit everything — whole-codebase health audit
 
-`/m-audit` gates **one branch's change** (its commits since `main`, plus anything staged) before it is pushed. This skill audits the **codebase as
+`/audit` gates **one branch's change** (its commits since `main`, plus anything staged) before it is pushed. This skill audits the **codebase as
 it stands**, looking for what accumulates *between* changes: code nothing calls any more,
 mechanisms whose consumer was removed, duplication that crept in, boundaries that eroded, domains
 that outgrew one folder, and documentation that quietly stopped being true.
@@ -240,7 +240,7 @@ Not "two lines look alike" — duplication that means one fix will have to be ma
 
 ## Brief 3 — Domain isolation, repo-wide (Phase 1, worker 3)
 
-Brief A of `/m-audit` asks this of a diff; ask it of every boundary that exists. For each
+Brief A of `/audit` asks this of a diff; ask it of every boundary that exists. For each
 cross-domain reference, is the connection **crucial**, and is it one of the **vital interfaces** in
 the `architecture` skill?
 
@@ -400,7 +400,7 @@ orphans the Von decision server on port 8000 (`pkill -f "von serve"`). Re-run
 `python3 -I tools/audit_scan.py all` and confirm the findings you fixed are gone and no new edge
 appeared in `deps`. Run `tools/lint.sh` too (`run_tests.sh` does first): a removal can leave an unused variable or
 parameter behind. Fix such a warning in the code; silencing it (`@warning_ignore`, an underscore prefix on a parameter that
-should go, a lowered level in `project.godot`) is a last resort, as in `m-audit`.
+should go, a lowered level in `project.godot`) is a last resort, as in `audit`.
 
 ## Output — the checklist
 

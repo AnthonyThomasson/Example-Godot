@@ -179,7 +179,8 @@ func set_run_status(text: String, running := false) -> void:
 	if running != _running:
 		_running = running
 		for g: TreeItem in _groups.values():
-			g.set_button_disabled(0, 0, running)
+			if g.get_button_count(0) > 0:  # a domain row has the ▶ button, a topic row does not
+				g.set_button_disabled(0, 0, running)
 	_update_buttons()
 
 

@@ -106,7 +106,7 @@ var entry_wall_standoff: float = 28.0
 var entry_pie_radius: float = 100.0
 var entry_pie_steps: int = 5
 var entry_corner_inset: float = 40.0
-var entry_short_room: float = 150.0
+var entry_short_room: float = 150.0   ## A room with a side under this (px) is too small for the team (agent_entry.gd `short_room`).
 
 var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
 var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
