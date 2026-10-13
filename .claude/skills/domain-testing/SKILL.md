@@ -99,7 +99,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   final snapshot, traces and logged errors. See the `test-debug` skill.
 - **In game:** the setup window's **Tests** button opens `test_browser.tscn`. Search, pick, then Play,
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
-  offers Rerun and Back/Escape. The in-game overlay toggle bar works on the test's NPCs.
+  offers Rerun and Back/Escape (Back changes scene to `main.tscn`, the setup window). The in-game overlay toggle bar works on the test's NPCs.
   `-- --play <filter>` on the command line opens the first matching test straight in the runner.
   The browser's **Run all** button, and the ▶ button on each domain row (which passes `--domain=<name>`),
   spawn a separate headless run of the whole suite or just that domain, Von tests included
