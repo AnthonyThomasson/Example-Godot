@@ -30,7 +30,9 @@ var traces: Dictionary = {}
 ## on a rendering run). `shots` lists the files written.
 var shot_prefix := ""
 var shots: Array = []
-## "PASS" | "FAIL" | "SKIPPED" | "TIMEOUT" once ended ("" while running).
+## "PASS" | "FAIL" | "SKIPPED" | "TIMEOUT" | "GAP" once ended ("" while running). GAP is a test tagged `gap` (a
+## behaviour the code does not show yet, written first and left red) that failed or timed out as expected; one that
+## passes is a FAIL ("drop the gap tag").
 var status := ""
 ## Why it was skipped / timed out.
 var reason := ""
@@ -45,6 +47,10 @@ var _allowed_logs: Array = []
 var _fail_on_errors := true
 var _fail_on_warnings := true
 var _concluded := false
+## Tagged `gap`: failing is the expected verdict (GAP), passing is the failure.
+var _gap := false
+var _gap_passed := false
+var _timed_out := false
 ## Never emitted: waits park on it once the test has ended.
 signal _never
 
@@ -54,6 +60,7 @@ func _init(tree: SceneTree, description: Dictionary) -> void:
 	_allowed_logs = description.get("allowed_logs", [])
 	_fail_on_errors = description.get("fail_on_errors", true)
 	_fail_on_warnings = description.get("fail_on_warnings", true)
+	_gap = Array(description.get("tags", [])).has("gap")
 
 
 # --- Lookup -------------------------------------------------------------------------------
@@ -246,6 +253,7 @@ func finish(result: String) -> void:
 		return
 	is_finished = true
 	status = result
+	_timed_out = _timed_out or result == "TIMEOUT"
 	finished.emit()
 
 
@@ -269,7 +277,9 @@ func on_log(entry: Dictionary) -> void:
 
 
 ## Final verdict once the run is over: fails unmet expected logs, and a non-manual test that
-## asserted nothing. Safe to call again (a late logged error re-decides it). Returns the status.
+## asserted nothing. A test tagged `gap` is expected to fail: its FAIL or TIMEOUT is reported as GAP (the failed
+## checks say what the code does not do yet) and a pass is a FAIL that says to drop the tag. Safe to call again (a
+## late logged error re-decides it). Returns the status.
 func conclude(manual: bool) -> String:
 	if not _concluded:
 		_concluded = true
@@ -278,9 +288,22 @@ func conclude(manual: bool) -> String:
 				check(false, "Expected log never appeared: /%s/ (%d more)" % [e["pattern"], e["count"]])
 		if checks.is_empty() and not manual and status != "SKIPPED":
 			check(false, "The test made no assertions")
-	if status == "SKIPPED" or status == "TIMEOUT":
+	if status == "SKIPPED":
 		return status
-	status = "FAIL" if checks.any(func(c): return not c["ok"]) else "PASS"
+	if _timed_out:
+		status = "TIMEOUT"
+	else:
+		status = "FAIL" if checks.any(func(c): return not c["ok"]) else "PASS"
+	if _gap:
+		if _gap_passed or status == "PASS":
+			if not _gap_passed:
+				_gap_passed = true
+				check(false, "passes: drop the gap tag")
+			status = "FAIL"
+		else:
+			status = "GAP"
+			if reason == "":
+				reason = "expected to fail (tagged gap)"
 	return status
 
 

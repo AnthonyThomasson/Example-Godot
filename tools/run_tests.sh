@@ -25,6 +25,9 @@
 #   tools/run_tests.sh --list [words]     list matching tests (id, flags, tags, name) and exit
 #   tools/run_tests.sh --include-von ai   also run tests that need the Von decision server
 #   tools/run_tests.sh --require-von ai   Von tests FAIL instead of skipping when no server is live
+#   tools/run_tests.sh gap                the tests tagged `gap`: specs the code does not meet yet, written first and
+#                                         left red; their failure is reported as GAP and does not fail the run, and one
+#                                         that passes FAILs ("drop the gap tag")
 #   tools/run_tests.sh --self-test        the harness's own tests (tests/_harness, hidden from normal runs)
 # Speed
 #   --jobs=N|auto   split the run over N parallel godot processes (auto = cores, at most 6). Without it, a run of the
@@ -156,7 +159,7 @@ if results or stray:
     json.dump({"results": results, "stray_logs": stray}, open(last, "w"))
 fresh = {}
 for r in results:
-    if r.get("status") in ("PASS", "FAIL") and r.get("wall_ms", 0) > 0:
+    if r.get("status") in ("PASS", "FAIL", "GAP") and r.get("wall_ms", 0) > 0:
         fresh.setdefault(r["id"], []).append(r["wall_ms"])
 if fresh:
     try:
@@ -233,7 +236,7 @@ run() {
   for x in "$@" ${args[@]+"${args[@]}"}; do [[ "$x" == "--summary" ]] && show_slowest=0; done
   SLOWEST=$show_slowest save_reports "${dirs[@]}"
   grep -h -E '^[0-9]+ passed, ' "${files[@]}" | sed -E 's/[^0-9]+/ /g' \
-    | awk -v n="$jobs" '{p+=$1; f+=$2; t+=$3; s+=$4} END {printf "%d passed, %d failed, %d timed out, %d skipped  (%d shards)\n", p, f, t, s, n}'
+    | awk -v n="$jobs" '{p+=$1; f+=$2; t+=$3; s+=$4; g+=$5} END {printf "%d passed, %d failed, %d timed out, %d skipped, %d gap  (%d shards)\n", p, f, t, s, g, n}'
   return $status
 }
 

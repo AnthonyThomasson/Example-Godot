@@ -125,7 +125,7 @@ timed() {
 }
 [ -n "$costs" ] && echo "costs-arg $costs"
 [ -n "$selection" ] && echo "selection:$selection"
-echo "0 passed, 0 failed, 0 timed out, 0 skipped"
+echo "0 passed, 0 failed, 0 timed out, 0 skipped, 0 gap"
 case "$FAKE_SCENARIO" in
   clean) report ;;
   timed) timed ;;

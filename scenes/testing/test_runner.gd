@@ -15,7 +15,8 @@ extends Node2D
 ##                 `--shard` takes one balanced slice of the run, balanced by the per-test wall-clock ms in the
 ##                 `--costs` file when there is one, by declared timeout when not) in turn, prints one
 ##                 line each (just the non-passing ones with `--summary`) plus a summary, writes `user://test_report.json` and exits 1 on any
-##                 failure (or any error/warning logged outside a test). `--out=<dir>` puts the report
+##                 failure (or any error/warning logged outside a test); a test tagged `gap` that fails is a GAP, expected
+##                 and not a failure (test_context.gd `conclude`). `--out=<dir>` puts the report
 ##                 and failure bundles in <dir> instead; started with `--log-file <dir>/godot.log` it
 ##                 also owns its engine log, so parallel runs and a running game never share files.
 ## Each test gets a fresh TestWorld child, freed between tests. The Von launcher is created only when
@@ -32,8 +33,10 @@ const OVERLAY_REGISTRY = preload("res://scenes/ui/overlays/overlay_registry.gd")
 const PERFORMANCE_OVERLAY = preload("res://scenes/ui/overlays/performance_overlay.gd")
 const BROWSER_SCENE := "res://scenes/testing/test_browser.tscn"
 const REPORT_PATH := "user://test_report.json"
-## Failed/timed-out tests write their event log, final state and traces here (one JSON per test id).
+## Failed/timed-out tests (and GAP ones) write their event log, final state and traces here (one JSON per test id).
 const BUNDLE_DIR := "user://test_failures"
+## The verdicts that carry a bundle (event log, final state, traces) and a `--shots` screenshot.
+const BUNDLED := ["FAIL", "TIMEOUT", "GAP"]
 ## Frame rate a Von-dependent test is paced to in real time (matches the batch run's --fixed-fps 60).
 const REALTIME_FPS := 60
 ## Seconds a queued run holds each verdict before the next test starts (the HUD's Next skips it).
@@ -252,7 +255,7 @@ func _close() -> Dictionary:
 	var snapshot := _ctx.snapshot() if _ctx != null and is_instance_valid(_world) else {}
 	if _shots and _ctx != null and is_instance_valid(_world):
 		var verdict := _ctx.conclude(_entry.get("manual", false))
-		if verdict == "FAIL" or verdict == "TIMEOUT":
+		if BUNDLED.has(verdict):
 			_ctx.screenshot("fail")
 	if EventBus.posted.is_connected(_on_event):
 		EventBus.posted.disconnect(_on_event)
@@ -279,7 +282,7 @@ func _close() -> Dictionary:
 
 
 ## The verdict + record for the open test.
-## A failed or timed-out result also carries `events`, `snapshot` (final actor/object state, taken
+## A failed, timed-out or GAP result also carries `events`, `snapshot` (final actor/object state, taken
 ## before teardown when `snapshot` is passed) and `traces`, so the cause can be read without a rerun.
 func _result(snapshot := {}) -> Dictionary:
 	_ctx.conclude(_entry.get("manual", false))
@@ -290,7 +293,7 @@ func _result(snapshot := {}) -> Dictionary:
 		"checks": _ctx.checks.duplicate(), "logs": _ctx.logs.duplicate(),
 		"manual": _entry.get("manual", false),
 	}
-	if _ctx.status == "FAIL" or _ctx.status == "TIMEOUT":
+	if BUNDLED.has(_ctx.status):
 		result["events"] = _ctx.plain_events()
 		result["snapshot"] = snapshot if not snapshot.is_empty() else _ctx.snapshot()
 		result["traces"] = _ctx.traces.duplicate(true)
@@ -426,8 +429,8 @@ func _run_queue(paths: Array) -> void:
 			if not _queue_active:
 				return
 			await _close()
-	_hud.show_queue_done("%d passed, %d failed, %d timed out, %d skipped" % [counts.get("PASS", 0),
-		counts.get("FAIL", 0), counts.get("TIMEOUT", 0), counts.get("SKIPPED", 0)])
+	_hud.show_queue_done("%d passed, %d failed, %d timed out, %d skipped, %d gap" % [counts.get("PASS", 0),
+		counts.get("FAIL", 0), counts.get("TIMEOUT", 0), counts.get("SKIPPED", 0), counts.get("GAP", 0)])
 
 
 ## Hold the shown verdict for QUEUE_PAUSE seconds of wall time, or until the HUD's Next is pressed.
@@ -625,9 +628,10 @@ func _write_bundle(r: Dictionary) -> String:
 	return ProjectSettings.globalize_path(path)
 
 
-## Print stray logs and the totals; returns the exit code. With `repeat` > 1 also names flaky tests.
+## Print stray logs and the totals; returns the exit code (a GAP is the expected outcome of a `gap` test, not a
+## failure). With `repeat` > 1 also names flaky tests.
 func _summarize(results: Array, repeat := 1) -> int:
-	var counts := { "PASS": 0, "FAIL": 0, "TIMEOUT": 0, "SKIPPED": 0 }
+	var counts := { "PASS": 0, "FAIL": 0, "TIMEOUT": 0, "SKIPPED": 0, "GAP": 0 }
 	for r in results:
 		counts[r["status"]] = counts.get(r["status"], 0) + 1
 	if not _stray_logs.is_empty():
@@ -640,7 +644,7 @@ func _summarize(results: Array, repeat := 1) -> int:
 			if r["status"] == "SKIPPED":
 				continue
 			var t: Array = tally.get(r["id"], [0, 0])
-			t[0] += 1 if r["status"] == "PASS" else 0
+			t[0] += 1 if r["status"] == "PASS" or r["status"] == "GAP" else 0
 			t[1] += 1
 			tally[r["id"]] = t
 		for id in tally:
@@ -651,7 +655,8 @@ func _summarize(results: Array, repeat := 1) -> int:
 		timed.sort_custom(func(a, b): return a["wall_ms"] > b["wall_ms"])
 		if timed.size() > 1:
 			print("Slowest: " + ", ".join(timed.slice(0, 5).map(func(r): return "%s %d ms" % [r["id"], r["wall_ms"]])))
-	print("%d passed, %d failed, %d timed out, %d skipped" % [counts["PASS"], counts["FAIL"], counts["TIMEOUT"], counts["SKIPPED"]])
+	print("%d passed, %d failed, %d timed out, %d skipped, %d gap" % [counts["PASS"], counts["FAIL"], counts["TIMEOUT"],
+		counts["SKIPPED"], counts["GAP"]])
 	var bad: int = counts["FAIL"] + counts["TIMEOUT"] + (1 if not _stray_logs.is_empty() else 0)
 	return 1 if bad > 0 else 0
 

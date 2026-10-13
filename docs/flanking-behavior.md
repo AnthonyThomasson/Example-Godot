@@ -2,7 +2,9 @@
 
 What an NPC should do when it flanks a target, and which tests hold the AI to it. The tests in
 `tests/ai/flank_*_test.gd` assert this document, not the current code: where the AI falls short the test
-is written first, left red and tagged `gap` (`tools/run_tests.sh gap` lists them); no test is red now.
+is written first, left red and tagged `gap` (`tools/run_tests.sh gap` lists them; the runner reports such a failure
+as GAP, expected and not a failure of the run, and a `gap` test that passes as a FAIL telling you to drop the tag); no
+flank test is red now.
 Each test's header comment names the behaviour (F, B1 to B9, C) it asserts.
 
 Flanking here means taking one of the sides of a known hostile, measured in the hostile's own frame

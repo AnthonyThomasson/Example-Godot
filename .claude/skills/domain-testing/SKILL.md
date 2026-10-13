@@ -23,9 +23,12 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **CLI:** `tools/run_tests.sh [filter words] [--include-von]` runs
   `godot --headless --fixed-fps 60 res://scenes/testing/test_runner.tscn -- --run-tests …`. A fresh checkout
   (no `.godot/` class cache) is imported first, since without it every script fails to parse. It prints one
-  line per test (`PASS/FAIL/TIMEOUT/SKIPPED  <id>  (<sim s> sim, <ms> ms)`, failed checks indented with ✗), then a
+  line per test (`PASS/FAIL/TIMEOUT/SKIPPED/GAP  <id>  (<sim s> sim, <ms> ms)`, failed checks indented with ✗), then a
   summary, and writes `report.json`. Exit code 1 means a test failed or timed out, or an
-  error/warning was logged outside any test. Filter words are word prefixes over id, name, domain,
+  error/warning was logged outside any test. **GAP** is a test tagged `gap` (a behaviour written into a spec that the
+  code does not show yet, left red on purpose) that failed or timed out: expected, printed with its failed checks and a
+  bundle like a FAIL, counted apart in the summary and never a failure of the run; a `gap` test that *passes* is a FAIL
+  ("drop the gap tag"). `tools/run_tests.sh gap` lists them (tag prefix); `--failed` and `--fail-fast` leave them out. Filter words are word prefixes over id, name, domain,
   description and tags (`ai` matches the ai domain, not "chair"). Sandboxes live apart in `sandboxes/` and are never run.
   `requires_von` tests are skipped unless `--include-von` is passed (`--require-von` runs them and
   fails when no server is live), and are then paced in real time
@@ -155,7 +158,8 @@ func run(t: TestContext) -> void:
 	t.check(t.actor(&"target").health < 50.0, "the target lost health")
 ```
 
-- **`describe()`** (all optional): `name`, `domain`, `description`, `tags`, `timeout` (sim s, default
+- **`describe()`** (all optional): `name`, `domain`, `description`, `tags` (the tag `gap` marks a test written
+  before the behaviour exists: it is expected to fail and reports GAP, see "Running tests"), `timeout` (sim s, default
   10), `requires_von`,
   `fail_on_errors` / `fail_on_warnings` (default true), `allowed_logs` (regexes).
 - **`configure(s: TestSetup)`** is data only, and the browser also calls it to list the switches.
@@ -425,7 +429,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 |---|---|
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
-| `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`). The runner frees it at close, which discards any test coroutine still parked on it. |
+| `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`: PASS / FAIL / TIMEOUT / SKIPPED, and GAP for a `gap`-tagged test that failed as expected). The runner frees it at close, which discards any test coroutine still parked on it. |
 | `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`, annotated with `WorldGen.annotate_layout`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, annotated with `WorldGen.annotate_layout` like a house. |

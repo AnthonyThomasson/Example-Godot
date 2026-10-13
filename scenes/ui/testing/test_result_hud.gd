@@ -18,6 +18,7 @@ signal pause_requested
 const STATUS_COLORS := {
 	"PASS": Color(0.45, 0.9, 0.45), "FAIL": Color(1.0, 0.4, 0.35), "TIMEOUT": Color(1.0, 0.6, 0.25),
 	"SKIPPED": Color(0.75, 0.75, 0.75), "RUNNING": Color(0.6, 0.8, 1.0),
+	"GAP": Color(0.85, 0.7, 0.4),  # tagged `gap`: failed as expected (a behaviour the code does not show yet)
 }
 
 var _title: Label

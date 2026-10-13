@@ -2,7 +2,8 @@ extends GameTest
 
 ## Harness self-test: TestContext decides verdicts correctly from fed log entries and assertions
 ## (logged warning/error fails, expect_log consumes, allowed/disabled logs pass, no-assertion test
-## fails, skip stays skipped). Uses throwaway contexts, so nothing real is logged.
+## fails, skip stays skipped, a `gap` test fails as GAP and passes as FAIL). Uses throwaway contexts, so nothing real
+## is logged.
 
 
 func describe() -> Dictionary:
@@ -70,4 +71,30 @@ func run(t: TestContext) -> void:
 	c = _ctx(t)
 	c.require(false, "stop here")
 	t.check(c.is_finished and c.conclude(false) == "FAIL", "a failed require ends the test as FAIL")
+	c.free()
+
+	c = _ctx(t, { "tags": ["ai", "gap"] })
+	c.check(false, "not yet")
+	t.expect_eq(c.conclude(false), "GAP", "a gap test that fails is GAP")
+	t.expect_eq(c.conclude(false), "GAP", "and stays GAP when re-decided")
+	c.free()
+
+	c = _ctx(t, { "tags": ["gap"] })
+	c.check(true, "fine")
+	t.expect_eq(c.conclude(false), "FAIL", "a gap test that passes is FAIL")
+	t.check(c.checks.any(func(k): return not k["ok"] and String(k["message"]).contains("drop the gap tag")), "and says to drop the tag")
+	t.expect_eq(c.conclude(false), "FAIL", "and stays FAIL when re-decided")
+	c.free()
+
+	c = _ctx(t, { "tags": ["gap"] })
+	c.check(true, "fine so far")
+	c.finish("TIMEOUT")
+	t.expect_eq(c.conclude(false), "GAP", "a gap test that times out is GAP")
+	c.free()
+
+	c = _ctx(t)
+	c.check(true, "fine so far")
+	c.finish("TIMEOUT")
+	t.expect_eq(c.conclude(false), "TIMEOUT", "a timed-out test stays TIMEOUT when re-decided")
+	t.expect_eq(c.conclude(false), "TIMEOUT", "again")
 	c.free()

@@ -25,7 +25,7 @@ signal checked_changed(ids: Array)
 signal filter_changed(text: String)
 
 const RESULT_HUD := preload("res://scenes/ui/testing/test_result_hud.gd")
-const STATUS_MARKS := { "PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱", "SKIPPED": "–" }
+const STATUS_MARKS := { "PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱", "SKIPPED": "–", "GAP": "○" }
 ## Side of the ▶ run button's icon on a domain row, in pixels.
 const RUN_ICON_SIZE := 22
 
