@@ -5,6 +5,11 @@ that rule is modelled on. Behaviours E1 to E9 are enforced; each has its tests
 in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
+E10 (the clear-time benchmark) is met and its test is green. Behaviours E11 to E16 are **open gaps**: real-world rules the AI does not follow yet, written here first from the
+sources, each with a test that is red on purpose and tagged `gap` (reported as GAP, not as a failure;
+`tools/run_tests.sh --include-von --require-von gap` runs them). Those tests leave the decisions to the real Von server
+(`requires_von`): the world gives the AI the situation and the test judges what the shipped AI does with it. They are the
+material for the next round of improvements.
 
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
@@ -140,6 +145,50 @@ Tests: `entry_guard_explore`, `entry_guard_search_room`, `entry_guard_advance`, 
 `entry_guard_under_fire_exempt`, `entry_guard_retreat_exempt`; with `entry_fallback_aborts` (an entry is given up when
 Von cannot be reached) and `entry_decision_in_flight_during_cross` (a decision already in flight waits for the crossing).
 
+**E10. Clear an average room within the benchmark.** From the point's `going_in` to the `clear` call a team takes 6 s
+at most, the 5 to 6 second training target for an average room. Why: speed is the dynamic entry's protection; a team
+that lingers in a half-cleared room is a team in the open.
+Test: `entry_clear_within_benchmark` (a pair, the furnished kitchen; real Von, `requires_von`).
+
+### Open gaps (E11 to E16, tests tagged `gap`)
+
+**E11. Reload at the stack, never in the funnel.** An entrant crosses with a topped-off gun: a magazine part spent is
+swapped for a full one while it is stacked, the one lull before the crossing, and never in the threshold or the room
+just taken. Why: doctrine starts an entry with a full magazine, and a reload in the fatal funnel is a stopped, unarmed
+body in the one place it must not stop (E4).
+Test: `entry_reloads_before_crossing` (7 of 12 rounds, above the band Von calls low, so only the entry has a reason to
+reload).
+
+**E12. Muzzles clear of teammates.** No member's gun line crosses a teammate's body, in any phase; in the stack a
+follower's muzzle is off the man in front of it. Why: the first rule of handling a weapon, and the reason the stack is
+drilled with muzzle awareness; in the game a gun points where its holder faces, so a follower facing the door through
+the man ahead of it is a flag.
+Test: `entry_stack_no_flagging` (a gun line within a body's radius of a teammate ahead and within 120 px).
+
+**E13. The last man covers the rear of the stack.** While the stack waits at the door, the last slot faces back the way
+the team came and holds the approach; the point and the second face the door. Why: the stack's rear is its blind side
+(the "The stack" paragraph above: the last man faces back and holds the hallway behind).
+Test: `entry_stack_last_covers_rear`.
+
+**E14. Short room: two go in, the rest hold outside.** A room too small for the team is entered by two, who take its
+corners; the later slots hold the stack side as security and never step into the doorway. The game's rule for "too
+small": a room under 150 px on either side (three bodies), whose door wall cannot hold a third corner. Why: a third
+body in a box room has no point of domination to take and blocks the two who do.
+Test: `entry_short_room_two_go_in` (the box room of `flank_maps.gd`).
+
+**E15. Engage from outside; no crossing on a hostile in view.** A hostile seen through the door is fought from outside,
+and nobody crosses while it stands in view, whatever tactic is chosen for the fight. Why: what is visible is engaged
+from outside, a room that can be cleared without entering is not entered, and a known gun on the door is the funnel at
+its worst (E3, E7's "if nothing is hostile in view").
+Test: `entry_hostile_in_view_holds_outside` (a defender that cannot be killed, in view from the pie arc).
+
+**E16. Doorways passed in a corridor are searched or secured first.** Walking a hallway past an open door into a room
+not yet cleared, the NPC enters it, or at least covers it with its gun from beside the jamb, before it is abreast of it;
+E9 so far enforces this only for the doorways a walk crosses. Why: E8's last sentence; a door left behind is a threat at
+the team's back.
+Test: `entry_corridor_doors_not_passed` (gunfire heard in the far room of the corridor spine draws the invader past two
+open doors).
+
 ## Situations
 
 The two common room shapes, `#` wall, `D` opening, `S` stack slots outside (1 is the point), `p` the pie
@@ -155,6 +204,17 @@ arc, `H` hard corner, `c` soft corner.
    #######   D   #####                         ###  D  ###########
               S1 S2 S3                                S1 S2 S3
             p                                       p
+```
+
+The two maps the open gaps add (`#` wall, `D` opening): the box room (E13), 140 px square off a corridor, and the
+corridor spine (E16), three rooms off one hallway.
+
+```
+        ########                          ##########################
+        # BOX  #                          # A      # B      # C    #
+   ######  D  ####################        ####  D  ####  D  ####  D #
+   D   CORRIDOR                  #        D   CORRIDOR              #
+   ###############################        ###########################
 ```
 
 Hard and soft are judged as the definition above says, by sight from just outside the threshold: the far
@@ -250,12 +310,22 @@ procedure.
 - [ALERRT Solo Officer Rapid Deployment](https://oklahoma.gov/cleet/training/cleet-training/2024-ne-region-classroom-courses/pryor/alerrt-solo-officer-rapid-deployment.html):
   confirms single-officer movement, threshold evaluation and room entry are taught; the public listing has
   titles only, no technique (E7).
-- E4's "finish the crossing when hit", E6's ready timeout and E7's ally joining are this game's own rules,
-  not sourced.
+- [Wikipedia, Tactical reload](https://en.wikipedia.org/wiki/Tactical_reload): a partly spent magazine is swapped
+  for a full one and kept; doctrine starts an entry into a building with a full magazine (E10). Tertiary; the
+  [NRA Women piece on when to reload](https://nrawomen.com/content/when-to-reload) names room clearing as a
+  situation for a tactical reload. A game-tactics wiki adds that reloading in the fatal funnel is dangerous; not
+  relied on.
+- A CQB training outline ([on Scribd](https://www.scribd.com/doc/142877171/CQB)) makes muzzle awareness one of its
+  two cardinal rules and gives the low ready as the carry "for the safety of people to your front" while lining up;
+  a SWAT tactics deck ([SlideShare](https://www.slideshare.net/slideshow/swat-tactics/54081869)) has the stack in
+  single file along the wall with "muzzle discipline and awareness vital" (E11). Course material seen through search
+  summaries; the rule itself is universal.
+- E4's "finish the crossing when hit", E6's ready timeout, E7's ally joining and E13's size rule for a short room are
+  this game's own rules, not sourced.
 
 ## Not modelled
 
 Closed or locked doors, breaching, flashbangs and the dynamic-entry "shock" they give (blocked on doors, issue
 #21). Stairs (bottom-up clearing, no leapfrogging). Mirrors and cameras under a door. Hallway bounding overwatch
-and corner clearing outside a room. Verbal commands to non-combatants. A defender reacting to a stack at its door.
-Entry speed is not tuned against the 5 to 6 second benchmark.
+and corner clearing outside a room (a doorway passed in a corridor is E16). Verbal commands to non-combatants. A
+defender reacting to a stack at its door. Entry speed against the 5 to 6 second benchmark is E10.

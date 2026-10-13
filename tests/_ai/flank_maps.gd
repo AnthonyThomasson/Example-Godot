@@ -63,6 +63,33 @@ static func house(s: TestSetup, furnish := true) -> void:
 	s.object(&"cabinet", "cabinet", Vector2(470, 438))       # in the hall, cover along the south wall
 
 
+# --- Box room ----------------------------------------------------------------------------------
+# A corridor with one small room off its north side: a box 140 px square, barely three bodies across, so a team of
+# three cannot take its corners (a "short" room, docs/tactical-entry.md E13). The corridor's west end is an outer door.
+#
+#        +------+          y 60
+#        | BOX  |
+#   +----+-[ ]--+--------+ y 200
+#   [ CORRIDOR           | y 200-300, entrance on the west end
+#   +-------------------+
+
+const BOX_CORRIDOR := Rect2(0, 200, 600, 100)
+const BOX_ROOM := Rect2(220, 60, 140, 140)
+const DOOR_BOX := Vector2(290, 200)
+const BOX_ENTRANCE := Vector2(0, 250)
+
+
+## Lay out the box room: a bare corridor and the small room off it.
+static func box_room(s: TestSetup) -> void:
+	s.layout([
+		{ "key": "corridor", "type": "entry_hall", "rect": BOX_CORRIDOR },
+		{ "key": "box_room", "type": "bedroom", "rect": BOX_ROOM },
+	], [
+		{ "pos": DOOR_BOX, "width": 70.0 },
+		{ "pos": BOX_ENTRANCE, "width": 80.0 },
+	])
+
+
 # --- Corridor spine ----------------------------------------------------------------------------
 # One long corridor with three rooms off its north side and a dead end at the east. Left and right of
 # anything standing in the corridor are walls; the only way to a side is through a room's door.
