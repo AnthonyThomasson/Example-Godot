@@ -99,25 +99,31 @@ func can_see_node(node: Node2D, from_pos: Vector2, facing: Vector2, space, exclu
 	return not _sight_blocked(space, from_pos, point, ex)
 
 
-## Whether the straight line `from`→`to` is broken for SIGHT. Unlike `blocked()` (physical: any solid
-## collider stops it), this looks OVER low cover — it walks the line, skipping each collider whose
-## coverage is at or below `see_over_coverage` and casting again past it, until it reaches `to` (clear)
-## or hits something tall enough to block (a wall or tall furniture). A collider with no readable
+## The first hit that blocks SIGHT along `from`→`to`, or {} when the line reaches `to`. Unlike `blocked()`
+## (physical: any solid collider stops it), this looks OVER low cover — it walks the line, skipping each
+## collider whose coverage is at or below `see_over_coverage` and casting again past it, until it reaches
+## `to` or hits something tall enough to block (a wall or tall furniture). A collider with no readable
 ## coverage is treated as a full blocker. The exclude list grows by one skipped collider each pass, so
-## the walk always terminates (there are finitely many colliders on the line).
-func _sight_blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
+## the walk always terminates (there are finitely many colliders on the line). Ignores `enabled`: it
+## answers what the line is, the callers decide whether sight is gated.
+func sight_hit(space, from: Vector2, to: Vector2, exclude: Array) -> Dictionary:
 	var ex := exclude
 	while true:
 		var hit := raycast(space, from, to, ex)
 		if hit.is_empty():
-			return false  # reached the target: nothing tall in the way
+			return {}  # reached the target: nothing tall in the way
 		if _hit_coverage(hit.get("collider")) > see_over_coverage:
-			return true  # too tall to see over
+			return hit  # too tall to see over
 		# Low cover: look over it and keep going past it.
 		if ex == exclude:
 			ex = exclude.duplicate()  # don't mutate the caller's list
 		ex.append(hit.get("rid"))
-	return true  # unreachable; satisfies the parser
+	return {}  # unreachable; satisfies the parser
+
+
+## Whether the straight line `from`→`to` is broken for SIGHT (`sight_hit`).
+func _sight_blocked(space, from: Vector2, to: Vector2, exclude: Array) -> bool:
+	return not sight_hit(space, from, to, exclude).is_empty()
 
 
 ## The coverage (0–100 height proxy) of a ray-hit collider, read through the hittable contract. An

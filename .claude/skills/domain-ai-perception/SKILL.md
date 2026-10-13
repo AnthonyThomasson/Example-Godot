@@ -70,6 +70,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `visible_points(character, points) -> Array` — of `points`, the subset in sight right now (view
   cone + clear line of sight, via `can_see`); the searcher's room-coverage test (behaviour samples a
   room and asks each tick which sampled points it has now seen).
+- `sight_end(character, to) -> Vector2` — where its sight toward `to` is first blocked (`AgentVision.sight_hit`, over
+  low cover), or `to`; the controller's `debug_sight_end` forwards it to the vision overlay.
 
 ## The snapshot and the wording rules — `domain-ai-snapshot`
 

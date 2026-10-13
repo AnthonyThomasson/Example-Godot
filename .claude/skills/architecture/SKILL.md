@@ -293,8 +293,8 @@ interface(s) and describes how they're implemented; this list is authoritative f
 11. **General → Interaction / AI: `PhysicsLayers.SOLID`**
     - `PhysicsLayers` (`general/physics_layers.gd`, a `class_name` static holder) — `SOLID` names
 	  the physics layer bit (1) that "walls + solid furniture" live on. Interaction's reach query
-	  (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`) and
-	  its debug mirror (`ai/debug/vision_debug.gd`) all raycast on this one shared constant instead
+	  (`character_interaction.gd`) and AI perception's sight/line-of-fire rays (`agent_vision.gd`; the
+	  vision overlay asks the controller's `debug_sight_end` instead of casting) raycast on this one shared constant instead
 	  of each redefining the same magic number — the single point of truth for that layer id. The character's
 	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), the
 	  bullet's `collision_mask` (`projectile/projectile.gd`) and Physics' `PhysicsConfig.wall_mask` read it too.

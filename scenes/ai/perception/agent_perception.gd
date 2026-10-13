@@ -724,6 +724,15 @@ func visible_points(character, points: Array) -> Array:
 	return seen
 
 
+## Where the NPC's sight from where it stands toward world point `to` is first blocked — over low cover, the same
+## rule that spots characters (agent_vision.gd) — or `to` itself when the line reaches it. The NPC excludes itself.
+## What the vision overlay draws its visible area from; a pure read.
+func sight_end(character, to: Vector2) -> Vector2:
+	var space: PhysicsDirectSpaceState2D = character.get_world_2d().direct_space_state
+	var hit: Dictionary = _vision.sight_hit(space, character.global_position, to, [character.get_rid()])
+	return hit["position"] if not hit.is_empty() else to
+
+
 ## The geometry of going through doorway `opening_id` into room `into` (see agent_entry.gd `geometry`): the door's
 ## frame, the stack slots and pie arc on either side, and the room's corners tagged hard or soft. {} when unknown.
 func entry_geometry(character, opening_id: String, into: String) -> Dictionary:

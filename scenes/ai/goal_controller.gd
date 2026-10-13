@@ -545,6 +545,14 @@ func debug_search_coverage() -> Dictionary:
 	return _behavior.debug_coverage() if _behavior != null else {}
 
 
+## Read-only: where the NPC's sight toward world point `to` is first blocked (over low cover, the perception's own
+## sight rule), or `to` when it reaches it — for the vision overlay, so it draws the area the sense really covers.
+func debug_sight_end(to: Vector2) -> Vector2:
+	if _perception == null or _character == null:
+		return to
+	return _perception.sight_end(_character, to)
+
+
 ## Read-only: what the NPC has heard and been told (gunfire heard, under-fire direction, ally callouts,
 ## lost hostiles, checked leads, radii) — for the contacts and hearing overlays. Empty before perception exists.
 func debug_memory() -> Dictionary:
