@@ -43,11 +43,12 @@ var _play: Button
 var _run_all: Button
 var _run_status: Label
 var _count: Label
-## The current list's domain rows (domain → TreeItem), each carrying a ▶ button.
+## The current list's group rows: a domain row per domain (keyed by its name, each carrying a ▶ button) and, under
+## it, a row per sub-folder of tests the domain has (keyed "<domain>/<category>", no button).
 var _groups: Dictionary = {}
 ## Ticked test ids (id → true); kept across searches, and stale ids are dropped on `open`.
 var _checked: Dictionary = {}
-## The tick-able tests the search shows: id → its TreeItem, and domain → [ids].
+## The tick-able tests the search shows: id → its TreeItem, and group key (domain, or "<domain>/<category>") → [ids].
 var _test_items: Dictionary = {}
 var _shown_by_domain: Dictionary = {}
 var _shown_count := 0
@@ -216,7 +217,21 @@ func _refresh(keep: String) -> void:
 			g.set_metadata(0, domain)
 			g.add_button(0, _run_icon(), 0, _running, "Run the %d %s tests" % [_runnable_count(domain), domain])
 			_groups[domain] = g
-		var item := _tree.create_item(_groups[domain])
+		var keys := [domain]
+		var category: String = t.get("category", "")
+		if category != "":
+			var key := domain + "/" + category
+			if not _groups.has(key):
+				var c := _tree.create_item(_groups[domain])
+				c.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)
+				c.set_editable(0, true)
+				c.set_text(0, category)
+				c.set_selectable(0, false)
+				c.set_custom_color(0, Color(0.6, 0.65, 0.75))
+				c.set_metadata(0, key)
+				_groups[key] = c
+			keys.append(key)
+		var item := _tree.create_item(_groups[keys[-1]])
 		if t.get("error", "") == "":
 			item.set_cell_mode(0, TreeItem.CELL_MODE_CHECK)  # before the text: a mode change clears it
 			item.set_editable(0, true)
@@ -233,9 +248,10 @@ func _refresh(keep: String) -> void:
 		item.set_metadata(0, t)
 		if t.get("error", "") == "":
 			_test_items[t["id"]] = item
-			if not _shown_by_domain.has(domain):
-				_shown_by_domain[domain] = []
-			_shown_by_domain[domain].append(t["id"])
+			for key in keys:
+				if not _shown_by_domain.has(key):
+					_shown_by_domain[key] = []
+				_shown_by_domain[key].append(t["id"])
 		if first == null:
 			first = item
 		if t["path"] == keep:
@@ -286,7 +302,7 @@ func _over_checkbox(pos: Vector2, item: TreeItem) -> bool:
 	return pos.x < _tree.get_item_area_rect(item, 0).position.x + box
 
 
-## A checkbox was toggled: a test row ticks itself, a domain row ticks or clears every shown test it holds.
+## A checkbox was toggled: a test row ticks itself, a domain or category row ticks or clears every shown test it holds.
 func _on_item_edited() -> void:
 	_apply_edit(_tree.get_edited())
 
@@ -323,7 +339,7 @@ func _all_shown_checked() -> bool:
 	return not _test_items.is_empty() and _test_items.keys().all(func(id): return _checked.has(id))
 
 
-## Bring every checkbox, the domain rows' partial state and the buttons in line with `_checked`.
+## Bring every checkbox, the domain and category rows' partial state and the buttons in line with `_checked`.
 func _sync_checks() -> void:
 	for id in _test_items:
 		(_test_items[id] as TreeItem).set_checked(0, _checked.has(id))

@@ -119,7 +119,7 @@ snapshots may start in one physics frame. A refused NPC keeps its wish (`_force`
 frame, so no NPC waits more than a frame per NPC ahead of it. The limit is a count, not a time, so when an NPC decides never
 depends on the machine's speed, and two NPCs that would claim the same flank side on one frame decide on different frames,
 each hearing the other's radio first. A test raises `per_frame` with `set_static` to see every NPC decide at once
-(`tests/ai/decisions_spread_over_frames_test.gd`).
+(`tests/ai/decision/decisions_spread_over_frames_test.gd`).
 
 ## `decision_client.gd` — the transport
 

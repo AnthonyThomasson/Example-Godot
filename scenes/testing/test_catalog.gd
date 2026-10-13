@@ -2,9 +2,10 @@ extends RefCounted
 
 ## Testing domain: finds every test (`res://tests/**/*_test.gd`) and describes it as a plain dict the
 ## browser and runner work from:
-##   { id, path, name, domain, description, tags, timeout, requires_von, manual, internal, switches, world,
+##   { id, path, name, domain, category, description, tags, timeout, requires_von, manual, internal, switches, world,
 ##     locked, error }
-## `id` is the path under tests/ without the suffix (e.g. "projectile/pistol_shot_wounds"); `error` is
+## `id` is the path under tests/ without the suffix (e.g. "projectile/pistol_shot_wounds"); `category` is the
+## sub-folder between the domain and the file when there is one (`tests/ai/entry/…` -> "entry", else ""); `error` is
 ## set (and the rest defaulted) when the script fails to load. `configure()` is called on a scratch
 ## TestSetup to read which switches and world a test uses — it only records data.
 
@@ -69,6 +70,7 @@ static func describe(path: String, root := "") -> Dictionary:
 		"id": rel, "path": path,
 		"name": parts[parts.size() - 1].capitalize(),
 		"domain": parts[0] if parts.size() > 1 else "general",
+		"category": parts[1] if parts.size() > 2 else "",
 		"description": "", "tags": [], "timeout": DEFAULT_TIMEOUT,
 		"requires_von": false, "manual": sandbox, "internal": false, "switches": {}, "world": "", "locked": [], "error": "",
 	}

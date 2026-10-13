@@ -71,7 +71,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   runs those domains plus the ones that compose them (its `affected()` table, from the architecture
   dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art, general, audio and testing
   run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
-  (`tests/<domain>/<name>_test.gd`) runs only that test** (`--id=<domain>/<name>`; it can only change its own
+  (`tests/<domain>/[<topic>/]<name>_test.gd`) runs only that test** (`--id=<domain>/[<topic>/]<name>`; it can only change its own
   result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
   `tests/_perf` runs the `perf` domain, `tests/_harness` the self-tests, and an unknown helper folder everything.
   `GAME_TEST_CHANGED_FILES` (newline-separated paths) stands in for git's view of the changes, which is how
@@ -132,7 +132,12 @@ and controller contract, EventBus and character signals) and never reaches into 
 
 ## Writing a test
 
-One file `tests/<domain>/<name>_test.gd` that `extends GameTest`. Id = `<domain>/<name>`.
+One file `tests/<domain>/<name>_test.gd` that `extends GameTest`. Id = `<domain>/<name>`. A domain with many tests
+splits them one folder deeper by topic (`tests/ai/entry/`, `flank/`, `gaze/`, `posture/`, `investigate/`, `combat/`,
+`movement/`, `decision/`, `perception/`): the id is then `<domain>/<topic>/<name>`, the domain is still the first
+folder (so `--domain=ai` and `--changed` see it), the descriptor's `category` is the topic and the browser shows a
+row per topic under the domain. The file name keeps its topic prefix (`entry_waits_for_stack_test.gd`), the name
+the specs quote.
 
 **Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one).
 
@@ -265,7 +270,7 @@ functional tests of their domain.
 
 ## Tactical entry tests (tag `entry`)
 
-`tests/ai/entry_*_test.gd` pin down `docs/tactical-entry.md` (E1 to E9; each header names its behaviour): staging and
+`tests/ai/entry/` pin down `docs/tactical-entry.md` (E1 to E9; each header names its behaviour): staging and
 the approach, the stack's slots, the pie, the crossing, the corners, the ready barrier and the radio, the solo entry
 and a joining ally, clearing, covering the doorways on and rear security. Scripted-Von tests on the Terrace house (`Maps.house(s, false)`, bare
 rooms so the geometry is clean), through `tests/_ai/entry_probe.gd` (`const Entry := preload(...)`): `rules(s, door)`
@@ -287,7 +292,7 @@ callouts carry `entry_step`). The brain is read through `debug_entry()` and `deb
 
 ## Investigation tests (tag `investigate`)
 
-`tests/ai/*investigate*` and `defender_stays_in_house_von` pin down how gunfire heard outside or inside the house is worded for Von
+`tests/ai/investigate/` pin down how gunfire heard outside or inside the house is worded for Von
 and answered (issue #40: defenders leaving the house). The shared helper is `tests/_ai/investigate_probe.gd` (`const Probe :=
 preload(...)`): `world(s, kind)` (the terrace house, one NPC in the hall, radio and trespass hostility off, Von left to the caller),
 `gunfire(at)` (a hit event nobody known fired, heard from `Probe.OUTSIDE` / `Probe.INSIDE`), `levels` / `asked_about_investigating`.
@@ -303,7 +308,7 @@ the scripted Von a real server's reply time by raising `DecisionStub.latency_fra
 
 ## Flanking tests (tag `flank`)
 
-`tests/ai/flank_*_test.gd` pin down how the AI weighs and takes the sides of a target: frame geometry, route
+`tests/ai/flank/` pin down how the AI weighs and takes the sides of a target: frame geometry, route
 safety, ally and radio claims, shot and cover wording, territory, and the walk itself. They are
 scripted-Von tests (no server); `tools/run_tests.sh flank` runs them. What they assert is written in
 `docs/flanking-behavior.md` (behaviours F, B1 to B9, C); each test header names the behaviour. A test that

@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Shared helpers for the investigation tests (tests/ai/*investigate*, *stays_in_house*; not a test itself):
+## Shared helpers for the investigation tests (tests/ai/investigate/; not a test itself):
 ## the terrace house with one NPC in the hall, gunfire heard from a chosen spot, and reads of what the NPC's
 ## last decision walk offered. Observes the NPC through `debug_state()` only.
 

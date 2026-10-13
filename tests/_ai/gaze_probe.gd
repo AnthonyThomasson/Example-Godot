@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Shared helpers for the gaze-and-fire tests (tests/ai/gaze_*_test.gd and friends; not a test itself). The behaviour they
+## Shared helpers for the gaze-and-fire tests (tests/ai/gaze/ and friends; not a test itself). The behaviour they
 ## assert is `docs/gaze-and-fire.md`: an NPC is always either looking at (and, when it can, shooting) a threat, or
 ## watching doors, never a wall and never with its back to a known threat. The geometry here is the test's own
 ## (door points, a ray along the facing), not read back from the code under test.

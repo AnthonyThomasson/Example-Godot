@@ -100,5 +100,5 @@ compare numbers, and an encoder reads "no cover" as "cover". So:
 A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
 **Posture** words appear only when someone is not standing, so a standing body's text is byte-identical (the `tools/von_scenarios` fixtures pin it): the
 NPC's own in its situation line (" You are crouching.") and a *visible* contact's in its contact line ("crouched low"; a last-seen posture may be stale, so it is never shown for a remembered one). Fact `crouched` is in the snapshot's
-`facts`. Test: `tests/ai/posture_in_von_state_test.gd`.
+`facts`. Test: `tests/ai/posture/posture_in_von_state_test.gd`.
 `low_ammo_fraction` is a controller export pushed through `apply_config`. Room types are humanized ("kitchen_living" → "kitchen living").

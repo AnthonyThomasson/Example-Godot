@@ -20,7 +20,7 @@
 #                                         scenes/<domain>/ plus the domains that compose it (see
 #                                         `affected` below), in ONE run; main.gd, root scenes,
 #                                         project.godot, worldgen, art and general run everything;
-#                                         testing adds --self-test. An edited tests/<d>/<name>_test.gd
+#                                         testing adds --self-test. An edited tests/<d>/[<topic>/]<name>_test.gd
 #                                         runs just that test; tests/_ai, _audio, _perf their users.
 #   tools/run_tests.sh --list [words]     list matching tests (id, flags, tags, name) and exit
 #   tools/run_tests.sh --include-von ai   also run tests that need the Von decision server

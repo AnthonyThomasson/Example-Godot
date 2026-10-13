@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Shared helpers for the "defenders stay in the house" tests (tests/ai/defenders_stay_in_house_*; not a test itself): place
+## Shared helpers for the "defenders stay in the house" tests (tests/ai/investigate/defenders_stay_in_house_*; not a test itself): place
 ## defenders (and optionally invaders) in a generated house the way Main does, then watch whether a defender ever steps outside.
 
 const MatchSpawner := preload("res://scenes/match_spawner.gd")

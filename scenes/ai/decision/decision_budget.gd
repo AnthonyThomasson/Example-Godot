@@ -7,7 +7,7 @@ extends RefCounted
 ## refused NPC keeps its wish and asks again next frame, so one waits at most a frame per NPC ahead of it. The
 ## limit is a count, not a time, so when each NPC decides never depends on the machine's speed: a test sees the
 ## same frames every run, and two NPCs that would claim the same flank side on one frame decide on different
-## ones, each hearing the other's radio first (`tests/ai/decisions_spread_over_frames_test.gd`).
+## ones, each hearing the other's radio first (`tests/ai/decision/decisions_spread_over_frames_test.gd`).
 
 ## Snapshots that may start in one physics frame. One flattens the cost into a single snapshot a frame; a test
 ## raises it to see every NPC decide at once.

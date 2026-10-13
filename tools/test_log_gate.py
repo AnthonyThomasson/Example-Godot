@@ -298,7 +298,7 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual([l for l in lines if l.startswith("selection:")], [])
 
     def test_changed_does_not_repeat_a_test_whose_domain_already_runs(self):
-        _, lines = self.changed(["scenes/ai/behavior/behavior.gd", "tests/ai/goal_names_the_gun_test.gd",
+        _, lines = self.changed(["scenes/ai/behavior/behavior.gd", "tests/ai/decision/goal_names_the_gun_test.gd",
                                  "tests/audio/bank_test.gd", "tests/audio/bank_test.gd.uid"])
         self.assertEqual([l for l in lines if l.startswith("selection:")],
                          ["selection: --domain=ai,perf", "selection: --id=audio/bank"])

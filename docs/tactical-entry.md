@@ -2,7 +2,7 @@
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
 that rule is modelled on. Behaviours E1 to E9 are enforced; each has its tests
-in `tests/ai/entry_*_test.gd` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
+in `tests/ai/entry/` (`tools/run_tests.sh entry`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are scripted-Von
 tests on the Terrace house of `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
 

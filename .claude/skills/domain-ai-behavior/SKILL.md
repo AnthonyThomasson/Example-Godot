@@ -28,7 +28,7 @@ fields are read live, so only those modules need the push.)
 
 | Primitive | Params | What it does | Done / re-decides |
 |---|---|---|---|
-| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked (a threat in sight takes the eyes and the gun: the watch stage, below). Stops on arrival (`move_input` is zeroed every tick after it, so the NPC stands still while the next decision is on its way: a real Von answer takes a moment, and from a point near the front door the last heading is out of the house; tests `tests/ai/move_stops_on_arrival_test.gd`, `gaze_arrival_stops`). A `look_around` move (search / explore) walks all the way INTO the room, then **covers it by sight** (`search_coverage.gd`, the `domain-ai-coverage` skill) until it has SEEN the room or its budget runs out. ADVANCE is a `move` with `aim: target`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
+| `move` | `point`, `aim` (travel / target / threat / point), `target_id`, `arrive_room`, `look_around` | Path to the point (or until ENTERING `arrive_room`), aiming as asked (a threat in sight takes the eyes and the gun: the watch stage, below). Stops on arrival (`move_input` is zeroed every tick after it, so the NPC stands still while the next decision is on its way: a real Von answer takes a moment, and from a point near the front door the last heading is out of the house; tests `tests/ai/movement/move_stops_on_arrival_test.gd`, `gaze_arrival_stops`). A `look_around` move (search / explore) walks all the way INTO the room, then **covers it by sight** (`search_coverage.gd`, the `domain-ai-coverage` skill) until it has SEEN the room or its budget runs out. ADVANCE is a `move` with `aim: target`: it closes in, then re-decides how to fight. | On arrival (forces a decision) — a `look_around` move only once the room is covered or its budget runs out (`max_commit_time` still caps the walk INTO the room before coverage starts). |
 | `engage` | `point` (anchor), `target_id`, `style` (peek_cover / ambush), `confine_inside` | Path to the anchor firing at will, then fight from it: **peek-and-cover** (peek to the nearest spot with a clear shot, fire on `fire_cooldown`, duck to cover for `cover_time`, positions committed for `reposition_interval`) or **ambush** (hold the covered spot, fire the moment a line opens). ENGAGE and FLANK use this, anchored at the chosen spot or side. | Moving: at `max_commit_time`. In position: every `tactic_interval` (timer starts on arrival) or when `engaged` lapses. |
 | `melee` | `target_id`, `confine_inside` | Close to `punch_range` and strike (a kick with a gun in hand, else a punch). | `tactic_interval` / `engaged` lapse. |
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
@@ -40,7 +40,7 @@ fields are read live, so only those modules need the push.)
 after the primitive steers, a threat in sight (or one seen a moment ago with a clear line) takes the NPC's eyes and gun whatever the primitive
 is (a move, a hold, a reload, an engage still walking, any entry phase; not a melee, an arrived engage or an interaction); no primitive
 or entry phase has its own fire call. With no threat a walker looks down its path (`Watch.travel_point`) and a resting NPC (hold / reload /
-an arrived move) turns among its room's doorways. An arrived move zeroes `move_input`. Tests: `tests/ai/gaze_*`,
+an arrived move) turns among its room's doorways. An arrived move zeroes `move_input`. Tests: `tests/ai/gaze/`,
 `entry_guard_fires_from_outside`, `fire_dry_gun_on_move_reloads`, `engaged_retargets_to_visible`.
 
 **Territory** is a param, not a policy: with `confine_inside` (set by the planner for a territorial
@@ -57,7 +57,7 @@ A running NPC cannot shoot or reload (`Character.shoot()` is ignored while runni
 (`Combat.can_fire_at(threat)`: loaded, in range, clear line) or the reload reflex is due (`Combat.reload_due`): it drops to a walk and
 takes the shot instead of sprinting on past its range. A leaf with `run_through_fire` (the RETREAT node) keeps sprinting. `Combat.shoot()`
 still skips a shot while `is_running()` without spending the fire cooldown.
-Tests: `tests/ai/ai_runs_to_destination_test.gd`, `retreat_keeps_running_test.gd`.
+Tests: `tests/ai/movement/ai_runs_to_destination_test.gd`, `retreat_keeps_running_test.gd`.
 
 **Posture** is a behaviour policy too (spec: `docs/cover-and-stance.md`, A1 to A3): after the primitive has steered and `run_input` is set,
 `_apply_posture` writes the posture `_wanted_posture` asks for through `Character.set_posture` (idempotent, so every tick). Everything outside a
@@ -66,14 +66,14 @@ and so does an NPC that is running. Fighting in place (`engage` arrived, or `hol
 pinned alike, and when moving about inside the fight). A crouch is held `posture_dwell` (0.7 s) before it is dropped; standing back up is never delayed.
 Exports on the controller: `posture_enabled` (the `ai.posture` switch), `posture_dwell`. `debug_status()` appends "crouching";
 `debug_state()` has `posture`. Not a decision-tree level: Von is never asked, so it works with the server down. Tests:
-`tests/ai/posture_crouches_in_fight_test.gd`, `posture_pinned_crouch_test.gd`, `posture_stands_to_run_test.gd`.
+`tests/ai/posture/posture_crouches_in_fight_test.gd`, `posture_pinned_crouch_test.gd`, `posture_stands_to_run_test.gd`.
 
 **Combat** — the gunnery, the peek-and-cover cycle, bursts, backing off a blocked barrel, the reload reflex, melee and the
 no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `Behavior` passes it the engaged contact and `hold_ground`.
 
 ## Tactical entry (`entry.gd`)
 
-The spec and the tests are `docs/tactical-entry.md` (E1 to E9) and `tests/ai/entry_*_test.gd`. `Behavior` adopts an
+The spec and the tests are `docs/tactical-entry.md` (E1 to E9) and `tests/ai/entry/`. `Behavior` adopts an
 ENTER leaf, starts the entry on the next tick (`begin(character, params)`: it reads the doorway's geometry and the team
 off the perception, `entry_geometry` / `entry_team`) and then calls `step()` each tick until it reports done. Phases:
 `approach` (to its stack slot: if on the wrong side of the door, out from the wall and across far out first; then to a
@@ -123,7 +123,7 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   detour is dropped and the entry abandoned (`abort` on the radio). Coming under fire before the crossing cancels the detour
   the same way (`_cancel_detour`); a crossing already under way is finished. A decision that was in flight when the NPC became
   committed to its own ENTER crossing is ignored (`set_leaf` returns) and the entry's end re-decides. `fallback()` (no decision to
-  be had) abandons any entry. Tests: `tests/ai/entry_guard_*_test.gd`, `entry_fallback_aborts`,
+  be had) abandons any entry. Tests: `tests/ai/entry/entry_guard_*_test.gd`, `entry_fallback_aborts`,
   `entry_decision_in_flight_during_cross`.
 - **Read-outs.** `Behavior.debug_entry()` (opening, into, slot, side, solo, phase, seen_fraction, pie_sides, covering, watch_doors,
   hidden_corners, corner, stack_point, team), also under `entry` in `debug_state()`;

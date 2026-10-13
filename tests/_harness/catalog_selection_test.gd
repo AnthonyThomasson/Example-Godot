@@ -21,6 +21,8 @@ func run(t: TestContext) -> void:
 	var all := Catalog.discover()
 	var ai := Catalog.discover(Catalog.ROOT, ["ai"])
 	t.check(not ai.is_empty() and ai.all(func(e): return e["domain"] == "ai"), "a domain filter keeps exactly that domain")
+	t.check(ai.all(func(e): return e["category"] != "" and String(e["id"]).begins_with("ai/" + e["category"] + "/")),
+		"an ai test's category is the folder between its domain and its file")
 	t.check(ai.size() < all.size(), "and leaves the others out")
 	var one := Catalog.discover(Catalog.ROOT, [], [ai[0]["id"]])
 	t.expect_eq(one.size(), 1, "an id filter keeps exactly one test")

@@ -56,7 +56,7 @@ place a threat is shot at, whichever primitive or entry phase is running.
 
 ## Tests
 
-`tests/ai/gaze_hold_watches_doors`, `gaze_fresh_npc_keeps_its_facing`, `gaze_arrival_stops` (Von answers held back by `latency_frames`),
+`tests/ai/gaze/gaze_hold_watches_doors`, `gaze_fresh_npc_keeps_its_facing`, `gaze_arrival_stops` (Von answers held back by `latency_frames`),
 `gaze_walk_looks_ahead`, `gaze_search_turns_to_threat`, `gaze_travel_watches_threat`, `entry_guard_fires_from_outside`,
 `fire_dry_gun_on_move_reloads`, `combat_waits_for_facing` (`Combat` driven with fakes), `engaged_retargets_to_visible` (`Behavior` driven
 with fakes), `ai_runs_to_destination` (W6), `retreat_keeps_running`; helper `tests/_ai/gaze_probe.gd`. A held NPC needs a look direction

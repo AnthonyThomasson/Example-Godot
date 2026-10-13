@@ -40,7 +40,7 @@ points) and clears `run_input`, so the NPC steps back until the barrel is clear,
 switching to its cover phase) wait for the back-off to finish. A pistol never reports blocked, so a chair against it changes nothing. An
 `is_automatic()` gun's trigger pull is a **burst**: `_burst_left = fire_burst − 1` more rounds, fired from `Behavior.apply()` (`Combat.continue_burst`) as the gun's own
 fire rate allows, ending early on a run, reload, wall or empty gun. Controller exports: `fire_burst` (3), `back_off_time` (0.45 s).
-Tests: `tests/ai/blocked_gun_steps_back_test.gd` (a rifle with a chair against its barrel), `pistol_fires_against_object_test.gd`.
+Tests: `tests/ai/combat/blocked_gun_steps_back_test.gd` (a rifle with a chair against its barrel), `pistol_fires_against_object_test.gd`.
 Not modelled: a rifleman cornered with a wall behind it can still stall (bounded by the back-off timer and re-decisions); cover logic treats walls as
 bulletproof though a rifle shoots through them.
 
@@ -50,5 +50,5 @@ is empty or reloading, and `Combat.shoot()` on an empty gun is a dry click that 
 cooldown. `auto_reload` (controller export, default on) is `Combat.reload_if_dry`, a reflex in `hold` (the server-down fallback, and after a
 reload), in the cover phase of peek-and-cover and from the watch stage whenever a threat is in view outside a crossing (W3): an EMPTY gun with a spare magazine is reloaded without a decision. A reload
 runs only while standing (running cancels it, so the `reload` primitive never sets `run_input`). `debug_state()` / `debug_combat()`
-carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/scripted_reload_decision_test.gd`,
+carry `reloading`; the combat overlay shows a RELOADING badge. Tests: `tests/ai/combat/scripted_reload_decision_test.gd`,
 `dry_pistol_fallback_test.gd`, `empty_pistol_no_spares_test.gd`.

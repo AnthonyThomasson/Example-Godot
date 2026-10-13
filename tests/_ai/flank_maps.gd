@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Realistic layouts for the flanking tests (tests/ai/flank_*_test.gd; not a test itself). Three buildings
+## Realistic layouts for the flanking tests (tests/ai/flank/ and tests/ai/entry/; not a test itself). Three buildings
 ## with rooms, walls, doorways, corridors and cover pieces in different areas, laid out with
 ## `TestSetup.layout`. Each map is a `static func` that fills a TestSetup, and its landmarks are consts, so
 ## a test names a place ("the hall door", "behind the island") instead of a raw coordinate.

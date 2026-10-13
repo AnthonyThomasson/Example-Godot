@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Shared helpers for the flanking tests (tests/ai/flank_*_test.gd; not a test itself). Everything reads
+## Shared helpers for the flanking tests (tests/ai/flank/; not a test itself). Everything reads
 ## an NPC through its public observer API: `debug_state()` (the last decision walk's levels) and
 ## `debug_zones()` (every flank side the snapshot weighed, including those the planner then dropped).
 
