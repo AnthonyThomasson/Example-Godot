@@ -1,7 +1,7 @@
 extends GameTest
 
-## A pistol shot that strikes a chair bursts particles at the entry point (HitParticles), styled by the chair's
-## material; the burst frees itself once its particles have died.
+## A pistol shot that strikes a chair bursts particles at the entry point (HitParticles); the burst frees itself
+## once its particles have died.
 
 
 func describe() -> Dictionary:

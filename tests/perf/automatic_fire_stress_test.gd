@@ -15,8 +15,7 @@ const RIFLES := [Vector2(1340, 250), Vector2(1340, 450), Vector2(1340, 650), Vec
 const TARGETS := 24
 const FIRE_FRAMES := 300
 const PISTOL_EVERY := 4  ## A pistol press every this many frames.
-# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). Before the performance work (#13): avg ~21-22.5 / p95 ~35-37 /
-# max ~39-52 ms per frame. (The shooters' lanes interleave and the SMGs' spread lands rounds on each other, which also
+# Frame budgets are the smooth-match standard (Perf.SMOOTH_*). (The shooters' lanes interleave and the SMGs' spread lands rounds on each other, which also
 # guards BloodWound under a sustained stream of hits. The pistols hold a standard 12-round magazine and do not reload,
 # so they add load for the first ~50 frames only; the automatic guns carry the rest.)
 # Each tracked chip carries a visuals child, so a full Despawner (1000) is ~2000 nodes; baseline ~2200.

@@ -2,7 +2,7 @@ extends GameTest
 
 ## Desired (E7): a lone invader at a door with as much wall on either side (the Terrace house's front door into the
 ## hall) slices the pie from both sides and goes in. Crossing in front of the door to its second side must not make
-## it start over from the other side's stack (it once looped there for good).
+## it start over from the other side's stack.
 
 const Entry := preload("res://tests/_ai/entry_probe.gd")
 const Maps := preload("res://tests/_ai/flank_maps.gd")

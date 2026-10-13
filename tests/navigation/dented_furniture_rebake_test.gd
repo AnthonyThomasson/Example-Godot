@@ -1,6 +1,6 @@
 extends GameTest
 
-## Shooting a chair dents its collider into a jagged polygon and shoves it against the arena wall; the
+## Shooting a chair dents its collider into a jagged polygon and shoves it; the
 ## re-bake that follows must produce a map the NavigationServer accepts (any engine error fails the
 ## test) and a path across the arena still exists.
 

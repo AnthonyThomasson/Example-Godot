@@ -23,6 +23,7 @@ func configure(s: TestSetup) -> void:
 
 func run(t: TestContext) -> void:
 	await t.seconds(0.5)  # the first bake is applied a frame or two after the build
+	t.check(_path_length(t) > 520.0, "the first bake already carves the shelf out (%.1f px; 480 is straight)" % _path_length(t))
 	var region: NavigationRegion2D = t.world.find_children("*", "NavigationRegion2D", true, false)[0]
 	var before: NavigationPolygon = region.navigation_polygon
 	var landed := [false]  # a lambda captures a bool by value

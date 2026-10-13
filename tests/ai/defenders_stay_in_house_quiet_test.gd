@@ -1,6 +1,6 @@
 extends GameTest
 
-## Desired (issue #40): in a quiet house, with nobody to fight or chase, a defender searching its rooms never
+## Desired: in a quiet house, with nobody to fight or chase, a defender searching its rooms never
 ## leaves the house. Defenders are placed as Main places them (a clear spot in a random room) in a generated house
 ## and left alone for a while; every defender must stay within the house's rooms (a doorway's depth of slack).
 ## `--seed=N` pins the layout, to sweep houses.

@@ -4,7 +4,7 @@ extends RefCounted
 
 ## A range so large that nothing is out of earshot: the tests that are not about distance use it, since the
 ## test camera frames the actors and would otherwise decide what they can hear.
-const EVERYWHERE := { &"shot": 1.0e9, &"impact": 1.0e9, &"footstep": 1.0e9 }
+const EVERYWHERE := { &"shot": 1.0e9, &"impact": 1.0e9, &"footstep": 1.0e9, &"reload": 1.0e9 }
 
 
 ## The `sound` events of `kind` (every kind when &"") whose profile starts with `prefix`, in order.

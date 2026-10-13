@@ -11,13 +11,6 @@ static func off(a: Node, p: Vector2) -> float:
 	return rad_to_deg(absf((a.facing as Vector2).angle_to(p - a.global_position)))
 
 
-## The smallest `off` over `points`: how close the actor's facing comes to any of them.
-static func off_any(a: Node, points: Array) -> float:
-	var best := 360.0
-	for p in points:
-		best = minf(best, off(a, p))
-	return best
-
 
 ## Whether a wall or solid piece stands within `reach` px dead ahead of actor `a` (along its facing), or of `from` along
 ## `facing` when those are given (a sampled frame rather than now).

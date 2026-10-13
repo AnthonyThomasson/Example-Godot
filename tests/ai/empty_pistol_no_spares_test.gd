@@ -6,7 +6,7 @@ extends GameTest
 func describe() -> Dictionary:
 	return {
 		"name": "An empty pistol with no spares is not offered a reload",
-		"description": "The shot-at defender has an empty pistol and no spares: no reload is offered, it fires nothing, and it is not stuck.",
+		"description": "The shot-at defender has an empty pistol and no spares: no reload is offered and it fires nothing.",
 		"tags": ["ai", "reload", "ammo", "scripted", "combat"],
 		"timeout": 20.0,
 	}

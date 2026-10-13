@@ -1,6 +1,6 @@
 extends GameTest
 
-## The same one-hit kill as death_bleeds_out, with the `physics.blood` switch off: the target still
+## The same one-hit kill as blood_follows_grout, with the `physics.blood` switch off: the target still
 ## dies and falls, but no blood appears at all — the switch reaches the Physics domain.
 
 
