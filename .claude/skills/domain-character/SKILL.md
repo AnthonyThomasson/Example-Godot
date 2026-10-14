@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, death, footsteps, walking into furniture and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, death, footsteps, walking into furniture and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -146,11 +146,16 @@ back (`apply_impulse`), a dead one's ragdoll is woken and thrown (`CharacterRagd
 ## Walking into furniture
 
 `_apply_pushes()` shoves each pushable the body slid into with `push_impulse` per *second* of contact
-(× `delta`), capped so the object is carried at no more than `speed × push_carry_factor` along the
-push (it is never launched ahead of the walker; the cap uses the walker's intent along the contact normal).
+(× `delta`) at the **contact point** (`collision.get_position()`), through `CharacterPush.shove(piece, dir, impulse, at_world, speed)`
+(`character_push.gd`, shared with the leg press in `domain-character-body`): the impulse lands off-centre, so a piece pushed near one
+end slides and turns about a point near the far end, one pushed in the middle of a side just slides. The shove is capped so the
+*contact point* (linear velocity plus spin) is carried at no more than `speed × push_carry_factor` along the push, worked out with the
+piece's effective mass at that point (mass and the physics server's inverse inertia), so a turning end is never flung ahead of the
+walker (the cap uses the walker's intent along the contact normal). Another character (no `linear_velocity`) takes the shove uncapped and
+ignores the point.
 The body runs in `MOTION_MODE_FLOATING` (top-down: no floor), otherwise a body it walks "down" into would be ridden as a platform and lend the character its launch velocity. The resulting slow-down (`push_slow_per_weight`,
 floored by `push_slow_min`) applies at once but eases back at `push_slow_release`/s, so a lost-contact
-frame doesn't snap speed. Test: `tests/character/walk_into_furniture_speed_test.gd`.
+frame doesn't snap speed. Tests: `tests/character/walk_into_furniture_speed_test.gd`, `walk_into_sofa_turns_test.gd`.
 
 ## Facing
 

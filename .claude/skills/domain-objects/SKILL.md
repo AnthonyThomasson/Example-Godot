@@ -17,8 +17,11 @@ The striker decides the ballistic outcome and hands the object a HitInfo; the ob
 
 ## The pushable contract (interface 5)
 
-Furniture is a `RigidBody2D`, so its native methods serve the contract (the engine integrates motion, collisions, pivoting and
-settling). A melee punch is a range-of-motion-scaled central shove.
+Furniture is a `RigidBody2D`, so its native `apply_impulse(v, at)` and `get_mass()` serve the contract (the engine integrates
+motion, collisions, pivoting and settling). A character's shoves (walking push, leg press, punch, kick) pass the contact offset as
+`at`, so a piece pushed near one end slides and turns about a point near the far end, one pushed in the middle of a side just
+slides; the turn is the body's own torque, damped by `PhysicsConfig.body_angular_damp`. A melee punch is a range-of-motion-scaled
+shove at the fist.
 
 ## The interactable contract (interface 8)
 

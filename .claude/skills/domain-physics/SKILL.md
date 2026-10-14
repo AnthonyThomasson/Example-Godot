@@ -13,9 +13,10 @@ Objects *compose* these components; Physics imports nothing outward.
 - `Physics.impact_impulse(hit)` / `Physics.spawn_debris(world, hit, surface)`.
 - `Knockback` — RigidBody2D adapter: configures its parent furniture body (no gravity, mass,
   `PhysicsConfig.body_*` damping, origin-pinned center of mass, contact reporting) and feeds it
-  impulses via `apply_impulse(v, at_world)`. The engine does the sweeping, pivoting and settling;
-  the component only hands momentum to the kinematic character on contact
-  (`impact_transfer_scale`).
+  impulses via `apply_impulse(v, at_world)` (central with no point; off the centre the body pivots under its own
+  torque, slowed by `body_angular_damp`; a character's shoves reach the body's native `apply_impulse(v, at)` the same way,
+  interface 5). The engine does the sweeping, pivoting and settling; the component only hands momentum to the kinematic
+  character on contact (`impact_transfer_scale`).
 - `Deformable` — records local impacts (dents / carved "missing pieces") and emits `changed`; the
   owner redraws + rebuilds its collider from the same deformed polygon. `record(hit, turn)` stores
   the impact un-turned by `turn`, for a body drawn turned beyond its node rotation (a character

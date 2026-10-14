@@ -204,7 +204,8 @@ func _report_hits() -> void:
 		end = item.strike_end(facing, _punch[_active_hand])  # The butt, once it is ahead of the hand.
 		if end.dot(facing) <= 0.0:
 			end = Vector2.ZERO
-	params.transform = Transform2D(0.0, _character.global_position + _raw_hand_position(_active_hand) + end)
+	var fist: Vector2 = _character.global_position + _raw_hand_position(_active_hand) + end
+	params.transform = Transform2D(0.0, fist)
 
 	# Range of motion: how fast the fist is swinging this frame (1.0 = full-speed extend).
 	var motion := clampf(absf(_punch_speed[_active_hand]) * PUNCH_EXTEND_TIME * _tempo, 0.0, 1.0)
@@ -216,7 +217,8 @@ func _report_hits() -> void:
 		var impulse := facing * CharacterConfig.punch_impulse * motion
 		var pushed := body.has_method("apply_impulse")
 		if pushed:
-			body.apply_impulse(impulse)
+			# At the fist (or the butt), so a piece struck off-centre turns.
+			body.apply_impulse(impulse, fist - (body as Node2D).global_position)
 		var damage := CharacterConfig.punch_damage * motion
 		GameLog.say("Punch (hand %d) hit %s for %.1f damage, push %.0f (%s, %.0f%% swing)" % [
 			_active_hand, body.name, damage, impulse.length(),

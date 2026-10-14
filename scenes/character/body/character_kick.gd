@@ -81,7 +81,8 @@ func _strike(character) -> void:
 	params.shape = _shape
 	params.collision_mask = MASK
 	params.exclude = [character.get_rid()]
-	params.transform = Transform2D(0.0, foot_world(character))
+	var foot: Vector2 = foot_world(character)
+	params.transform = Transform2D(0.0, foot)
 	for result in character.get_world_2d().direct_space_state.intersect_shape(params, 8):
 		var body: Node = result.collider
 		if body == character or _hit_bodies.has(body):
@@ -90,7 +91,8 @@ func _strike(character) -> void:
 		var impulse: Vector2 = character.facing * CharacterConfig.kick_impulse
 		var pushed := body.has_method("apply_impulse")
 		if pushed:
-			body.apply_impulse(impulse)
+			# At the foot, so a piece struck off-centre turns.
+			body.apply_impulse(impulse, foot - (body as Node2D).global_position)
 		var damage := CharacterConfig.kick_damage
 		GameLog.say("Kick hit %s for %.1f damage, push %.0f (%s)" % [
 			body.name, damage, impulse.length(), "pushable" if pushed else "fixed"])

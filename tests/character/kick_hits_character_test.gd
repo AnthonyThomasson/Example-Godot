@@ -1,8 +1,8 @@
 extends GameTest
 
 ## A kick wounds the character it reaches for `kick_damage`, once per kick, and posts the same world `hit` event a
-## punch does (outcome `punch`, so it sounds like one) with the kicker as attacker. A second kick is refused while
-## one is under way.
+## punch does (outcome `punch`, so it sounds like one) with the kicker as attacker, and knocks the victim back (the
+## pushable contract). A second kick is refused while one is under way.
 
 
 func describe() -> Dictionary:
@@ -29,6 +29,7 @@ func run(t: TestContext) -> void:
 	kicker.aim_at(victim.global_position)
 	await t.seconds(0.3)
 	t.check(not you.is_kicking(), "not kicking before V")
+	var victim_start: Vector2 = victim.global_position
 	kicker.kick()
 	await t.frames(2)
 	t.check(you.is_kicking(), "a kick is under way")
@@ -42,3 +43,9 @@ func run(t: TestContext) -> void:
 	var hit := func(d): return d["attacker"] == you and d["victim"] == victim and d["outcome"] == &"punch"
 	t.check(t.happened(&"hit", hit), "a punch-outcome hit event names the kicker as attacker")
 	t.check(you.leg_kick_amount(1) == 0.0, "the left leg never kicks")
+	# A character is pushable too: the kick's shove, kick_impulse over the body's mass, is eaten by the knockback
+	# friction within a few frames, about a pixel of travel.
+	var knock: float = CharacterConfig.kick_impulse / victim.get_mass()
+	var travel: float = knock * knock / (2.0 * CharacterConfig.push_knockback_friction)
+	var shoved: Vector2 = victim.global_position - victim_start
+	t.check(shoved.x > travel * 0.5, "the kick knocked the victim back along it (dx %.2f, want > %.2f)" % [shoved.x, travel * 0.5])
