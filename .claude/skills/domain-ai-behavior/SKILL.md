@@ -106,7 +106,8 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   `COVER_DEPTH` back inside the cleared room, off the doorway's axis on the NPC's side, the gun aimed through it. With a
   team, each member claims the nearest doorway no teammate's `cover` call names (kept once its own; a tie goes to the lower
   instance id) and radios `cover` with `covering`; one left over (or, with no doorway on, the last one in) goes to `rear`,
-  anyone else is done. The hold ends when a teammate seen holding (`cover` / `rear`) is no longer (it radioed `done`,
+  anyone else is done. Each member on the rear has a spot of its own (`_hold_rear_or_done`: by slot, the members take turns either
+  side of the doorway just inside it, each pair `SPOT_SPACING` (44 px) further along the wall), so two never share one. The hold ends when a teammate seen holding (`cover` / `rear`) is no longer (it radioed `done`,
   `abort`, or claims another doorway), or after `entry_cover_time` (cover) / `rear_security_time` (rear); a member that
   held radios `done`. Alone, it turns its gaze through each doorway on in turn, `entry_watch_dwell` once settled, then is
   done. The heartbeat repeats the latest call whole, so `covering` and `cleared_room` stay on the radio.
@@ -130,7 +131,7 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   at 3x `look_rate`) instead of at it, until the member ahead of it is through (`_turn_at`); then it looks at the door as every
   follower does. A threat in sight takes the eyes first (the watch stage).
 - **A short room takes two (E13).** The doorway geometry's `capacity` (perception, below) is 2 for a room with a side under
-  `entry_short_room` (150 px). A member whose slot is past it (`_holds_outside`) stays in `stack` running `_tick_security`: still,
+  `entry_short_room` (150 px). A member with that many claiming lower slots ahead of it (`_holds_outside`) stays in `stack` running `_tick_security`: still,
   facing back (E12), until the room is called clear by the team and a teammate that held it moves on (`_team_moved`) or
   `rear_time` has run out since, then radios `done`. It never crosses. Not held back once nobody ahead of it is on the radio and
   the room is not called clear (it takes the lead); gives up (`abort`) after `SECURITY_CAP` (30 s) with no clear call.
@@ -145,7 +146,21 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   after it was ready (restarted when the stack grows). A follower crosses `entry_follow_gap` after the member ahead of
   it radioed `in`. A member still at `claim` once the one behind has waited the timeout is dropped from the order.
 - **Corners.** Point: the door-wall corner on its own side (buttonhook); alone, the door-wall corner on the side away
-  from where it ended the pie. Second: the hard corner on the other side. Later members: a spot inside off the axis.
+  from where it ended the pie. Second: the hard corner on the other side. Later members: a spot inside off the axis, `SPOT_SPACING`
+  apart.
+- **Bodies on the way.** Every phase walks through `Locomotion.move_to`, so a member goes round a teammate at rest, stops short of
+  one on its slot or spot and takes a free spot beside it (an approach waypoint counts as reached there too, `_loco.reached`), and gives
+  way to a walking one. The crossing never stands in the funnel except while `Locomotion.holding()` (a body in its way). A walk a body
+  seals and stays in re-plans (`Entry.way_blocked`, called by `Behavior._way_blocked` on `Locomotion.take_blocked`): the approach goes
+  on to its next waypoint; with none left a member the stack keeps from its slot takes the back of the stack (`_to_back`: the slot
+  behind the last claimed, radioed as a new claim; E2 goes by arrival), and with no slot to take gives the claim up (`abort`; `Behavior`
+  re-decides with `resolve_reason()` "way blocked", or a detour hands the walk back to its order); a pie step is skipped; the thrower
+  gives the bang up; a crossing waits out the first signal (the one ahead moves on into the room), then gives the entry up if still
+  outside the wall plane, or takes its corner where it stands once through; a corner, cover or rear spot is held where it stands and
+  the room is covered from there. An entrant walks all the way into its corner (`CORNER_REACH` 6 px): in a small room a corner
+  a stride short sits in the doorway of the one crossing behind it. E13's capacity counts a member's place in the stack (how many
+  claim a lower slot), not its slot's number, since a member that took the back leaves its old slot empty. A member back in `stack` stands where it was held (its place). Tests: `entry_held_walk_replans`,
+  `stack_ai_goes_round_player_in_slot`.
 - **Commitment.** `committed()` is true while crossing; the controller starts no decision then (a forced one waits),
   so a hit or a hostile seen in the doorway is fought once the NPC is through. Posture stands throughout, and it never
   runs, not even under fire: a running character cannot shoot, so a sprint to the stack or through the doorway would
@@ -195,7 +210,8 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   is no longer known drops to hold and forces a re-decision), commit.
 - `update_known(known, delta) -> bool` — adopt the perception's hostiles; retarget a lost engaged
   contact to the nearest other; with none left, a leaf that needs a target ends → true (re-decide).
-- `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()`,
+- `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()` (with `resolve_reason()`, read just before it:
+  "way blocked" when a body seals the only way of the walk and stays, "" for a finished task; the controller forces its decision with it),
   `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
   `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
   start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view(character)`,
@@ -212,17 +228,49 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
 
 ## Locomotion (`locomotion.gd`)
 
-All movement flows through `move_to(character, dest)` on a `NavigationAgent2D`. `path_ahead()` returns the walk it was just given
+All movement flows through `move_to(character, dest, within := 0)` on a `NavigationAgent2D` (`within`: arrive closer than the agent's
+own 16 px; the entry's stack slots use `SLOT_REACH` 6 px, since a member a stride short of its slot stands on the next one). `path_ahead()` returns the walk it was just given
 (`{ path, index }`, or {}), which the behaviour's entry guard reads. The Navigation
 domain bakes furniture in as navmesh holes and rings the house with a walkable outdoor strip.
 Steering always aims at `get_next_path_position()` — a navmesh waypoint, so it is wall-safe, and for
 an unreachable target it steps toward the closest reachable point. Furniture physically on the route
 (a piece shoved off its baked hole) is bulldozed by the character's own push physics; there is no RVO
 avoidance and no straight-at-the-destination fallback. `reachable(p)` snaps a point onto the navmesh
-(every leaf destination goes through it); `reached(character, point)` reports arrival. Falls back to
-straight-line steering with no agent. **Bodies at rest:** the Navigation domain also keeps a *steering map* with each character at
-rest carved out. `_choose_map` (called by `move_to` / `reached`) puts the agent on it only for a walk that goes round such a body
-(a route at most `DETOUR_RATIO` x the plain one + `DETOUR_SLACK` px, ending where the plain one does, with neither the NPC nor `dest`
-standing in a hole); every other walk, including one a body seals, stays on the plain map and shoves through.
-`reachable` / `on_navmesh` always use the plain map. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
-`inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules.
+(every leaf destination goes through it); `reached(character, point, within := 0)` reports arrival (at the free spot it took, below; never while held).
+Falls back to straight-line steering with no agent. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
+`inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules. `reachable` / `on_navmesh` always use the plain map.
+
+**Characters (issue #53).** A walk accounts for the characters the NPC KNOWS of and never walks into one: `Behavior` hands it
+the perception's contacts every tick (`bodies`, set in `Behavior.apply`: what it sees, or saw within `contact_memory_ttl`, with `pos`, `vel`, `facing`, `visible`);
+a body it has not seen does not exist for the walk, and one out of sight whose last spot (within `WALK_BODY_RANGE`, 450 px) it can see
+now with nobody on it has moved on (`Behavior._walk_bodies`, via `AgentPerception.visible_points`). `ignore_id` leaves out the one a
+`melee` closes on. A body whose track is slower than
+`REST_SPEED` (40 px/s) is at rest, any faster one a walker. Each walk (a new one when the destination moves more than `NEW_WALK` px) is in
+one of three ways, checked once a physics frame (`_check`):
+- **plain**: the world's own map (furniture only). The first known body at rest the path passes closer than `PASS_CLEARANCE` (32 px, and
+  closer than the NPC stands to it now) within `LOOKAHEAD` (400 px), or one standing on the goal, ends it:
+- **round**: the Navigation domain's steering map, with every character at rest carved out, when its route reaches the goal and passes
+  no known body at rest (`_goes_round`), whatever the detour (out of the room and in by another door included);
+- **held**: no way round (the body seals the only way, or has just stopped and the map, re-baked every 0.75 s, has not carved it yet),
+  or the body stands on the goal: the NPC walks on until `STOP_GAP` (56 px) from the body and stands. It looks for a way round every
+  `RECHECK` s and walks on the moment nothing known is in the way. After `WAIT` (0.75 s), and every `REPLAN_EVERY` (4 s) after, it
+  re-plans: a body on the goal sends it to the nearest free spot near the destination (`_free_spot`: rings from 44 px, open floor, 40 px
+  clear of every body at rest, same side of the walls); any other hold raises `take_blocked()`, on which `Behavior._way_blocked`
+  re-plans whatever walks: a `move` / `engage` / `melee` / `interact` (and a `throw` still closing on its spot) ends with `resolve_reason()`
+  "way blocked" and the controller re-decides; an `entry` re-plans its own walk (`Entry.way_blocked`, "Tactical entry" above). The walk
+  stays held meanwhile; an evade holds the best spot it has until the burst. So no walk is held more than `WAIT` + `REPLAN_EVERY` s.
+  The steering map is the one `NavBuilder.steering_map` names when `setup` runs (Main drops the NPCs in the frame the navmesh is
+  built); `_goes_round` waits for `NavBuilder.ready` on both maps.
+**Giving way (`_give_way`)**: of two walkers in view whose
+courses come within `GIVE_CLEARANCE` (36 px) in the next `GIVE_HORIZON` (1.2 s), the one with the right of way walks on (`_has_way`: the
+other sees it, by distance or its facing, and its instance id is the lower; one that cannot see it cannot give way, so the other does); the
+other steps aside off the walker's line when it stands on it (open floor, clear of other bodies, never toward the walker), else waits, until
+the walker has gone by (at most `GIVE_MAX` 3 s). Even with the right of way it stops for a walker on course closer than `GIVE_IMMINENT`
+(50 px), whose track may not show it setting off yet. Last of all, whatever the walk (and the combat back-off), `keep_off` drops the part of a step that heads
+into a known body closer than `KEEP_OFF` (36 px) so the NPC slides past it (the agent cuts a path's corners by up to its 16 px
+`path_desired_distance`); with nothing left of the step it stands. `holding()` is true whenever the walk stands or steps aside for a body (held, giving way, kept off, or at the free spot beside a taken destination): the entry's crossing then does not push on straight. `debug_state()["loco"]` adds `way`, `held_for`, `giving_way`. Cost: per walker per
+frame, the agent's path against the few known bodies near it; a steering route only on a change of way or every `RECHECK` while held; the
+free-spot search only on a re-plan. Tests: `tests/ai/movement/npc_detours_round_body_at_rest`, `npc_waits_at_doorway_held_by_teammate`,
+`npc_dest_taken_stops_nearby`, `npc_routes_only_round_bodies_it_sees`, `npc_walkers_give_way`, `npc_routes_around_character`,
+`npc_own_hole_does_not_slow_it`, and the scenario `tests/ai/entry/entry_team_no_bumping` (real Von; `tests/_ai/bump_probe.gd` measures
+"walks into").

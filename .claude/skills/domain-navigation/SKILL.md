@@ -41,9 +41,14 @@ and send its own path the long way round.
 
 These holes live in a **second map**, not the world's: `build` adds a child region `NavSteering` (`steering_region(region)`) on a map of
 its own (`steering_map(planning_map)`, made on first use with the project's 2D navigation defaults and freed with its last region).
+`steering_map` names it from NavBuilder's own count of steering regions, so it is valid the moment `build` returns, before the server has
+taken the region in (Main drops the NPCs in within that frame, and each NPC's locomotion asks for it as it is set up); whether it answers
+queries yet is `ready`, as for any map (`tests/navigation/steering_map_named_once_built_test.gd`).
 The world's own map stays furniture-only, because the AI plans on it (flank/fire/retreat spots, route length and exposure, tactical
 entry slots, search coverage) and a body's hole would bend every one of those. Only a `NavigationAgent2D` walks the steering map, and
-the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). `rebake_steering(region, house, rooms)` re-bakes it.
+the AI's `Locomotion` chooses per walk (see `domain-ai-behavior`). The map carves every body at rest, seen or not; which bodies a walk
+accounts for is the walker's business (the AI goes round by it only for a body it knows of, and stops short when it has no way round).
+`rebake_steering(region, house, rooms)` re-bakes it.
 
 **Every bake is welded** (`_weld_vertices`, run by `_bake_polygon` and by `rebake_async` when its bake lands): it merges the vertices that
 share a 1 px cell, because a hole meeting a wall leaves vertices a fraction of a pixel apart and the server rejects such an edge

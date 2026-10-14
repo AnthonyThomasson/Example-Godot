@@ -36,7 +36,8 @@ lowest slot that does) and reacts only to generic conditions the character repor
 a dry gun is a click (below); otherwise it equips the gun and, **if `weapon_blocked()` (the barrel is against a wall or object), sets
 `_back_off_timer = back_off_time`, keeps the cooldown and returns false**, else calls `shoot()` and, only on success, notes engagement and starts
 the cooldown. `Behavior.apply()` ends each tick with `Combat.apply_back_off`: while the timer runs it overrides `move_input = -facing` (away from where the gun
-points) and clears `run_input`, so the NPC steps back until the barrel is clear, then shoots. Callers that advance state on a shot (peek-and-cover
+points, less any part that heads into a body it knows of: `Locomotion.keep_off`) and clears `run_input`, so the NPC steps back until the
+barrel is clear, then shoots. Callers that advance state on a shot (peek-and-cover
 switching to its cover phase) wait for the back-off to finish. A pistol never reports blocked, so a chair against it changes nothing. An
 `is_automatic()` gun's trigger pull is a **burst**: `_burst_left = fire_burst − 1` more rounds, fired from `Behavior.apply()` (`Combat.continue_burst`) as the gun's own
 fire rate allows, ending early on a run, reload, wall or empty gun. Controller exports: `fire_burst` (3), `back_off_time` (0.45 s).

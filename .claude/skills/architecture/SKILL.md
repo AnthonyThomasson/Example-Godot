@@ -256,9 +256,11 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
 	 living characters at rest under the region's parent), `NavBuilder.steering_map(planning_map) -> RID` (a map of its own, holding
-	 the furniture *and* those holes; invalid when the world has none), `steering_region(region)` and
+	 the furniture *and* those holes; named from the frame `build` returns, before it has synchronized (`ready` tells when it answers);
+	 invalid when the world has none), `steering_region(region)` and
 	 `rebake_steering(region, house, rooms, agent_radius=14.0)` (driven by `nav_updater.gd`). The world's own map stays furniture-only, because the AI
-	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest.
+	 plans on it; the AI's `Locomotion` puts its `NavigationAgent2D` on the steering map for a walk that goes round a body at rest it
+	 knows of (the map carves every one; what a walker accounts for is the AI's rule, `domain-ai-behavior`).
    - **Map queries**, what the AI asks of a baked map when it weighs a point or a route: `NavBuilder.ready(map) -> bool`
 	 (valid, synchronized at least once and has taken in every region `build` put on it, so a map still showing the previous
 	 navmesh counts as unbaked), `snap(map, p) -> Vector2` (`p` on the navmesh; unchanged before the bake),

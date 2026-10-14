@@ -52,6 +52,14 @@ const THROUGH_DEPTH := 26.0
 const HEARTBEAT := 2.0
 ## A waypoint (px) counts as reached this close.
 const WAYPOINT_REACH := 20.0
+## How close (px) a member walks into its stack slot: a stride short of it would stand on the next slot.
+const SLOT_REACH := 6.0
+## How close (px) an entrant walks into its corner: all the way, since a few px short of a corner beside the doorway (a small
+## room's) is still in the way of the one crossing behind it.
+const CORNER_REACH := 6.0
+## Distance (px) between the spots two members hold side by side (the later members' spots inside, the rear spots): clear of
+## each other's footprint, so neither stands in the hole the other's body cuts in the steering map.
+const SPOT_SPACING := 44.0
 ## Most seconds the committed crossing may take before it gives up the commitment (a blocked doorway).
 const CROSS_CAP := 6.0
 ## Gaze (rad) within which the look through the door has settled at a pie step.
@@ -146,6 +154,7 @@ var _burst_seen := -1              ## The physics frame of the last stun burst i
 var _burst_at := -INF              ## `_time` of the stun burst in the room.
 var _security_clock := 0.0         ## Seconds spent holding the stack outside a short room (E13).
 var _security_held_at := -1.0      ## `_security_clock` the room was first called clear (-1 = not yet).
+var _blocked_count := 0            ## How many times the walk of this phase has been found sealed (`way_blocked`).
 ## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
 ## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
 ## for a gaze the hostile will not let go of.
@@ -245,6 +254,7 @@ func reset() -> void:
 	_top_off_spent = 0.0
 	_security_clock = 0.0
 	_security_held_at = -1.0
+	_blocked_count = 0
 
 
 ## Give the entry up (the NPC chose something else, e.g. a fight): radio `abort` so the stack stops counting on it.
@@ -368,6 +378,69 @@ func step(character, delta: float) -> bool:
 	return phase == "done"
 
 
+## The walk this phase is on has no way through: a body seals it and stays (`Locomotion.take_blocked`, after a moment's
+## wait and then every few seconds while it stays held). The phase re-plans, so no member stands held for ever: the approach
+## goes on to its next point (or its slot) by whatever way there is; a member the stack itself keeps from its slot takes the
+## back of the stack (`_to_back`), and with no slot to take it gives the claim up; a pie step is skipped; the thrower gives
+## the bang up; a member crossing waits out the first signal (the one ahead is still in the doorway and moves on in a moment),
+## then takes its corner where it stands once through, or gives the entry up when the doorway is still sealed; a corner, a
+## cover spot or the rear spot is held from where it stands, and the room is covered from where it stands. True when the
+## entry is given up (radioed `abort`): the caller re-decides because the way is blocked.
+func way_blocked(character) -> bool:
+	_blocked_count += 1
+	match phase:
+		"approach":
+			if not _waypoints.is_empty():
+				_waypoints.pop_front()
+				return false
+			if _to_back(character):
+				return false
+			_radio("abort")
+			phase = "done"
+			return true
+		"pie":
+			if not _pie_queue.is_empty():
+				_pie_queue.pop_front()
+				_clock = 0.0
+		"bang":
+			if _bang_stage == "go":
+				_give_up_bang()
+				_set_phase(character, "stack")
+		"cross":
+			if _blocked_count < 2:
+				return false  # The member ahead is still in the doorway: it moves on into the room in a moment.
+			if (character.global_position - (_geo["pos"] as Vector2)).dot(_geo["out"]) >= -THROUGH_DEPTH:
+				_radio("abort")
+				phase = "done"
+				return true
+			corner = character.global_position
+		"corner":
+			corner = character.global_position
+		"clear":
+			_covered = true
+		"cover":
+			_cover_spot = character.global_position
+		"rear":
+			_rear_spot = character.global_position
+	return false
+
+
+## Take the back of the stack (E2: the slots go by arrival): the slot behind the last one claimed, when this member is not
+## already the last and the doorway's wall has a slot there. A change is radioed as a new claim. False when there is none to
+## take.
+func _to_back(character) -> bool:
+	var team: Array = [] if secure else _perception.entry_team(opening)
+	var last := 0
+	for m in team:
+		last = maxi(last, int(m["slot"]))
+	if last < slot or last >= (_geo["slots"][side] as Array).size():
+		return false
+	slot = last + 1
+	_enter_approach(character)
+	_radio("claim")
+	return true
+
+
 ## Keep this NPC's slot and side in step with the radio: a slot an ally with a lower instance id also claimed is
 ## given up for the next free one, and the side follows the point's (the side is never re-read from where this NPC
 ## stands: a lone entrant crosses in front of the door to slice its other side). A change is radioed as a new claim.
@@ -420,14 +493,15 @@ func _tick_approach(character, team: Array, delta: float) -> void:
 	if not team.is_empty() and _bang_due(character, team, delta):
 		return  # The rest of the stack is in place: the thrower goes straight to throw, rather than into its slot first.
 	_aim_travel(character)
-	while not _waypoints.is_empty() and character.global_position.distance_to(_waypoints[0]) <= WAYPOINT_REACH:
-		_waypoints.pop_front()
+	while not _waypoints.is_empty() and (character.global_position.distance_to(_waypoints[0]) <= WAYPOINT_REACH \
+			or _loco.reached(character, _waypoints[0])):
+		_waypoints.pop_front()  # Got there, or to the free spot beside it when a body stands on it.
 	if not _waypoints.is_empty():
 		_loco.move_to(character, _waypoints[0])
 		return
 	var spot := _stack_point()
-	if not _at(character, spot):
-		_loco.move_to(character, spot)
+	if not _at(character, spot, SLOT_REACH):
+		_loco.move_to(character, spot, SLOT_REACH)
 		return
 	character.move_input = Vector2.ZERO
 	_set_phase(character, "stack")
@@ -440,7 +514,7 @@ func _tick_approach(character, team: Array, delta: float) -> void:
 func _tick_stack(character, team: Array, delta: float) -> void:
 	var spot := _stack_point()
 	if character.global_position.distance_to(spot) > WAYPOINT_REACH:
-		_loco.move_to(character, spot)  # Shoved out of the slot: step back in.
+		_loco.move_to(character, spot, SLOT_REACH)  # Shoved out of the slot: step back in.
 	else:
 		character.move_input = Vector2.ZERO
 	if _covers_rear(team):
@@ -492,11 +566,12 @@ func _topping_off(character, delta: float) -> bool:
 
 
 ## Whether this member holds the stack outside instead of going in (E13): a room too small for the team takes two
-## (`geometry.capacity`), so every slot past them stays on the stack side. It does while the two ahead are still on the
-## radio, and keeps holding once the room has been called clear. With nobody ahead and the room not cleared (they died or
-## gave it up) it is not held back, and takes the lead.
+## (`geometry.capacity`), so every member with two or more ahead of it in the stack stays on the stack side (its place in
+## the stack, not its slot's number: a member that took the back of the stack leaves its old slot empty). It does while the
+## two ahead are still on the radio, and keeps holding once the room has been called clear. With nobody ahead and the room
+## not cleared (they died or gave it up) it is not held back, and takes the lead.
 func _holds_outside(team: Array) -> bool:
-	if slot <= int(_geo.get("capacity", 99)):
+	if team.filter(func(m): return m["slot"] < slot).size() < int(_geo.get("capacity", 99)):
 		return false
 	return _security_held_at >= 0.0 or not _ahead(team).is_empty()
 
@@ -679,7 +754,7 @@ func _tick_bang(character, team: Array, delta: float) -> void:
 		_:
 			var spot := _stack_point()
 			if character.global_position.distance_to(spot) > WAYPOINT_REACH:
-				_loco.move_to(character, spot)  # Back in its slot (or, shoved out of it, a step back in).
+				_loco.move_to(character, spot, SLOT_REACH)  # Back in its slot (or, shoved out of it, a step back in).
 			else:
 				character.move_input = Vector2.ZERO
 			_look_toward(character, away, delta, 3.0)
@@ -821,7 +896,7 @@ func _corner_for(order: int) -> Vector2:
 	if order == 1:
 		return _pick_corner(corners, -side, true)
 	var door: Vector2 = _geo["pos"]
-	return _loco.reachable(door - (_geo["out"] as Vector2) * 90.0 + (_geo["along"] as Vector2) * side * (float(_geo["width"]) * 0.5 + 30.0 * (order - 1)))
+	return _loco.reachable(door - (_geo["out"] as Vector2) * 90.0 + (_geo["along"] as Vector2) * side * (float(_geo["width"]) * 0.5 + SPOT_SPACING * (order - 1)))
 
 
 ## The corner on side `on`: on the door's own wall first (a hard one when `hard_first`), else a hard one on that side,
@@ -844,9 +919,9 @@ func _pick_corner(corners: Array, on: int, hard_first: bool) -> Vector2:
 ## Through the threshold to the corner without stopping, gaze across the room; `in` once in the room and off the
 ## door's axis, then on to the corner.
 func _tick_cross(character, delta: float) -> void:
-	_loco.move_to(character, corner)
-	if character.move_input == Vector2.ZERO:
-		character.move_input = (corner - character.global_position).normalized()  # Never stand in the funnel.
+	_loco.move_to(character, corner, CORNER_REACH)
+	if character.move_input == Vector2.ZERO and not _loco.holding():
+		character.move_input = (corner - character.global_position).normalized()  # Never stand in the funnel (unless a body is in the way).
 	_look_toward(character, _across_from(corner), delta, 3.0)
 	var rel: Vector2 = character.global_position - (_geo["pos"] as Vector2)
 	var through: bool = rel.dot(_geo["out"]) < -THROUGH_DEPTH and absf(rel.dot(_geo["along"])) > float(_geo["width"]) * 0.5
@@ -867,8 +942,8 @@ func _across_from(p: Vector2) -> Vector2:
 ## room clear: its sector is covered either way); then clear the room by sight.
 func _tick_corner(character, team: Array, delta: float) -> void:
 	_look_toward(character, _across_from(corner), delta, 3.0)
-	if not _at(character, corner) and _clock < CROSS_CAP:
-		_loco.move_to(character, corner)
+	if not _at(character, corner, CORNER_REACH) and _clock < CROSS_CAP:
+		_loco.move_to(character, corner, CORNER_REACH)
 		_dwell = 0.0
 		return
 	character.move_input = Vector2.ZERO
@@ -933,8 +1008,11 @@ func _hold_rear_or_done(character, spare := false) -> void:
 	if not (last or (spare and not _through.is_empty())):
 		_end_hold()
 		return
+	# A spot of its own: the slots take turns either side of the doorway, each pair a body's clearance further along the wall.
 	var door: Vector2 = _geo["pos"]
-	_rear_spot = _loco.reachable(door - (_geo["out"] as Vector2) * 30.0 + (_geo["along"] as Vector2) * side * (float(_geo["width"]) * 0.5 + 24.0))
+	var rank := maxi(slot - 1, 0)
+	var on := side if rank % 2 == 0 else -side
+	_rear_spot = _loco.reachable(door - (_geo["out"] as Vector2) * 30.0 + (_geo["along"] as Vector2) * on * (float(_geo["width"]) * 0.5 + 24.0 + SPOT_SPACING * floorf(rank / 2.0)))
 	_set_phase(character, "rear")
 	_radio("rear")
 	character.move_input = Vector2.ZERO
@@ -1058,13 +1136,15 @@ func _end_hold() -> void:
 func _set_phase(character, next: String) -> void:
 	phase = next
 	_clock = 0.0
+	_blocked_count = 0
 	GameLog.say("%s entry %s > %s: %s at %s (slot %d%s)" % [character.name, opening, into, next, character.global_position.round(),
 		slot, ", alone" if solo else ""])
 
 
-## Whether the character has got to `p`: close by, or at the end of its nav path there.
-func _at(character, p: Vector2) -> bool:
-	return character.global_position.distance_to(p) <= WAYPOINT_REACH * 0.6 or _loco.reached(character, p)
+## Whether the character has got to `p`: close by, or at the end of its nav path there (arriving within `within` px when
+## given, `Locomotion.move_to`).
+func _at(character, p: Vector2, within := 0.0) -> bool:
+	return character.global_position.distance_to(p) <= (within if within > 0.0 else WAYPOINT_REACH * 0.6) or _loco.reached(character, p, within)
 
 
 ## This NPC's stack slot on the team's side.

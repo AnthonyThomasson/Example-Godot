@@ -107,7 +107,7 @@ var callout_range: float = 1500.0
 var callout_ttl: float = 6.0
 # Tactical entry (the doorway geometry; see agent_entry.gd).
 var entry_enabled: bool = false        ## Whether doorways into rooms left to clear are offered (ENTER).
-var entry_stack_spacing: float = 34.0
+var entry_stack_spacing: float = 44.0
 var entry_wall_standoff: float = 28.0
 var entry_pie_radius: float = 100.0
 var entry_pie_steps: int = 5

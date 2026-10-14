@@ -27,7 +27,7 @@ const THRESHOLD_SLACK := 8.0
 const PASS_DEPTH := 150.0
 
 var vision: RefCounted                ## The perception's sight sense (sight rays over low cover).
-var stack_spacing: float = 34.0       ## Distance (px) between neighbouring stack slots: a body's width and a little.
+var stack_spacing: float = 44.0       ## Distance (px) between neighbouring stack slots: clear of a neighbour's footprint.
 var wall_standoff: float = 28.0       ## Distance (px) of a stack slot off the wall's centreline.
 var pie_radius: float = 100.0         ## Distance (px) from the threshold of the pie arc a point man sweeps from.
 var pie_steps: int = 5                ## Points on the pie arc (angle steps).

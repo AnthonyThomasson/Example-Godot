@@ -47,8 +47,9 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes).
 - **A blinded NPC** (`Character.is_blind()`, docs/grenades.md G15) sees nothing: `observe()` skips the sighting pass (no new sighting, nothing `visible`, the `_looked` state is dropped) and the learning look, so what it holds of a hostile stays where it was last seen. Contacts "age as usual" but a blind NPC cannot tell that one has gone, so `contacts()` / `lost_hostiles()` keep every sighting the memory still holds (`lead_memory_ttl`) while it is blind (`_contact_ttl`); the behaviour fires blind at the last-known spot of the engaged one. It is back to `contact_memory_ttl` the tick it sees again.
 - `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),
-  with `hostile`/`reason`/`visible`/`age`. `lost_hostiles()` — hostiles last seen longer ago, within
-  `lead_memory_ttl` (investigation leads).
+  with `hostile`/`reason`/`visible`/`age`. The behaviour hands the whole list to its locomotion every tick: the bodies a walk goes
+  round, stops short of or gives way to are these, never one the NPC has not seen (`domain-ai-behavior`, Locomotion).
+  `lost_hostiles()` — hostiles last seen longer ago, within `lead_memory_ttl` (investigation leads).
 - `process_hit(character, data) -> bool` — a hit on/near the NPC → `under_fire` (direction + whether it
   hit), `engaged`, hostility; a hit farther off within `hearing_radius` → `heard_gunfire` (a lead), but
   ONLY from a shooter not already known hostile — gunfire from a character it is fighting (or any other
@@ -170,7 +171,8 @@ room on into rooms not cleared (what the team covers after clearing it, E8; the 
 baked nav map and cached (walls do not move): `out` (unit normal away from the room, from the room edge the door lies on)
 and `along` (the wall's axis), `wall` (wall length either side), `side` (the side with more wall, 0 when even), `slots`
 (single file against the wall on each side: `wall_standoff` off it, the first a body clear of the jamb, then every
-`stack_spacing`, snapped), `pie` (`pie_steps` points `pie_radius` from the threshold, from 55° to 25° off the axis), and the
+`stack_spacing` (44 px: clear of the neighbour's footprint, outside the 34 px hole a body at rest on the next slot cuts in the
+steering map, so a slot is never a destination inside a teammate), snapped), `pie` (`pie_steps` points `pie_radius` from the threshold, from 55° to 25° off the axis), and the
 `capacity` (how many go in: 2 when a side of the room is under `short_room`, the controller's `entry_short_room`, else `MAX_SLOTS`: E13), the
 room's four corners inset `corner_inset`, each `near` (on the door's wall), `side` and `hard` (no sight line from 24 px
 outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step, covering; `abort` and `done` drop one), `free_slot(team,

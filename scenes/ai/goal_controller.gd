@@ -190,8 +190,9 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_ready_timeout: float = 6.0
 ## Seconds a follower leaves after the member ahead of it is through, so the stack crosses one at a time.
 @export var entry_follow_gap: float = 0.3
-## Distance (px) between neighbouring stack slots along the wall: a body's width and a little.
-@export var entry_stack_spacing: float = 34.0
+## Distance (px) between neighbouring stack slots along the wall: clear of a neighbour's footprint (the 34 px hole a body at
+## rest cuts in the steering map, plus room to spare), so a slot never lies in the hole of the member beside it.
+@export var entry_stack_spacing: float = 44.0
 ## Distance (px) of a stack slot off the wall's centreline.
 @export var entry_wall_standoff: float = 28.0
 ## Distance (px) from the threshold of the arc the point slices the pie from.
@@ -313,6 +314,8 @@ var _last_options := {} ## The option groups of the last snapshot, retained for 
 var _decide_timer := 0.0 ## Seconds until the next decision is allowed.
 var _force := false ## Force a decision now (task resolved or salient event).
 var _force_reason := "" ## Why `_force` was last raised, kept (with `_force_ms`) for the brain overlay.
+var _decisions := 0 ## Decision walks started so far (`debug_state()["decisions"]`).
+var _decision_reason := "" ## Why the latest walk was started: the force reason, or "cadence" (`debug_state()["decision_reason"]`).
 var _force_ms := 0 ## When `_force_reason` was raised (msec).
 var _last_callout := {} ## The last callout this NPC radioed (`position`, `point`, `label`, `at`), for the hearing overlay.
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
@@ -504,13 +507,17 @@ func debug_status() -> String:
 ## one-line label, for an observer (the dev command server) to inspect on demand. It answers what a log
 ## line can't: the facts the last decision gated on, every level of the last walk (the exact state and
 ## question Von saw, the options, its probabilities and pick, auto-picks and timings), what the NPC
-## knows (`contacts`), the running primitive and pathing. Pure reads — never perturbs the loop.
+## knows (`contacts`), the running primitive and pathing, how many decision walks it has started and why the latest one
+## started (`decisions`, `decision_reason`: the force reason, e.g. "task resolved" or "way blocked", or "cadence"). Pure
+## reads — never perturbs the loop.
 func debug_state() -> Dictionary:
 	var out := {
 		"npc": _npc_name(),
 		"goal": goal_text(),
 		"decide_in": _decide_timer,
 		"forced": _force,
+		"decisions": _decisions,
+		"decision_reason": _decision_reason,
 		"facts": _last_facts,
 	}
 	if _planner != null:
@@ -688,8 +695,9 @@ func control(character, delta: float) -> void:
 	# An active interaction holds the tick; when it or a move resolves, re-decide at once.
 	if _behavior.service_interaction(character, delta, _force):
 		return
+	var why: String = _behavior.resolve_reason()
 	if _behavior.take_resolved():
-		_force_now("task resolved")
+		_force_now(why if why != "" else "task resolved")
 		var lead: String = _behavior.reached_lead()
 		if lead != "":
 			_perception.check_lead(lead) # Reached it and found nothing: don't send it back there.
@@ -744,6 +752,8 @@ func _maybe_interrupt(character) -> void:
 ## Sense the situation and start a decision walk over it. The planner answers asynchronously via
 ## `decided` / `failed` (the latter wired to the behaviour's steady-stance fallback).
 func _start_decision(character) -> void:
+	_decisions += 1
+	_decision_reason = _force_reason if _force else "cadence"
 	_force = false
 	_decide_timer = decide_interval
 	_apply_config()  # Pick up any export retuned at runtime before sensing + deciding.

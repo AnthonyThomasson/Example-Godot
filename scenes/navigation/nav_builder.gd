@@ -105,11 +105,11 @@ static func steering_region(region: NavigationRegion2D) -> NavigationRegion2D:
 ## The steering map that goes with the world's navigation map `planning_map`, the one a NavigationAgent2D
 ## should walk (`agent.set_navigation_map`): paths on it route around the characters at rest. Invalid
 ## (keep the planning map) when no steering region is on it, so an agent in a world that never baked one
-## walks the plain map.
+## walks the plain map. Named from the moment `build` has added the steering region, before the map has synchronized
+## (Main drops the NPCs in within that same frame; whether the map answers queries yet is `ready`).
 static func steering_map(planning_map: RID) -> RID:
-	var map: RID = _steering_maps.get(planning_map, RID())
-	if map.is_valid() and not NavigationServer2D.map_get_regions(map).is_empty():
-		return map
+	if int(_steering_regions.get(planning_map, 0)) > 0:
+		return _steering_maps.get(planning_map, RID())
 	return RID()
 
 
@@ -340,9 +340,9 @@ static func _body_hull(body: Node2D) -> PackedVector2Array:
 ## walks leaves none, because every character is inside its own hole and a walker's would seal or split the passage
 ## around itself (the hall, a doorway) and lead its own path the long way round. A character that stands still is
 ## carved, and so is one pushing against a wall or another body without getting anywhere; when it sets off its hole
-## goes at the next re-bake and, until then, whoever stands inside a hole walks the character-free map (see
-## `Locomotion`). Re-measured on every call from the live collider transform, so `rebake` and `nav_updater.gd` follow
-## the characters as they stop, set off, appear and die.
+## goes at the next re-bake. Every body at rest is carved, seen or not: which of them a walk accounts for is up to the
+## walker (the AI's `Locomotion` goes round by this map only for a body it knows of). Re-measured on every call from the
+## live collider transform, so `rebake` and `nav_updater.gd` follow the characters as they stop, set off, appear and die.
 static func character_holes(root: Node) -> Array:
 	var out: Array = []
 	if root == null:

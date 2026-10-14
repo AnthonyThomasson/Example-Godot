@@ -71,11 +71,18 @@ funnel is exposed to anyone inside; staging out of sight keeps surprise.
 Tests: `entry_stages_beside_opening`, `entry_approach_off_door_axis`.
 
 **E2. Stack beside the opening.** Several invaders heading for the same opening queue in single file on
-the wall beside it, one slot each, ordered by arrival, each a body's width behind the one in front, none in the
-doorway's line of sight. Slots are claimed over the radio (the same claim pattern as a flank side), so two
+the wall beside it, one slot each, ordered by arrival, each clear of the one in front (`entry_stack_spacing`, 44 px: outside
+the footprint a body on the next slot keeps clear around it, so no slot is a spot inside a teammate), none in the doorway's line of
+sight. A member walks round the teammates already in the stack (the human among them), stops short of one on its own slot and takes a
+free spot beside it, and gives way to one walking (`domain-ai-behavior`, Locomotion). When a body seals the only way to where a phase
+walks and stays, the member re-plans within a few seconds rather than waiting on it: on to its next point; one the stack itself keeps
+from its slot takes the back of the stack (the slots go by arrival), and with no slot left gives the claim up (`abort`) and re-decides;
+a pie step is skipped; a corner, cover or rear spot is held from where it stands. Slots are claimed over the radio (the same claim pattern as a flank side), so two
 invaders never take the same one. Why: a stack is the formation every technique starts from; crowding the door
 makes a target and blocks the point man.
-Tests: `entry_stack_orders_slots`, `entry_stack_no_double_claim`.
+Tests: `entry_stack_orders_slots`, `entry_stack_no_double_claim`, `entry_spots_clear_of_each_other`, `entry_team_no_bumping` (four invaders
+placed as in a match, real Von: nobody walks into a teammate, standing or walking), `entry_held_walk_replans`, `stack_ai_goes_round_player_in_slot`
+(a match built as `main.gd` builds one: the AI goes round the human standing in its slot).
 
 **E3. Slice the pie.** The first in the stack walks a short arc outside the opening (`entry_pie_steps` points, 100 px from
 the threshold, from 55° to 25° off the door's axis), turning its gaze through the doorway at each, before it crosses. What it sees from outside it engages from
@@ -95,7 +102,8 @@ Tests: `entry_no_pause_in_threshold`, `entry_hit_in_threshold_clears_it`, `entry
 
 **E5. Take opposite corners, hard corner first.** Entering as a team, the point turns to the near
 corner on its own side and the second crosses to the door-wall corner on the other side, the hard corner. They do not
-take the same corner, and each turns its gaze across the room as it goes so the sectors interlock. Why: two
+take the same corner, and each turns its gaze across the room as it goes so the sectors interlock. Each walks all the way into its
+corner: in a small room a corner a stride short stands in the doorway the next one crosses. Why: two
 interlocking sectors cover the whole room and each other.
 Tests: `entry_pair_take_opposite_corners`, `entry_pair_hard_corner_first`.
 
@@ -122,14 +130,14 @@ send it back to the start).
 has not: each member covers a different one of the room's doorways on into a room nobody has cleared (doors to outside
 and the one they came in by do not count), standing back inside the cleared room off that doorway's axis with its gun
 through it. A member left over, when there are more of them than such doorways, holds the doorway they came in by as rear
-security, facing back the way it came; a room with no doorway on leaves only the last one in on the rear. The team holds
+security, facing back the way it came, each at a spot of its own just inside it (taking turns either side of the doorway); a room with no doorway on leaves only the last one in on the rear. The team holds
 until one of them moves on (its next entry, or `entry_cover_time` without one), and then the rest go too. Alone, the
 invader looks through each doorway on in turn before it moves on. Then they take the next opening or unsearched room. A
 room whose door is past is never passed without being searched or secured first. Why: a cleared room that is not marked
 is searched again; the doorways on are where the next threat comes from, and a doorway left unwatched is a hole in the
 team's rear.
 Tests: `entry_marks_room_cleared`, `entry_pair_covers_remaining_doors`, `entry_solo_covers_remaining_doors`,
-`entry_cover_holds_until_team_moves`, `entry_rear_security`.
+`entry_cover_holds_until_team_moves`, `entry_rear_security`, `entry_spots_clear_of_each_other`.
 
 **E9. No unguarded thresholds.** A walk that would cross into a room that is not cleared goes in by tactical
 entry, whatever order sent the NPC there: a search or explore, an investigation lead, closing in on or flanking a
@@ -175,7 +183,7 @@ corners; the later slots hold the stack side as security and never step into the
 small": a room under 150 px on either side (three bodies), whose door wall cannot hold a third corner. Why: a third
 body in a box room has no point of domination to take and blocks the two who do. In the code, the doorway's geometry
 carries a `capacity` (`AgentEntry.geometry`: 2 for a room with a side under `short_room`, the controller's
-`entry_short_room`; else every slot). A member whose slot is past it stays in `stack` (`Entry._holds_outside`,
+`entry_short_room`; else every slot). A member with that many ahead of it in the stack (claiming lower slots) stays in `stack` (`Entry._holds_outside`,
 `_tick_security`), facing back along the line (E12), while the two ahead are still on the radio and after the room is
 called clear, and radios `done` once a teammate that held the room has moved on (or `rear_security_time` after the call).
 It does not stand in for the two: with nobody ahead and the room not called clear (they died or gave up) it takes the lead,
@@ -228,7 +236,7 @@ in. After the entry the AI's corner, clear and cover roles ignore the human. The
 numbered, the human's own highlighted, the AI's dimmer (`scenes/ui/hud/stack_markers.gd`). Only invaders enter, so only a
 human invader is ever offered a slot. Why: a stack is a formation the human can only join if it can see where it forms and the
 team can count on it to be there; the number says how many go in ahead.
-Tests: `stack_player_reserved_slot`, `stack_player_keeps_slot_late_ai_behind`, `stack_far_player_ignored`,
+Tests: `stack_ai_goes_round_player_in_slot`, `stack_player_reserved_slot`, `stack_player_keeps_slot_late_ai_behind`, `stack_far_player_ignored`,
 `stack_point_waits_for_player`, `stack_point_goes_when_player_ready`, `stack_follower_waits_for_player`,
 `stack_player_idle_withdrawn`, `stack_player_leaving_withdraws`, `stack_defender_player_none`, `stack_player_slot_von` (the real
 Von server; `tools/run_tests.sh stack --include-von`), `ui/stack_markers_draw`, `general/stack_player_wiring`.

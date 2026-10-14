@@ -38,6 +38,8 @@ const Watch := preload("res://scenes/ai/behavior/watch.gd")
 
 ## Seconds past a grenade's fuse that the thrower waits for the burst before it gives up waiting.
 const THROW_WAIT_MARGIN := 1.0
+## How near (px) a contact out of sight must have been last seen for a walk to check that it is still there (`_walk_bodies`).
+const WALK_BODY_RANGE := 450.0
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0
@@ -109,6 +111,7 @@ var _resume := {}                 ## The leaf an entry detour paused (see `_begi
 var _guard_clock := 0.0           ## Seconds the guard has been watching (sim time), for the re-arm of a given-up doorway.
 var _guard_off := {}              ## Doorway id -> `_guard_clock` before which the guard leaves it alone.
 var _hostiles: Array = []         ## Known hostile contacts this tick (nearest first), from perception.
+var _known: Array = []            ## Every contact the perception handed in this tick (`update_known`), hostile or not.
 var _primitive: StringName = &"hold" ## The running primitive.
 var _params := {}                 ## Its params (from the leaf).
 var _path: Array = []             ## The decision path ids (e.g. ["combat", "t_12", "flank", "side_left"]).
@@ -136,6 +139,7 @@ var _in_interaction := false      ## Committed to an active object interaction.
 var _interaction_timer := 0.0     ## Seconds left before ending the current interaction.
 var _commit_timer := 0.0          ## Seconds left on the current move/approach commitment (safety cap).
 var _resolved := false            ## A task just finished (arrived / interaction ended / target lost) → re-decide.
+var _resolve_reason := ""        ## Why `_resolved` was raised when it was not a finish ("way blocked"; see `resolve_reason`).
 var _evade := {}                  ## The plan to get clear of a live grenade being carried out ({} = none); see `set_evade`.
 var _evade_arrived := false       ## The evade reached its safe spot.
 var _throw_kind: StringName = &"" ## The grenade being thrown (`throw` leaf): &"frag" / &"stun".
@@ -554,6 +558,22 @@ func _adopt(leaf: Dictionary) -> void:
 			_combat.begin_throw(int(_params.get("slot", -1)), _throw_spot, _perception.grenade_range(_throw_kind))
 
 
+## The characters a walk accounts for: every contact the NPC knows of, less one out of sight whose last-known spot, near
+## enough to matter (`WALK_BODY_RANGE`), it can see now with nobody on it (it has moved on unseen).
+func _walk_bodies(character) -> Array:
+	var here: Vector2 = character.global_position
+	var spots: Array = []
+	for c in _known:
+		if not c["visible"] and (c["pos"] as Vector2).distance_to(here) <= WALK_BODY_RANGE:
+			spots.append(c["pos"])
+	if spots.is_empty():
+		return _known
+	var empty: Array = _perception.visible_points(character, spots)
+	if empty.is_empty():
+		return _known
+	return _known.filter(func(c): return c["visible"] or not empty.has(c["pos"]))
+
+
 ## Fight known contact `id`: capture its body and last-known position (no-op when it isn't known).
 func _engage(id: int) -> void:
 	for c in _hostiles:
@@ -587,6 +607,7 @@ func fallback() -> void:
 func update_known(known: Array, delta: float) -> bool:
 	_commit_timer -= delta
 	_tactic_timer -= delta
+	_known = known
 	_hostiles = known.filter(func(c): return c["hostile"])
 	if _engage_id == 0:
 		return false
@@ -634,12 +655,19 @@ func service_interaction(character, delta: float, force: bool) -> bool:
 	return true
 
 
-## Whether a committed task just finished (arrived / interaction ended / target lost while deciding).
-## Clears the flag; the controller forces a re-decision when it returns true.
+## Whether a committed task just finished (arrived / interaction ended / target lost while deciding), or its walk is
+## blocked (`resolve_reason`). Clears the flag; the controller forces a re-decision when it returns true.
 func take_resolved() -> bool:
 	var r := _resolved
 	_resolved = false
+	_resolve_reason = ""
 	return r
+
+
+## Why the task is resolved, read before `take_resolved()`: "way blocked" when a body seals the only way of its walk and
+## stays ("" = it finished).
+func resolve_reason() -> String:
+	return _resolve_reason
 
 
 ## The investigation lead the running move has reached (its `lead` param), or "" — so the controller
@@ -677,6 +705,8 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 func apply(character, delta: float) -> void:
 	_combat.tick(delta)
 	_loco.sample(character, delta)  # Observation only (stuck overlay); never alters the tick.
+	_loco.bodies = _walk_bodies(character)  # Every walk accounts for the characters the NPC knows of, and only those.
+	_loco.ignore_id = _engage_id if _primitive == &"melee" else 0  # A melee closes on its target: no walk round it.
 	if not _evade.is_empty():
 		_apply_evade(character, delta)
 		return
@@ -697,6 +727,8 @@ func apply(character, delta: float) -> void:
 			_apply_throw(character, delta)
 		_:
 			_apply_hold(character)
+	if _loco.take_blocked():
+		_way_blocked(character)
 	_apply_watch(character, delta)
 	_guard_clock += delta
 	_entry_guard(character)
@@ -707,6 +739,24 @@ func apply(character, delta: float) -> void:
 	_running = character.is_running()
 	_posture = character.posture()
 	_reloading = character.is_reloading()
+
+
+## A body seals the only way of the walk the primitive is on and stays (`Locomotion.take_blocked`): re-plan, so the NPC is
+## never held for ever. A move, an engage, a melee or an interact re-decides (another walk, or the same one held), and so does
+## a throw still closing on its spot (not once the wind-up has begun); an entry re-plans its own walk (`Entry.way_blocked`)
+## and, when it gives the entry up, re-decides too, or, as a detour, hands the walk back to the order it paused. An evade
+## (not a primitive: it replaces the order) holds the best spot it has until the burst.
+func _way_blocked(character) -> void:
+	if _primitive in [&"move", &"engage", &"melee", &"interact"]:
+		_resolved = true
+		_resolve_reason = "way blocked"
+	elif _primitive == &"throw" and _combat.throw_stage == "aim":
+		_end_throw()
+		_resolve_reason = "way blocked"
+	elif _primitive == &"entry" and _entry.way_blocked(character):
+		_finish_entry()
+		if _resolved:
+			_resolve_reason = "way blocked"
 
 
 ## The watch stage (docs/gaze-and-fire.md), run after the primitive has steered: an NPC is always either looking at (and, when

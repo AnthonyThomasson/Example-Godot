@@ -310,8 +310,24 @@ does, in `run`: `Stack.attach(t, id)` (`tests/_ai/stack_probe.gd`, `const Stack 
 `attach(character, rooms, t.world.openings)`; null before the feature exists). The stack is read through `view()` (`Stack.mine`,
 `Stack.slot_point`) and the human's radio through the usual `Entry.calls(t, step, &"me")`; `Stack.walk` takes the puppet through points
 (`Stack.crossing(door)` goes in through a door). A late AI joiner is held back like in `entry_ally_joins_stack` (`entry_enabled` false, speed 0)
-until the human has its slot. `stack_player_slot_von` runs the whole thing with the real Von server (`requires_von`). The UI half is
+until the human has its slot. `stack_player_slot_von` runs the whole thing with the real Von server (`requires_von`). `stack_ai_goes_round_player_in_slot` builds the match as Main does instead (`match_world_probe.gd`, below) and its human is the player's own character and controller, given its stack through `MatchSpawner.bind_player`. The UI half is
 `tests/ui/stack_markers_draw_test.gd` (a fake stack with a `view()`), the wiring `tests/general/stack_player_wiring_test.gd`.
+
+## Bodies in the way (issue #53)
+
+`tests/_ai/bump_probe.gd` (`const Bump := preload(...)`) measures "walks into" off public state only: `watch(t, who, duration, stop)` records
+every frame a character steers (`move_input`) within 60° of another it touches (centres under 31 px) as a bump, with whether the other was at
+rest and how far it was shoved; `of_kind`, `collisions` (a head-on pair's two bumps as one collision), `describe`, `tally`, `totals`. The
+mechanism tests are `tests/ai/movement/npc_*` (scripted Von, a puppet teammate standing still), the scenario `tests/ai/entry/entry_team_no_bumping`
+(real Von, four invaders placed by `MatchSpawner`). A test that a held walk re-plans reads `debug_state()["decisions"]` / `["decision_reason"]`
+("way blocked"): an auto-picked level asks Von nothing (`tests/ai/entry/entry_held_walk_replans` for an entry's walk).
+
+**A match built as Main builds one.** A test world waits for its navigation maps (the steering map's too) before an actor spawns; a match does
+not, its NPCs are set up in the frame the navmesh is baked. `tests/_ai/match_world_probe.gd` (`const Match := preload(...)`) builds that:
+`Match.build(layout, t.world, invader_points, human_point)` lays the `TestSetup` layout (e.g. `Maps.house(TestSetup.new(), false)`) in a
+`SubViewport` with a `World2D` of its own (fresh maps, as each match's), bakes it, adds the re-baker, the invaders (`MatchSpawner.add_npc`) and
+the human (the player's character and controller, `MatchSpawner.bind_player`) in the same frame, and returns the nodes (they are not test actors:
+`Match.calls(t, speaker, step)` reads their radio). `tests/ai/stack_ai_goes_round_player_in_slot` uses it.
 
 ## Investigation tests (tag `investigate`)
 

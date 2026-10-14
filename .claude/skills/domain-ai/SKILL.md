@@ -52,7 +52,9 @@ the running primitive.
 
 **Observer reads** (pure reads, never perturbing the loop): `debug_status()` is the decision path as labels plus the running
 primitive's progress. `debug_state() -> Dictionary` is the deep snapshot: every level of the last walk (the state and question
-Von saw, the options, its probabilities and pick), the facts, the contacts, the running primitive and pathing; the dev command
+Von saw, the options, its probabilities and pick), the facts, the contacts, the running primitive and pathing (`loco`: the walk's
+`way` plain / round / held, `held_for`, `giving_way`), and `decisions` (walks started) with `decision_reason` (why the latest started:
+the force reason, e.g. "task resolved", "way blocked", "attacked", or "cadence"); the dev command
 server's `ai` verb dumps it and `tools/von_probe.py` replays captured levels against Von. `debug_zones() -> Array` flattens the
 last snapshot's option groups to world points, each with its `label`, `desc` (for an inspector to explain a clicked point) and
 `tags`, tagged by zone kind (fire / flank / advance / retreat / lead / search / entry / room / interaction, plus `waypoint` for

@@ -296,6 +296,7 @@ func apply_back_off(character, delta: float) -> void:
 		return
 	_back_off_timer -= delta
 	character.move_input = -character.facing
+	_loco.keep_off(character)  # Never back into a body it knows of.
 	character.run_input = false
 
 
