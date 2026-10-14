@@ -120,6 +120,7 @@ const CharacterRagdoll = preload("res://scenes/character/body/character_ragdoll.
 const CharacterFootsteps = preload("res://scenes/character/character_footsteps.gd")
 const CharacterLegs = preload("res://scenes/character/body/character_legs.gd")
 const CharacterKick = preload("res://scenes/character/body/character_kick.gd")
+const CharacterPush = preload("res://scenes/character/character_push.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
@@ -957,10 +958,11 @@ func damage_taken() -> float:
 	return _deformable.damage_total if _deformable else 0.0
 
 
-# --- Pushable contract (shoved by Knockback transfers and other walking characters) -----
+# --- Pushable contract (interface 5: Knockback transfers, blasts, a walking character, punch, kick) ---
 
-## Take a shove; divided by mass and folded into locomotion.
-func apply_impulse(impulse: Vector2) -> void:
+## Take a shove; divided by mass and folded into locomotion. `_at` (the contact offset from the origin) is the
+## pushable contract's; a character does not turn, so a shove anywhere on it is a central one.
+func apply_impulse(impulse: Vector2, _at := Vector2.ZERO) -> void:
 	_knockback += impulse / maxf(CharacterConfig.player_mass, 0.5)
 
 
@@ -997,14 +999,12 @@ func _apply_pushes() -> float:
 		# The normal points back toward the character, so "into the object" is -normal.
 		var dir := -collision.get_normal()
 		var impulse := CharacterConfig.push_impulse * input_strength * get_physics_process_delta_time()
-		# Carry the object along rather than launch it: never drive it faster than we walk.
-		if collider.has_method("get_mass") and "linear_velocity" in collider:
-			var along: float = collider.linear_velocity.dot(dir)
-			var gap := maxf(move_input.dot(dir) * _move_speed() * CharacterConfig.push_carry_factor - along, 0.0)
-			impulse = minf(impulse, gap * collider.get_mass())
-		collider.apply_impulse(dir * impulse)
-		if collider.has_method("get_mass"):
-			heaviest = maxf(heaviest, collider.get_mass())
+		if not collider.has_method("get_mass"):
+			collider.apply_impulse(dir * impulse)
+			continue
+		# At the point of contact, so a piece pushed off-centre turns; carried, never driven faster than we walk.
+		CharacterPush.shove(collider, dir, impulse, collision.get_position(), move_input.dot(dir) * _move_speed())
+		heaviest = maxf(heaviest, collider.get_mass())
 
 	if heaviest <= 0.0:
 		return 1.0

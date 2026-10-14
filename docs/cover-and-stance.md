@@ -67,10 +67,10 @@ Tests: `posture_turn_speed`.
 **P5. Legs touch the world.** The legs are swept from the body centre toward where the pose puts them and rest at
 the first wall or solid piece they meet (as the hands do), so a stride's toes and a crouch's knees
 never draw through anything; a knee that would pass through something moves the foot back. A foot or
-knee swinging into a light, pushable piece shoves it, scaled by how fast it moves into it and capped so the piece is
-never driven faster than the character walks; a wall or a heavy piece only stops the leg, and a foot at rest shoves
-nothing. Other characters stop a leg but are never shoved by it.
-Tests: `legs_rest_on_walls`.
+knee swinging into a light, pushable piece shoves it where it touches (so a piece pressed near one end turns), scaled
+by how fast it moves into it and capped so the piece is never driven faster than the character walks; a wall or a
+heavy piece only stops the leg, and a foot at rest shoves nothing. Other characters stop a leg but are never shoved by it.
+Tests: `legs_rest_on_walls`, `leg_press_turns_furniture`.
 
 **A1. Fighting low.** An NPC fighting in place (an engaged NPC in position, or one holding or reloading
 with a hostile known or shots landing) crouches (behind cover, in the open or pinned alike). It is a manner of carrying

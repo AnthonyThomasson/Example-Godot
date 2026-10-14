@@ -1,7 +1,6 @@
 ---
-name: m-rebase
-description: Rebase this branch onto the latest origin/main, keeping uncommitted changes, and resolve conflicts (asking when intent is unclear). Manual only (`/m-rebase`); the ticket workflows run its steps after plan acceptance.
-disable-model-invocation: true
+name: rebase
+description: Rebase this branch onto the latest origin/main, keeping uncommitted changes, and resolve conflicts (asking when intent is unclear). Use on `/rebase`, when asked to rebase or catch up with main, and in the ticket workflow after plan acceptance and before the audit.
 ---
 
 # Rebase

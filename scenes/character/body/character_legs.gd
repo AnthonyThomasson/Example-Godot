@@ -9,15 +9,17 @@ extends RefCounted
 ##   along the surface; the rig reads it back through `character.foot_clamp(i)`;
 ## - the knee is judged the same way from the leg the ankle leaves: a knee that would pass through something
 ##   moves the foot back by what it overshot (a crouch facing a wall keeps its knees off it), up to `KNEE_TRIES`;
-## - a foot or knee swinging into a light, pushable piece shoves it, scaled by how fast the foot is moving into
-##   it and how far it wanted to go, and capped so the piece is never driven faster than the character walks (the
-##   same rule as the body's own push). A fixed wall only stops the leg, and a foot at rest pushes nothing.
+## - a foot or knee swinging into a light, pushable piece shoves it where it rests, scaled by how fast the foot is
+##   moving into it and how far it wanted to go, and capped so the piece is never driven faster than the character
+##   walks (the body's own push, `character_push.gd`). A fixed wall only stops the leg, and a foot at rest pushes nothing.
 ## Other characters are solid to a leg (it rests against them) but are never shoved by it. Nothing is cast while
 ## nothing is near. Tuning: CharacterConfig.leg_*.
 
 const Rig = preload("res://scenes/character/body/character_rig.gd")
 ## The collide-and-slide a leg makes toward where the rig wants it (shared with the hands).
 const Sweep = preload("res://scenes/character/body/body_sweep.gd")
+## The shove the body's own walking push gives (at the contact point, carried at walking pace).
+const Push = preload("res://scenes/character/character_push.gd")
 
 ## Physics layer a leg meets: walls, solid furniture and living characters (the hands' mask).
 const MASK := PhysicsLayers.SOLID
@@ -114,16 +116,13 @@ func _press(space: PhysicsDirectSpaceState2D, character, slot: int, wanted: Vect
 	var approach := velocity.dot(dir)
 	if approach <= 0.0:
 		return
-	var piece := _pushable_at(space, character, character.global_position + rested)
+	var at: Vector2 = character.global_position + rested
+	var piece := _pushable_at(space, character, at)
 	if piece == null:
 		return
 	var strength := clampf(approach / maxf(float(character.speed), 1.0), 0.0, 1.0) * clampf(depth / FULL_PRESS, 0.0, 1.0)
-	var impulse := CharacterConfig.leg_push_impulse * strength * delta
-	# Carry the piece along rather than launch it: never drive it faster than the character walks.
-	if "linear_velocity" in piece:
-		var gap := maxf(float(character.speed) * CharacterConfig.push_carry_factor - piece.linear_velocity.dot(dir), 0.0)
-		impulse = minf(impulse, gap * piece.get_mass())
-	piece.apply_impulse(dir * impulse)
+	# At the point where the leg rests, so a piece pressed near an end turns; never driven faster than the character walks.
+	Push.shove(piece, dir, CharacterConfig.leg_push_impulse * strength * delta, at, float(character.speed))
 
 
 ## The light, pushable piece touching a foot-sized circle at world point `at`, or null: a body that takes an

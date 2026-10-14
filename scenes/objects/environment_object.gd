@@ -2,11 +2,11 @@ extends RigidBody2D
 
 ## An Objects-domain world object (furniture, decor). Owns its surface data (shape, size,
 ## color, cover/penetration ratings, material, mass) and composes two Physics components —
-## a Knockback child (RigidBody2D adapter + pushable contract) and a Deformable child (damage
+## a Knockback child (RigidBody2D adapter, how take_hit shoves it) and a Deformable child (damage
 ## dents/chunks). The engine integrates its motion, collisions and pivoting. It
 ## exposes the two contracts the rest of the game talks to it through, and nothing else:
 ##   • get_surface() / take_hit(HitInfo)  — the "hittable" contract (Projectile, melee)
-##   • apply_impulse(Vector2) / get_mass() — the "pushable" contract (Knockback, character)
+##   • apply_impulse(Vector2, at) / get_mass() — the "pushable" contract (blasts, a character's push, legs, punch, kick)
 ## The force and deformation MATH lives in the Physics domain; this file only wires it up.
 
 @export var shape_type: String = "circle"  ## "circle", "square", or "rect".
@@ -38,7 +38,7 @@ extends RigidBody2D
 @export var facing: Vector2 = Vector2.DOWN
 
 ## Physics components, created in _ready() (runtime-shape convention).
-var _knockback: Knockback  ## RigidBody2D adapter + pushable contract.
+var _knockback: Knockback  ## RigidBody2D adapter; take_hit shoves the body through it.
 var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
 var _smear: BloodSmear  ## Drags blood out of a puddle as the piece slides through it (solid pieces only).
 var _collider_rebuild_queued := false  ## A deferred `_rebuild_collider` is already waiting.
@@ -106,9 +106,10 @@ func get_interactions() -> Array:
 	return interactions
 
 
-# --- Pushable contract (shoved by Knockback transfers and the walking character) -------
-# Both halves are served by RigidBody2D's native methods: apply_impulse() (a one-arg central
-# shove) and get_mass() (returns `mass`, which Knockback sets from `weight`). Nothing to add.
+# --- Pushable contract (interface 5: blasts, a character's walking push, legs, punch, kick) ---
+# Both halves are served by RigidBody2D's native methods: apply_impulse(v, at) (`at` the contact offset from the
+# origin, so a shove off the centre turns the piece; omitted = a central shove) and get_mass() (returns `mass`,
+# which Knockback sets from `weight`). Nothing to add.
 
 
 # --- Collider (built in code; rebuilt to follow the deformed silhouette) ---------------

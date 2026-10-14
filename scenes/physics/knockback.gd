@@ -2,9 +2,9 @@ class_name Knockback extends Node
 
 ## Reusable physics adapter for a shoveable RigidBody2D. Add it as a child of the body. It
 ## configures the body for top-down play (no gravity, mass, damping, sleep, origin-pinned
-## center of mass) and is the home of the "pushable" contract: the owner forwards
-## `apply_impulse()` / `get_mass()` here, so any pusher uses one contract and never touches
-## the body directly. The engine integrates motion, collisions, pivoting and settling; this
+## center of mass), and its `apply_impulse(v, at_world)` is how the owner's `take_hit` shoves
+## the body. The "pushable" contract itself is the body's native `apply_impulse(v, at)` /
+## `get_mass()`. The engine integrates motion, collisions, pivoting and settling; this
 ## component only feeds it impulses and hands momentum to the kinematic character on contact.
 ## All tuning is PhysicsConfig.body_* / impact_*.
 

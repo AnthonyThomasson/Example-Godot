@@ -74,8 +74,7 @@ never drop or reword what is there. A revised plan replaces the old `## Plan`.
 ### Rebase after acceptance
 
 Right after the plan is accepted (a bug: the restated bug agreed), before anything is built: `git fetch origin main`;
-if `git rev-list --count HEAD..origin/main` > 0, do the `m-rebase` steps yourself (it is manual-only: read
-`.claude/skills/m-rebase/SKILL.md`), uncommitted changes kept. Read what came in (`git log --oneline` and the diff of
+if `git rev-list --count HEAD..origin/main` > 0, invoke `rebase` (uncommitted changes kept). Read what came in (`git log --oneline` and the diff of
 the new commits) against the plan. A change to a domain, interface, rule, test or doc the plan builds on (renamed API,
 new behaviour in the area, moved file, a contradicting spec) **reopens the grilling**: ask about each, revise, get it
 accepted again. Say so when nothing relevant came in or there was nothing to rebase.
@@ -91,6 +90,11 @@ gone; Play restarted for the latest code), and ask ("looks right, go on to the a
 new round: update `## Plan` if scope moved, test first, code, green, ask again. Audit only once the behaviour is right.
 
 ### Audit
+
+Before starting it, check what `main` gained since the last rebase: `git fetch origin main`; if
+`git rev-list --count HEAD..origin/main` > 0, invoke `rebase` (uncommitted changes kept), read what came
+in against the change as in "Rebase after acceptance", and rerun the checks (new tests, `--changed`) on the rebased
+tree, so the audit reviews against the current `origin/main`. Say so when nothing came in.
 
 One agent runs `audit`. It sees committed plus staged work: commit or stage first if the user asked for commits, else
 tell it which files are only in the working tree. Start it with

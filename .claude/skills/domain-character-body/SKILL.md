@@ -203,8 +203,9 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   or character it meets, sliding the leftover; a knee that would pass through something moves the foot back (`KNEE_TRIES`); the rig reads the result
   through `foot_clamp(i)` (null = unobstructed) and re-solves the knee (`CharacterRig.knee_at`). A foot or knee swinging into a pushable
   (`apply_impulse` + `get_mass`, never another character) shoves it by `leg_push_impulse` scaled by its world speed into the piece and how far it wanted
-  to go, capped at walking pace like the body's push; a foot at rest pushes nothing. Nothing is cast unless something is within `NEAR` px; cleared while
-  busy in an interaction and on death.
+  to go, at the point where the leg rests, through `shove` in the body's own `character_push.gd` (`domain-character`): a piece pressed near an end turns, and its
+  contact point is carried at no more than walking pace; a foot at rest pushes nothing. Nothing is cast unless something is within `NEAR` px; cleared while
+  busy in an interaction and on death. Tests: `tests/character/legs_rest_on_walls_test.gd`, `leg_press_turns_furniture_test.gd`.
 
 **The run's legs and arms.** `pose.run_amount()` (0..1, smoothed from the speed past walking pace) blends the rig's
 foot swing and lift from `body_stride` / `body_foot_lift` to `body_run_stride` / `body_run_foot_lift`, the stride
@@ -283,11 +284,11 @@ character's fresh `facing`, and the character pulls its controller's intent at t
 During a swing `character_hands.gd` runs a shape query (`intersect_shape`) at the fist's *raw*
 punch position — which extends into what is hit, unlike the drawn hand that rests on the surface
 — and dedupes per swing. Each new hit shoves the body via the "pushable" contract
-(`apply_impulse`) and deals damage, both scaled by the swing's range of motion (how fast the fist
+(`apply_impulse(impulse, at)`, `at` the fist's offset from the body, or the butt's for a long gun, so a piece struck near an end turns) and deals damage, both scaled by the swing's range of motion (how fast the fist
 is moving this frame; 1.0 = full-speed extend). It emits `punched(hand, body, damage)` → the
 character re-emits `hit_landed(body, damage, hand)`. A punch pushes but never deforms; walls (no
 `apply_impulse`) take damage without moving. Tuned by `CharacterConfig.punch_impulse` /
-`punch_damage` (walking push tuned by the same holder). A long gun's butt strike (`domain-items`) shortens the hand's extension by `Item.strike_forward()` + `strike_short()` and queries the hit at the butt (`Item.strike_end`) once it is ahead of the fist; the other hand is placed rigidly on the barrel (`_raw_hand_position`: the weapon hand's place plus `strike_direction` x `strike_support_gap()`, toward the butt, gripping from the first frame of the swing) so both arms follow the turning gun, the swing takes `strike_tempo()` times a fist's extend/retract time (the damage's range of motion is normalised by it), and the redraw key carries both hands' punch amounts, since the gun turns with them.
+`punch_damage` (walking push tuned by the same holder). Test: `tests/character/punch_turns_furniture_test.gd`. A long gun's butt strike (`domain-items`) shortens the hand's extension by `Item.strike_forward()` + `strike_short()` and queries the hit at the butt (`Item.strike_end`) once it is ahead of the fist; the other hand is placed rigidly on the barrel (`_raw_hand_position`: the weapon hand's place plus `strike_direction` x `strike_support_gap()`, toward the butt, gripping from the first frame of the swing) so both arms follow the turning gun, the swing takes `strike_tempo()` times a fist's extend/retract time (the damage's range of motion is normalised by it), and the redraw key carries both hands' punch amounts, since the gun turns with them.
 
 ## The leg kick
 
@@ -298,7 +299,7 @@ kick is already under way), then a STRIKE (`kick_strike_time`, the foot thrown o
 The rig lifts the kicking ankle to `kick_foot_height` (body radii) first and throws it out along `facing` (never past `kick_reach` or the
 leg's length at that height), the knee bent up toward the aim and the toes following; the other leg keeps striding. During the strike a
 circle of `kick_radius` at `kick_reach * amount()` ahead of the body centre is queried on `PhysicsLayers.SOLID`: each body is hit once
-per kick, shoved by `kick_impulse` along `facing` (`apply_impulse`) and dealt `kick_damage` (`take_damage`) at full strength, then
+per kick, shoved by `kick_impulse` along `facing` at the foot (`apply_impulse(impulse, at)`, so a piece kicked near an end turns) and dealt `kick_damage` (`take_damage`) at full strength, then
 `kicked(body, damage)` → the character posts `hit_landed(body, damage, 2)` and the `&"hit"` event with outcome `punch` (so it sounds like
 a punch; louder for its damage), like a punch it never deforms. The legs layer rests the thrown foot against walls like any other. Cleared
 on an interaction and on death. Tuning: `CharacterConfig.kick_*`. Tests: `tests/character/kick_*_test.gd`.
