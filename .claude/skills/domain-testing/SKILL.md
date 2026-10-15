@@ -95,8 +95,8 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **`--shots`:** `tools/run_tests.sh --shots words` runs windowed (not headless) and saves
   `<bundle dir>/<id>__fail.png` for each failed test (printed as `shot:`); `t.screenshot(label)` saves one
   on demand (returns "" when headless or `--shots` is off). Read the PNG to see what went wrong.
-- **Coverage:** `python3 tools/test_coverage.py` lists untested domains, unused switches and interfaces
-  no test calls.
+- **Coverage:** `python3 tools/test_coverage.py` lists untested domains (a domain's tests counted in `tests/<domain>/**/*_test.gd`, its
+  topic folders included), unused switches and interfaces no test calls.
 - **Failures:** a FAIL/TIMEOUT prints each actor's final state and the `t.trace` series ranges, and writes
   `<out dir>/failures/<id>.json` (path printed as `bundle:`) with the full time-stamped event log, the
   final snapshot (actors, objects, and vehicles with their position, rotation and speed), traces and logged errors. See the `test-debug` skill.
