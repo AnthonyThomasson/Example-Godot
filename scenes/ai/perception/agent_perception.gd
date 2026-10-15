@@ -247,7 +247,7 @@ func process_hit(character, data: Dictionary) -> bool:
 			and _hostility.is_hostile(attacker.get_instance_id(), _memory)
 		if self_pos.distance_to(pos) <= hearing_radius and not known_shooter:
 			var cell := "%d,%d" % [floori(pos.x / 200.0), floori(pos.y / 200.0)]
-			_memory.remember(&"heard_gunfire", { "pos": pos, "from": from }, lead_memory_ttl, cell)
+			_memory.remember(&"heard_gunfire", { "pos": pos }, lead_memory_ttl, cell)
 		return false
 	_memory.remember(&"under_fire", { "from": from, "hit": hit_me }, under_fire_time, "latest")
 	_memory.remember(&"engaged", {}, engage_dwell, "latest")
