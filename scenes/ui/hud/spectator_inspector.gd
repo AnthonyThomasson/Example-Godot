@@ -1,6 +1,6 @@
 extends CanvasLayer
 
-## UI domain, spectator inspector: the debug lens for the 2-AI spectator match. SPACE pauses/resumes.
+## UI domain, spectator inspector: the debug lens for the spectator match (defenders vs invaders). SPACE pauses/resumes.
 ## A LEFT-CLICK on an NPC selects it — revealing ONLY that NPC's debug overlays (the enabled ones) and
 ## hiding every other NPC's; clicking it again, or empty ground, clears the selection. With an NPC
 ## selected, a LEFT-CLICK on one of its tactical points (a zone marker) highlights that point and opens
@@ -11,9 +11,8 @@ extends CanvasLayer
 ## It runs PROCESS_MODE_ALWAYS so Space and clicks work while the tree is paused (freeze the match, then
 ## inspect). A decoupled observer like the other spectator UI: it reads only published surfaces — the
 ## combatants' public `global_position` and `outfit_view()`, the framing camera for the cursor's world point, and each
-## NPC's `debug_zones()` (duck-typed) for the point details — and flips the debug-overlay toggles by the same
-## duck-typed property names `main.gd`'s `_configure_debug` uses (`show_actions` / `show_path` /
-## `show_vision` / `show_tactics` / `show_room_zones`). Main builds it in spectator mode. Player-mode
+## NPC's `debug_zones()` (duck-typed) for the point details — and flips the debug-overlay toggles (every per-NPC
+## `show_<x>` flag of the overlay registry) through `OverlayRegistry.apply`, as Main does. Main builds it in spectator mode. Player-mode
 ## input is untouched: Space stays the player's INTERACT there (this node exists only in the match).
 
 ## World-space pick radius (px) around the cursor within which a click selects an NPC.
@@ -42,8 +41,8 @@ var _outfit: Label           ## What the selected NPC wears, bottom right (hidde
 var _contact_markers: Node2D ## World-space overlay that draws the selected NPC's contact knowledge.
 
 
-## Keep running while paused and build the hint + detail UI. `flags` is the set of overlay toggles the
-## setup menu enabled (property name -> bool); a selected NPC shows exactly those. `right_clear` is the screen width (px) from
+## Keep running while paused and build the hint + detail UI. `flags` is the overlay toggle bar's per-NPC toggles (Main's
+## `_overlay_flags` without the global ones; property name -> bool); a selected NPC shows exactly those. `right_clear` is the screen width (px) from
 ## the right edge the outfit panel keeps clear: Main hands it the overlay toggle bar's column, which the seed readout sits under.
 ## Called by Main.
 func setup(combatants: Array, flags: Dictionary, right_clear: float) -> void:
