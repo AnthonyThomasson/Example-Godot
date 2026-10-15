@@ -228,5 +228,5 @@ grenade lives, so the NPC holds the spot until the burst. A grenade in flight is
 spot it LANDED, which the allies' plans need) and is repeated once if it rests 30 px or more from there; an ally's call or the NPC's own throw is not radioed again.
 The behaviour carries the plan out (`domain-ai-behavior`, "The evade reflex").
 
-**Wrappers for the GRENADE tactic and the bang entry on `AgentPerception`:** `grenade_zone_radius(kind, radius)`, `in_grenade_zone(character, kind, radius, burst, p, height := standing)`,
-`grenade_escape(character, kind, radius, burst, fuse_left)` (from where the NPC stands), `can_lob(character, from, to, max_range)`. Tests: `tests/ai/grenade/`.
+**Wrappers for the behaviour sub-domain on `AgentPerception`:** `can_lob(from, to, kind)`, `lob_clear(from, to)`, `grenade_range(kind)` and
+`grenade_fuse(kind)` (above), and `evade_plan()`, `known_grenades()`, `grenade_announcements()`. Tests: `tests/ai/grenade/`.
