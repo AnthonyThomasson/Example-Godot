@@ -1,25 +1,16 @@
 class_name BloodDecals
-extends Node2D
+extends "res://scenes/physics/chunked_layer.gd"
 
 ## A layer of bloody footprints and smears under a world node, batching every print (a polygon) and
 ## ribbon (a smear's feathered, varying-width trail) so thousands of marks cost a few draw calls instead
 ## of thousands of nodes. Marks are grouped in `CHUNK`-px squares and only the chunk that gained a mark
-## (or whose ribbon grew) redraws. They dry from `BloodConfig.color` to `dried_color` over
+## (or whose ribbon grew) redraws (`chunked_layer.gd`). They dry from `BloodConfig.color` to `dried_color` over
 ## `print_dry_time` (chunks holding wet marks redraw at `DRY_REDRAW` Hz), and the oldest are dropped past
 ## `BloodConfig.print_max`. Kept off the shared Despawner so a trail can't evict casings and splatters.
 
-## Side (px) of a chunk.
-const CHUNK := 128.0
 ## Redraws per second of a chunk that still holds wet marks.
 const DRY_REDRAW := 2.0
 const NODE_NAME := "BloodDecals"
-
-## Every mark, oldest first: { kind, chunk, born (physics frame), alpha, ... } (see `print_at`, `ribbon_begin`).
-var _marks: Array[Dictionary] = []
-## chunk cell -> the marks drawn by that chunk.
-var _by_chunk: Dictionary = {}
-## chunk cell -> its drawing node.
-var _chunks: Dictionary = {}
 
 
 ## The decal layer held by `parent`, or null if none yet.
@@ -30,32 +21,26 @@ static func find(parent: Node) -> BloodDecals:
 ## The decal layer under `parent` (the node the marks' maker lives in, like a splatter's parent), made
 ## on first use. Each parent has its own layer, freed with it.
 static func layer(parent: Node) -> BloodDecals:
-	var found := find(parent)
-	if found != null:
-		return found
-	var made := BloodDecals.new()
-	made.name = NODE_NAME
-	made.z_index = BloodConfig.print_z_index
-	parent.add_child(made)
-	return made
+	return _get_or_make(parent, NODE_NAME, BloodDecals, BloodConfig.print_z_index) as BloodDecals
 
 
 ## Add a filled polygon (world space) at `alpha` 0..1 of the blood colour.
 func print_at(poly: PackedVector2Array, alpha: float) -> void:
 	if poly.size() < 3 or Geometry2D.triangulate_polygon(poly).is_empty():
 		return  # the engine can't draw it; drop it rather than log an error
-	_add({ "kind": "print", "chunk": _chunk_cell(poly[0]), "poly": poly, "alpha": alpha })
+	var born := Engine.get_physics_frames()
+	_add({ "kind": "print", "chunk": _chunk_cell(poly[0]), "born": born, "poly": poly, "alpha": alpha }, BloodConfig.print_max)
 
 
 ## Start a smear ribbon at world `point`: `width` px across and `alpha` 0..1 there. Grow it with
 ## `ribbon_extend`. Drawn as a feathered band whose width and opacity follow its samples. Returns the mark.
 func ribbon_begin(point: Vector2, width: float, alpha: float) -> Dictionary:
 	var mark := {
-		"kind": "ribbon", "chunk": _chunk_cell(point), "alpha": 1.0,
+		"kind": "ribbon", "chunk": _chunk_cell(point), "born": Engine.get_physics_frames(), "alpha": 1.0,
 		"points": PackedVector2Array([point]), "widths": PackedFloat32Array([width]),
 		"alphas": PackedFloat32Array([alpha]),
 	}
-	_add(mark)
+	_add(mark, BloodConfig.print_max)
 	return mark
 
 
@@ -87,16 +72,6 @@ func ribbon_count() -> int:
 	return _count("ribbon")
 
 
-## Every mark still held (oldest first), for tests and tools.
-func items() -> Array[Dictionary]:
-	return _marks
-
-
-## The marks chunk `cell` draws.
-func marks_in(cell: Vector2i) -> Array:
-	return _by_chunk.get(cell, [])
-
-
 ## The blood colour of mark `m` right now: dries toward dried_color, alpha scaled by the mark's own.
 func color_of(m: Dictionary) -> Color:
 	var seconds := BloodConfig.print_dry_time
@@ -109,24 +84,6 @@ func color_of(m: Dictionary) -> Color:
 	return c
 
 
-## Stamp mark `m` with its birth frame and file it under its chunk.
-func _add(m: Dictionary) -> void:
-	m["born"] = Engine.get_physics_frames()
-	_marks.append(m)
-	var cell: Vector2i = m["chunk"]
-	if not _by_chunk.has(cell):
-		_by_chunk[cell] = []
-	(_by_chunk[cell] as Array).append(m)
-	_chunk_node(cell).queue_redraw()
-	while _marks.size() > BloodConfig.print_max:
-		var old: Dictionary = _marks.pop_front()
-		old["dead"] = true
-		var old_cell: Vector2i = old["chunk"]
-		(_by_chunk[old_cell] as Array).erase(old)
-		if _chunks.has(old_cell):
-			(_chunks[old_cell] as Node).queue_redraw()
-
-
 ## How many held marks are of `kind` ("print" or "ribbon").
 func _count(kind: String) -> int:
 	var n := 0
@@ -136,20 +93,12 @@ func _count(kind: String) -> int:
 	return n
 
 
-## The chunk grid cell containing world `pos`.
-func _chunk_cell(pos: Vector2) -> Vector2i:
-	return Vector2i((pos / CHUNK).floor())
-
-
-## The draw chunk for `cell`, created on first use.
-func _chunk_node(cell: Vector2i) -> Node2D:
-	if not _chunks.has(cell):
-		var node := DecalChunk.new()
-		node.owner_layer = self
-		node.cell = cell
-		add_child(node)
-		_chunks[cell] = node
-	return _chunks[cell]
+## A draw chunk for this layer's marks in `cell`.
+func _make_chunk(cell: Vector2i) -> Node2D:
+	var node := DecalChunk.new()
+	node.owner_layer = self
+	node.cell = cell
+	return node
 
 
 ## One chunk: draws the layer's marks that fall in its cell.
