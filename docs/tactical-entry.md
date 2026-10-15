@@ -14,9 +14,9 @@ follow yet is written the same way before it is built: the behaviour here, and a
 An *opening* is a doorway in a wall (`WorldGen.get_openings`: `pos`, `width`, `front`/`exit`, the rooms it
 joins). Doorways are open archways; there are no door objects yet (issue #21), so forced breaching is not
 modelled (see *Not modelled*). The AI's side lives in `scenes/ai/`: `perception/` (what it knows of the
-opening, `visible_points`), `decision/` (the ENTER tactic) and `behavior/` (the entry phases, `look_at` aim,
-`search_coverage.gd` for clearing). See `domain-ai-perception`, `domain-ai-decision`, `domain-ai-behavior`
-and `domain-ai-coverage`.
+opening, `visible_points`), `decision/` (the ENTER tactic) and `behavior/` (the entry phases and their aim in `entry.gd`,
+`search_coverage.gd` for clearing). See `domain-ai-perception`, `domain-ai-decision`, `domain-ai-entry` (the entry phases),
+`domain-ai-behavior` and `domain-ai-coverage`.
 
 ## The real-world tactics being simulated
 
