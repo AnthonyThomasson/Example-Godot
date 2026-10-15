@@ -219,8 +219,11 @@ interfaces it takes part in (by number) and describes how they're implemented.
    (the penetration power of its rounds, 1 for a non-gun), which the character reads for its `reload` event. A `Magazine` (an `Item` subclass, types in `MagazineConfig`, each tied to one `gun` id,
    with its own capacity and optional `reload_time`) is carried
    by the character, never held or selectable; a gun loads one and each shot spends a round. For a reload
-   an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Guns are the one
-   place Items reach into the Projectile System (`ProjectileSpawner`/`CasingSpawner`).
+   an item calls the character's `best_magazine(gun)` / `take_magazine(gun)` / `stow_magazine(m)`. Items reach into the
+   Projectile System in two places. A gun fires through `ProjectileSpawner.spawn(position, direction, parent, ignore = null, item_damage = 0.0,
+   muzzle_speed = -1.0, penetration = 1.0, max_range = -1.0, strikes_shooter = false) -> Node` (the round; the gun connects its
+   `hit(body, damage)` signal to its user's `report_shot`) and ejects a case through `CasingSpawner.spawn(position, direction, parent) -> Node`;
+   a `ThrownGrenade` calls `Explosion.frag` / `Explosion.stun` (above).
 
 7. **Character ↔ Controller** (enables non-player characters)
    The character reads intent from a pluggable **controller child** — any node with
