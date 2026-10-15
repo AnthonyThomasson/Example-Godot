@@ -134,7 +134,7 @@ and controller contract, EventBus and character signals) and never reaches into 
 
 One file `tests/<domain>/<name>_test.gd` that `extends GameTest`. Id = `<domain>/<name>`. A domain with many tests
 splits them one folder deeper by topic (`tests/ai/entry/`, `flank/`, `gaze/`, `posture/`, `investigate/`, `combat/`,
-`movement/`, `decision/`, `perception/`, `stack/`): the id is then `<domain>/<topic>/<name>`, the domain is still the first
+`movement/`, `decision/`, `perception/`, `stack/`, `grenade/`): the id is then `<domain>/<topic>/<name>`, the domain is still the first
 folder (so `--domain=ai` and `--changed` see it), the descriptor's `category` is the topic and the browser shows a
 row per topic under the domain. The file name keeps its topic prefix (`entry_waits_for_stack_test.gd`), the name
 the specs quote.
@@ -215,7 +215,7 @@ func run(t: TestContext) -> void:
     `if not …: return`), `expect_eq`, `expect_near`, `expect_log(pattern, count)`, `skip(why)`.
     A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
-  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `set_posture(p)` (wants `stand` / `crouch`, written every frame like the AI does; `&""` stops asking), `toggle_crouch()` (one press of C), `stop()`, `select_slot(n)`, `punch()`, `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
+  (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `set_posture(p)` (wants `stand` / `crouch`, written every frame like the AI does; `&""` stops asking), `toggle_crouch()` (one press of C), `stop()`, `select_slot(n)`, `punch()`, `kick()` (the leg kick), `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
   `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`, `use_vehicle()` (one press of E: get in
   by the nearest usable door, or out; ignored by a character without `try_use_vehicle`) and `drive(throttle, steer, handbrake)` (holds the
   driving keys as the player's do: `move_input` = `(steer, -throttle)` limited to length 1, `run_input` = handbrake; `drive(0, 0, false)`
