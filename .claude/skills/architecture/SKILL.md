@@ -494,7 +494,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
       in an object interaction: board by the door whose handle is nearest, or get out), `vehicle() -> Node` (the vehicle it is boarding, riding
       in or getting out of; null on foot) and `is_in_vehicle()` (seated only). It steps the component once a physics frame right after its
       controller (`control(delta)`), so a ride overrides that frame's intent, and calls `abandon()` from `_die` (the ride ends where the body is).
-      While a ride lasts `is_busy()` is true and `try_interact()` / `interact_with` are refused.
+      It asks the component `is_active()` (true from the E press to the last step out): while a ride lasts `is_busy()` is true and
+      `try_interact()` / `interact_with` are refused.
     - **What the Vehicles domain calls on the character.** During the walk to the door its controller fields `move_input` / `aim_point` /
       `run_input` (interface 7), and from the driver's seat it reads `move_input` / `run_input` as the drive intent; then the ride API:
       `set_ride_pose(at, toward, fold, step := Vector2.ZERO)` (world point, facing, fold 0 standing .. 1 seated, and `step`, the legs' motion
