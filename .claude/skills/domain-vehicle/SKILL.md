@@ -149,7 +149,7 @@ of the vehicle. A body not touching last step is a new impact.
 - **Anything but a character:** a new impact faster than `crash_min_speed` posts `crash` at once with `speed` and the
   struck `get_surface().material` (`""` for a wall or none). Walls stop the vehicle and furniture is shoved by the
   solver natively (a `RigidBody2D` pushable).
-- **A pile with a living character** (the `current_item()` probe). The solver treats a character as immovable, so it stops
+- **A pile with a living character** (a body in the group `characters`). The solver treats a character as immovable, so it stops
   the vehicle on one (and any piece pressing one) as on a wall, even on a frame where the character is already moving off.
   So for every contact whose body is a living character or a free pushable piece (`_is_piece`: a non-frozen `RigidBody2D`
   with `apply_impulse` / `get_mass`), `_pile` finds what stands in front: from a character, its own circle (`radius`)
@@ -279,5 +279,5 @@ rule to them. They read the vehicle only through the drivable contract via `test
 - The van's side and rear-right doors lead to the same seat (`cargo_right`): taking one makes the other's seat taken.
 
 **Interfaces:** 3 (hittable), 4 (Vehicles → Physics: `Deformable`, `Physics.impact_impulse` / `spawn_debris`), 5
-(pushable), 7 (the `current_item()` probe; the controller fields a ride writes), 10 (EventBus), 11 (`PhysicsLayers.SOLID`, `DrawLayers`),
+(pushable), 7 (the group `characters`; the controller fields a ride writes), 10 (EventBus), 11 (`PhysicsLayers.SOLID`, `DrawLayers`),
 12 (Vehicles → Art), 19 (Character ↔ Vehicle) — signatures in `architecture`.

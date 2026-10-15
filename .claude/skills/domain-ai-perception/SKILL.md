@@ -42,9 +42,8 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
   before testing sight, and reads each known set once per pass). That look runs every `LEARN_EVERY_FRAMES` (6) physics frames,
   offset per NPC by instance id so a squad does not look on the same frame, and again at the start of every `sense()`, so what
-  it knows at a decision is what it sees at that moment. The characters it tests are found by scanning the world
-  root once and keeping the list (`_other_characters`: rescanned only when a node with `current_item` enters or leaves the
-  tree, via `node_added` / `node_removed`; the scan walks ~1000 nodes).
+  it knows at a decision is what it sees at that moment. The characters it tests are the group `characters` (interface 7)
+  under the world root, itself left out, in tree order (`_other_characters`).
 - **A blinded NPC** (`Character.is_blind()`, docs/grenades.md G15) sees nothing: `observe()` skips the sighting pass (no new sighting, nothing `visible`, the `_looked` state is dropped) and the learning look, so what it holds of a hostile stays where it was last seen. Contacts "age as usual" but a blind NPC cannot tell that one has gone, so `contacts()` / `lost_hostiles()` keep every sighting the memory still holds (`lead_memory_ttl`) while it is blind (`_contact_ttl`); the behaviour fires blind at the last-known spot of the engaged one. It is back to `contact_memory_ttl` the tick it sees again.
 - `contacts(self_pos)` — characters seen within `contact_memory_ttl` (hostiles first, then nearest),
   with `hostile`/`reason`/`visible`/`age`. The behaviour hands the whole list to its locomotion every tick: the bodies a walk goes
