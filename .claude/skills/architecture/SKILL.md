@@ -430,7 +430,9 @@ interfaces it takes part in (by number) and describes how they're implemented.
     would change its result with `TestSetup.lock_interaction` (`camera` / `pause` / `overlays`), sending
     its own input through `TestContext.inject` so the lock lets it through; the runner also builds the
     Navigation domain's draw-only `nav_debug.gd` (via the world, kept current by `nav_updater.gd`) and the
-    UI's `PerformanceOverlay` for the overlay bar's global toggles. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
+    UI's `PerformanceOverlay` for the overlay bar's global toggles. Its scene carries General's camera (`general/camera_controller.gd`),
+    which it points at the setup's camera targets (every actor by default) with `frame(targets)` and whose `pan_enabled` it clears where a
+    human-driven player walks on WASD or the test locks the camera. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
     `PhysicsConfig.debris_enabled` master switches and the Audio domain's `audio.sound` switch; statics are restored after each test.
     A sandbox (`sandboxes/`, e.g. a `ticket-assets` showroom) may also draw through Art (12: its own painter on
     `PixelCanvas`, rendered by `PixelArt.render` / `render_turned`) and render a sound with
@@ -555,6 +557,7 @@ main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner �
 Sandbox (Testing) ──(own painter)──▶ PixelArt / PixelCanvas (Art);  Sandbox ──(recipe_for / render)──▶ SoundBank / SoundSynth (Audio) ─▶ its own AudioStreamPlayer2D
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
+TestRunner ─▶ Camera (General: frame(targets), pan_enabled)
 TestWorld ─▶ vehicle scenes (TestSetup.vehicle)
 TestRunner / TestWorld ─▶ DecisionStub / DecisionServerLauncher / NPC scenes (AI), config-holder statics (behaviour switches)
 TestBrowser ──(Back: scene change)──▶ main
