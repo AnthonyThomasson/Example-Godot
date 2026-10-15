@@ -53,7 +53,7 @@ class FakeCharacter extends RefCounted:
 
 ## Perception with a clear line to everything.
 class FakePerception extends Node:
-	func has_line_to(_character, _node, _point: Vector2) -> bool:
+	func has_line_to(_node, _point: Vector2) -> bool:
 		return true
 
 	func note_engaged() -> void:
