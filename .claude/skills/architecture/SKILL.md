@@ -392,8 +392,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  and per-column spans) is built from outside by the Vehicles domain's `art/vehicle_art.gd`.
     - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
 	  turn steps, tone ramp and surface-finish tuning.
-    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb, trunk and vest painters, Items' gun
-    painters (pistol, SMG, rifle) and Vehicles' painters (`scenes/vehicle/art/`: car, van, door, wheel, lamp) all render through
+    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb, trunk and vest painters, Items' painters
+    (`items/art/`: the guns held and dropped, the frag and stun grenades and the spoon) and Vehicles' painters (`scenes/vehicle/art/`: car, van, door, wheel, lamp) all render through
     these; Art imports nothing from other domains.
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)
