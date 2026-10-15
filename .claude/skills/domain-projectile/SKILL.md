@@ -88,7 +88,12 @@ Called by Items' `ThrownGrenade` when its fuse is out: `Explosion.frag(at, world
   a `StaticBody2D` (a wall) always does, a piece of furniture when its `get_surface().coverage` is above the **body's own height** (a character's is
   its posture's: crouched 35, standing 60, so a crouched character behind a couch (45) is shielded and a standing one is not; a table (30) shields
   nobody). Lower pieces are cleared and the ray goes on. A body with no collider (the fallen) is reached at its centre. The same rule serves the blast, the
-  flash; the bang asks it with `walls_only` (only a wall stops the line: furniture muffles nothing).
+  flash; the bang asks it with `walls_only` (only a wall stops the line: furniture muffles nothing). `_reach` runs on `_walk(space, at, to, height,
+  exclude, cover_reach, walls_only, target)`, the one walk past what does not stop the line (`_stops`; `_against` for a finite `cover_reach`), which
+  counts a line that has cleared `MAX_CLEARED` pieces as stopped. Two read-only statics put the same walk to the AI's perception (interface 3):
+  `shields(space, burst, p, height, exclude, cover_reach := INF) -> bool` (whether a body `height` tall at `p` is shielded from a burst at
+  `burst`, the AI's grenade dodging) and `first_stop(space, a, b, height, exclude) -> Dictionary` (the ray hit of the first wall or piece that
+  stops the line, `{}` when none does: where it looks for the shadow behind cover).
 - **Frag blast** (`_blast`): the bodies near are the circle's overlaps on the solid layer (walls left out: they only block) plus every dead character
   (they left the layer but are still thrown). Each within `blast_radius` of the blast point (to its centre) with a clear line takes `blast_damage` (full to
   `kill_radius`, `blast_damage * (R - d) / (R - kill)` beyond) through `take_hit` (a `HitInfo` with `speed_factor` 0: no impact of its own) and posts
