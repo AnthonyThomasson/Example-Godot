@@ -909,26 +909,6 @@ func grenade_announcements() -> Array:
 	return _grenades.announcements()
 
 
-## How far (px) from a burst of `kind` and danger `radius` the danger zone reaches (a frag's blast radius and `evade_margin`).
-func grenade_zone_radius(kind: StringName, radius: float) -> float:
-	return _throw.zone_radius(kind, radius)
-
-
-## Whether a body `height` tall (-1: the standing height) at world point `p` is inside the danger zone of a grenade of `kind`
-## and danger `radius` that would go off at `burst`: within the zone's reach and not shielded from the burst (docs/grenades.md G7, G16).
-func in_grenade_zone(character, kind: StringName, radius: float, burst: Vector2, p: Vector2, height := -1.0) -> bool:
-	return _throw.in_zone(character.get_world_2d().direct_space_state, kind, radius, burst, p,
-		height if height >= 0.0 else _throw.stand_height(), _character_rids(character))
-
-
-## The nearest safe spot (by route) the NPC can reach before a grenade of `kind` and danger `radius` at `burst` goes off
-## in `fuse_left` s: `{ spot, crouch, route }`, `spot` being `Vector2.INF` when there is none in time (see agent_throw.gd `escape`).
-func grenade_escape(character, kind: StringName, radius: float, burst: Vector2, fuse_left: float) -> Dictionary:
-	var world: World2D = character.get_world_2d()
-	return _throw.escape(world.direct_space_state, world.navigation_map, kind, radius, burst, character.global_position, fuse_left,
-		_throw.run_speed(character), _character_rids(character))
-
-
 ## Whether a grenade of `kind` can be lobbed from `from` to `to`: within its throw range and over everything between, low furniture included.
 func can_lob(character, from: Vector2, to: Vector2, kind: StringName) -> bool:
 	return _throw.can_lob(character.get_world_2d().direct_space_state, from, to, _throw.range_of(kind), _character_rids(character))
