@@ -12,12 +12,12 @@ extends Node2D
 ## draws the fallen ragdoll instead. What the character wears (its `outfit()`, Items) overrides the look exports for the parts
 ## it names (`_dress`): the headwear, the shirt's sleeves, a vest and its plates' wear, the pants and the footwear.
 
-const BodyPainter = preload("res://scenes/character/body/body_painter.gd")
-const HeadPainter = preload("res://scenes/character/body/head_painter.gd")
-const HandPainter = preload("res://scenes/character/body/hand_painter.gd")
-const LimbPainter = preload("res://scenes/character/body/limb_painter.gd")
-const TorsoPainter = preload("res://scenes/character/body/torso_painter.gd")
-const VestPainter = preload("res://scenes/character/body/vest_painter.gd")
+const BodyPainter = preload("res://scenes/character/body/art/body_painter.gd")
+const HeadPainter = preload("res://scenes/character/body/art/head_painter.gd")
+const HandPainter = preload("res://scenes/character/body/art/hand_painter.gd")
+const LimbPainter = preload("res://scenes/character/body/art/limb_painter.gd")
+const TorsoPainter = preload("res://scenes/character/body/art/torso_painter.gd")
+const VestPainter = preload("res://scenes/character/body/art/vest_painter.gd")
 const Rig = preload("res://scenes/character/body/character_rig.gd")  # The joint indices, shared with the ragdoll.
 
 # The look exports: what the character wears where its outfit names nothing. Setting one re-resolves the look (`_dress`).

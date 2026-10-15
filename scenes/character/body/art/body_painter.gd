@@ -9,8 +9,8 @@ extends RefCounted
 ## a vest over the shoulders (vest_painter.gd: `vest`, `vest_color`, the plates and their wear). Options (`opts`, defaulting to
 ## CharacterConfig.art_*): `backpack`, `pack`, `sleeves`, and the vest's.
 
-const HeadPainter = preload("res://scenes/character/body/head_painter.gd")
-const VestPainter = preload("res://scenes/character/body/vest_painter.gd")
+const HeadPainter = preload("res://scenes/character/body/art/head_painter.gd")
+const VestPainter = preload("res://scenes/character/body/art/vest_painter.gd")
 
 const _SHOULDER_HEIGHT := 4  ## Heights for cast shadows, floor-up.
 const _PACK_HEIGHT := 6

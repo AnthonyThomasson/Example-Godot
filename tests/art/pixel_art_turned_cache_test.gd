@@ -5,7 +5,7 @@ extends GameTest
 ## colour, material, option or angle is a different texture, and an options dictionary changed after the call does not
 ## change what was cached.
 
-const Painter := preload("res://scenes/character/body/hand_painter.gd")
+const Painter := preload("res://scenes/character/body/art/hand_painter.gd")
 const SIZE := Vector2(14, 14)
 const COLOR := Color(0.93, 0.76, 0.6)
 

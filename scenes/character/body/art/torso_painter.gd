@@ -9,7 +9,7 @@ extends RefCounted
 ## shirt (vest_painter.gd). Options (`opts`, defaulting to CharacterConfig.art_*): `face` ("front" | "back" | "side"), `pants`,
 ## `backpack`, `pack`, `sleeves` and the vest's (body_painter.gd).
 
-const VestPainter = preload("res://scenes/character/body/vest_painter.gd")
+const VestPainter = preload("res://scenes/character/body/art/vest_painter.gd")
 
 const _PANTS_HEIGHT := 3  ## Heights for cast shadows, floor-up.
 const _SHIRT_HEIGHT := 4
