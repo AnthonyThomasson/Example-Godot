@@ -439,7 +439,8 @@ the stack, `note_acts` / `took`).
 The rules are `docs/vehicles.md` (V1 to V9, each with its tests named under it). Thirty puppet-driven tests in `tests/vehicle/`, plus
 `tests/audio/vehicle_sounds_test.gd`, `tests/audio/vehicle_door_tone_test.gd`, `tests/general/camera_zooms_out_driving_test.gd` and `tests/general/use_vehicle_key_test.gd` (a
 `player` actor and injected E). The shared helper is `tests/_vehicle/vehicle_probe.gd` (`const Probe := preload(...)`; not a test): the plan's
-numbers as consts (`DOOR_REACH`, `BOARD_MAX_SPEED`, `EXIT_MAX_SPEED`, `HARM_MIN_SPEED`, `DOOR_OPEN_TIME`, `FOLD_TIME`) and each kind's door table
+numbers as consts (`DOOR_REACH`, `BOARD_MAX_SPEED`, `EXIT_MAX_SPEED`, `HARM_MIN_SPEED`, `DOOR_OPEN_TIME`, `FOLD_TIME`: `board_animation_is_continuous`
+checks the door's and the fold's measured ease against the last two, within 0.4× to 2×) and each kind's door table
 (`CAR_DOORS`, `VAN_DOORS`), so a test checks the spec and not the code; `ready` / `has_reads` (a read that does not exist fails a `require`
 instead of a script error), `config_value` / `kind_value` (VehicleConfig read by name), the door and seat reads (`door`, `open_of`,
 `seat_of`, `occupant`, `watch_doors` / `opened`), the vehicle frame (`forward`, `right`, `outward`, `stand_point`, `edge`, `gap_to_solid`,
