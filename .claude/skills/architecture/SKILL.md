@@ -109,7 +109,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    character's through `blast_push`); a melee punch shoves through the "pushable"
    contract below, deals its damage through `take_damage(amount)` (the character's plain damage entry, no HitInfo;
    tests wound a character with it too) and does **not** deform, and reads `get_surface()` only for the struck
-   `material` it posts. `Explosion` reaches the characters by the one probe of interface 7 (`current_item()`), reads their `is_dead`, `facing`, `get_surface()`, and calls
+   `material` it posts. `Explosion` finds the characters under the world by the group `characters` (interface 7), reads their `is_dead`, `facing`, `get_surface()`, and calls
    `take_stun` / `take_damage` / `blast_push` / `take_hit` on them, and `apply_impulse` on a pushable (capped by `get_mass()`): the sanctioned surface. Its
    cover rule (G7, `docs/grenades.md`) is published as two read-only line queries the AI's perception asks of a grenade, so the AI keeps no copy:
    `Explosion.shields(space, burst, p, height, exclude, cover_reach := INF) -> bool` (whether a wall, or a piece of furniture whose `coverage` is
@@ -209,7 +209,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `weight()`, `look()` (what the art draws), `view()` (what the UI shows) and `revision` (bumped by every change, which the art watches)). The
    character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)` (0..1, how far that hand is thrown: a long gun swings round by it),
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
-   `world_root()` (also read by the AI to find the world's characters), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
+   `world_root()` (also read by the AI: the characters it perceives are the group `characters` under it), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
    `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`), `aim_target()` (the aim point a grenade is thrown to) / `aim_sway()` (rad, the stun's wandering turn of every shot and throw; 0 unstunned) and `weapon_raise()` (0..1, how far
    a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
    `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
@@ -247,8 +247,9 @@ interfaces it takes part in (by number) and describes how they're implemented.
    while it is posed by the ride (the item put away);
    the stun (a grenade's flash and bang): `take_stun(blind, deaf)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
-   (aim, visible wounds, a reload in progress and the posture are things it perceives). A node is a character if it exposes `current_item()`:
-   that is the one probe the AI uses to find characters in the world, so it is part of this interface and is not renamed lightly.
+   (aim, visible wounds, a reload in progress and the posture are things it perceives). Every character joins the group `characters` in its `_ready`:
+   that group is how the AI (its perception and tactics), the Projectile System's `Explosion` and a vehicle tell a character in the world, so it
+   is part of this interface and is not renamed lightly.
    `player_controller.gd` is the human one and
    is the only *gameplay* file that touches `Keybinds` (observers read one thing each: Main `MENU`; the test runner `MENU`, `PAUSE` and the camera actions;
    the spectator inspector `PAUSE`; the camera its pan and zoom actions). Signals:
@@ -492,7 +493,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
       through the vehicle's frame in px/s, so a carried body does not walk at the vehicle's speed): the first pose cancels a reload, puts the
       held item away (`current_item()` null) and disables the collision shape; the fold is the drawn crouch fold (`posture_folded()` reads it);
       and `end_ride()` (on its own feet again, shape on, item back). It also reads `facing`, `radius`, `speed`, `global_position`, and for a
-      character it strikes (found by the `current_item()` probe, interface 7) `is_dead`, `health`, `velocity`, `get_mass()` and calls
+      character it strikes (a body in the group `characters`, interface 7) `is_dead`, `health`, `velocity`, `get_mass()` and calls
       `apply_impulse` / `take_damage(amount)`; collision exceptions are Godot's own (`add_collision_exception_with` / `remove_...`).
     - **The vehicle** (`vehicle.gd`, a `RigidBody2D` on `PhysicsLayers.SOLID`, found by the group `vehicles`): `doors() -> Array`
       (`[{ id, kind` (`swing` / `slide` / `rear`)`, seat, handle, open` (0..1)`, hinge, angle, offset }]`, world space), `seats() -> Array`
