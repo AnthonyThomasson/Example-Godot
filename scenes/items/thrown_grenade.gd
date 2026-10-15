@@ -213,7 +213,7 @@ func _post(stage: StringName) -> void:
 
 ## Aloft it draws over the living; down it lies beneath them, like a dropped item.
 func _update_layer() -> void:
-	z_index = 1 if _motion.height > 12.0 else -1
+	z_index = DrawLayers.ABOVE if _motion.height > 12.0 else DrawLayers.LYING
 
 
 ## Move across the floor by `motion`, striking walls, solid furniture taller than it is high and the living in the way:

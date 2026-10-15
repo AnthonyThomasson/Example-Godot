@@ -73,7 +73,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
   (`tests/<domain>/[<topic>/]<name>_test.gd`) runs only that test** (`--id=<domain>/[<topic>/]<name>`; it can only change its own
   result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
-  `tests/_perf` runs the `perf` domain, `tests/_harness` the self-tests, and an unknown helper folder everything.
+  `tests/_vehicle` runs `vehicle`, `audio` and `general` (its users), `tests/_perf` runs the `perf` domain, `tests/_harness` the self-tests, and an unknown helper folder everything.
   `GAME_TEST_CHANGED_FILES` (newline-separated paths) stands in for git's view of the changes, which is how
   `tools/test_log_gate.py` tests this mapping.
 - **Which command?**
@@ -99,7 +99,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   no test calls.
 - **Failures:** a FAIL/TIMEOUT prints each actor's final state and the `t.trace` series ranges, and writes
   `<out dir>/failures/<id>.json` (path printed as `bundle:`) with the full time-stamped event log, the
-  final snapshot, traces and logged errors. See the `test-debug` skill.
+  final snapshot (actors, objects, and vehicles with their position, rotation and speed), traces and logged errors. See the `test-debug` skill.
 - **In game:** the setup window's **Tests** button opens `test_browser.tscn`. Search, pick, then Play,
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
   offers Rerun and Back/Escape (Back changes scene to `main.tscn`, the setup window). The in-game overlay toggle bar works on the test's NPCs.
@@ -134,12 +134,12 @@ and controller contract, EventBus and character signals) and never reaches into 
 
 One file `tests/<domain>/<name>_test.gd` that `extends GameTest`. Id = `<domain>/<name>`. A domain with many tests
 splits them one folder deeper by topic (`tests/ai/entry/`, `flank/`, `gaze/`, `posture/`, `investigate/`, `combat/`,
-`movement/`, `decision/`, `perception/`): the id is then `<domain>/<topic>/<name>`, the domain is still the first
+`movement/`, `decision/`, `perception/`, `stack/`): the id is then `<domain>/<topic>/<name>`, the domain is still the first
 folder (so `--domain=ai` and `--changed` see it), the descriptor's `category` is the topic and the browser shows a
 row per topic under the domain. The file name keeps its topic prefix (`entry_waits_for_stack_test.gd`), the name
 the specs quote.
 
-**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one).
+**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one). They are `player_gun_range_sandbox.gd` and `vehicle_sandbox.gd` ("Vehicle yard": a walled concrete yard with the player, a car and a van, furniture to shove and three dummies; `nav.rebake` off, since rammed furniture would re-bake as overlapping holes).
 
 ```gdscript
 extends GameTest
@@ -176,6 +176,10 @@ func run(t: TestContext) -> void:
     800×500 arena.
   - Objects: `object(id, catalogue_key_or_definition, pos, opts)`. Objects are placed under the
     house/arena root before the nav bake, so they are carved.
+  - Vehicles: `vehicle(id, kind, pos, rotation := 0.0, props := {})` (`kind` `car` / `van`: `res://scenes/vehicle/<kind>.tscn`;
+    rotation 0 = its front toward +x). Placed under the world root after the nav bake (not carved: the AI ignores vehicles), in
+    place before they join the tree; a kind with no scene places nothing and `t.vehicle(id)` is then null. The world then waits
+    one physics frame before the actors, because a new body joins the physics space only at the next step.
   - Actors: `actor(id, kind, pos, props)`. Kind is `puppet` (scripted), `player` (human-driven),
     `defender`, `invader`, or a scene path. `props` are set on the character before `_ready` (for
     example `max_health`, `start_slot`: 1 unarmed / 2 fists / 3 pistol / 4 key / 5 SMG / 6 assault rifle, `faction`, and the ammo props
@@ -199,7 +203,7 @@ func run(t: TestContext) -> void:
   resume into a torn-down world.
   - Waits, all in sim time: `await t.seconds(s)`, `await t.frames(n)`,
     `await t.until(cond, timeout, msg := "") -> bool` (with `msg`, a timeout records a failed check).
-  - Lookup: `t.actor(id)`, `t.puppet(id)` (the ScriptedController), `t.object(id)`,
+  - Lookup: `t.actor(id)`, `t.puppet(id)` (the ScriptedController), `t.object(id)`, `t.vehicle(id)`,
     `t.controller(id, method)` (e.g. `&"current_act"` for an NPC brain), `t.world`, `t.rooms`, `t.time`.
   - Event log: `t.events_of(topic, filter)`, `t.happened(topic, filter)`, `t.spawned(name_part)`.
     Topics are every EventBus topic (`&"hit"`: position, victim, source, attacker, direction, damage;
@@ -212,7 +216,10 @@ func run(t: TestContext) -> void:
     A test that asserts nothing fails.
 - Puppet (`scripted_controller.gd`): `aim_at(node_or_point)`, `walk_to(point)` + `has_arrived()`
   (straight line, no pathing), `walk(dir)`, `set_run(on)` (holds run while moving), `set_posture(p)` (wants `stand` / `crouch`, written every frame like the AI does; `&""` stops asking), `toggle_crouch()` (one press of C), `stop()`, `select_slot(n)`, `punch()`, `shoot()` (one click), `hold_fire(on)` (hold the trigger: an automatic gun fires at its rate; a semi-auto one is unaffected), `reload()`,
-  `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`. Actions run on
+  `interact(object, id)` (refusals land in `failed_interactions`), `end_interaction()`, `use_vehicle()` (one press of E: get in
+  by the nearest usable door, or out; ignored by a character without `try_use_vehicle`) and `drive(throttle, steer, handbrake)` (holds the
+  driving keys as the player's do: `move_input` = `(steer, -throttle)` limited to length 1, `run_input` = handbrake; `drive(0, 0, false)`
+  lets go). Actions run on
   the character's next frame, and the character derives `facing` from the aim one frame later, so
   aim, wait a moment, then fire.
 - Make randomness deterministic where the assertion depends on it (e.g. `projectile.flyover` off,
@@ -304,7 +311,7 @@ finding, not as the doctrine gap. Their maps: the box room (`Maps.box_room`, `En
 
 ## Stack tests (tag `stack`)
 
-`tests/ai/stack_*_test.gd` pin down the human's place in an AI stack (E16 in `docs/tactical-entry.md`), on the Terrace house and the back
+`tests/ai/stack/stack_*_test.gd` pin down the human's place in an AI stack (E16 in `docs/tactical-entry.md`), on the Terrace house and the back
 door like the entry tests. A **puppet with the invader faction** stands in for the human, and the test gives it the stack radio the way Main
 does, in `run`: `Stack.attach(t, id)` (`tests/_ai/stack_probe.gd`, `const Stack := preload(...)`, which loads `PlayerStack` by path and calls
 `attach(character, rooms, t.world.openings)`; null before the feature exists). The stack is read through `view()` (`Stack.mine`,
@@ -327,7 +334,7 @@ not, its NPCs are set up in the frame the navmesh is baked. `tests/_ai/match_wor
 `Match.build(layout, t.world, invader_points, human_point)` lays the `TestSetup` layout (e.g. `Maps.house(TestSetup.new(), false)`) in a
 `SubViewport` with a `World2D` of its own (fresh maps, as each match's), bakes it, adds the re-baker, the invaders (`MatchSpawner.add_npc`) and
 the human (the player's character and controller, `MatchSpawner.bind_player`) in the same frame, and returns the nodes (they are not test actors:
-`Match.calls(t, speaker, step)` reads their radio). `tests/ai/stack_ai_goes_round_player_in_slot` uses it.
+`Match.calls(t, speaker, step)` reads their radio). `tests/ai/stack/stack_ai_goes_round_player_in_slot` uses it.
 
 ## Investigation tests (tag `investigate`)
 
@@ -426,6 +433,20 @@ the teleport made a frame later, or the physics step puts a free body back), and
 `tests/_ai/bang_probe.gd` (`const Bang := preload(...)`: `rules` SEARCH > STUN ENTRY > that doorway, `stack`, `arm`, `radio_mate` for a teammate that is a puppet radioing its part of
 the stack, `note_acts` / `took`).
 
+## Vehicle tests (domain `vehicle`, `tests/vehicle/`)
+
+The rules are `docs/vehicles.md` (V1 to V9, each with its tests named under it). Thirty puppet-driven tests in `tests/vehicle/`, plus
+`tests/audio/vehicle_sounds_test.gd`, `tests/audio/vehicle_door_tone_test.gd`, `tests/general/camera_zooms_out_driving_test.gd` and `tests/general/use_vehicle_key_test.gd` (a
+`player` actor and injected E). The shared helper is `tests/_vehicle/vehicle_probe.gd` (`const Probe := preload(...)`; not a test): the plan's
+numbers as consts (`DOOR_REACH`, `BOARD_MAX_SPEED`, `EXIT_MAX_SPEED`, `HARM_MIN_SPEED`, `DOOR_OPEN_TIME`, `FOLD_TIME`) and each kind's door table
+(`CAR_DOORS`, `VAN_DOORS`), so a test checks the spec and not the code; `ready` / `has_reads` (a read that does not exist fails a `require`
+instead of a script error), `config_value` / `kind_value` (VehicleConfig read by name), the door and seat reads (`door`, `open_of`,
+`seat_of`, `occupant`, `watch_doors` / `opened`), the vehicle frame (`forward`, `right`, `outward`, `stand_point`, `edge`, `gap_to_solid`,
+`local_velocity`, `pivot`, `outward_slip`, `along`), placing (`place`, `move_vehicle`), the ride (`board`, `exit`, `board_by`), driving
+(`reach_speed`, `hold_speed`) and the draw layers (`layer`, `absolute_z`, `draws_above`). Everything goes through the drivable contract
+(interface 19) duck-typed. `tools/run_tests.sh --domain=vehicle` runs the domain; `--changed` on `scenes/vehicle/` runs vehicle, character,
+items, interaction, projectile, physics, objects, ai, perf, audio and general.
+
 ## Errors and warnings fail the test (`log_watch.gd`)
 
 Godot 4.4 has no in-process logger hook (that arrives with `OS.add_logger` in 4.5). `LogWatch` tails
@@ -505,7 +526,8 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`: PASS / FAIL / TIMEOUT / SKIPPED, and GAP for a `gap`-tagged test that failed as expected). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. Vehicles (`TestSetup.vehicle`) are placed after the nav wait and before the actors, followed by one more
+physics frame so they are in the space. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`, annotated with `WorldGen.annotate_layout`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, annotated with `WorldGen.annotate_layout` like a house. |
 | `scripted_controller.gd` | The puppet controller. |
@@ -517,6 +539,12 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `test_browser.gd` / `.tscn` | Hosts the UI browser window. Engine metas `test_selection` / `test_results` / `test_filter` survive the round trip through a test. |
 
 ## Gotchas
+
+- **A body added this frame is not in the physics space.** A direct-space query (a shape query, a ray) on the frame a body was added
+  misses it: it joins the broadphase at the next physics step (`TestWorld` waits one after placing vehicles).
+- **A test camera reads its screen centre only while current.** Godot updates `Camera2D.get_screen_center_position()` only for the
+  viewport's current camera, and the runner's own camera stays current: a test that adds its own camera and reads where it looks calls
+  `make_current()` on it (`tests/general/camera_zooms_out_driving_test.gd`).
 
 - **Von tests are paced in real time.** Batch runs use `--fixed-fps 60`, so the sim outruns the wall
   clock and game-time timers (HTTP timeouts, the launcher's probe interval) fire early. While a `requires_von` test is open the runner sleeps each frame to

@@ -36,6 +36,7 @@ static func _new_pool(position: Vector2, parent: Node) -> Node:
 	var pool := Node2D.new()
 	pool.name = "BloodPool"
 	pool.script = BloodPool
+	pool.z_index = BloodConfig.z_index  # the whole pool lies at blood's rung; its draw layer inherits it
 
 	var visuals := Node2D.new()
 	visuals.name = "BloodPoolVisuals"

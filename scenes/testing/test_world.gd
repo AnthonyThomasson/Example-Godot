@@ -30,6 +30,7 @@ var rooms: Array = []
 var openings: Array = []
 var actors: Dictionary = {}
 var objects: Dictionary = {}
+var vehicles: Dictionary = {}
 
 ## Original values of overridden statics: `[script, prop, value]`.
 var _saved_statics: Array = []
@@ -62,6 +63,14 @@ func build(setup: TestSetup) -> void:
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await _await_nav_sync()
+	for v in setup.vehicles:
+		var vehicle := _spawn_vehicle(v)
+		if vehicle != null:
+			vehicles[v["id"]] = vehicle
+	if not vehicles.is_empty():
+		# A new body joins the physics server's broadphase only at its next step: wait for it, so the vehicles are solid
+		# (and found by space queries) before an actor is placed or the test's first query runs.
+		await get_tree().physics_frame
 	for a in setup.actors:
 		actors[a["id"]] = _spawn_actor(a, setup.switches)
 	_apply_world_switches(setup.switches)
@@ -173,6 +182,29 @@ func _build_nav() -> void:
 	updater.name = "NavUpdater"
 	add_child(updater)
 	updater.setup(region, house, rooms, _nav_debug)
+
+
+## Instance vehicle `v` (`TestSetup.vehicle`) from `res://scenes/vehicle/<kind>.tscn`, set its props, then add it to
+## the world, already in place. A kind with no scene is left out (null) without an error, so a test written before the
+## vehicle exists fails on its own `require`.
+func _spawn_vehicle(v: Dictionary) -> Node:
+	var path := "res://scenes/vehicle/%s.tscn" % v["kind"]
+	if not ResourceLoader.exists(path):
+		return null
+	var scene := load(path) as PackedScene
+	if scene == null:
+		return null
+	var vehicle := scene.instantiate()
+	vehicle.name = String(v["id"])
+	var props: Dictionary = v["props"]
+	for prop in props:
+		vehicle.set(prop, props[prop])
+	# Placed before it joins the tree, like an actor: a body added at the origin and moved afterwards shoves what is there.
+	if vehicle is Node2D:
+		vehicle.position = to_local(v["position"])
+		vehicle.rotation = v["rotation"]
+	add_child(vehicle)
+	return vehicle
 
 
 ## Instance actor `a`, inject its controller and props/switches/overlays, then add it to the world.

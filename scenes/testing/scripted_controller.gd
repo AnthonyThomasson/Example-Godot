@@ -3,7 +3,7 @@ extends Node
 ## Testing domain: a puppet controller — a character's `control(character, delta)` child (interface 7)
 ## driven by a test instead of a human or an AI. Commands are queued here and carried out on the
 ## character's own frame, through only the published controller API (`move_input`, `aim_point`,
-## `run_input`, `set_posture`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`).
+## `run_input`, `set_posture`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`, `try_use_vehicle`).
 ##
 ## Commands return at once; wait on their effect through the TestContext, e.g.
 ## `p.walk_to(spot)` then `await t.until(p.has_arrived, 3.0, "never arrived")`.
@@ -137,6 +137,23 @@ func interact(object: Node, id: String) -> void:
 	_pending.append(func(c):
 		if not c.interact_with(object, id):
 			failed_interactions.append([object, id]))
+
+
+## Press E once (the player's use-vehicle key): board the nearest door's seat, or get out. A character without
+## `try_use_vehicle` ignores it, so a test written before the feature fails on its own `require`.
+func use_vehicle() -> void:
+	_pending.append(func(c):
+		if c.has_method("try_use_vehicle"):
+			c.try_use_vehicle())
+
+
+## Hold the driving keys, as the player's WASD and Shift do: `throttle` 1 is W, -1 is S; `steer` 1 is D, -1 is A
+## (relative to the vehicle, which reads them); `handbrake` is the run key. Written as `Input.get_vector` gives
+## them (W up = -y, length at most 1). `drive(0, 0, false)` lets go.
+func drive(throttle: float, steer: float, handbrake: bool) -> void:
+	_walk_target = null
+	_move_dir = Vector2(steer, -throttle).limit_length(1.0)
+	_run = handbrake
 
 
 ## End the active interaction.

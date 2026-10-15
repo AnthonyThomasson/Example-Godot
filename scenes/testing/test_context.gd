@@ -40,6 +40,7 @@ var is_finished := false
 
 var _actors: Dictionary = {}
 var _objects: Dictionary = {}
+var _vehicles: Dictionary = {}
 var _tree: SceneTree
 ## Outstanding expected log lines: `{ pattern, count }`.
 var _expected_logs: Array = []
@@ -87,6 +88,12 @@ func puppet(id: StringName) -> Node:
 ## The object placed as `id` (null if unknown or freed).
 func object(id: StringName) -> Node:
 	var n = _objects.get(id)  # untyped: assigning a freed object to a Node variable is an engine error
+	return n if is_instance_valid(n) else null
+
+
+## The vehicle placed as `id` (`TestSetup.vehicle`; null if unknown, freed, or its kind has no scene).
+func vehicle(id: StringName) -> Node:
+	var n = _vehicles.get(id)  # untyped, as in `object`
 	return n if is_instance_valid(n) else null
 
 
@@ -310,10 +317,11 @@ func conclude(manual: bool) -> String:
 
 
 ## Register what the world placed (called by the runner after the build).
-func bind(built_world: Node2D, actors: Dictionary, objects: Dictionary, world_rooms: Array) -> void:
+func bind(built_world: Node2D, actors: Dictionary, objects: Dictionary, world_rooms: Array, vehicles: Dictionary = {}) -> void:
 	world = built_world
 	_actors = actors
 	_objects = objects
+	_vehicles = vehicles
 	rooms = world_rooms
 
 
@@ -321,7 +329,7 @@ func bind(built_world: Node2D, actors: Dictionary, objects: Dictionary, world_ro
 ## health/death, held item, and an NPC brain's decision path (duck-typed through the public API).
 ## Freed nodes are skipped, so take it before the world is torn down.
 func snapshot() -> Dictionary:
-	var out := { "actors": {}, "objects": {} }
+	var out := { "actors": {}, "objects": {}, "vehicles": {} }
 	for id in _actors:
 		var a: Node = actor(id)
 		if a == null:
@@ -341,6 +349,13 @@ func snapshot() -> Dictionary:
 		var o: Node = object(id)
 		if o is Node2D:
 			out["objects"][String(id)] = { "position": _vec(o.global_position) }
+	for id in _vehicles:
+		var v: Node = vehicle(id)
+		if v is Node2D:
+			var row := { "position": _vec(v.global_position), "rotation": snappedf(v.global_rotation, 0.01) }
+			if v.has_method("speed"):
+				row["speed"] = snappedf(v.speed(), 0.1)
+			out["vehicles"][String(id)] = row
 	return out
 
 

@@ -12,6 +12,10 @@ extends Node
 ##   &"grenade"   a thrown grenade bounced (stage &"bounce"; &"rest" is silent)   { position, kind, stage }
 ##   &"explosion" a grenade went off              { position, kind }
 ##   &"stun"      a character was flashed / banged; only a deafening of `focus` is voiced   { character, deaf }
+##   &"vehicle"   a vehicle's ignition, door (open / close / slide_open / slide_close), crash (+ speed, material) or a
+##                character struck (bump_character, + speed)   { position, kind, stage }
+##   &"engine"    a vehicle's engine started / stopped   { vehicle, kind, stage }
+##   &"skid"      a vehicle's tyres began / stopped sliding   { vehicle, stage }
 ## Each becomes a *profile* (SoundBank), a rendered variant of it, and a voice: a pooled AudioStreamPlayer2D, capped
 ## per category with the oldest cut off first. The surface under a footfall comes from SoundSurface.
 ## Everything accepted is announced back on the bus as &"sound" { kind, profile, variant, position, volume_db,
@@ -20,6 +24,11 @@ extends Node
 ## `focus` is the character whose ears this is (Main sets the human; nothing hears for an AI). While it is deafened
 ## (`stun_view().deaf`) `muffled()` is true: game audio goes through a low-pass on its own bus, closing at once and lifting
 ## slowly, and a tinnitus whine (a looping voice that follows the deafness and is cut when it ends) plays once per stun.
+##
+## A running engine and a sliding vehicle's tyres are loops: one looping voice per vehicle and kind (`loop_of`), started by
+## the `engine` / `skid` start event and following the vehicle every frame, duck-typed like the focus (its position, and
+## `engine_state()` rpm and load for the engine's pitch and level, `slip()` and `speed()` for the squeal's), until the stop
+## event, the vehicle's engine stopping or the vehicle being freed.
 ##
 ## Randomness (which variant, pitch and volume jitter) comes from this node's own RNG, never the gameplay one.
 ## Voice lifetimes are counted in simulated time (`_now`), not read from the players, so a fixed-FPS test run
@@ -33,6 +42,9 @@ const THROW := &"throw"
 const GRENADE := &"grenade"
 const EXPLOSION := &"explosion"
 const TINNITUS := &"tinnitus"
+const ENGINE := &"engine"
+const VEHICLE := &"vehicle"
+const SKID := &"skid"
 ## The bus every game voice plays on, with the muffling low-pass on it; the tinnitus plays on the master bus, above the muffle.
 const GAME_BUS := &"GameSound"
 ## Real milliseconds to give the audio mixer at shutdown (see `_exit_tree`).
@@ -57,6 +69,8 @@ var _voices: Array = []
 var _last_variant: Dictionary = {}
 ## `[profile, variant]` pairs still to pre-render in the background (empty once the library is warm).
 var _warm: Array = []
+## The loops following a vehicle, by `_loop_key`: { vehicle, kind (`engine` / `skid`), profile, voice, pitch, volume_db }.
+var _loops: Dictionary = {}
 
 
 func _ready() -> void:
@@ -71,6 +85,7 @@ func _process(delta: float) -> void:
 	_now += delta
 	_prewarm()
 	_hear_stun(delta)
+	_follow_loops(delta)
 
 
 ## On quit, stop and free every voice. The engine's mixer thread only lets go of a stopped playback on its next
@@ -103,13 +118,23 @@ func muffled() -> bool:
 	return _deaf_left() > 0.0
 
 
+## The loop of `kind` (`engine` or `skid`) following `vehicle`: { profile, pitch, volume_db } as it plays now, or {} when none.
+func loop_of(vehicle: Node, kind: StringName) -> Dictionary:
+	var loop: Dictionary = _loops.get(_loop_key(vehicle, kind), {})
+	if loop.is_empty():
+		return {}
+	return { "profile": loop["profile"], "pitch": loop["pitch"], "volume_db": loop["volume_db"] }
+
+
 ## Cut every voice off and forget what was played (a fresh start for the next match or test).
 func reset() -> void:
 	for v: Dictionary in _voices:
 		(v["player"] as AudioStreamPlayer2D).stop()
 		v["until"] = 0.0
+		v["loop"] = ""
 	_last_variant.clear()
 	_tinnitus = {}
+	_loops.clear()
 	_rng.seed = SoundConfig.rng_seed
 
 
@@ -155,6 +180,40 @@ func _on_posted(topic: StringName, data: Dictionary) -> void:
 		&"stun":
 			if data.get("character") == focus and focus != null and float(data.get("deaf", 0.0)) > 0.0:
 				_start_tinnitus(data)
+		&"vehicle":
+			_vehicle_sound(data)
+		&"engine":
+			var vehicle: Variant = data.get("vehicle")
+			if data.get("stage") == &"start":
+				_start_loop(ENGINE, vehicle, SoundBank.engine_profile(data.get("kind", &"")))
+			elif data.get("stage") == &"stop":
+				_stop_loop(vehicle, ENGINE)
+		&"skid":
+			var vehicle: Variant = data.get("vehicle")
+			if data.get("stage") == &"start":
+				_start_loop(SKID, vehicle, SoundBank.skid_profile())
+			elif data.get("stage") == &"stop":
+				_stop_loop(vehicle, SKID)
+
+
+## A one-shot vehicle sound: the ignition, a door, a crash (louder the faster, by what was struck) or a character struck.
+func _vehicle_sound(data: Dictionary) -> void:
+	var kind: StringName = data.get("kind", &"")
+	var stage: StringName = data.get("stage", &"")
+	var speed := float(data.get("speed", 0.0))
+	var profile := &""
+	var extra_db := 0.0
+	match stage:
+		&"ignition":
+			profile = SoundBank.ignition_profile(kind)
+		&"door_open", &"door_close", &"slide_open", &"slide_close":
+			profile = SoundBank.door_profile(kind, StringName(String(stage).trim_prefix("door_")))
+		&"crash", &"bump_character":
+			var material := "flesh" if stage == &"bump_character" else String(data.get("material", ""))
+			profile = SoundBank.crash_profile(material, speed)
+			extra_db = linear_to_db(clampf(speed / SoundConfig.crash_speed_ref, 0.5, 1.6))
+	if profile != &"":
+		_play(VEHICLE, profile, data, extra_db)
 
 
 ## How loud a hit is beyond its profile's own level: a faster bullet hits harder, a punch by its damage.
@@ -176,11 +235,21 @@ func _play(category: StringName, profile: StringName, data: Dictionary, extra_db
 	var entry := SoundBank.sound(profile, variant)
 	if entry.is_empty():
 		return {}
-	var stream: AudioStreamWAV = entry["stream"]
 	var swing := float(SoundConfig.category_jitter_scale.get(category, 1.0))
 	var pitch := pitch_scale * (1.0 + _rng.randf_range(-SoundConfig.pitch_jitter, SoundConfig.pitch_jitter) * swing)
-	var volume := float(entry["level_db"]) + SoundConfig.master_db + float(SoundConfig.category_db.get(category, 0.0)) \
-		+ extra_db + _rng.randf_range(-SoundConfig.volume_jitter_db, SoundConfig.volume_jitter_db) * swing
+	var volume := _level(category, entry) + extra_db \
+		+ _rng.randf_range(-SoundConfig.volume_jitter_db, SoundConfig.volume_jitter_db) * swing
+	return _voice(category, profile, variant, entry["stream"], at, volume, pitch, reach, bus)
+
+
+## A sound's level before what the event adds: its profile's own, the master's and its category's.
+func _level(category: StringName, entry: Dictionary) -> float:
+	return float(entry["level_db"]) + SoundConfig.master_db + float(SoundConfig.category_db.get(category, 0.0))
+
+
+## Start `stream` (variant `variant` of `profile`) on a voice of `category` at `at`, heard up to `reach`, and announce it.
+func _voice(category: StringName, profile: StringName, variant: int, stream: AudioStreamWAV, at: Vector2, volume: float,
+		pitch: float, reach: float, bus: StringName = GAME_BUS) -> Dictionary:
 	var voice := _acquire(category)
 	var player: AudioStreamPlayer2D = voice["player"]
 	player.stream = stream
@@ -303,14 +372,16 @@ func _acquire(category: StringName) -> Dictionary:
 	if count >= cap and not oldest.is_empty():
 		(oldest["player"] as AudioStreamPlayer2D).stop()
 		oldest["category"] = category
+		oldest["loop"] = ""  # A loop cut off for a newer voice is over (`_follow_loops` lets it go).
 		return oldest
 	if not free.is_empty():
 		free["category"] = category
+		free["loop"] = ""
 		return free
 	var player := AudioStreamPlayer2D.new()
 	player.name = "Voice%d" % _voices.size()
 	add_child(player)
-	var voice := { "player": player, "category": category, "until": 0.0, "started": 0.0 }
+	var voice := { "player": player, "category": category, "until": 0.0, "started": 0.0, "loop": "" }
 	_voices.append(voice)
 	return voice
 
@@ -342,3 +413,111 @@ func _prewarm() -> void:
 	while not _warm.is_empty() and (Time.get_ticks_usec() - t0) / 1000.0 < SoundConfig.prewarm_budget_ms:
 		var next: Array = _warm.pop_front()
 		SoundBank.sound(next[0], next[1])
+
+
+# --- Loops that follow a vehicle -------------------------------------------------------------
+
+## The key of `vehicle`'s loop of `kind`.
+static func _loop_key(vehicle: Variant, kind: StringName) -> String:
+	return "%d/%s" % [(vehicle as Object).get_instance_id() if vehicle is Object else 0, kind]
+
+
+## Start `vehicle`'s loop of `category` (`engine` / `skid`) playing `profile`, unless it already has one. It is not culled
+## by range (it lasts, and the listener may come closer): its voice is heard up to the category's range, kept current.
+func _start_loop(category: StringName, vehicle: Variant, profile: StringName) -> void:
+	if not is_instance_valid(vehicle) or not (vehicle is Node2D) or profile == &"":
+		return
+	var key := _loop_key(vehicle, category)
+	if _loops.has(key):
+		return
+	var entry := SoundBank.sound(profile, _pick_variant(category, profile))
+	if entry.is_empty():
+		return
+	var loop := { "vehicle": vehicle, "kind": category, "profile": profile, "level": _level(category, entry) }
+	var aim := _loop_aim(loop)
+	if aim.is_empty():
+		return
+	loop["pitch"] = aim["pitch"]
+	loop["volume_db"] = aim["volume_db"]
+	var at := (vehicle as Node2D).global_position
+	var voice := _voice(category, profile, int(_last_variant.get(profile, 0)), entry["stream"], at, loop["volume_db"],
+		loop["pitch"], _range(category))
+	voice["until"] = INF  # It plays until it is stopped.
+	voice["loop"] = key
+	loop["voice"] = voice
+	_loops[key] = loop
+
+
+## Stop `vehicle`'s loop of `category`, if it has one.
+func _stop_loop(vehicle: Variant, category: StringName) -> void:
+	if is_instance_valid(vehicle):
+		_end_loop(_loop_key(vehicle, category))
+
+
+## End the loop `key` and free its voice.
+func _end_loop(key: String) -> void:
+	var loop: Dictionary = _loops.get(key, {})
+	if loop.is_empty():
+		return
+	_loops.erase(key)
+	var voice: Dictionary = loop["voice"]
+	if voice.get("loop") == key:
+		(voice["player"] as AudioStreamPlayer2D).stop()
+		voice["until"] = 0.0
+		voice["loop"] = ""
+
+
+## Every frame each loop follows its vehicle: its position, and its pitch and level glide toward what the vehicle's state
+## asks for. A loop whose vehicle is gone (or whose engine no longer runs), or whose voice was cut off, ends.
+func _follow_loops(delta: float) -> void:
+	if _loops.is_empty():
+		return
+	var glide := 1.0 - exp(-SoundConfig.loop_ease * delta)
+	for key: String in _loops.keys():
+		var loop: Dictionary = _loops[key]
+		var voice: Dictionary = loop["voice"]
+		var vehicle: Variant = loop["vehicle"]
+		var aim := _loop_aim(loop) if is_instance_valid(vehicle) else {}
+		if aim.is_empty() or voice.get("loop") != key:
+			_end_loop(key)
+			continue
+		loop["pitch"] = lerpf(loop["pitch"], aim["pitch"], glide)
+		loop["volume_db"] = lerpf(loop["volume_db"], aim["volume_db"], glide)
+		var player: AudioStreamPlayer2D = voice["player"]
+		player.pitch_scale = loop["pitch"]
+		player.volume_db = loop["volume_db"]
+		player.max_distance = _range(loop["kind"])
+		player.global_position = (vehicle as Node2D).global_position
+
+
+## What `loop` should sound like now, read off its vehicle (duck-typed): { pitch, volume_db }, or {} once it should stop
+## (an engine that no longer runs). The engine climbs in pitch with the revs and is louder on the throttle and high in the
+## revs; the squeal is as loud as the slide (and the speed) and a little higher the harder it slides.
+func _loop_aim(loop: Dictionary) -> Dictionary:
+	var vehicle: Object = loop["vehicle"]
+	var level: float = loop["level"]
+	if loop["kind"] == ENGINE:
+		if not vehicle.has_method("engine_state"):
+			return {}
+		var state: Dictionary = vehicle.call("engine_state")
+		if not state.get("running", false):
+			return {}
+		var rpm := clampf(float(state.get("rpm", 0.0)), 0.0, 1.0)
+		var throttle := clampf(float(state.get("load", 0.0)), 0.0, 1.0)
+		return { "pitch": lerpf(SoundConfig.engine_pitch.x, SoundConfig.engine_pitch.y, rpm),
+			"volume_db": level - SoundConfig.engine_load_db * (1.0 - throttle) + SoundConfig.engine_rev_db * rpm }
+	if not vehicle.has_method("slip"):
+		return {}
+	var slip := clampf(float(vehicle.call("slip")), 0.0, 1.0)
+	var speed := float(vehicle.call("speed")) if vehicle.has_method("speed") else SoundConfig.skid_full_speed
+	var amount := clampf(slip / maxf(SoundConfig.skid_full_slip, 0.01), 0.1, 1.0) * clampf(speed / SoundConfig.skid_full_speed, 0.25, 1.0)
+	return { "pitch": 1.0 + SoundConfig.skid_pitch * slip, "volume_db": level + linear_to_db(amount) }
+
+
+## How far `category` carries for whoever is looking now: its range, scaled by the camera's zoom like `reach_from`.
+func _range(category: StringName) -> float:
+	var reach: float = SoundConfig.category_range.get(category, 1000.0)
+	var camera := get_viewport().get_camera_2d()
+	if camera != null and SoundConfig.range_follows_zoom and camera.zoom.x > 0.0:
+		reach /= camera.zoom.x
+	return reach

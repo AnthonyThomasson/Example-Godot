@@ -6,7 +6,7 @@ description: Deep implementation detail for the Physics System domain (scenes/ph
 # Physics System domain
 
 Stateless helpers + reusable Node components, sharing no imports with other domains (a leaf).
-Objects *compose* these components; Physics imports nothing outward.
+Objects, the character and a vehicle *compose* these components; Physics imports nothing outward.
 
 - `HitInfo` — the one data packet a striker fills in (`position, normal, direction, damage,
   speed_factor, penetrated, has_exit, exit_position, exit_normal, blood, height, source`); `height` is the 0..100 height the striker flew at
@@ -21,7 +21,9 @@ Objects *compose* these components; Physics imports nothing outward.
 - `Deformable` — records local impacts (dents / carved "missing pieces") and emits `changed`; the
   owner redraws + rebuilds its collider from the same deformed polygon. `record(hit, turn)` stores
   the impact un-turned by `turn`, for a body drawn turned beyond its node rotation (a character
-  facing its aim); the owner turns the impacts back when drawing.
+  facing its aim); the owner turns the impacts back when drawing. A vehicle (Vehicles domain) composes one with `allow_chunks`
+  off, its own `max_depth` / `max_impacts`, and leaves its collider alone (it does not listen to `changed`); it has no
+  `Knockback`, being a `RigidBody2D` of its own, and draws the dents with `Deformation.draw_marks`.
 - `Deformation` — the polygon math + drawing (shared by furniture and walls). `shape_polygon` keeps its last 256 dented
   silhouettes, keyed by everything they are made from (shape, size, the dents, the deformation tuning) and checked for equality:
   each hit asks for the same one three times (collider, shadow, drawing) and every repaint of a wounded character asks again
@@ -96,7 +98,7 @@ up to three colliderless nodes under `world`, each named for what it is, animate
 cools from yellow to deep red, fading over its last stretch) and `ExplosionSmoke` (puffs that drift out, swell and fade over `smoke_time`, ~4 s for a frag, a
 thin ~2.6 s for a stun). A frag also burns a mark into the world's `ScorchDecals` layer (`ScorchDecals.layer(world).burn(at, radius)`, node `ScorchDecals`):
 ragged stepped rows, a darker core in a lighter rim and a few specks, batched in 128 px chunks like `BloodDecals` / `DebrisLayer` (only the chunk that gained a
-mark redraws), drawn at the blood decals' depth and kept for good up to `Despawner.max_scene_objects` marks (the oldest dropped). A stun leaves no scorch.
+mark redraws), drawn at the blood decals' depth (`BloodConfig.print_z_index`, `DrawLayers.BLOOD`) and kept for good up to `Despawner.max_scene_objects` marks (the oldest dropped). A stun leaves no scorch.
 Tuning is `PhysicsConfig.explosion_looks` (one row per kind: `flash_*`, `fireball_*`, `smoke_*`, `scorch_radius`), `explosion_pixel` and `scorch_color`;
 `PhysicsConfig.explosion_fx_enabled` is the master switch (off: nothing spawns). Test: `tests/physics/explosion_fx`.
 
@@ -117,4 +119,4 @@ The core keeps only the entry points: `Physics.spawn_debris` (draws a bullet's `
 (the layer the ragdoll sweep and the blood queries treat as blocking). `BloodConfig` (blood tuning and its master switches) is
 documented in `domain-physics-blood`. Both are `class_name` static holders — there is no `Config` autoload.
 
-**Interfaces:** 4 (Objects / Character → Physics), 11 (`PhysicsLayers` in `PhysicsConfig.wall_mask`) — signatures in `architecture`.
+**Interfaces:** 4 (Objects / Character / Vehicles → Physics), 11 (`PhysicsLayers` in `PhysicsConfig.wall_mask`; `DrawLayers`: blood and scorch decals `BLOOD`, `ExplosionFx.Z_INDEX` = `EFFECTS`) — signatures in `architecture`.

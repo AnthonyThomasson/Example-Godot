@@ -7,7 +7,8 @@ extends Node2D
 ## one an elongated, forward-thrown splat). Satellites and spike tips are clipped by walls and furniture,
 ## so blood never lands across them. All shapes are merged into opaque outlines before drawing, so
 ## overlaps don't darken; the splat then dries from `BloodConfig.color` to `dried_color`.
-## Sits at a negative z_index so it draws beneath the player and furniture (like spent casings).
+## Draws at `BloodConfig.z_index` (`DrawLayers.BLOOD`): over the floor and rugs, under what lies there (a body, casings)
+## and the standing world.
 
 ## Vertices in the core blob's outline.
 const CORE_VERTS := 16

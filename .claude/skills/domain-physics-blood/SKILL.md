@@ -76,7 +76,7 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   splatter is a thin film (`splat_wetness`) drying to 0 over `splat_dry_time`; a pool is its flow fill, wet for
   `pool_wet_time`. Dried blood returns 0. Ages count physics frames.
 - `BloodDecals` (`Node2D`, one per parent via `layer(parent)` / `find(parent)`): batches prints (polygons) and
-  smear ribbons, drawn in 128 px chunks (each with its own mark list) that redraw only when they gain a mark or a
+  smear ribbons at `BloodConfig.print_z_index`, drawn in 128 px chunks (each with its own mark list) that redraw only when they gain a mark or a
   ribbon grows (and at 2 Hz while drying, `print_dry_time`); own FIFO cap `print_max` (not the Despawner).
   `ribbon_begin(point, width, alpha) -> mark`, `ribbon_extend(mark, point, width, alpha)` (width 0 = taper to a
   point), `ribbon_count()`; a ribbon is drawn as two quads per segment via `draw_primitive`, solid on its centre line
@@ -103,4 +103,9 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   continue as the wispy tail (`BloodField.pool_near(pos, radius)` finds the pool; wetness includes the trail).
 - Tests: `tests/physics/footprints_*`, `object_smear*` (incl. `object_smear_pool`), `smear_ribbon_shape`, `blood_pool_trail`, `blood_field_query`, `blood_decals_cap`.
 
-**Interfaces:** 4 (Objects / Character → Physics) — signatures in `architecture`.
+**Draw order.** All blood lies at `DrawLayers.BLOOD` (−3, General's ladder, interface 11): `BloodConfig.z_index` (a `BloodSplat`;
+a `BloodPool` node itself, set by `BloodSpawner._new_pool`, so its `BloodPoolVisuals` child draws there and the pool as a whole sits on
+blood's rung) and `print_z_index` (the `BloodDecals` prints and smears, and Physics' scorch decals). Over the floor (−5) and rugs (−4),
+under what lies there (a dead body, casings, a dropped item, `LYING` −2) and so under a vehicle driving over it.
+
+**Interfaces:** 4 (Objects / Character → Physics), 11 (`DrawLayers.BLOOD`) — signatures in `architecture`.

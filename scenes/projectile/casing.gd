@@ -12,7 +12,7 @@ extends Node2D
 
 
 func _ready() -> void:
-	z_index = -1  # Draw beneath the player and furniture.
+	z_index = DrawLayers.LYING  # On the floor: beneath the player, furniture and a vehicle's chassis.
 
 
 ## Kick the casing out along `eject_dir` (need not be normalized) and let it settle.

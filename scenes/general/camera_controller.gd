@@ -6,6 +6,8 @@ extends Camera2D
 ## pushing the mouse to a screen edge — and after `manual_hold` seconds without panning the
 ## automatic framing eases back in.
 ## An explosion on the EventBus shakes the view (through `Camera2D.offset`, so the follow and the framing are untouched).
+## Following (or framing) someone aboard a vehicle, the zoom eases out with the vehicle's speed (its `view_zoom_out()`, read
+## duck-typed through the target's `vehicle()`) and back in as it slows.
 ## This file owns all camera tuning and follows the input pattern.
 
 ## Higher = slower, smoother follow (the camera lerps by 1/follow_speed each frame).
@@ -117,7 +119,7 @@ func _process(delta: float) -> void:
 	elif _player:
 		var target_pos := _calculate_target_position()
 		global_position = global_position.lerp(target_pos, 1.0 / follow_speed)
-		_ease_zoom()
+		_ease_zoom(1.0 - _drive_zoom_out(_player))
 
 
 ## A grenade went off: shake by its kind and how near it is (linear to nothing at the kind's range, felt squared).
@@ -175,9 +177,9 @@ func _take_over() -> void:
 	_manual = true
 
 
-## Ease the zoom toward the automatic zoom scaled by the wheel.
-func _ease_zoom() -> void:
-	var z := clampf(_base_zoom * _zoom_bias, wheel_min_zoom, wheel_max_zoom)
+## Ease the zoom toward the automatic zoom scaled by the wheel (and by `out_scale`: under 1 zooms out).
+func _ease_zoom(out_scale := 1.0) -> void:
+	var z := clampf(_base_zoom * _zoom_bias * out_scale, wheel_min_zoom, wheel_max_zoom)
 	zoom = zoom.lerp(Vector2(z, z), 1.0 / follow_speed)
 
 
@@ -214,7 +216,20 @@ func _frame_combatants() -> void:
 	var vp := get_viewport_rect().size
 	var fit := minf(vp.x / maxf(box.size.x, 1.0), vp.y / maxf(box.size.y, 1.0))
 	_base_zoom = clampf(fit, min_zoom, max_zoom)
-	_ease_zoom()
+	var out := 0.0
+	for t in live:
+		out = maxf(out, _drive_zoom_out(t))
+	_ease_zoom(1.0 - out)
+
+
+## How far `who`'s vehicle zooms the view out (0 on foot, or for a vehicle that does not say).
+func _drive_zoom_out(who: Node) -> float:
+	if not who.has_method("vehicle"):
+		return 0.0
+	var ride: Variant = who.call("vehicle")
+	if not is_instance_valid(ride) or not (ride as Object).has_method("view_zoom_out"):
+		return 0.0
+	return clampf(float(ride.call("view_zoom_out")), 0.0, 0.9)
 
 
 ## The point the camera eases toward: the target, offset toward the mouse as it nears a

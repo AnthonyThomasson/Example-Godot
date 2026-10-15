@@ -1,6 +1,6 @@
 ---
 name: domain-audio
-description: Deep implementation detail for the Audio domain (scenes/audio/) — the procedural sound system. Every sound is synthesized in code (SoundSynth recipes → AudioStreamWAV, cached by SoundBank), picked by profile (gun, material × outcome × round weight, floor surface × gait), and played by the `Sound` autoload through a capped pool of positional voices. Use when editing scenes/audio/, adding or retuning a sound (gunshots, bullet impacts, footsteps, reloads), adding a material / surface / gun voice, changing how events map to sounds, voice limits or range, or asserting on sound in a test. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Audio domain (scenes/audio/) — the procedural sound system. Every sound is synthesized in code (SoundSynth recipes → AudioStreamWAV, cached by SoundBank), picked by profile (gun, material × outcome × round weight, floor surface × gait, vehicle kind × stage, crash material × speed band), and played by the `Sound` autoload through a capped pool of positional voices, with looping voices that follow a vehicle (engine, skid). Use when editing scenes/audio/, adding or retuning a sound (gunshots, bullet impacts, footsteps, reloads, grenades, vehicle engines, doors, skids and crashes), adding a material / surface / gun voice, changing how events map to sounds, voice limits or range, or asserting on sound in a test. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Audio domain
@@ -10,7 +10,8 @@ the `Sound` service (an autoload) listens and plays. There are no audio files: e
 `SoundSynth` from a recipe, so a new material or gun is a row in a table, not an asset.
 
 ```
-gun.gd / projectile.gd / character*.gd / thrown_grenade.gd / explosion.gd ──EventBus──▶ Sound ─▶ SoundBank ─▶ SoundSynth ─▶ AudioStreamWAV
+gun.gd / projectile.gd / character*.gd / thrown_grenade.gd / explosion.gd / vehicle.gd ──EventBus──▶ Sound ─▶ SoundBank ─▶ SoundSynth ─▶ AudioStreamWAV
+Sound ──(engine_state / slip / speed, duck-typed, each frame)──▶ the vehicle a loop follows
 floor.gd ──SoundSurface.register──▶ SoundSurface ◀── Sound (floor under a footfall or a grenade's bounce)
 main.gd ──Sound.focus = the human──▶ Sound (the muffle + tinnitus of a bang)
 ```
@@ -19,11 +20,11 @@ main.gd ──Sound.focus = the human──▶ Sound (the muffle + tinnitus of a
 
 | File | Role |
 |---|---|
-| `sound_config.gd` (`SoundConfig`) | Static tuning: `enabled` master switch, `master_db`, `category_db`, `category_voices`, `category_range`, `range_follows_zoom`, `pitch_jitter`, `volume_jitter_db`, `sample_rate` (22050), `peak`, `variants`, the `light_power_max` / `heavy_power_min` weight bands, `rng_seed`, `prewarm`, and the deafness tuning `muffle_cutoff_hz` / `muffle_open_hz` / `muffle_attack` / `muffle_release`, `tinnitus_tail` / `tinnitus_full_s`. Categories are `shot`, `impact`, `footstep`, `reload` and the grenades' `throw`, `grenade`, `explosion`, `tinnitus`; per-category tables (`category_db`, `_voices`, `_range`, `_jitter_scale`, `_variants`). |
-| `sound_synth.gd` (`SoundSynth`) | `render(recipe, seed) -> AudioStreamWAV`. Layers: `noise` (envelope, 2-pole low-pass, 1-pole high-pass), `tone` (gliding sine), `modes` (damped resonators = how a material rings). Optional `vary` makes each seed its own take (every layer's gain, decay, cut-offs, delay and partials are nudged). Mix → optional `drive` (tanh) → normalize to `peak` → 4 ms fade → 16-bit mono. A `loop` recipe skips the fade and its stream loops over the whole clip (its layers must be whole cycles of the length, or it clicks at the seam). Same recipe + seed ⇒ same bytes. |
-| `sound_bank.gd` (`SoundBank`) | The library. `*_profile(...)` name a sound without rendering it; `sound(profile, variant) -> { stream, level_db }` renders once and caches; `recipe_for`, `profiles()`, `clear_cache()`, `cached_count()`. Holds the `SHOTS`, `MATERIALS`, `FOOTSTEPS`, `RELOADS` tables and the grenades' `THROWS`, `GRENADE_BODIES`, `GRENADE_SURFACES`, `EXPLOSIONS`. |
+| `sound_config.gd` (`SoundConfig`) | Static tuning: `enabled` master switch, `master_db`, `category_db`, `category_voices`, `category_range`, `range_follows_zoom`, `pitch_jitter`, `volume_jitter_db`, `sample_rate` (22050), `peak`, `variants`, the `light_power_max` / `heavy_power_min` weight bands, `rng_seed`, `prewarm`, and the deafness tuning `muffle_cutoff_hz` / `muffle_open_hz` / `muffle_attack` / `muffle_release`, `tinnitus_tail` / `tinnitus_full_s`, and the vehicles' `engine_pitch` (0.85 idle .. 2.9 redline), `engine_load_db` 4, `engine_rev_db` 3, `skid_full_slip` 0.4, `skid_pitch` 0.18, `skid_full_speed` 200, `loop_ease` 14/s, `crash_medium_speed` 150 / `crash_heavy_speed` 280 (the crash bands) and `crash_speed_ref` 180. Categories are `shot`, `impact`, `footstep`, `reload`, the grenades' `throw`, `grenade`, `explosion`, `tinnitus` and the vehicles' `engine` (−9 dB, 4 voices, 1400 px, 1 variant), `vehicle` (−2 dB, 6, 1800 px) and `skid` (−7 dB, 3, 1600 px, 1 variant); per-category tables (`category_db`, `_voices`, `_range`, `_jitter_scale`, `_variants`). |
+| `sound_synth.gd` (`SoundSynth`) | `render(recipe, seed) -> AudioStreamWAV`. Layers: `noise` (envelope, 2-pole low-pass, 1-pole high-pass), `tone` (gliding sine), `modes` (damped resonators = how a material rings), `pulses` (a periodic excitation, `rate` noise bursts a second, rounded to whole pulses per clip, each `burst` s long, its level cycling through `pattern` and nudged by `spread` / `jitter`, or continuous noise at `rate` 0; shaped by `lp` / `hp`, `noise` of it heard raw and the rest rung through resonators `freqs` / `amps` / `decays`, swelled by `wobble` [cycles per clip, depth]: an engine's firing, a tyre's squeal). Optional `vary` makes each seed its own take (every layer's gain, decay, cut-offs, delay and partials are nudged). Mix → optional `drive` (tanh) → normalize to `peak` → 4 ms fade → 16-bit mono. A `loop` recipe skips the fade and its stream loops over the whole clip; in a loop whatever a layer still sounds past the clip's end is folded back onto its start (`_at`), so decaying layers and pulses join without a seam (a steady tone must still be a whole number of cycles of the length). Same recipe + seed ⇒ same bytes. |
+| `sound_bank.gd` (`SoundBank`) | The library. `*_profile(...)` name a sound without rendering it; `sound(profile, variant) -> { stream, level_db }` renders once and caches; `recipe_for`, `profiles()`, `clear_cache()`, `cached_count()`. Holds the `SHOTS`, `MATERIALS`, `FOOTSTEPS`, `RELOADS` tables, the grenades' `THROWS`, `GRENADE_BODIES`, `GRENADE_SURFACES`, `EXPLOSIONS`, and the vehicles' `VEHICLES` (per kind: `db`, the engine's firing `rate` / `pattern` / `burst` / `lp` / `noise` and exhaust `pipe` resonances, the starter's `crank`, the `door` pitch and weight, whether it has a `slide` door), `ENGINE_LOOP` (1 s), `DOOR_STAGES` and `CRASH_BANDS` (`light` / `medium` / `heavy`: `db`, `body`, `crunch`, `length`, `glass`, `debris`). |
 | `sound_surface.gd` (`SoundSurface`) | Static floor registry (the `BloodSurface` pattern): `register(rect, material, pattern) -> id`, `unregister(id)`, `at(pos) -> StringName` (newest floor wins; none = `outdoor`), `surface_for(material, pattern)`. |
-| `sound.gd` (autoload `Sound`) | The service: EventBus listener, variant/pitch/volume choice, range cull, voice pool, `&"sound"` announcements. `active(category)`, `reset()`, static `reach_from(...)`; `focus` (a character node, Main sets the human) and `muffled()` (see "Deafness"). |
+| `sound.gd` (autoload `Sound`) | The service: EventBus listener, variant/pitch/volume choice, range cull, voice pool, `&"sound"` announcements. `active(category)`, `reset()` (also ends every loop), static `reach_from(...)`; `focus` (a character node, Main sets the human) and `muffled()` (see "Deafness"); the vehicle loops and `loop_of(vehicle, kind) -> { profile, pitch, volume_db }` (`{}` when none; see "Vehicle loops"). |
 
 ## Profiles
 
@@ -41,6 +42,12 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `explosion/frag` | Big and low: a crack, the boom and a sub-bass, a roar and a rumble, debris pattering down; 0.97 s (a profile may not run past 1 s, `audio/bank`). |
 | `explosion/stun` | Sharp, very loud (+3 dB trim, then the category's +3), bright (a ring of high partials) and over in 0.42 s. |
 | `tinnitus/whine` | A seamless 0.8 s loop of three thin tones (4.3 kHz twice, 5 Hz apart so they beat, and 6.85 kHz). |
+| `engine/<car\|van>` | A seamless 1 s loop: the firing train at idle (28 / 20 firings a second through a four-cylinder `pattern`), rung through the exhaust's resonances, with block hum and valve ticks. The service pitches it by the revs. The van's is deeper (larger, lower `pipe` resonances, slower firing). An unknown kind is voiced as a car. |
+| `ignition/<kind>` | The starter cranking a few strokes (a geared whine slowing at each compression), then the engine catching, racing up and settling to idle; 0.98 s. |
+| `door/<kind>/<open\|close>` | In a reload's register: dry mechanical clicks over a low thunk, no creak or ring. `open`: the handle's click, the latch letting go with a low knock, and the soft thump of the door coming off its seal. `close`: the slam (the door's weight thumping home with the body's low panels, 150 / 230 Hz), the latch clicking shut into it, a dull knock of the trim. The van's door is lower and heavier. |
+| `door/van/<slide_open\|slide_close>` | Only a kind with a sliding door: the roll back on its runners into the stop, and the heavy thunk of it shutting with the catch clicking home (no panel ring). |
+| `skid/tyre` | A seamless 1 s loop: the rubber's stick-slip ringing a few close pitches (about 1 to 2.7 kHz) that beat and swell, over a hiss. |
+| `crash/<material>/<light\|medium\|heavy>` | A vehicle striking `material` (every `MATERIALS` entry; `wall` for `""`, `default` for an unknown one), the band by the closing speed (`SoundConfig.crash_medium_speed` / `crash_heavy_speed`): the vehicle's mass thumping home (a sub boom when heavy), sheet metal folding and ringing, the struck material's own crack and ring, glass and debris after a heavy one. `crash/flesh/<band>` is a character struck: a dull, heavy thud. |
 
 - **Materials:** `wood metal glass ceramic composite stone plastic fabric foliage electronics flesh`, `wall` (what walls
   report as the empty material `""`) and `default` for anything unknown. `composite` is the helmet's (a dull, short knock: thump 0.55,
@@ -66,6 +73,9 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `&"grenade"` | `ThrownGrenade._post` (Items) | `position`, `kind`, `stage`: `bounce` → `grenade/<kind>/<floor under it>`; `rest` is silent. |
 | `&"explosion"` | `Explosion.frag` / `.stun` (Projectile) | `position`, `kind` → `explosion/<kind>`. The same event shakes the camera (General). |
 | `&"stun"` | `Character.take_stun` (Character) | `character`, `deaf`, `position`: voiced only for the `focus` character and a `deaf` > 0 (the tinnitus). A blind-only stun, or another character's, is silent. |
+| `&"vehicle"` | `vehicle.gd` (Vehicles) | `position`, `kind`, `stage`: `ignition` → `ignition/<kind>`; `door_open` / `door_close` / `slide_open` / `slide_close` → `door/<kind>/<open\|close\|slide_open\|slide_close>`; `crash` (+ `speed`, `material`) → `crash/<material>/<band>`, `bump_character` (+ `speed`) → `crash/flesh/<band>`, both louder within the band by `linear_to_db(clamp(speed / crash_speed_ref, 0.5, 1.6))`. Category `vehicle`. |
+| `&"engine"` | `vehicle.gd` | `vehicle`, `kind`, `stage`: `start` starts the vehicle's `engine/<kind>` loop, `stop` ends it. |
+| `&"skid"` | `vehicle.gd` | `vehicle`, `stage`: `start` starts its `skid/tyre` loop, `stop` ends it. |
 
 It posts `&"sound"` `{ kind, profile, variant, position, volume_db, pitch }` for every sound it accepts. That is
 what tests assert on (the runner records every bus event); nothing else listens.
@@ -112,6 +122,17 @@ medium impact keeps ≥ 40 % of its energy under 250 Hz; low-end weight, includi
 ≥ 1.8× medium→heavy). To measure, `tools/dump_sounds.gd` then analyse the `.wav`s (the test's helpers are in
 `tests/_audio/sound_probe.gd`: `brightness`, `low_share`, `low_weight`).
 
+## Why a door is a thunk, not a creak
+
+A vehicle door sits in a reload's register: its clicks are short noise bursts (a few ms, so they carry little
+energy however crisp), and the body of the sound is low tones and low resonances: the latch's knock (140 → 80 Hz), the seal's thump
+(100 → 58 Hz), the slam (125 → 48 Hz) with the panels at 150 / 230 Hz (the slide door 130 / 210 Hz) and the impact noise low-passed
+at ~1 kHz. No creak and no panel ring: creaks and panel rings above ~300 Hz read high-pitched. Measured (`tests/_audio/sound_probe.gd`
+`low_share` under 300 Hz, the lowest of the takes): car open 0.80, car close 0.82, van open 0.87, van close 0.86, slide open 0.82,
+slide close 0.86 (the test's floor 0.75; footsteps and impacts ~0.83); brightness 0.001 to 0.018, far under the reloads' clicks (up
+to 0.86). Keep a new door sound's high clicks short and its weight under ~150 Hz: the 2-pole measure counts a 165 Hz tone only
+~0.6 low. Test: `tests/audio/vehicle_door_tone_test.gd`.
+
 ## Deafness: `Sound.focus`, `muffled()` and the tinnitus (G14)
 
 `Sound.focus` is a character node (Main sets the human when there is one and clears it at teardown; null = nobody's ears, so an
@@ -128,6 +149,19 @@ AI's stun is silent). Audio reads only its `stun_view()` (`deaf`), duck-typed, s
   deafness**: each frame its `until` and volume come from `stun_view().deaf`, fading over `tinnitus_tail` (1.5 s) and cut when the
   deafness ends; a stun shorter than `tinnitus_full_s` starts it quieter. Its range is `1e6` (it is in the listener's own head).
 
+## Vehicle loops (`engine`, `skid`)
+
+One looping voice per vehicle and kind, keyed by the vehicle's instance id (`_loops`); a second `start` for the same one is ignored.
+`_start_loop` plays variant 0 at the vehicle with `until` = INF (it plays until stopped) and is **not** range-culled (it lasts, and the
+listener may come closer); its `max_distance` is the category's range at the camera's zoom (`_range`), kept current. Each frame
+`_follow_loops` moves the voice to the vehicle and glides its pitch and level (`loop_ease`) toward `_loop_aim`, read off the vehicle
+duck-typed (Audio imports nothing from Vehicles):
+- **engine:** pitch `lerp(engine_pitch.x, .y, rpm)`; level = the sound's level − `engine_load_db × (1 − load)` + `engine_rev_db × rpm`
+  (`engine_state()`). An engine that no longer runs ends the loop.
+- **skid:** pitch `1 + skid_pitch × slip`; level + `linear_to_db(clamp(slip / skid_full_slip, 0.1, 1) × clamp(speed / skid_full_speed, 0.25, 1))`.
+A loop ends on its `stop` event, its vehicle freed, its engine stopped, or its voice taken by a newer one of the category (the voice's
+`loop` key is cleared when it is reacquired). `loop_of(vehicle, kind)` is what tests read.
+
 ## Gotchas
 
 - `play()` outside the scene tree logs an engine error (which fails a test); voices are only ever added as
@@ -136,9 +170,10 @@ AI's stun is silent). Audio reads only its `stun_view()` (`deaf`), duck-typed, s
   without it any process that quits mid-sound reports leaked `AudioStreamPlaybackWAV` objects.
 - With a camera present (the test runner has one), range culling is live: audio tests that are not about distance
   set `SoundConfig.category_range` to `Probe.EVERYWHERE` (`tests/_audio/sound_probe.gd`).
-- Sounds render lazily (1–12 ms each, the whole library ~0.7 s) and, with a display, are pre-rendered in the
+- Sounds render lazily (1–12 ms each for most; one variant of each of the 205 profiles took ~2.2 s in a headless run at load average
+  ~3.8, against `audio/bank`'s 3000 ms budget) and, with a display, are pre-rendered in the
   background at `prewarm_budget_ms` a frame after launch, every variant of every profile (`Sound.library()`: the first variants
-  first; the 330 sounds take ~1.6 s), because a variant first synthesized in a fight is a 9–35 ms hitch; headless tests render on first use
+  first; 466 sounds), because a variant first synthesized in a fight is a 9–35 ms hitch; headless tests render on first use
   (`Perf.warm_sounds()` in `tests/_perf/perf_probe.gd` does what the pre-warm would have by the time a match is fought).
 - Headless uses the Dummy audio driver: playback is accepted and silent. Nothing here can be heard by a test.
 
@@ -148,6 +183,7 @@ AI's stun is silent). Audio reads only its `stun_view()` (`deaf`), duck-typed, s
   borrows its band's). The `shot` event already carries `gun` and `power`.
 - **A material:** a row in `SoundBank.MATERIALS` (`hard`, `db`, `thump`, `modes`/`amps`/`decays`, `lp`, `grit`).
 - **A floor surface:** a row in `FOOTSTEPS`, and a case in `SoundSurface.surface_for`.
+- **A vehicle kind:** a row in `SoundBank.VEHICLES` (until then it is voiced as a car).
 - **A new category** (reload, a body falling …): a topic posted by the owning domain, a `*_profile` + recipe in
   `SoundBank`, a case in `Sound._on_posted`, entries in `SoundConfig`'s category tables, and a test.
 - Audition without playing the game: `godot --headless --path . -s tools/dump_sounds.gd -- --out=DIR
@@ -161,4 +197,7 @@ events → profiles), `sound_service` (caps, freeing, variety, reset, RNG isolat
 the real-emitter tests `gun_shot_sound`, `impact_material_sound`, `impact_outcome_sound`, `impact_blocked_sound`,
 `footstep_surface_sound`, `footstep_variety`, `footstep_tone`, `impact_weight`, `reload_sound`, `grenade_sounds` (throw, floor-voiced bounce,
 `explosion/frag` against `explosion/stun`, the tinnitus and the muffle for the focus only; its range table adds the new categories, `Probe.everywhere`
-in `tests/_ai/grenade_probe.gd`). Switch `audio.sound` (`SoundConfig.enabled`) turns it all off.
+in `tests/_ai/grenade_probe.gd`) and `vehicle_sounds` (ignition, the engine loop rising in pitch with speed and cut on exit, door open and
+close, the van's slide door, the skid loop, a slow and a fast crash, a character struck, the van's engine deeper; through
+`tests/_vehicle/vehicle_probe.gd`) and `vehicle_door_tone` (every door take no brighter than the brightest reload, over 0.75 of its
+energy under 300 Hz). Switch `audio.sound` (`SoundConfig.enabled`) turns it all off.

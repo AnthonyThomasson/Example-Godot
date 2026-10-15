@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Forced-Entry) — the fourteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Forced-Entry) — the fifteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Forced-Entry architecture
@@ -8,7 +8,7 @@ description: The architecture map for this Godot project (Forced-Entry) — the 
 A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
 furnished house, with two "hands" that aim at the mouse, a punch on **F**, a leg kick, a gun (pistol, SMG or
 assault rifle) that fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
-organized into **fourteen isolated domains** so each can be changed on its own.
+organized into **fifteen isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
@@ -17,7 +17,7 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 sub-domains keeps a short overview skill and one `domain-<domain>-<sub>` skill per sub-domain (listed in the table below); the
 composition root is `domain-main`.
 
-## The fourteen domains (one folder each under `scenes/`)
+## The fifteen domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
@@ -29,11 +29,12 @@ composition root is `domain-main`.
 | **Projectile System** | `projectile/` | `domain-projectile` | Shooting: penetration (the target's and the bullet's own power), a character's armour stopping a round, damage, cover, ricochet; and a grenade's burst (`Explosion`: the frag's blast and fragments, the stun's flash and bang). |
 | **Physics System** | `physics/` | `domain-physics` (+ `domain-physics-blood` for `physics/blood/`) | Physical reactions: forces, knockback, deformation, debris, ragdoll, and blood (its own sub-folder, `physics/blood/`). |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
-| **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads, a grenade's throw, bounce, burst) and played by the `Sound` autoload through a capped pool of positional voices; a deafened `Sound.focus` (the human) gets a muffle and a tinnitus whine. |
+| **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads, a grenade's throw, bounce, burst, a vehicle's ignition, doors, crashes, engine and skid loops) and played by the `Sound` autoload through a capped pool of positional voices; a deafened `Sound.focus` (the human) gets a muffle and a tinnitus whine. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`). |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`) and the draw-order ladder (`DrawLayers`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus: debug player panel, match HUD, pre-game setup window, settings page, seed readout, test browser window, test result banner. |
 | **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Plus `ai/team/`, the human's side of the entry radio (`PlayerStack`, interface 17). Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
+| **Vehicles** | `vehicle/` | `domain-vehicle` | Drivable vehicles (a car and a van, only in the sandbox): the rigid body and its driving model, doors and seats, getting in and out (the character's `CharacterVehicleUse` component and the ride), collisions and the harm to a character struck, the dents, the vehicle art and its events. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`, or one folder deeper by topic (`tests/ai/entry/`). |
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
@@ -82,8 +83,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
    World-Gen owns the *catalogue*; Objects owns the *field schema* and turns a plain definition
    dict into a node. World-Gen never touches an object's fields.
 
-3. **Objects/Character ↔ strikers: the "hittable" contract**
-   Every world object (furniture **and** walls), **and the Character domain's `character.gd`**,
+3. **Objects/Character/Vehicles ↔ strikers: the "hittable" contract**
+   Every world object (furniture **and** walls), **the Character domain's `character.gd`** and **the Vehicles domain's `vehicle.gd`**,
    implements:
    - `get_surface() -> Dictionary` → `{ coverage, penetration, material, color }` — `coverage` is a height on a 0–100 scale: a bullet
      flies at one height and strikes what stands above it (a character's is its posture's; `docs/cover-and-stance.md`)
@@ -98,7 +99,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
    surface) and `height` (the 0..100 height the striker flew at, which picks a character's hit zone; −1 = none: a blast strikes the
    whole body). The projectile decides the ballistic outcome, then hands
    the struck body a HitInfo; the body decides what a hit *does to it* — an object spawns debris
-   (interface 4), the character bleeds instead (its `BloodWound` component, interface 4). A round that meets a `stop_power` and does not
+   (interface 4), the character bleeds instead (its `BloodWound` component, interface 4), a vehicle is dented
+   (`Deformable`), throws debris and is shoved at the hit (`Physics.impact_impulse`) and is never destroyed. A round that meets a `stop_power` and does not
    beat it is blocked; one that beats it always penetrates, so an armoured body reads `penetrated == false` as "stopped by the armour" (it
    then takes only the armour's blunt share, no wound). The
    projectile and the grenade's `Explosion` (Projectile System: the frag's blast, `Explosion.frag`) are the strikers that call `take_hit`
@@ -109,16 +111,17 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `material` it posts. `Explosion` reaches the characters by the one probe of interface 7 (`current_item()`), reads their `is_dead`, `facing`, `get_surface()`, and calls
    `take_stun` / `take_damage` / `blast_push` / `take_hit` on them, and `apply_impulse` on a pushable (capped by `get_mass()`): the sanctioned surface. An object also carries `object_name` (its display name), which the AI's wording reads.
 
-4. **Objects/Character → Physics** (objects and the character compose physics; Physics is a leaf domain)
+4. **Objects/Character/Vehicles → Physics** (objects, the character and a vehicle compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
 	 `apply_impulse(v, at_world)`.
    - `Deformable` (Node child): `record(hit, turn = 0.0)`, `impacts`, `damage_total`, `changed`
-	 signal (`turn`: the body's drawn turn beyond its node rotation; the character passes its facing).
+	 signal (`turn`: the body's drawn turn beyond its node rotation; the character passes its facing). A vehicle composes one
+	 (no `Knockback`: it is its own `RigidBody2D`) with chunks off and does not rebuild its collider from the dents.
    - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` and
 	 `draw_wall` optionally textured — `draw_shape` also turned by `texture_angle`, its hit marks
 	 optional for a caller drawing them over later layers with `draw_marks` — so pixel art is drawn
 	 through the dented silhouette).
-   - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects)
+   - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects and a vehicle)
 	 `BloodWound` (Node child, character: `record(hit)` on a hit throws a splatter spray and owes drips, one
 	 `BloodSplat` every `BloodConfig.drip_interval_min..max` s from the body's blood origin; `stop()` on death)
 	 and `Physics.bleed_out(parent, source, exclude)`
@@ -162,7 +165,10 @@ interfaces it takes part in (by number) and describes how they're implemented.
    Furniture is a `RigidBody2D`, so its native methods (this is their signature) serve the contract and a shove off
    the centre turns it; the character ignores `at` and integrates knockback into locomotion. Used by
    furniture→character contact transfers, bullet impacts, an explosion's blast (central), and the character's punch,
-   kick, leg press and walking push (each at its contact point). To carry a piece at walking pace instead of launching it,
+   kick, leg press and walking push (each at its contact point). A vehicle (`vehicle.gd`, a `RigidBody2D`) is pushable through
+   its native methods too (a bullet shoves it at the hit); it shoves furniture through the physics solver and a character it
+   strikes through the character's `apply_impulse` (interface 19), and a piece pressed against a character it strikes (or
+   that it presses against one) through the piece's `apply_impulse`, read against its `linear_velocity`. To carry a piece at walking pace instead of launching it,
    a pusher may also read a `RigidBody2D` pushable's `linear_velocity` / `angular_velocity` and the inverse inertia the
    physics server holds for it (`PhysicsServer2D.body_get_direct_state`), and cap its shove by them; a pushable without
    them (a character) is shoved uncapped.
@@ -220,7 +226,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    every frame while the trigger is held when `is_automatic()`), `reload()` (R: a timed swap to
    the fullest carried magazine, taking the item's `reload_time()`; refused while running or busy and cancelled by running, switching items or
    dying), `select_slot(id)`, `try_interact()` /
-   `interact_with(object, id)` / `end_interaction()`, and may read `damage_taken()` (accumulated hit
+   `interact_with(object, id)` / `end_interaction()`, `try_use_vehicle()` (E: get in or out, interface 19), and may read `damage_taken()` (accumulated hit
    damage, for injury sensing), `posture()`, `is_running()` / `stamina_fraction()`, `run_speed()` (px/s standing and running, slower while stunned or weighed down by the outfit: how an AI works out whether it gets somewhere in time) / `posture_coverage(posture)` (the body's height on the coverage scale in `stand` / `crouch`, what furniture must stand above to shield it), the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `current_item()` / `current_slot()` / `item_reach()` / `has_item(id)` (the held item, its slot and reach, and whether a slot is carried — what the AI's wording, the debug panel and `requires_item` interactions read), `is_attacking()` (a punch swing is under way), `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
@@ -231,6 +237,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `{ type, name, condition }`: what the debug panel and the spectator inspector list), and where a round strikes it: `hit_zone(height)` (`feet` / `legs` / `torso` /
    `head` by height over the posture's coverage; `&""` below 0) and `hit_side(direction)` (`front` / `flank` / `back` against the shoulders' facing), with
    `get_surface_at` (interface 3); an outfit's weight slows `run_speed()` and every pace;
+   while the character rides a vehicle (interface 19, from the E press to its last step out) `is_busy()` is true, and `current_item()` is null
+   while it is posed by the ride (the item put away);
    the stun (a grenade's flash and bang): `take_stun(blind, deaf, from)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
    (aim, visible wounds, a reload in progress and the posture are things it perceives). A node is a character if it exposes `current_item()`:
@@ -342,30 +350,49 @@ interfaces it takes part in (by number) and describes how they're implemented.
       controllers within `callout_range` consume it (which flank an ally holds, whom it fights, where to
       support it, which stack slot is taken, when the point is through, which room is clear, which doorway on is
       covered, when the team moves on, which grenade to get clear of).
+    - `&"vehicle"`, `&"engine"`, `&"skid"`: a vehicle (Vehicles) posts `&"vehicle"` `{ position, kind` (`&"car"` / `&"van"`)`, stage }` with
+      stage `ignition` (a driver sat down; the vehicle's centre), `door_open` / `slide_open` (a shut door starts to open; at its handle),
+      `door_close` / `slide_close` (the frame it shuts), `crash` (a new impact above `VehicleConfig.crash_min_speed` on anything but a
+      character, + `speed` (the closing speed) and `material` (the struck `get_surface().material`, `""` for a wall)) or `bump_character`
+      (a character struck, + `speed`); `&"engine"` `{ vehicle, kind, stage }` `start` / `stop`; `&"skid"` `{ vehicle, stage }` `start` /
+      `stop` (the tyres begin / stop sliding). Audio voices the one-shots and keeps one looping voice per vehicle for its `engine` and its
+      `skid`, following the vehicle each frame through `engine_state()`, `slip()` and `speed()` read duck-typed off the event's `vehicle`
+      (the `Sound.focus` pattern, interface 18), so it stays a leaf.
     Emitters and listeners never reference each other (like `Despawner`).
 
-11. **General → Interaction / AI: `PhysicsLayers.SOLID`**
+11. **General → every domain: shared ids, `PhysicsLayers.SOLID` and `DrawLayers`**
     - `PhysicsLayers` (`general/physics_layers.gd`, a `class_name` static holder) — `SOLID` names
 	  the physics layer bit (1) that "walls + solid furniture" live on. Interaction's reach query
 	  (`character_interaction.gd`) and AI perception's sight/line-of-fire rays (`agent_vision.gd`; the
 	  vision overlay asks the controller's `debug_sight_end` instead of casting) raycast on this one shared constant instead
 	  of each redefining the same magic number — the single point of truth for that layer id. The character's
 	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), the
-	  bullet's `collision_mask` (`projectile/projectile.gd`) and Physics' `PhysicsConfig.wall_mask` read it too.
+	  bullet's `collision_mask` (`projectile/projectile.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
+	  checks and clearing check (`scenes/vehicle/`) read it too.
+    - `DrawLayers` (`general/draw_layers.gd`, a `class_name` static holder) — the world's draw-order ladder, one rung per kind of thing,
+	  so what lies on the floor, what a vehicle covers and what flies over it keep one order across domains: `FLOOR` −5 (Objects' `Floor`,
+	  via `ObjectArtConfig.floor_z_index`) < `RUG` −4 (rugs and mats, `ObjectArtConfig.rug_z_index`) < `BLOOD` −3 (Physics: splats, a
+	  bleed-out pool, prints and smears, the scorch decals; `BloodConfig.z_index` / `print_z_index`) < `LYING` −2 (a dead body,
+	  `CharacterConfig.ragdoll_z_index`; a spent casing, Projectile; a `DroppedItem` and a grenade at rest, Items) < `UNDER_VEHICLE` −1
+	  (a vehicle's `Chassis`) < `STANDING` 0 (Godot's default: the living, a vehicle's occupants, furniture, walls) < `ABOVE` 1 (a
+	  vehicle's `Roof`, a grenade in flight, the UI's `StackMarkers`) < `EFFECTS` 4 (Physics' `ExplosionFx`). A domain's own z knob is initialised from its rung,
+	  never a bare number; within a rung the scene tree decides. `docs/vehicles.md` V3 / V6 (a body struck down lies under the vehicle).
 
-12. **Objects / Character / Items → Art** (leaf: the pixel-art engine; each domain owns its painters)
+12. **Objects / Character / Items / Vehicles → Art** (leaf: the pixel-art engine; each domain owns its painters)
     - `PixelArt.render(painter, size, color, facing, material, opts) -> Texture2D` — a painter's art
 	  at a cardinal facing (the image is turned); furniture, walls, floors.
     - `PixelArt.render_turned(painter, size, color, angle, material, opts) -> Texture2D` + `PixelArt.snap_angle(angle)`
 	  — canonical art lit for a snapped angle, drawn rotated by the caller to the exact one;
-	  characters, hands, the guns.
+	  characters, hands, the guns, a vehicle's body, doors, wheels and lamps.
     - `PixelCanvas` — the surface a painter draws on (`static paint(canvas, base, material, opts)`):
 	  shapes (`rounded`/`ellipse`/`disc`/`bowed`), `fill`, `bevel`, `outline`, `surface`, `grain`,
-	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …
+	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …; `PixelCanvas.ConvexShape.new(rect, x0, x1, y0, y1)` (a shape from its per-row
+	  and per-column spans) is built from outside by the Vehicles domain's `art/vehicle_art.gd`.
     - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
 	  turn steps, tone ramp and surface-finish tuning.
-    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb, trunk and vest painters and Items' gun
-    painters (pistol, SMG, rifle) all render through these; Art imports nothing from other domains.
+    Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb, trunk and vest painters, Items' gun
+    painters (pistol, SMG, rifle) and Vehicles' painters (`scenes/vehicle/art/`: car, van, door, wheel, lamp) all render through
+    these; Art imports nothing from other domains.
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)
     `scenes/testing/` builds a test's world and drives it through the interfaces above only:
@@ -373,7 +400,11 @@ interfaces it takes part in (by number) and describes how they're implemented.
     factories (2, incl. `WallFactory.openings_for`), `NavBuilder`
     + `nav_updater.gd` (9), the character scenes plus the controller contract (7) — a puppet
     `ScriptedController` or `player_controller.gd` on `character/character_base.tscn` (the
-    controller-less character) — and `EventBus` / character signals (7, 10) for its event log.
+    controller-less character), the vehicle scenes (19: `TestSetup.vehicle(id, kind, pos, rotation := 0.0, props := {})` instances
+    `res://scenes/vehicle/<kind>.tscn` under the world root after the nav bake (not carved) and waits one physics frame so the new bodies
+    are in the space; `t.vehicle(id)` reads it back; the puppet presses E with `use_vehicle()` and drives with
+    `drive(throttle, steer, handbrake)`, writing `move_input` / `run_input` as the player's keys do) — and `EventBus` / character
+    signals (7, 10) for its event log.
     Behaviour switches set existing exported props and config-holder `static var`s by name
     (duck-typed, like Main's overlay flags); a test can also script the Von answers through the AI
     decision sub-domain's `DecisionStub` statics (`decision_stub.gd`, read by `decision_client.gd`; the runner also drives the
@@ -437,6 +468,36 @@ interfaces it takes part in (by number) and describes how they're implemented.
     - The sight half of the same stun is the UI's `StunScreen` (`ui/hud/stun_screen.gd`, `watch(character)`, `drawn()`), built by Main for the human and reading
       `stun_view()` (`blind`, `blind_total`) and the `&"stun"` event; it knows nothing of Audio, nor Audio of it.
 
+19. **Character ↔ Vehicle: the drivable contract** (`scenes/vehicle/`; spec `docs/vehicles.md`)
+    - **The character's side.** `character.gd` composes the Vehicles domain's `CharacterVehicleUse` (`vehicle/character_vehicle_use.gd`,
+      preloaded and added in `_ready` like `CharacterInteraction`) and forwards opaque calls: `try_use_vehicle()` (E, refused while dead or
+      in an object interaction: board by the door whose handle is nearest, or get out), `vehicle() -> Node` (the vehicle it is boarding, riding
+      in or getting out of; null on foot) and `is_in_vehicle()` (seated only). It steps the component once a physics frame right after its
+      controller (`control(delta)`), so a ride overrides that frame's intent, and calls `abandon()` from `_die` (the ride ends where the body is).
+      While a ride lasts `is_busy()` is true and `try_interact()` / `interact_with` are refused.
+    - **What the Vehicles domain calls on the character.** During the walk to the door its controller fields `move_input` / `aim_point` /
+      `run_input` (interface 7), and from the driver's seat it reads `move_input` / `run_input` as the drive intent; then the ride API:
+      `set_ride_pose(at, toward, fold, step := Vector2.ZERO)` (world point, facing, fold 0 standing .. 1 seated, and `step`, the legs' motion
+      through the vehicle's frame in px/s, so a carried body does not walk at the vehicle's speed): the first pose cancels a reload, puts the
+      held item away (`current_item()` null) and disables the collision shape; the fold is the drawn crouch fold (`posture_folded()` reads it);
+      and `end_ride()` (on its own feet again, shape on, item back). It also reads `facing`, `radius`, `speed`, `global_position`, and for a
+      character it strikes (found by the `current_item()` probe, interface 7) `is_dead`, `health`, `velocity`, `get_mass()` and calls
+      `apply_impulse` / `take_damage(amount)`; collision exceptions are Godot's own (`add_collision_exception_with` / `remove_...`).
+    - **The vehicle** (`vehicle.gd`, a `RigidBody2D` on `PhysicsLayers.SOLID`, found by the group `vehicles`): `doors() -> Array`
+      (`[{ id, kind` (`swing` / `slide` / `rear`)`, seat, handle, open` (0..1)`, hinge, angle, offset }]`, world space), `seats() -> Array`
+      (`[{ id, occupant }]`), `driver() -> Node`, `board(character, door_id) -> RefCounted` (the ride, or null when that door cannot be used
+      now), `exit(character) -> bool`, `drive_input(character, throttle, steer, handbrake)` (driver only, engine running), and the reads
+      `speed()` (px/s, unsigned), `engine_state()` (`{ running, rpm, load }`), `slip()` (0 while the tyres grip), `wheel_angle()`,
+      `brake_lights()` and `view_zoom_out()` (`VehicleConfig.drive_zoom_out` × speed / top speed: how far a camera following someone
+      aboard zooms out). Its two draw layers are part of the contract too (the tests find them by name): the child `Chassis` (`layer`
+      export `"chassis"`, at `DrawLayers.UNDER_VEHICLE`) and the child `Roof` (`layer` `"roof"`, at `DrawLayers.ABOVE`). Everything else on it (`half_size`, `outline`, `row`, `door_list`, `seat_point`, `occupant`, `is_free`, `reserve`,
+      `change_seat`, `release`, `open_door` / `close_door`, `start_engine` / `stop_engine`, `brake_input`, `exit_door`, `hit_marks`) is
+      Vehicles-internal, for its ride and visuals.
+    - **Its other contracts:** hittable (3), Deformable / debris / impulse (4), pushable (5), the `vehicle` / `engine` / `skid` topics (10)
+      and its painters (12). General's camera reads `target.vehicle().view_zoom_out()` duck-typed (`has_method`), never `VehicleConfig`;
+      `player_controller.gd` calls `try_use_vehicle()` on `Keybinds.USE_VEHICLE` (E). Only the sandbox and the tests place a vehicle:
+      Main, World-Gen, the nav map and the AI do not know them.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
@@ -447,7 +508,9 @@ main ─▶ LoadoutConfig ─▶ GunConfig / MagazineConfig / OutfitConfig / Ite
 main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals only, no dependency on Settings)
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects;  Projectile ──(get_surface_at / take_hit)──▶ Character ─▶ Outfit (Items)
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
-Objects / Character / Item ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)
+Character ─▶ CharacterVehicleUse (Vehicles) ─▶ Vehicle   (the ride and a strike call back only the character API of interface 19, as an Item calls its user's)
+Vehicle ─▶ Deformable / Physics.impact_impulse / Physics.spawn_debris (Physics);  Vehicle ─▶ PhysicsLayers (General)
+Objects / Character / Item / Vehicle ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
 Physics debris / casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
@@ -458,26 +521,30 @@ Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload"
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
 main ──(Sound.focus = the human)──▶ Sound   /   Character (&"stun") ──▶ EventBus ──▶ Sound (tinnitus + muffle for the focus), StunScreen (UI)
 Explosion (&"explosion") ──▶ EventBus ──▶ Sound (the burst) / Camera (shake)
+Vehicle (&"vehicle", &"engine", &"skid") ──▶ EventBus ──▶ Sound ──(engine_state / slip / speed, duck-typed)──▶ the vehicle's loops
+Camera ──(target.vehicle().view_zoom_out(), duck-typed)──▶ Vehicle
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display; DebugUI and the inspector outfit_view)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
+TestWorld ─▶ vehicle scenes (TestSetup.vehicle)
 ```
 
 Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
-`Despawner`, `PhysicsLayers`), which every domain may use (World-Gen's only outward code dep is
+`Despawner`, `PhysicsLayers`, `DrawLayers`), which every domain may use (World-Gen's only outward code dep is
 the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into twelve `class_name` static holders: `BallisticsConfig`
+only on Godot's `Image`). Tuning is split into thirteen `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
 push + punch + being stunned + hit zones, sides and the outfit's weight + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
 types, capacities and reload times), `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
-muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, look, the armour's zones, sides and protection numbers, a plate's durability) and `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands). World-Gen's `LayoutRules` (which rooms may
+muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, look, the armour's zones, sides and protection numbers, a plate's durability), `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands, the vehicles' engine, skid and crash numbers) and `VehicleConfig` (Vehicles: one row per kind — size, mass, engine, brakes, steering, grip, doors and seats — one `looks` row per kind, and the shared getting-in, driving, harm, crash, camera and look numbers). World-Gen's `LayoutRules` (which rooms may
 hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
-tuning. There is no `Config` autoload. A thirteenth static holder, `PhysicsLayers`
+tuning. There is no `Config` autoload. A fourteenth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
-plays for doorway sides.
+plays for doorway sides; a fifteenth, `DrawLayers` (General, interface 11), is the shared draw-order ladder every
+domain's z knob starts from.
 
 ## Cross-cutting conventions
 

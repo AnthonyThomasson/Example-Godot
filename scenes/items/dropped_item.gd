@@ -48,7 +48,7 @@ static func spawn(dropped: Item, at: Vector2, angle: float, velocity: Vector2, p
 
 
 func _ready() -> void:
-	z_index = -1  # Beneath the living, like a fallen body.
+	z_index = DrawLayers.LYING  # Beneath the living and a vehicle's chassis, like a fallen body.
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_height = start_height
 	var circle := CircleShape2D.new()

@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/vehicle/vehicle.gd" id="1_vehicle"]
+[ext_resource type="Script" path="res://scenes/vehicle/vehicle_visuals.gd" id="2_visuals"]
+
+[node name="Vehicle" type="RigidBody2D"]
+script = ExtResource("1_vehicle")
+
+[node name="Chassis" type="Node2D" parent="."]
+script = ExtResource("2_visuals")
+layer = "chassis"
+
+[node name="Roof" type="Node2D" parent="."]
+script = ExtResource("2_visuals")
+layer = "roof"

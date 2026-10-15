@@ -44,7 +44,7 @@ holds no interaction logic.
   `size`/`openings`; `openings` are `{ side, offset, width }`). `wall.gd` owns the wall-segment
   math (`wall_segments()`) and colliders.
 - `environment_object.gd` (a `RigidBody2D`) builds its collider only when `solid`; non-solid
-  decor is `freeze`d (no shape), gets `z_index = ObjectArtConfig.rug_z_index` (-3) and registers a porous `BloodSurface` rect. Physics components (`Knockback`,
+  decor is `freeze`d (no shape), gets `z_index = ObjectArtConfig.rug_z_index` (`DrawLayers.RUG`, −4) and registers a porous `BloodSurface` rect. Physics components (`Knockback`,
   `Deformable`, `BloodSmear`) are added as child Nodes in `environment_object._ready()`.
 
 The editor shows "no shape" warnings on each `Wall` — expected; the shapes exist at runtime.
@@ -59,7 +59,7 @@ child `Node2D`s) read from their control node and draw it.
 
 `FloorFactory.spawn(rect, definition, name, parent)` builds a `Floor` (`Node2D`, no collider —
 shots, navigation and AI perception all pass over it) holding `size`, `art`, `color`,
-`floor_material`, `art_opts`. It sits at `ObjectArtConfig.floor_z_index` (beneath blood pools,
+`floor_material`, `art_opts`. It sits at `ObjectArtConfig.floor_z_index` (`DrawLayers.FLOOR`, −5: beneath blood pools,
 casings and rugs). `floor_visuals.gd` repeats `ObjectArt.tile(...)` across the rect
 (`texture_repeat` on, nearest filter, scaled by `pixel_size`).
 
@@ -68,7 +68,7 @@ which asks `FloorPainter.groove(local, opts, half)` — analytic, mirroring the 
 slab grid lines, plank row seams, parquet borders + strips; butt joints and cracks aren't modelled) — and
 `FloorPainter.porous(opts)` (carpet), so blood follows the texture and soaks into carpet. A non-solid piece (a rug, mat
 or runner) registers its rect the same way as a porous surface and unregisters on exit, and draws at
-`ObjectArtConfig.rug_z_index` (-3, above floors, below blood) so a pool shows on it. A floor also registers its rect, `floor_material` and
+`ObjectArtConfig.rug_z_index` (`DrawLayers.RUG`, −4, above floors, below blood) so a pool shows on it. A floor also registers its rect, `floor_material` and
 `art_opts.pattern` with the Audio domain's `SoundSurface` (interface 16) so footsteps sound like
 the floor (planks and parquet wood, ceramic tile, slate stone, concrete, carpet; no floor = outdoors).
 
@@ -87,7 +87,8 @@ art instead of a flat shape with its name label (the flat path stays for any def
   (doors/drawers front lip, crown, glass top, chest lid), `shelf` (books / boxes / shoes),
   `counter` (backsplash, basin, overhang), `appliance` (`panel`: burners, fridge, microwave,
   washer, dryer, tv), `bed`, `office_chair`, `toilet`, `bath` (tub / shower), `rug` (medallion,
-  stripes, plush), `plant`, `lamp`, `coat_rack`, `car`, `fixture` (mirror / towel rack), and the
+  stripes, plush), `plant`, `lamp`, `coat_rack`, `car` (the garage's parked car: static furniture, unrelated to the Vehicles domain's drivable car,
+  whose painters are its own), `fixture` (mirror / towel rack), and the
   tiling `floor` (`tile_size(opts)`; planks, parquet, tiles, checker, mosaic, carpet, concrete)
   and `wall` (plaster / brick cap, symmetric across the thickness). Each knob reads
   `opts.get(key, ObjectArtConfig.<painter>_<key>)`, so a catalogue `art_opts` picks the variant
@@ -113,4 +114,4 @@ the wall (`art_color` is also the debris color); `wall_visuals.gd` fetches a
 wall_tile_px)`. To add a painter: write `<name>_painter.gd`, register it in `ObjectArt.PAINTERS`,
 add its knobs to `ObjectArtConfig`, and set `"art": "<name>"` on catalogue definitions.
 
-**Interfaces:** 2 (World Generation → Objects), 3 (hittable), 4 (Objects → Physics), 5 (pushable), 8 (interactable), 12 (Objects → Art), 16 (`SoundSurface`) — signatures in `architecture`.
+**Interfaces:** 2 (World Generation → Objects), 3 (hittable), 4 (Objects → Physics), 5 (pushable), 8 (interactable), 11 (`DrawLayers` for the floor and rug z), 12 (Objects → Art), 16 (`SoundSurface`) — signatures in `architecture`.

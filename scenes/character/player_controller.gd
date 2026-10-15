@@ -41,3 +41,5 @@ func control(character, _delta: float) -> void:
 		character.reload()
 	if Keybinds.is_interact_just_pressed():
 		character.try_interact()
+	if Keybinds.is_use_vehicle_just_pressed():
+		character.try_use_vehicle()

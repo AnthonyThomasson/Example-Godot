@@ -74,7 +74,8 @@ non-flesh surface it strikes (any outcome but fly-over) within `blood_carry_dist
 `max_range` is `Projectile.max_distance`: the round is spent exactly there (the last step is clamped, so it is never seen past it); `strikes_shooter`
 leaves `ignore` in the sweep, so the shooter can be hit while still being the `attacker` of its hits (a grenade's fragments). A bullet is added with a
 readable name (`Projectile`, `Projectile2`, ...), which is how the tests count them. A casing is Despawner-tracked by
-`CasingSpawner`; its toss lasts `eject_time` (~0.3 s), then it rests.
+`CasingSpawner`; its toss lasts `eject_time` (~0.3 s), then it rests, drawn at `DrawLayers.LYING` (−2: on the floor, under the
+living and a vehicle's chassis).
 
 ## Explosion (`explosion.gd`, `class_name Explosion`): a grenade's burst
 
@@ -111,4 +112,4 @@ Tests: `tests/projectile/frag_blast_by_distance`, `frag_blast_blocked_by_wall`, 
 Interface notes: the blast's `&"hit"` events carry `attacker` = the thrower, so the AI's "attacked me" hostility sees a victim's own teammate as an
 attacker when it throws; the Audio domain ignores `&"blast"` hits (no impact profile), the burst has its own sound.
 
-**Interfaces:** 3 (hittable), 4 (`Physics.spawn_explosion`), 5 (pushable), 6 (the guns' `ProjectileSpawner` / `CasingSpawner`, `ThrownGrenade` → `Explosion`), 7 (what `Explosion` calls on a character), 10 (EventBus `&"hit"`, `&"explosion"`), 11 (`PhysicsLayers`) — signatures in `architecture`.
+**Interfaces:** 3 (hittable), 4 (`Physics.spawn_explosion`), 5 (pushable), 6 (the guns' `ProjectileSpawner` / `CasingSpawner`, `ThrownGrenade` → `Explosion`), 7 (what `Explosion` calls on a character), 10 (EventBus `&"hit"`, `&"explosion"`), 11 (`PhysicsLayers`, `DrawLayers.LYING` for a casing) — signatures in `architecture`.

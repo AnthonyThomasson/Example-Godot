@@ -21,7 +21,7 @@
 #                                         `affected` below), in ONE run; main.gd, root scenes,
 #                                         project.godot, worldgen, art and general run everything;
 #                                         testing adds --self-test. An edited tests/<d>/[<topic>/]<name>_test.gd
-#                                         runs just that test; tests/_ai, _audio, _perf their users.
+#                                         runs just that test; tests/_ai, _audio, _perf, _vehicle their users.
 #   tools/run_tests.sh --list [words]     list matching tests (id, flags, tags, name) and exit
 #   tools/run_tests.sh --include-von ai   also run tests that need the Von decision server
 #   tools/run_tests.sh --require-von ai   Von tests FAIL instead of skipping when no server is live
@@ -252,6 +252,8 @@ affected() {
     physics) echo physics objects projectile character items ai perf ;;
     objects) echo objects physics projectile character items interaction navigation ai perf ;;
     character) echo character items interaction projectile physics objects ai perf ;;
+    # The character composes the vehicle's CharacterVehicleUse; the camera (general) and Sound (audio) read the vehicle.
+    vehicle) echo vehicle character items interaction projectile physics objects ai perf audio general ;;
     ui) echo ui ;;
     worldgen|art|general|testing|audio) echo all ;;  # audio: the Sound autoload runs in every test
     *) echo all ;;  # anything unknown is treated as risky
@@ -300,6 +302,7 @@ if [[ $CHANGED -eq 1 ]]; then
       tests/_harness/*) self_test=1 ;;
       tests/_ai/*) exact="$exact ai" ;;
       tests/_audio/*) exact="$exact audio" ;;
+      tests/_vehicle/*) exact="$exact vehicle audio general" ;;   # also feeds audio/vehicle_sounds and the general vehicle tests
       tests/_perf/*) perf=1 ;;
       tests/_*/*) domains="$domains all" ;;    # an unknown helper folder: assume the worst
       tests/*/*.uid) ;;                        # generated next to a script

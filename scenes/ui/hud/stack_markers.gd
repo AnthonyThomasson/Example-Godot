@@ -25,7 +25,7 @@ var _slots: Array = []   ## The slots now drawn: { n, point, mine, held }.
 ## Watch the human's stack (anything with `view()`).
 func watch(stack: Node) -> void:
 	_stack = stack
-	z_index = 1   # Above the floor and the furniture's shadows, under the characters' bodies' labels.
+	z_index = DrawLayers.ABOVE   # Over the floor and the standing world, so a character on a slot never hides its ring.
 
 
 ## The slots drawn right now, as `{ n, point, mine, held }`, empty with no reservation.

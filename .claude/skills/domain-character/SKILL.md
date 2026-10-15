@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, the outfit (hit zones, sides, armour in take_hit, its weight), death, footsteps, walking into furniture and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, the outfit (hit zones, sides, armour in take_hit, its weight), death, footsteps, walking into furniture, riding a vehicle (the forwards to the Vehicles domain's CharacterVehicleUse and the ride pose) and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -30,8 +30,9 @@ character's fresh `facing`, and the character pulls its controller's intent at t
 
 `_apply_damage(amount, direction)` (shared by `take_hit`, which passes the shot's direction, and
 `take_damage`, the punch path) calls `_die(direction)` at zero health. `_die` leaves layer 1 and
-moves to `CharacterConfig.ragdoll_z_index` (beneath the living, above blood pools), ends any
-interaction, builds `ragdoll` from the rig's joints with the body's momentum (walk + knockback,
+moves to `CharacterConfig.ragdoll_z_index` (`DrawLayers.LYING`, −2: beneath the living and a vehicle's chassis and roof, above blood
+pools; `vehicle/fallen_body_under_vehicle`), ends any
+interaction, abandons any vehicle ride (`CharacterVehicleUse.abandon()`: the body falls where it is, the door left as it is), builds `ragdoll` from the rig's joints with the body's momentum (walk + knockback,
 including the killing blow's shove), lets go of the held item (`Item.drop(self, momentum + toss)`;
 a returned node removes the slot, so `current_item()` may be null on a corpse), then emits `died`.
 While dead `_physics_process` only steps the ragdoll (`step(delta, space, global_position)`); the
@@ -169,6 +170,26 @@ out-of-step sines, up to `stun_sway` degrees x the level). `stun_view()` feeds t
 back (`apply_impulse`), a dead one's ragdoll is woken and thrown (`CharacterRagdoll.blast`). The `throw` stance (`CharacterConfig.stances`) is the wind-up's drawn-back arm.
 `set_loadout(..., grenades := {})` takes a slot -> count dict. Tests: `tests/items/grenade_*`, `tests/character/stunned_slow_and_sway_test.gd`.
 
+## Riding a vehicle (interface 19, `docs/vehicles.md`)
+
+The character composes the Vehicles domain's `CharacterVehicleUse` (`scenes/vehicle/character_vehicle_use.gd`, preloaded and
+added in `_ready` beside the interaction) and only forwards: `try_use_vehicle()` (E from `player_controller.gd` on
+`Keybinds.is_use_vehicle_just_pressed()`, the puppet's `use_vehicle()`; refused while dead or in an object interaction, and
+stands a crouched character up through `_stand_if_busy`), `vehicle()` and `is_in_vehicle()`. `_physics_process` calls
+`_vehicle_use.control(delta)` right after the controller, so the ride overrides that frame's intent (it walks the character to the
+door with `move_input` / `aim_point`, and from the driver's seat hands the keys on to the vehicle). While the ride lasts (`is_active()`)
+`is_busy()` is true and `try_interact()` / `interact_with` are refused.
+
+The Vehicles domain poses the body with `set_ride_pose(at, toward, fold, step)`: the first pose sets `_riding`, cancels a reload and
+disables the collision shape (`set_deferred`); each pose sets `global_position`, `facing`, `aim_point`, the posture to `stand` and
+`_posture_height` between standing and the crouch height by `fold` (so `posture_folded()` and the body art read the seated fold), keeps
+`_ride_step` and drops `_rig_cache`. While `_riding`, `_ease_posture` is skipped, `current_item()` returns null (the item put away: no
+firing, nothing drawn in the hands) and `_ride_frame` replaces the rest of the frame: no movement, knockback or push, stamina refilling,
+legs and kick cleared, and `pose.update` with `_ride_step` as the motion (the legs step with the pose through the vehicle's frame, not
+with the vehicle). `end_ride()` clears `_riding`, re-enables the shape, zeroes the step and points the aim along the facing. The collision
+exception with the vehicle is the component's (added at boarding, dropped once the body is clear of it after the ride).
+Tests: `tests/vehicle/` (`domain-vehicle`), `tests/general/use_vehicle_key_test.gd`.
+
 ## Walking into furniture
 
 `_apply_pushes()` shoves each pushable the body slid into with `push_impulse` per *second* of contact
@@ -209,4 +230,4 @@ landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
 `outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
-**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 12 (Character → Art) — signatures in `architecture`.
+**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 11 (`DrawLayers.LYING` for the fallen body), 12 (Character → Art), 19 (Character ↔ Vehicle) — signatures in `architecture`.

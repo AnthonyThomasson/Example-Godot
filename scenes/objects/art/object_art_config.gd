@@ -124,10 +124,10 @@ static var prop_colors: Dictionary = {
 }
 
 # --- Floors + walls ---
-## Floors draw beneath everything else in the house (blood pools, casings, rugs).
-static var floor_z_index: int = -4
-## Rugs and mats lie on the floor but under blood (`BloodConfig.z_index`, -2), so a pool shows on them.
-static var rug_z_index: int = -3
+## Floors draw beneath everything else in the house (blood pools, casings, rugs): `DrawLayers.FLOOR`.
+static var floor_z_index: int = DrawLayers.FLOOR
+## Rugs and mats lie on the floor but under blood (`BloodConfig.z_index`), so a pool shows on them: `DrawLayers.RUG`.
+static var rug_z_index: int = DrawLayers.RUG
 ## Floor pattern sizes (world px): plank width + board length, parquet square, glazed tile
 ## (also the checker cell), mosaic tile, concrete slab.
 static var floor_plank_px: int = 8

@@ -6,8 +6,8 @@ class_name ExplosionFx
 ## debris and the blood), animates in `_process` and frees itself when its life is over, Despawner-tracked. The scorch is a mark
 ## in the world's `ScorchDecals` layer. Looks and timings: `PhysicsConfig.explosion_looks`.
 
-## Draw order of the flash, fireball and smoke: above the living.
-const Z_INDEX := 4
+## Draw order of the flash, fireball and smoke: above the living and a vehicle's roof.
+const Z_INDEX := DrawLayers.EFFECTS
 ## The fireball cools through these as it ages: white-yellow core, orange, deep red.
 const FIRE_CORE := Color(1.0, 0.92, 0.5)
 const FIRE_MID := Color(1.0, 0.55, 0.12)

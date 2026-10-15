@@ -85,6 +85,11 @@ var _deaf_left := 0.0
 var _stun_clock := 0.0
 var _stun_phase := Vector2.ZERO
 
+## A ride in a vehicle (the Vehicles domain moves the character through `set_ride_pose` / `end_ride`): posed by it
+## rather than walking, its collision shape off, its held item put away; the step its legs take through the vehicle.
+var _riding := false
+var _ride_step := Vector2.ZERO
+
 ## Knockback velocity from objects shoved into the character; decays each frame. Added on
 ## top of controller-driven movement.
 var _knockback := Vector2.ZERO
@@ -124,11 +129,15 @@ const CharacterFootsteps = preload("res://scenes/character/character_footsteps.g
 const CharacterLegs = preload("res://scenes/character/body/character_legs.gd")
 const CharacterKick = preload("res://scenes/character/body/character_kick.gd")
 const CharacterPush = preload("res://scenes/character/character_push.gd")
+## Vehicle component (Vehicles domain): boards, rides and leaves vehicles. Composed in code like the interaction; the
+## character forwards `try_use_vehicle()`, `vehicle()`, `is_in_vehicle()` and lets it drive the ride each frame.
+const CharacterVehicleUse = preload("res://scenes/vehicle/character_vehicle_use.gd")
 
 @onready var _shape: CollisionShape2D = $CollisionShape2D
 @onready var _hands := $Hands
 @onready var _controller := _find_controller()
 var _interaction: Node  ## The CharacterInteraction child, built in _ready().
+var _vehicle_use: Node  ## The CharacterVehicleUse child, built in _ready().
 
 
 func _ready() -> void:
@@ -166,6 +175,9 @@ func _ready() -> void:
 	_interaction = CharacterInteraction.new()
 	add_child(_interaction)
 
+	_vehicle_use = CharacterVehicleUse.new()
+	add_child(_vehicle_use)
+
 
 func _physics_process(delta: float) -> void:
 	if is_dead:
@@ -176,7 +188,8 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_posture_cooldown = maxf(_posture_cooldown - delta, 0.0)
-	_ease_posture(delta)
+	if not _riding:  # In a vehicle the ride poses the fold.
+		_ease_posture(delta)
 	_update_stun(delta)
 	# Items keep their own clocks (a gun's time between rounds, a grenade's wind-up); tick them before the controller
 	# pulls the trigger, so a round that is due this frame can leave this frame.
@@ -186,7 +199,14 @@ func _physics_process(delta: float) -> void:
 	# Pull intent from the controller first, so facing/movement use this frame's input.
 	if _controller:
 		_controller.control(self, delta)
+	# A ride in a vehicle overrides the controller's intent: it walks the character to the door, poses it in and out,
+	# and hands its keys on to the vehicle from the driver's seat.
+	_vehicle_use.control(delta)
 	_update_reload(delta)
+
+	if _riding:
+		_ride_frame(delta)
+		return
 
 	# While in an interaction the character is fully frozen: it holds the exact spot the
 	# interaction placed it (possibly overlapping the object, via a collision exception the
@@ -278,8 +298,10 @@ func select_slot(slot: int) -> void:
 
 
 ## Toggle an object interaction: start the best one in reach, or end the active one. Starting one stands
-## the character up (sitting or lying is its own posture).
+## the character up (sitting or lying is its own posture). Ignored while using a vehicle.
 func try_interact() -> void:
+	if _vehicle_use.is_active():
+		return
 	_interaction.try_interact()
 	_stand_if_busy()
 
@@ -293,6 +315,8 @@ func interactions_in_reach() -> Array:
 ## Begin the action `id` on `object` if it is reachable and valid; true on success. Lets a
 ## controller pick both the object and the action, unlike the random `try_interact()`.
 func interact_with(object: Node, id: String) -> bool:
+	if _vehicle_use.is_active():
+		return false
 	var began: bool = _interaction.interact_with(object, id)
 	_stand_if_busy()
 	return began
@@ -303,9 +327,71 @@ func end_interaction() -> void:
 	_interaction.end_interaction()
 
 
-## True while locked in an object interaction (sitting, lying, …).
+## True while locked in an object interaction (sitting, lying, …) or using a vehicle (boarding, riding, getting out).
 func is_busy() -> bool:
-	return _interaction.is_busy()
+	return _interaction.is_busy() or _vehicle_use.is_active()
+
+
+## E: get into the vehicle whose door is nearest (in reach, the vehicle slow enough), or out of the one it sits in.
+## Ignored while in an object interaction. The getting in and out is the Vehicles domain's (CharacterVehicleUse).
+func try_use_vehicle() -> void:
+	if is_dead or _interaction.is_busy():
+		return
+	_vehicle_use.try_use_vehicle()
+	_stand_if_busy()
+
+
+## The vehicle the character is boarding, riding in or getting out of; null on foot.
+func vehicle() -> Node:
+	return _vehicle_use.vehicle()
+
+
+## True only while seated in a vehicle (not on the way in or out).
+func is_in_vehicle() -> bool:
+	return _vehicle_use.is_in_vehicle()
+
+
+## The Vehicles domain poses the riding character for this frame: at `at` (world), facing `toward` (unit), folded
+## `fold` (0 standing .. 1 seated: the crouch fold, so `posture_folded()` reads it), its legs stepping with `step` (px/s,
+## its motion through the vehicle). The first pose of a ride puts the held item away and takes the body off the physics
+## layers (the vehicle carries it).
+func set_ride_pose(at: Vector2, toward: Vector2, fold: float, step := Vector2.ZERO) -> void:
+	if not _riding:
+		_riding = true
+		_cancel_reload()
+		_shape.set_deferred("disabled", true)
+	global_position = at
+	facing = toward.normalized()
+	aim_point = at + facing * 64.0
+	_posture = &"stand"
+	var crouch_height: float = CharacterConfig.postures[&"crouch"]["height"]
+	_posture_height = lerpf(1.0, crouch_height, clampf(fold, 0.0, 1.0))
+	_ride_step = step
+	_rig_cache = null
+
+
+## The ride is over (out of the vehicle, or never posed): the character stands on its own feet where it is, with its
+## body back on the physics layers and its item in hand.
+func end_ride() -> void:
+	if _riding:
+		_riding = false
+		_shape.set_deferred("disabled", false)
+	_ride_step = Vector2.ZERO
+	aim_point = global_position + facing * 64.0
+	_rig_cache = null
+
+
+## A frame of a ride: the vehicle has posed the body; it only breathes, its legs stepping with the pose's step.
+func _ride_frame(delta: float) -> void:
+	velocity = Vector2.ZERO
+	move_input = Vector2.ZERO
+	run_input = false
+	_update_stamina(false, delta)
+	_knockback = Vector2.ZERO
+	_hands.facing = facing
+	_legs.clear()
+	_kick.clear()
+	pose.update(delta, facing, _ride_step, speed, _stances(), _hands.punch_amounts())
 
 
 ## The active interaction's HUD label, or "" when idle.
@@ -651,8 +737,10 @@ func _post_melee_hit(hand: int, body: Node, damage: float) -> void:
 
 # --- Item-facing API (what an Item may call on its user) --------------------------------
 
-## The held item.
+## The held item (none while riding in a vehicle: it is put away).
 func current_item() -> Item:
+	if _riding:
+		return null
 	return _items.get(_current_slot)
 
 
@@ -995,6 +1083,7 @@ func _die(direction: Vector2) -> void:
 	collision_layer = 0
 	z_index = CharacterConfig.ragdoll_z_index
 	end_interaction()
+	_vehicle_use.abandon()  # Killed boarding or getting out: the ride ends where the body is.
 	var momentum := move_input * _move_speed() * _push_slow + _knockback
 	# The body falls from the standing skeleton, whatever it was doing.
 	_posture = &"stand"

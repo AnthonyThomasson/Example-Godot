@@ -61,7 +61,8 @@ The in-game observers: each reads only the Character public API / signals (incl.
 - `stack_markers.gd` — the **stack markers** (`StackMarkers` Node2D, world space, built by `main.gd` under `World` for a human match). Draws the
   slots of the doorway the human's `PlayerStack` has reserved a place at (`docs/tactical-entry.md` E16): a numbered ring on the floor for each
   slot, the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
-  `watch(stack)` then it polls the stack's `view()` and redraws on change; `drawn()` is what is shown (what the test reads,
+  `watch(stack)` then it polls the stack's `view()` and redraws on change; it draws at `DrawLayers.ABOVE` (interface 11), over the standing world, so a
+  character on a slot never hides its ring; `drawn()` is what is shown (what the test reads,
   `tests/ui/stack_markers_draw_test.gd`).
 
 - `stun_screen.gd` — the **stun screen** (`StunScreen` CanvasLayer, layer 90, built by `main.gd` under `World` for a human match; G14 of
@@ -72,4 +73,4 @@ The in-game observers: each reads only the Character public API / signals (incl.
   (≥ 0.2) keeps the old frame. A deaf-only stun, another character's flash and a dead/freed character draw nothing. `drawn()` is `{ white, afterimage,
   remaining }` (what the test reads, `tests/ui/stun_screen_whiteout_test.gd`). A decoupled observer; the white is drawn on an inner full-rect `Control` (mouse-ignoring).
 
-**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus `&"hit"`, `&"stun"`), 17 (stack markers), 18 (stun screen) — signatures in `architecture`.
+**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus `&"hit"`, `&"stun"`), 11 (`DrawLayers.ABOVE` for the stack markers), 17 (stack markers), 18 (stun screen) — signatures in `architecture`.

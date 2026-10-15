@@ -11,6 +11,8 @@ static var seed_override := 0
 var world: Dictionary = {}
 ## Objects to place: `{ id, definition, position, opts }` (definition already resolved to a dict).
 var objects: Array = []
+## Vehicles to place: `{ id, kind, position, rotation, props }` (see `vehicle`).
+var vehicles: Array = []
 ## Characters to place: `{ id, kind, position, props, children }` — `props` set on the character,
 ## `children` maps a child node path to props set on that child, all before it enters the tree.
 var actors: Array = []
@@ -67,6 +69,15 @@ func object(id: StringName, definition: Variant, position: Vector2, opts: Dictio
 	if def.is_empty():
 		push_error("TestSetup: unknown object definition '%s'" % [definition])
 	objects.append({ "id": id, "definition": def, "position": position, "opts": opts })
+	return self
+
+
+## Place a drivable vehicle `id` of `kind` (`car`, `van`: the scene `res://scenes/vehicle/<kind>.tscn`) at `position`,
+## turned by `rotation` (rad; 0 = its front toward +x, its left side toward -y). `props` are set on it before it enters
+## the tree. It goes under the world root after the nav bake, so it is not carved (the AI ignores vehicles). A kind
+## with no scene places nothing: `t.vehicle(id)` is then null.
+func vehicle(id: StringName, kind: StringName, position: Vector2, rotation := 0.0, props: Dictionary = {}) -> TestSetup:
+	vehicles.append({ "id": id, "kind": kind, "position": position, "rotation": rotation, "props": props })
 	return self
 
 

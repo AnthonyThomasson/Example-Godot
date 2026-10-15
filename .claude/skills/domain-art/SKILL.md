@@ -1,6 +1,6 @@
 ---
 name: domain-art
-description: Deep implementation detail for the Art domain (scenes/art/) — the procedural top-down pixel-art engine every painter draws through: PixelCanvas (the drawing surface, shapes, shading, material finishes), PixelArt (the cached renderer, cardinal vs. freely turning art, lighting steps) and ArtConfig (shared resolution, light, shadows, tones, surface textures). Use when editing scenes/art/, writing or debugging any painter (furniture, walls, floors, characters, held items), or tuning the shared pixel-art look. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Art domain (scenes/art/) — the procedural top-down pixel-art engine every painter draws through: PixelCanvas (the drawing surface, shapes, shading, material finishes), PixelArt (the cached renderer, cardinal vs. freely turning art, lighting steps) and ArtConfig (shared resolution, light, shadows, tones, surface textures). Use when editing scenes/art/, writing or debugging any painter (furniture, walls, floors, characters, held items, vehicles), or tuning the shared pixel-art look. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Art domain
@@ -17,7 +17,8 @@ the world light already turned into that frame, so its shading lands correctly a
 turned. Painters live in their own domain: Objects (`objects/art/*_painter.gd` + the `ObjectArt`
 registry), Character (`character/body/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`), Items
 (`items/art/pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd` and the three `*_flat_painter.gd` for a gun lying
-dropped). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
+dropped), Vehicles (`vehicle/art/car_painter.gd`, `van_painter.gd`, `door_painter.gd`, `wheel_painter.gd`, `lamp_painter.gd`, through
+the shared `vehicle_art.gd`; see `domain-vehicle`). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
 
 ## PixelArt (`pixel_art.gd`) — the renderer
 
@@ -28,7 +29,7 @@ dropped). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
   lit as if turned by `angle`; the caller draws it rotated (`draw_set_transform`, or
   `Deformation.draw_shape(..., texture_angle)`). Callers pass `snap_angle(angle)` (one of
   `ArtConfig.turn_steps` lighting steps) and rotate to the exact angle when drawing — smooth
-  turning, few cached textures, world-consistent light. Characters, hands, the pistol.
+  turning, few cached textures, world-consistent light. Characters, hands, the guns, a vehicle's body, doors, wheels and lamps.
 - Static cache keyed by painter path + inputs (+ orientation); survives scene reloads. Each
   piece's random detail is seeded by its inputs *without* orientation, so it doesn't change as the
   piece turns.
@@ -44,6 +45,12 @@ through snapshots).
 - **Shapes:** `rounded(r, radius)`, `ellipse(r)`, `disc(c, radius)` are `ConvexShape`s (one span
   per row/column: native row fills, O(1) depth-from-edge + normal, edge band enumerated
   directly); `bowed(r, radius, bow)` is a mask `Shape` (run-length sweeps).
+- **Cost:** a mask `Shape` tests every pixel of its bounds when built and keeps a per-pixel mask, depth and normal; a
+  `ConvexShape` keeps one span per row and per column, so its fill, bevel and outline cost its edge. A shape that is convex along
+  both axes but not a rounded rect or ellipse can be built from outside with `PixelCanvas.ConvexShape.new(rect, x0, x1, y0, y1)`
+  (per row: first inside x and one past the last; per column the same in y): the Vehicles domain's `vehicle_art.convex` does, once
+  per geometry, for its windscreens and side windows. `cast_shadows()` walks the whole canvas, so a large canvas painted for every
+  lighting step (a vehicle body) skips it and shades with bevels.
 - **Drawing:** `fill(shape, color, height)`, `clear`, `paint_over(rect, color)`, `line`, `px`.
 - **Shading:** `bevel(shape, from_k, to_k, lit, unlit)` (light-facing edges lit, far edges
   shaded; swap for a recess), `bevel_relative` / `outline_relative` (shade what's drawn — shapes
@@ -60,4 +67,4 @@ Shared tuning: `pixel_size`, `light_from`, `turn_steps`, drop shadow (`drop_shad
 the tone ramp, and the surface-finish densities. Domain-specific proportions and colors stay in
 each domain's config (`ObjectArtConfig`, `CharacterConfig.art_*`).
 
-**Interfaces:** 12 (Objects / Character / Items → Art) — signatures in `architecture`.
+**Interfaces:** 12 (Objects / Character / Items / Vehicles → Art) — signatures in `architecture`.

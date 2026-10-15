@@ -307,8 +307,8 @@ static var ragdoll_blast_lift: float = 0.35
 static var ragdoll_drop_toss: float = 70.0
 ## A fallen part's floor shadow shift per px of height (matches the standing drop shadow).
 static var body_shadow_per_height: float = 0.03
-## Draw layer of a dead body: beneath the living, above blood pools.
-static var ragdoll_z_index: int = -1
+## Draw layer of a dead body: `DrawLayers.LYING`, beneath the living and a vehicle's chassis, above blood pools.
+static var ragdoll_z_index: int = DrawLayers.LYING
 
 # --- Pose (the living motion of head, shoulders, hands and weapon; see character_pose.gd) ---
 # Each part chases `facing` on a damped spring: `freq` is how fast (rad/s), `damping` how much it

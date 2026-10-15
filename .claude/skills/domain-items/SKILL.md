@@ -154,7 +154,7 @@ that spot is inside a wall. The dropped item falls from about hand height on a p
 bounces, skids to a stop with a fading spin and glances off walls and solid furniture (circle
 `cast_motion` on layer 1); it picks which side lands up once (`flip`) and draws through
 `item.draw_dropped(canvas, at, angle, modulate, opts)` over
-a shadow that closes in as it lands, at `z_index` −1, and stops processing once at rest. Tuning is
+a shadow that closes in as it lands, at `DrawLayers.LYING` (−2: over the blood, under the living and a vehicle's chassis), and stops processing once at rest. Tuning is
 its exports. Visual only: nothing picks it up and the Despawner never frees it. A gun's
 `draw_dropped` paints its flat painter (`items/art/pistol_flat_painter.gd`, `smg_flat_painter.gd`, `rifle_flat_painter.gd`): the gun's
 side profile lying on the floor — receiver with sights and muzzle, grip (and, on the long guns, magazine and stock) raked off one side
@@ -178,4 +178,4 @@ Art: `art/stun_grenade_painter.gd`, `frag_grenade_painter.gd` (option `spoon`: t
 Guns are the one place Items reach into the Projectile System
 (`ProjectileSpawner` / `CasingSpawner`). No other item crosses that boundary.
 
-**Interfaces:** 6 (Items ↔ Character, incl. `Outfit` / `OutfitConfig`), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 12 (Items → Art) — signatures in `architecture`.
+**Interfaces:** 6 (Items ↔ Character, incl. `Outfit` / `OutfitConfig`), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 11 (`DrawLayers`: a dropped item and a grenade at rest `LYING`, a grenade in flight `ABOVE`), 12 (Items → Art) — signatures in `architecture`.

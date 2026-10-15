@@ -1,6 +1,6 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, and shared physics-layer ids (PhysicsLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, or a cross-domain physics-layer constant. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers) and the draw-order ladder (DrawLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant or a draw-order rung. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
@@ -13,14 +13,25 @@ HUDs and menus are the **UI domain** (`scenes/ui/`) — see the `domain-ui` skil
 `class_name` static holders) names physics-layer bits so they aren't redefined as magic numbers
 per caller. `SOLID := 1` is the layer walls, solid furniture and bodies sit on — read by Interaction's reach query
 (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`), the character's hand queries and leg sweeps (`character/body/`), a dropped
-item's glance (`items/dropped_item.gd`), the bullet (`projectile/projectile.gd`) and `PhysicsConfig.wall_mask`.
+item's glance (`items/dropped_item.gd`), the bullet (`projectile/projectile.gd`), `PhysicsConfig.wall_mask` and a vehicle's body, door and
+clearing queries (`scenes/vehicle/`).
+
+`draw_layers.gd` (`class_name DrawLayers`, the same kind of holder) is the world's draw-order ladder (interface 11): `FLOOR` −5,
+`RUG` −4, `BLOOD` −3 (blood and scorch decals), `LYING` −2 (a dead body, casings, a dropped item, a grenade at rest),
+`UNDER_VEHICLE` −1 (a vehicle's chassis), `STANDING` 0 (the default: the living, furniture, walls), `ABOVE` 1 (a vehicle's roof, a
+grenade in flight, the UI's stack markers), `EFFECTS` 4 (an explosion's flash and smoke). Every domain's z knob starts from its rung (`ObjectArtConfig`,
+`BloodConfig`, `CharacterConfig`, the casing, the dropped item and grenade, the vehicle's layers, `ExplosionFx`, the UI's `StackMarkers`), so a new layer is a
+rung here, not a number in a domain.
 
 ## Input architecture
 
 All input flows through the `Keybinds` autoload; gameplay never hard-codes action strings or
 `KEY_*`. To add/change an input: add an action constant, add its default to `DEFAULTS`, and expose
 a typed helper. `player_controller.gd` (Character domain) is the one gameplay consumer of
-Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle, in the "Movement" group after Run — and the action keys, incl. `RELOAD`, default R, and `KICK`, default V, in the "Combat" group next to Punch and Fire). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
+Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle, in the "Movement" group after Run — and the action keys, incl. `RELOAD`, default R, and `KICK`, default V, in the "Combat" group next to Punch and Fire, and `USE_VEHICLE`, default E, label
+"Get in / out of vehicle", in the "Interaction" group after Interact: `is_use_vehicle_just_pressed()` → `character.try_use_vehicle()`;
+while the player drives, its movement keys and `RUN` are the vehicle's throttle, steer and handbrake, read by the Vehicles domain off the
+character's `move_input` / `run_input`, so driving adds no action). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
 inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
 `command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
 outside. `Keybinds._ready` registers every action in the InputMap, so there is no `project.godot [input]` section: this file
@@ -102,7 +113,8 @@ and consumed by the AI for combat awareness, hostility and gunfire heard, and by
 `&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
 Items and Character and consumed only by Audio; the grenades' `&"throw"`, `&"grenade"` (a bounce or rest), `&"explosion"` (consumed by Audio and the camera shake, and
-by the AI) and `&"stun"` (Audio's tinnitus, the stun screen, the AI); `&"sound"`, which Audio posts for every sound it
+by the AI) and `&"stun"` (Audio's tinnitus, the stun screen, the AI); the vehicles' `&"vehicle"` (ignition, doors, crashes, a character struck), `&"engine"` and `&"skid"` (consumed by Audio);
+`&"sound"`, which Audio posts for every sound it
 makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
 consumed by allied AIs.
@@ -130,6 +142,11 @@ consumed by allied AIs.
     cleared on `NOTIFICATION_WM_MOUSE_EXIT` / focus-out), so a cursor that left at an edge or has
     never moved can't drag the camera. `pan_enabled` off removes the pan (wheel still works); the
     test runner turns it off for a world with a human-driven player, where WASD walks.
+- **Zoom out while driving** (both modes): `_drive_zoom_out(who)` reads `who.vehicle().view_zoom_out()` duck-typed (`has_method` on the
+  target and on what `vehicle()` returns; 0 on foot, clamped to 0..0.9), never `VehicleConfig`. Following, `_ease_zoom(1 − that)` scales the
+  automatic zoom down, so the view widens with the vehicle's speed (`VehicleConfig.drive_zoom_out`, 0.35, at its top speed) and eases back
+  in as it slows, at the follow easing; framing, the largest among the live framed targets is used. The wheel's `_zoom_bias` multiplies on
+  top. Test: `tests/general/camera_zooms_out_driving_test.gd`.
 - **Explosion shake** (`&"explosion"` on the EventBus, both modes): a burst adds trauma (0..1) = `shake_frag` (1.0) / `shake_stun` (0.5) times
   `near²`, `near` = 1 − distance / the kind's range (`shake_frag_range` 1500, `shake_stun_range` 900; beyond it nothing), capped at 1, and the view
   is thrown about through `Camera2D.offset` by `shake_max_offset` (28 px) × trauma² / zoom (two out-of-step wobbles per axis at `shake_speed`),
@@ -152,4 +169,4 @@ human `Player` and `DebugUI`, points the camera at both NPCs in framing mode, an
 for watching and regression-testing both AI agent-types (defender and invader). Composition-root
 wiring lives in `main.gd`; the General observers only read published contracts.
 
-**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`), 14 (`Settings`, the dev command server), 15 (`GameLog`) — signatures in `architecture`.
+**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`, `DrawLayers`), 14 (`Settings`, the dev command server), 15 (`GameLog`), 19 (the camera's `vehicle().view_zoom_out()`, `USE_VEHICLE`) — signatures in `architecture`.

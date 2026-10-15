@@ -23,6 +23,8 @@ const FIRE := "fire"
 const INTERACT := "interact"
 ## Reload the held gun from a carried magazine.
 const RELOAD := "reload"
+## Get into the vehicle whose door is nearest, or out of the one the player sits in.
+const USE_VEHICLE := "use_vehicle"
 ## Return to the pre-game setup window to start a fresh match (handled by main.gd, works in both
 ## player and spectator mode).
 const MENU := "menu"
@@ -61,6 +63,7 @@ const DEFAULTS := {
 	KICK: KEY_V,
 	INTERACT: KEY_SPACE,
 	RELOAD: KEY_R,
+	USE_VEHICLE: KEY_E,
 	MENU: KEY_ESCAPE,
 	PAUSE: KEY_SPACE,
 	CAMERA_LEFT: KEY_A,
@@ -100,6 +103,7 @@ const LABELS := {
 	FIRE: "Fire",
 	RELOAD: "Reload",
 	INTERACT: "Interact",
+	USE_VEHICLE: "Get in / out of vehicle",
 	ITEM_1: "Item 1",
 	ITEM_2: "Item 2",
 	ITEM_3: "Item 3",
@@ -132,6 +136,7 @@ const GROUPS := {
 	FIRE: "Combat",
 	RELOAD: "Combat",
 	INTERACT: "Interaction",
+	USE_VEHICLE: "Interaction",
 	ITEM_1: "Items",
 	ITEM_2: "Items",
 	ITEM_3: "Items",
@@ -379,6 +384,11 @@ func is_fire_pressed() -> bool:
 ## action path as the others.
 func is_interact_just_pressed() -> bool:
 	return Input.is_action_just_pressed(INTERACT)
+
+
+## True on the frame the use-vehicle key (E) is pressed: get in, or out. Rebindable like the others.
+func is_use_vehicle_just_pressed() -> bool:
+	return Input.is_action_just_pressed(USE_VEHICLE)
 
 
 ## True on the frame the reload key (R) is pressed. Rebindable like the others.

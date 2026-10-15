@@ -133,8 +133,9 @@ static var thick_blood: float = 0.8
 static var print_max: int = 1000
 ## Seconds a print or smear takes to dry from `color` to `dried_color`.
 static var print_dry_time: float = 90.0
-## Draw order of prints and smears; blood is drawn at `z_index`, so this puts them just above it.
-static var print_z_index: int = -2
+## Draw order of prints and smears (and the scorch decals): blood's rung, `DrawLayers.BLOOD`; their decal layers are
+## added after the first splat, so they draw over it.
+static var print_z_index: int = DrawLayers.BLOOD
 ## Footprints: load a foot loses per print (so ~1/print_decay prints follow a soak), the load below
 ## which a foot prints nothing, and the print's opacity at load 1 and at the threshold.
 static var print_decay: float = 0.09
@@ -191,5 +192,5 @@ static var pool_trail_length: float = 50.0
 static var color: Color = Color(0.42, 0.02, 0.03, 0.85)
 ## What blood dries to (see `splat_dry_time`).
 static var dried_color: Color = Color(0.24, 0.04, 0.03, 0.85)
-## Draw order: negative so blood sits under the player and furniture (like spent casings).
-static var z_index: int = -2
+## Draw order: `DrawLayers.BLOOD`, on the floor and rugs, under what lies there (a body, casings) and the standing world.
+static var z_index: int = DrawLayers.BLOOD

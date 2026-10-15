@@ -1,7 +1,8 @@
 extends Node2D
 
 ## Draw layer for a bleed-out pool: its flow's cells drawn through a threshold shader (see `_draw_flow`).
-## Sits at a negative z_index so the pool draws beneath the player and furniture (like spent casings).
+## Draws at its pool's z_index (`BloodConfig.z_index`, set on the pool by the spawner): beneath what lies on the floor,
+## the player and furniture.
 ## Reads the flow from its parent control node (blood_pool.gd).
 
 ## The threshold runs per screen pixel on the bilinearly magnified field (edge width ~1 px via
@@ -71,10 +72,6 @@ const PAD := 3
 var _flow_texture: ImageTexture
 ## The threshold shader's material, created on the first flow draw.
 var _flow_material: ShaderMaterial
-
-
-func _ready() -> void:
-	z_index = BloodConfig.z_index
 
 
 func _draw() -> void:

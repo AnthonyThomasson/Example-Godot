@@ -232,7 +232,7 @@ func _start(entry: Dictionary) -> void:
 	_building = false
 	if not is_instance_valid(_world):
 		return
-	_ctx.bind(_world, _world.actors, _world.objects, _world.rooms)
+	_ctx.bind(_world, _world.actors, _world.objects, _world.rooms, _world.vehicles)
 	for id in _world.actors:
 		_observe_actor(id, _world.actors[id])
 	_frame_camera(setup)

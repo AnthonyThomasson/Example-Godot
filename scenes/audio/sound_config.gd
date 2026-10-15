@@ -5,8 +5,9 @@ class_name SoundConfig
 ##
 ## Every sound is synthesized in code (SoundSynth) from a recipe SoundBank builds for a *profile*, then
 ## played by the `Sound` service through a small pool of positional voices. A sound belongs to one of
-## eight categories — `shot`, `impact`, `footstep`, `reload`, and the grenades' `throw`, `grenade` (a bounce), `explosion`
-## and `tinnitus` — and the per-category tables below are keyed by those names.
+## eleven categories — `shot`, `impact`, `footstep`, `reload`, the grenades' `throw`, `grenade` (a bounce), `explosion`
+## and `tinnitus`, and the vehicles' `engine` (a loop per running vehicle), `vehicle` (ignition, doors, crashes) and `skid`
+## (a loop per sliding vehicle) — and the per-category tables below are keyed by those names.
 
 ## Master switch: off = the `Sound` service synthesizes, plays and posts nothing.
 static var enabled: bool = true
@@ -16,7 +17,7 @@ static var enabled: bool = true
 static var master_db: float = 0.0
 ## Trim (dB) per category, on top of each profile's own level.
 static var category_db: Dictionary = { &"shot": 0.0, &"impact": -2.0, &"footstep": -8.0, &"reload": -6.0,
-	&"throw": -6.0, &"grenade": -4.0, &"explosion": 3.0, &"tinnitus": -4.0 }
+	&"throw": -6.0, &"grenade": -4.0, &"explosion": 3.0, &"tinnitus": -4.0, &"engine": -9.0, &"vehicle": -2.0, &"skid": -7.0 }
 ## Random pitch swing either side of 1 (0.06 = ±6%) on every play, so a burst of identical events does not sound
 ## like one sample machine-gunned.
 static var pitch_jitter: float = 0.06
@@ -29,12 +30,13 @@ static var category_jitter_scale: Dictionary = { &"footstep": 1.7 }
 ## --- Voices ---
 ## Most voices a category may have sounding at once; past it the oldest of that category is cut off.
 static var category_voices: Dictionary = { &"shot": 6, &"impact": 8, &"footstep": 8, &"reload": 3,
-	&"throw": 3, &"grenade": 4, &"explosion": 3, &"tinnitus": 1 }
+	&"throw": 3, &"grenade": 4, &"explosion": 3, &"tinnitus": 1, &"engine": 4, &"vehicle": 6, &"skid": 3 }
 ## Distance (px, at camera zoom 1) beyond which a category cannot be heard. The AI's own hearing radius
 ## (`hearing_radius`, 900) is the reference for how far a human-scale sound carries.
 ## A burst carries farther than a shot; the tinnitus is in the listener's own head, so it is never out of range.
 static var category_range: Dictionary = { &"shot": 2400.0, &"impact": 1400.0, &"footstep": 900.0, &"reload": 800.0,
-	&"throw": 900.0, &"grenade": 1000.0, &"explosion": 3200.0, &"tinnitus": 1.0e6 }
+	&"throw": 900.0, &"grenade": 1000.0, &"explosion": 3200.0, &"tinnitus": 1.0e6, &"engine": 1400.0, &"vehicle": 1800.0,
+	&"skid": 1600.0 }
 ## True = the range grows as the camera zooms out (and shrinks as it zooms in), because Godot's 2D
 ## attenuation is measured in world px and a zoomed-out spectator would otherwise hear nothing.
 static var range_follows_zoom: bool = true
@@ -53,6 +55,27 @@ static var muffle_release: float = 0.9
 static var tinnitus_tail: float = 1.5
 static var tinnitus_full_s: float = 3.0
 
+## --- Vehicles ---
+## The engine loop's pitch with the engine idling at no revs (x) and at the redline (y); the revs (`engine_state().rpm`,
+## 0..1) move it between the two, so it climbs through each gear and drops at the change.
+static var engine_pitch: Vector2 = Vector2(0.85, 2.9)
+## How much quieter (dB) the engine is off the throttle than on it, and how much louder at the redline than at no revs.
+static var engine_load_db: float = 4.0
+static var engine_rev_db: float = 3.0
+## The skid loop is at full level from this `slip()` up (quieter below it), and pitched up by `skid_pitch` at full slip.
+static var skid_full_slip: float = 0.4
+static var skid_pitch: float = 0.18
+## The skid loop is at full level from this vehicle speed (px/s) up, quieter below it (down to a quarter); a vehicle with no
+## `speed()` is taken to be at it.
+static var skid_full_speed: float = 200.0
+## How fast (per second) a loop's pitch and level follow what they track, so a gear change or a sudden slide glides.
+static var loop_ease: float = 14.0
+## A crash at this closing speed (px/s) or faster is `medium`, at the second `heavy` (slower: `light`); within its band
+## a crash is louder the faster, by the speed over `crash_speed_ref` (clamped).
+static var crash_medium_speed: float = 150.0
+static var crash_heavy_speed: float = 280.0
+static var crash_speed_ref: float = 180.0
+
 ## --- Synthesis ---
 ## Sample rate (Hz) sounds are rendered at.
 static var sample_rate: int = 22050
@@ -62,7 +85,7 @@ static var peak: float = 0.9
 static var variants: int = 2
 ## Renders per profile for the categories that want more than `variants`: a step is heard far more often than a
 ## shot, so it has more different takes to draw from.
-static var category_variants: Dictionary = { &"footstep": 6, &"grenade": 3, &"tinnitus": 1 }
+static var category_variants: Dictionary = { &"footstep": 6, &"grenade": 3, &"tinnitus": 1, &"engine": 1, &"skid": 1 }
 ## A projectile's penetration power below this is "light" (SMG); the bands impacts are voiced in.
 static var light_power_max: float = 0.9
 ## A projectile's penetration power from this up is "heavy" (rifle); between the two it is "medium" (pistol).

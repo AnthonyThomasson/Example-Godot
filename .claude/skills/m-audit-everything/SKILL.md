@@ -211,7 +211,7 @@ Same bar as comments: concise, present-tense, current state. Read the Phase 1 re
    everywhere it is stated (`AGENTS.md` ×2; the skill's `description`, intro, table heading):
 
    ```bash
-   ls -d scenes/*/ | wc -l    # the real number (fourteen)
+   ls -d scenes/*/ | wc -l    # the real number (fifteen)
    grep -rn "domains" AGENTS.md .claude/skills/architecture/SKILL.md | grep -iE "ten|eleven|twelve|nine|thirteen|fourteen|fifteen|[0-9]+ domains"
    ```
 

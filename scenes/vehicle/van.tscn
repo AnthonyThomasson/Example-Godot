@@ -1,0 +1,7 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" path="res://scenes/vehicle/vehicle.tscn" id="1_vehicle"]
+
+[node name="Van" instance=ExtResource("1_vehicle")]
+kind = &"van"
+color = Color(0.82, 0.82, 0.78, 1)
