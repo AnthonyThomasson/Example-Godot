@@ -449,7 +449,7 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 	var options: Array = []
 	for p in picks.slice(0, _v.max_options_per_level):
 		var e: Dictionary = p["e"]
-		var room := _room(rooms, e["into"])
+		var room := SnapshotVocab.room_by_key(rooms, e["into"])
 		var place := "the doorway into the %s" % _v.room_name(room["type"]) if p["status"] == "unsearched" \
 			else "the doorway to the %s" % _v.compass((e["pos"] as Vector2) - self_pos)
 		options.append({ "id": e["id"], "label": place,
@@ -477,11 +477,6 @@ static func entry_rooms(entries: Dictionary) -> Dictionary:
 	for opt in entries.get("options", []):
 		out[str(opt["params"]["into"])] = true
 	return out
-
-
-## The room with key `key` in `rooms`, or {}.
-func _room(rooms: Array, key: String) -> Dictionary:
-	return SnapshotVocab.room_by_key(rooms, key)
 
 
 ## Unexplored parts of the house (rooms not yet seen), named by direction only — the NPC doesn't know
