@@ -328,9 +328,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
       attacker` (the thrower, or null)`, radius` (the blast radius of a frag, the flash radius of a stun)` }`), before the burst's hits and stuns, for
       Audio (`explosion/<kind>`), the camera (General: `Camera2D.offset` shake by distance and kind) and the AI (`docs/grenades.md`). The grenade's other topics: `&"throw"` (Items, the `GrenadeItem` as it leaves the hand: `{ position, kind, attacker }`), `&"grenade"` (Items, `ThrownGrenade`:
       `{ position, kind, stage }` with stage `bounce` / `rest`) and `&"stun"` (Character, `take_stun`: `{ character, position, blind, deaf, from }`). Audio voices the
-      `throw` (`throw/<kind>`), a `grenade` `bounce` (`grenade/<kind>/<floor>`, the floor from `SoundSurface.at`; a `rest` is silent) and the `explosion`; the AI hears where a
-      grenade comes down from its `bounce` / `rest`; of the `stun` it
-      voices only a deafening of its `focus` (interface 18), and the UI's `StunScreen` reads the human's own `stun` event to freeze the frame of the flash.
+      `throw` (`throw/<kind>`), a `grenade` `bounce` (`grenade/<kind>/<floor>`, the floor from `SoundSurface.at`; a `rest` is silent) and the `explosion`, and of the `stun`
+      only a deafening of its `focus` (interface 18); the AI hears where a grenade comes down from its `bounce` / `rest`, and the UI's `StunScreen` reads the human's own `stun` event to freeze the frame of the flash.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
       muzzle)`, gun, attacker, power }`).
     - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
