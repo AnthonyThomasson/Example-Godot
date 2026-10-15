@@ -119,7 +119,7 @@ delivers to any listener, which filters by `topic`. Emitters and listeners never
 other. Topics in use: `&"hit"`, posted by the Projectile System for each damaging hit and
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`, plus
 `outcome` / `material` and, for bullets, `speed_factor`, `power`)
-and consumed by the AI for combat awareness, hostility and gunfire heard, by Audio for impacts and by the match HUD's combat feed;
+and consumed by the AI for combat awareness, hostility and gunfire heard, by Audio for impacts;
 `&"shot"` (a round left a gun; also the Lighting domain's muzzle flash), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
 Items and Character and consumed by Audio; the grenades' `&"throw"` (consumed by Audio), `&"grenade"` (a bounce or rest, consumed by Audio and the AI), `&"explosion"` (consumed by Audio, the camera shake, the
@@ -169,7 +169,7 @@ consumed by allied AIs.
   splatters and pools, a grenade's `GrenadeSpoon`); domains register spawns with it. The Physics domain's `DebrisLayer` and `ScorchDecals` read
   `max_scene_objects` as the cap on landed chips and scorch marks too.
 
-HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) belong to
+HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`) belong to
 `scenes/ui/` — see the `domain-ui` skill for their implementation detail.
 
 ## Spectator match mode

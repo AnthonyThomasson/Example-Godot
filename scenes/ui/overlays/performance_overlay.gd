@@ -2,8 +2,8 @@ extends CanvasLayer
 
 ## UI domain, performance overlay: a compact stats panel (FPS, frame / physics time, draw calls, nodes,
 ## memory) with a frame-time graph, toggled by the "Performance" button of the overlay toggle bar. It docks
-## directly left of that bar (`OverlayToggles.RESERVED_WIDTH`), below the match HUD's timer and to the right
-## of its goal readout, so it overlaps none of the other HUDs until moved: left-drag the panel to put it
+## directly left of that bar (`OverlayToggles.RESERVED_WIDTH`), below the match HUD's timer, so it overlaps
+## none of the other HUDs until moved: left-drag the panel to put it
 ## elsewhere. Reads only Godot's `Performance` monitors and the frame delta — it knows nothing of the
 ## domains. Runs PROCESS_MODE_ALWAYS so it keeps updating (and stays draggable) while the match is paused.
 

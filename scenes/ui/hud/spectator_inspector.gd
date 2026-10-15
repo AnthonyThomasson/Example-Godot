@@ -19,11 +19,10 @@ extends CanvasLayer
 const PICK_RADIUS := 48.0
 ## World-space pick radius (px) within which a click on the selected NPC's zone opens its details.
 const ZONE_PICK_RADIUS := 20.0
-## The match HUD goal readout's left edge, width and bottom (it occupies x 24, y 76..356) — the detail
-## panel mirrors these so a clicked point's details stack directly under the goal text.
-const GOAL_LEFT := 24.0
-const GOAL_WIDTH := 560.0
-const GOAL_BOTTOM := 356.0
+## The clicked point's detail panel: its left edge, width and top (below the match HUD's timer).
+const DETAIL_LEFT := 24.0
+const DETAIL_WIDTH := 560.0
+const DETAIL_TOP := 76.0
 ## The outfit panel's gap (px) from the screen width it keeps clear on the right (`setup`'s `right_clear`).
 const OUTFIT_GAP := 10.0
 
@@ -43,7 +42,7 @@ var _contact_markers: Node2D ## World-space overlay that draws the selected NPC'
 
 ## Keep running while paused and build the hint + detail UI. `flags` is the overlay toggle bar's per-NPC toggles (Main's
 ## `_overlay_flags` without the global ones; property name -> bool); a selected NPC shows exactly those. `right_clear` is the screen width (px) from
-## the right edge the outfit panel keeps clear: Main hands it the overlay toggle bar's column, which the seed readout sits under.
+## the right edge the outfit panel keeps clear: Main hands it the overlay toggle bar's column, kept clear.
 ## Called by Main.
 func setup(combatants: Array, flags: Dictionary, right_clear: float) -> void:
 	_combatants = combatants
@@ -53,12 +52,12 @@ func setup(combatants: Array, flags: Dictionary, right_clear: float) -> void:
 	_contact_markers = ContactMarkers.new()
 	_contact_markers.name = "ContactMarkers"
 	get_parent().add_child(_contact_markers)
-	# The clicked point's details sit top-left, directly beneath the match HUD's goal readout.
+	# The clicked point's details sit top-left, below the match HUD's timer.
 	_detail = _make_label(HORIZONTAL_ALIGNMENT_LEFT, 22)
-	_detail.offset_left = GOAL_LEFT
-	_detail.offset_right = GOAL_LEFT + GOAL_WIDTH
-	_detail.offset_top = GOAL_BOTTOM + 8.0
-	_detail.offset_bottom = GOAL_BOTTOM + 8.0 + 240.0
+	_detail.offset_left = DETAIL_LEFT
+	_detail.offset_right = DETAIL_LEFT + DETAIL_WIDTH
+	_detail.offset_top = DETAIL_TOP
+	_detail.offset_bottom = DETAIL_TOP + 240.0
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail.visible = false
 	# The selected NPC's outfit sits at the bottom, just left of the toggle bar's column, growing up and to the left.

@@ -1,7 +1,7 @@
 extends RefCounted
 
-## UI hud: how the hud observers find an NPC's controller, shared by the match HUD and the spectator inspector: the child in
-## the group `npc_controllers` (the AI controller, interface 7), which `goal_text()`, `debug_zones()` and
+## UI hud: how the hud observers find an NPC's controller, used by the spectator inspector: the child in
+## the group `npc_controllers` (the AI controller, interface 7), which `debug_zones()` and
 ## `known_contacts_for_display()` are read off.
 
 

@@ -35,7 +35,7 @@ composition root is `domain-main`.
 | **Lighting** | `lighting/` | `domain-lighting` | The world's dusk lighting, a leaf like Audio (`docs/lighting.md`): the ambient and the sky, a light per light-giving piece (declared by the piece) and per room fixture within a per-floor budget, their seeded rhythms, the shot and explosion flashes, and who stands in a light. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
 | **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), the event bus (`EventBus`), the log (`GameLog`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`), the draw-order ladder (`DrawLayers`) and the light masks (`LightMasks`). |
-| **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus, one sub-domain per folder: menus (pre-game setup window, settings page), hud (debug player panel, match HUD, seed readout, spectator inspector and its contact markers, stun screen, stack markers), overlays (overlay registry, toggle bar, performance overlay) and testing (test browser window, test result banner). |
+| **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus, one sub-domain per folder: menus (pre-game setup window, settings page), hud (debug player panel, match HUD, spectator inspector and its contact markers, stun screen, stack markers), overlays (overlay registry, toggle bar, performance overlay) and testing (test browser window, test result banner). |
 | **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-entry`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Plus `ai/team/`, the human's side of the entry radio (`PlayerStack`, interface 17). Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Vehicles** | `vehicle/` | `domain-vehicle` | Drivable vehicles (a car and a van, only in the sandbox): the rigid body and its driving model, doors and seats, getting in and out (the character's `CharacterVehicleUse` component and the ride), collisions and the harm to a character struck, the dents, the vehicle art and its events. |
 | **Testing** | `testing/` | `domain-testing` | Game tests: a second composition root that builds a declared world (arena, hand-laid room layout or generated house) with chosen behaviour switches, runs a test's script against it and asserts what happened; the in-game test browser + runner, and the headless CLI runner. Test cases live in `tests/<domain>/*_test.gd`, or one folder deeper by topic (`tests/ai/entry/`); sandboxes to play by hand (`GameTest` scripts with no assertions) live outside `scenes/` in `sandboxes/*_sandbox.gd`. |
@@ -315,7 +315,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
    side (kitchen)`), `debug_state() -> Dictionary` (the deep snapshot the dev command server's `ai` verb dumps), `debug_zones() -> Array`
    (the tactical points the spectator inspector picks from; it rings the one it describes on the NPC's tactics overlay, the overlay child
-   exposing `set_focus(point)` / `clear_focus()`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) and `goal_text()` (the plain-language goal with `{gun}` filled in with the NPC's gun) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry` (`show_grenades` reads `debug_grenades()`: `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: none), throw: {} }`);
+   exposing `set_focus(point)` / `clear_focus()`), the draw-only overlays' `debug_*` getters (e.g. `debug_entry_view()` for the tactical-entry ones), `known_contacts_for_display()` (the spectator inspector's contact list) for those observers to show. Each overlay is a child of the NPC with a `show_<x>` export named in the UI's `OverlayRegistry` (`show_grenades` reads `debug_grenades()`: `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: none), throw: {} }`);
    Main, the spectator inspector and the Testing world set those flags by that name, so an overlay's export is part of this surface. Every NPC is the same generic goal-driven agent
    driven by `ai/goal_controller.gd`; the defender (`ai/npc_defender.tscn`) and the invader
    (`ai/npc_invader.tscn`), both inherited from `ai/npc.tscn` (itself an inherited scene of the controller-less
@@ -394,7 +394,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
     - `&"hit"`: the Projectile System posts one per damaging hit and the Character one per landed
       punch (`{ position, victim, source, direction, damage, attacker }`; `attacker` = the striking
       character or null). The AI controller consumes it for combat awareness, hostility ("attacked
-      me") and gunfire heard farther off; the match HUD for its combat feed. It also says *how* the
+      me") and gunfire heard farther off. It also says *how* the
       hit met the surface, for the Audio domain: `outcome` (`&"blocked"` / `&"penetrate"` /
       `&"ricochet"` for a bullet, `&"punch"` for a fist or a kick, `&"blast"` for a frag's blast: posted by the Projectile System's
       `Explosion` with the thrower as `attacker` and `speed_factor` 0, which Audio does not voice as an impact: the burst has its own sound), `material` (the struck surface's, `""` for a
@@ -645,7 +645,7 @@ Objects / Character / Item / Vehicle ──(painters)──▶ PixelArt / PixelC
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
 AIController ─▶ ItemRegistry slot ids (Items: FISTS_SLOT, STUN_SLOT, FRAG_SLOT)
 Physics debris / hit particles / blood / explosion fx, Projectile casings ─▶ Despawner
-Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
+Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"callout": the human's claim)──▶ allied AIControllers;  StackMarkers (UI) ──(view())──▶ PlayerStack
 AI perception ──(Explosion.shields / first_stop: the blast's cover rule)──▶ Explosion (Projectile)
@@ -657,7 +657,7 @@ main ──(Sound.focus = the human)──▶ Sound   /   Character (&"stun") �
 Explosion (&"explosion") ──▶ EventBus ──▶ Sound (the burst) / Camera (shake)
 Vehicle (&"vehicle", &"engine", &"skid") ──▶ EventBus ──▶ Sound ──(engine_state / slip / speed, duck-typed)──▶ the vehicle's loops
 Camera ──(target.vehicle().view_zoom_out(), duck-typed)──▶ Vehicle
-UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display and the tactics overlay's set_focus / clear_focus; DebugUI and the inspector outfit_view)
+UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (the inspector debug_zones / known_contacts_for_display and the tactics overlay's set_focus / clear_focus; DebugUI and the inspector outfit_view)
 DebugUI ─▶ LoadoutConfig.grenade_options (Items)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 Sandbox (Testing) ──(own painter)──▶ PixelArt / PixelCanvas (Art);  Sandbox ──(recipe_for / render)──▶ SoundBank / SoundSynth (Audio) ─▶ its own AudioStreamPlayer2D

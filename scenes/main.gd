@@ -5,8 +5,8 @@ extends Node2D
 ## procedurally furnished house just ahead of the player, front entrance first.
 
 ## Seed for the house layout; 0 = a new random seed each run, resolved to a concrete value at
-## spawn so the whole run (house + NPC placement) reproduces from it. The seed is shown in the
-## corner (SeedDisplay) and can be re-entered in the setup window to pin a layout you like.
+## spawn so the whole run (house + NPC placement) reproduces from it. The seed is logged and can be
+## re-entered in the setup window to pin a layout you like.
 @export var house_seed: int = 0
 ## Force a specific floorplan (a key in HouseDefinitions); "" = pick one at random.
 @export var force_plan: String = ""
@@ -357,9 +357,6 @@ func _spawn_world() -> void:
 	# from it, and so it can be displayed and re-entered to pin this layout.
 	if house_seed == 0:
 		house_seed = randi()
-	var seed_display := get_node_or_null("SeedDisplay")
-	if seed_display and seed_display.has_method("show_seed"):
-		seed_display.show_seed(house_seed)
 	_world = Node2D.new()
 	_world.name = "World"
 	_world.add_to_group(&"match_world")  # how the dev command server finds the match's nodes
@@ -475,12 +472,11 @@ func _teardown_world() -> void:
 
 
 ## Start the match HUD on `combatants` (every character in the match, a human included, so a result is
-## shown whichever way the match is played). An endless run gives it a time limit; a match with a human
-## in it shows only the timer and the result.
+## shown whichever way the match is played). An endless run gives it a time limit.
 func _begin_match_hud(combatants: Array) -> void:
 	var hud := get_node_or_null("MatchHUD")
 	if hud and hud.has_method("begin"):
-		hud.begin(combatants, endless_time_limit if _endless else 0.0, spectator_mode)
+		hud.begin(combatants, endless_time_limit if _endless else 0.0)
 
 
 ## Turn the scene into a pure AI spectator match: drop the human player and its player-HUD, point the

@@ -39,7 +39,7 @@ and answers with `set_rows`.
 
 Everything one match builds lives under a fresh `World` node (group `match_world`), so `_teardown_world` can free it in place:
 
-1. resolve `house_seed` (0 → random) and show it (`SeedDisplay`); `WorldGen.generate(seed, force_plan, front_entrance, world)`; `WorldGen.get_rooms`;
+1. resolve `house_seed` (0 → random) (logged by `WorldGen.generate`); `WorldGen.generate(seed, force_plan, front_entrance, world)`; `WorldGen.get_rooms`;
 2. `NavBuilder.build` the nav map, the `nav_debug.gd` overlay and the `nav_updater.gd` re-baker (interface 9), then the dusk
    lighting: `WorldLighting.light(_world, house_seed, rooms)` (interface 20, `docs/lighting.md`: the ambient, the sky, the pieces'
    lights and the room fixtures, the flashes), under `World` so a teardown frees it; the characters spawned after it cast their own
@@ -61,7 +61,7 @@ Everything one match builds lives under a fresh `World` node (group `match_world
    the human invader too, the first of them its lead (`rank` 2) and the second its sergeant (1); each defender, the human defender too, draws one of the
    defenders' styles (`merc`, `borg`), a look seed of its own and one of its style's `weapons` (`scrap`, `pipe`; an invader's is `police`), all handed to
    `LoadoutConfig.apply` as its `style` (`{ look, seed, rank, weapon }`). Tests and sandboxes never come through here and keep the weapon they ask for;
-6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit, show_details)`, in spectator mode the camera framing + `SpectatorInspector`
+6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit)`, in spectator mode the camera framing + `SpectatorInspector`
    (`setup(combatants, flags, OverlayToggles.RESERVED_WIDTH)`: the width its outfit panel keeps clear; the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 
 Overlay flags live in `_overlay_flags` (one entry per row of `OverlayRegistry`), seeded by `_initial_overlays`: the registry's defaults, then the

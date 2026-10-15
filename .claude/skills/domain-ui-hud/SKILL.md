@@ -1,33 +1,26 @@
 ---
 name: domain-ui-hud
-description: Deep implementation detail for the UI hud sub-domain (scenes/ui/hud/) — the player debug panel (DebugUI), the spectator match HUD (MatchHUD: timer, goals, winner banner, combat feed, match_ended), the seed readout, the spectator inspector (click-to-select NPC, pause, tactical-point details, the selected NPC's outfit) and its world-space contact markers, and the shared outfit lines (outfit_lines.gd). Use when editing scenes/ui/hud/ or working on the in-game HUDs, match verdict, the combat feed, the seed label or click-to-inspect. Decoupled observers of the Character API and the EventBus. Complements the `domain-ui` overview and the `architecture` skill.
+description: Deep implementation detail for the UI hud sub-domain (scenes/ui/hud/) — the player debug panel (DebugUI), the spectator match HUD (MatchHUD: timer, winner banner, match_ended), the spectator inspector (click-to-select NPC, pause, tactical-point details, the selected NPC's outfit) and its world-space contact markers, and the shared outfit lines (outfit_lines.gd). Use when editing scenes/ui/hud/ or working on the in-game HUDs, match verdict, or click-to-inspect. Decoupled observers of the Character API and the EventBus. Complements the `domain-ui` overview and the `architecture` skill.
 ---
 
 # UI · HUD sub-domain (`scenes/ui/hud/`)
 
-The in-game observers: each reads only the Character public API / signals (incl. `outfit_view()`), the AI controller's `goal_text()` / `debug_zones()` / `known_contacts_for_display()` and the EventBus `&"hit"` (and, for the stun screen, `&"stun"`) topic. See `domain-ui` for what all UI scripts share.
+The in-game observers: each reads only the Character public API / signals (incl. `outfit_view()`), the AI controller's `debug_zones()` / `known_contacts_for_display()` and, for the stun screen, the EventBus `&"stun"` topic. See `domain-ui` for what all UI scripts share.
 
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
   item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
   `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), a grenades line (`Grenades: 1 stun, 2 frag`, "—" with none, read through `item_count(slot)` for the slots of `LoadoutConfig.grenade_options()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
   (punch left/right, kick or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Attaches to its character by the
   exported `character_path`; listens to `hit_landed` on the character; freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
-  Bottom left (26pt, growing up from the bottom edge: free in a player match, where the match HUD hides its combat feed), an `=== OUTFIT ===` block of
+  Bottom left (26pt, growing up from the bottom edge: free), an `=== OUTFIT ===` block of
   `OutfitLines.of(outfit_view())`, refreshed every frame (`docs/outfits.md` O13). Tested by `tests/ui/debug_panel_outfit_test.gd`.
 
 - `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants, time_limit := 0.0, show_details := true)` wires it to
   any number of characters (a human included); it is **re-entrant** (an endless run calls it for each new match),
   emits `match_ended(verdict)` once when a faction is eliminated or `time_limit` seconds pass undecided
   ("TIME UP - DRAW"), `set_countdown(text)` shows a line under the verdict (Main's next-match countdown), and
-  `show_details` off (a match with a human) hides the goal readout and combat feed, leaving the timer and result. Also: a top-centre
-  running timer (34pt), a top-left goal readout listing every NPC's name and goal (28pt, spans the left half of the screen and word-wraps), a centre
-  winner banner (62pt gold), and a bottom-left combat feed (28pt orange, last 6 hits from EventBus
-  `&"hit"`). Declares the winner once an entire faction is eliminated. `main.gd` calls `begin` / `set_countdown` and listens to
+  nothing else is shown but a top-centre running timer (34pt) and a centre winner banner (62pt gold): no goal readout or combat feed. Declares the winner once an entire faction is eliminated. `main.gd` calls `begin` / `set_countdown` and listens to
   `match_ended`. Tested by `tests/ui/match_hud_verdict_test.gd`.
-
-- `seed_display.gd` — the **seed readout** (`SeedDisplay` node). `show_seed(level_seed)` writes the
-  run's seed into a 32pt label anchored to the bottom-right corner (semi-transparent), so a layout
-  you like can be re-entered in the setup window. `main.gd` calls it once per match.
 
 - `spectator_inspector.gd` — the **spectator inspector** (`SpectatorInspector` node), built by `main.gd`
   only in spectator mode via `setup(combatants, flags, right_clear)` (`flags` = the current overlay toggles; `right_clear` = the screen width from the right edge its outfit
@@ -38,7 +31,7 @@ The in-game observers: each reads only the Character public API / signals (incl.
   it. No NPC shows any overlay until clicked (the view stays focused on one NPC). With an NPC selected, a
   left-click on one of its tactical points (nearest zone within `ZONE_PICK_RADIUS`, from its
   `debug_zones()`) highlights that point (overlay `set_focus`) and fills a detail panel — top-left,
-  directly beneath the match HUD's goal readout — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
+  below the match HUD's timer — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
   paused (freeze the match, then inspect). Decoupled like the other observers: reads the combatants'
   public `global_position` and `outfit_view()`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
   toggles (every per-NPC flag of the overlay registry) through `OverlayRegistry.apply` (`domain-ui-overlays`), as Main does: a selection
@@ -46,16 +39,16 @@ The in-game observers: each reads only the Character public API / signals (incl.
   `INTERACT`, unused in the player-less match). A mouse-ignoring detail label (with text shadow).
   While an NPC is selected, an outfit panel (22pt, shadowed, mouse-ignoring) lists `<name> — OUTFIT` and `OutfitLines.of(outfit_view())`, at the bottom
   right with its right edge `right_clear + OUTFIT_GAP` (10 px) from the screen edge, clear of the
-  toggle bar's column and the seed readout, growing up and to the left; refreshed on select and every frame (`_refresh_outfit`), so plate wear shows live;
+  toggle bar's column, growing up and to the left; refreshed on select and every frame (`_refresh_outfit`), so plate wear shows live;
   hidden with no selection. Tested by `tests/ui/inspector_outfit_test.gd`.
 
 - `outfit_lines.gd` — the **outfit lines** (a `RefCounted` with one static, preloaded by the debug panel and the inspector). `OutfitLines.of(view)` turns a
   character's `outfit_view()` into one line per slot in the view's order: a garment `Head: Helmet`, a plate `Front plate: Ceramic IV plate 68%`
   (`"%d%%" % roundi(condition * 100)`), `—` for nothing worn. It reads nothing but the view.
 
-- `hud_probe.gd` — the **controller probe** (a `RefCounted` with one static, preloaded by the match HUD and the inspector).
+- `hud_probe.gd` — the **controller probe** (a `RefCounted` with one static, preloaded by the inspector).
   `controller_of(character)` returns the character's child in the group `npc_controllers` (the AI controller, which joins it in its `_ready`),
-  or null for the player, a null or a freed character: the node `goal_text()`, `debug_zones()` and `known_contacts_for_display()` are read off.
+  or null for the player, a null or a freed character: the node `debug_zones()` and `known_contacts_for_display()` are read off.
   The inspector still checks `has_method("debug_zones")` on it before it picks a tactical point.
 
 - `contact_markers.gd` — the **contact markers** (`ContactMarkers` Node2D, world space, built by the inspector). When an NPC is

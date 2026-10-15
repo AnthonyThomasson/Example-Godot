@@ -36,7 +36,7 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
 - `performance_overlay.gd` — the **performance overlay** (`PerformanceOverlay` CanvasLayer, layer 9, built by
   `main.gd` next to the toggle bar when Debug is on; `set_shown(on)` from the "Performance" toggle, off
   by default). A compact semi-transparent panel docked left of the toggle bar (`OverlayToggles.RESERVED_WIDTH`)
-  at y 76 — below the match HUD's top-centre timer and right of its goal readout, so it overlaps no other
+  at y 76 — below the match HUD's top-centre timer, so it overlaps no other
   HUD in either mode. Shows FPS (+ low over the last `SAMPLES` frames), frame / physics ms, draw calls,
   objects, node count, active 2D physics objects, static memory (Godot `Performance` monitors, text refreshed
   every `REFRESH` s) and a per-frame frame-time bar graph with a 16.7 ms reference line. Left-drag the panel to
