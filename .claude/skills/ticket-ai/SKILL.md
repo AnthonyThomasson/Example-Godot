@@ -17,7 +17,7 @@ plan and the test scenarios. Don't shape the behaviour around what the AI, snaps
 ## Tests: the whole pipeline
 
 - Location: `tests/ai/<topic>/<name>_test.gd` (topics: `entry`, `flank`, `gaze`, `posture`, `investigate`, `combat`, `grenade`,
-  `movement`, `decision`, `perception`); shared setup in `tests/_ai/<name>_probe.gd`.
+  `movement`, `decision`, `perception`, `stack`); shared setup in `tests/_ai/<name>_probe.gd`.
 - **Scenario tests script nothing:** perception, snapshot, the real Von server at every tree level, behaviour, radio
   and guard all run. `"requires_von": true`, tag `von`, run with `--include-von --require-von`.
 - Build the world so the decision under test is the natural one (nearest doorway, the one unsearched room, the hostile

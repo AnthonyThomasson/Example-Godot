@@ -2,7 +2,7 @@
 
 How an invader gets through an opening into a building, alone or as a team, and the real-world tactics
 that rule is modelled on. Behaviours E1 to E9 and E11 to E17 are enforced; each has its tests
-in `tests/ai/entry/` (`tools/run_tests.sh entry`; E16's in `tests/ai/stack_*`), named under the behaviour, following the convention of
+in `tests/ai/entry/` (`tools/run_tests.sh entry`; E16's in `tests/ai/stack/`), named under the behaviour, following the convention of
 `docs/flanking-behavior.md`. They are tests on the Terrace house of
 `tests/_ai/flank_maps.gd`, read through `tests/_ai/entry_probe.gd`.
 E10 (the clear-time benchmark) is met and its test is green. E1 to E9 are scripted-Von tests. E10 to E16 are tests that run

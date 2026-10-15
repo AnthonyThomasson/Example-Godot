@@ -1,6 +1,6 @@
 extends RefCounted
 
-## Shared helpers for the tests of the player's place in an AI stack (tests/ai/stack_*_test.gd; not a test itself). The
+## Shared helpers for the tests of the player's place in an AI stack (tests/ai/stack/stack_*_test.gd; not a test itself). The
 ## behaviour they assert is ticket #41 / `docs/tactical-entry.md` E16: a human invader near a doorway an AI team is
 ## stacking at is given the first free slot over the radio, shown on the floor, and counts in the team's barrier.
 ##
