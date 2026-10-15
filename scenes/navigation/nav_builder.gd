@@ -198,11 +198,14 @@ static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array
 	var nav_poly: NavigationPolygon = job["poly"]
 	var origin := house.position
 	_remember_source(region, job)
+	# Held weakly: a lambda that captures a node freed before it runs logs an engine error (a world torn down mid-bake).
+	var region_ref: WeakRef = weakref(region)
 	NavigationServer2D.bake_from_source_geometry_data_async(nav_poly, job["source"], func() -> void:
 		_weld_vertices(nav_poly, origin)
 		_drop_slivers(nav_poly)
-		if is_instance_valid(region):
-			region.navigation_polygon = nav_poly
+		var target := region_ref.get_ref() as NavigationRegion2D
+		if target != null:
+			target.navigation_polygon = nav_poly
 		if done.is_valid():
 			done.call())
 

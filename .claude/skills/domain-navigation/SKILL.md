@@ -86,7 +86,9 @@ furniture's **current** positions — `furniture_holes` reads each collider's li
 so moved pieces carve at their new spots. `rebake_async(region, house, rooms, agent_radius, done)` does the same with the
 bake on the NavigationServer's worker thread: the source geometry (walls from the scene tree, the footprint, the furniture
 holes) is gathered on the main thread by `_source_for`, `bake_from_source_geometry_data_async` bakes it, and the polygon is
-assigned (slivers dropped) when the bake lands, then `done` runs; a region freed meanwhile is left alone. The sync `rebake`
+assigned (slivers dropped) when the bake lands, then `done` runs; a region freed meanwhile is left alone (the callback holds it
+by a `WeakRef`: a lambda capturing a node freed before it runs logs an engine error into whatever runs next, a test world torn
+down mid-bake; `tests/navigation/rebake_outlives_region`). The sync `rebake`
 stays for a caller that needs the map now (`perf/bake_and_path_stress` times it); the re-baker uses the async one, so no
 frame pays for a bake (`tests/navigation/rebake_runs_off_the_main_thread_test.gd`).
 
