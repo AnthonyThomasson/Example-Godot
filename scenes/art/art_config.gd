@@ -28,6 +28,8 @@ static var cast_shadow_px: int = 2
 static var cast_shadow_darken: float = 0.22
 
 # --- Tone ramp (darken/lighten amounts applied to a piece's base color) ---
+## How far each tone of `PixelCanvas.tones` darkens (`tone_outline`, `tone_shadow`, `tone_dark`) or lightens
+## (`tone_light`, `tone_highlight`) a piece's base color.
 static var tone_outline: float = 0.62
 static var tone_shadow: float = 0.36
 static var tone_dark: float = 0.18

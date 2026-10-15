@@ -10,12 +10,12 @@ class_name CharacterConfig
 ## slower), and a fast object sliding into the character shoves them back.
 
 # --- Postures (the body's height: stand or crouch; a controller picks one with `set_posture`) ---
-# Not to be confused with `stances` below (how a hand is held). A posture trades speed for a smaller target:
-# `speed` multiplies the walk speed; `turn` is the fastest the body swings round to the aim (rad/s, 0 = at once);
-# `coverage` is the body's height on the same 0–100 scale as an object's
-# coverage (a bullet carries one height, and strikes whatever is taller than it), so a lower posture is
-# struck by fewer shots and hides behind lower cover; `height` scales the drawn body's standing heights.
-# Keep `crouch` coverage at or below the AI's `cover_min` (40), so everything it treats as cover hides a crouch.
+## Not to be confused with `stances` below (how a hand is held). A posture trades speed for a smaller target:
+## `speed` multiplies the walk speed; `turn` is the fastest the body swings round to the aim (rad/s, 0 = at once);
+## `coverage` is the body's height on the same 0–100 scale as an object's
+## coverage (a bullet carries one height, and strikes whatever is taller than it), so a lower posture is
+## struck by fewer shots and hides behind lower cover; `height` scales the drawn body's standing heights.
+## Keep `crouch` coverage at or below the AI's `cover_min` (40), so everything it treats as cover hides a crouch.
 static var postures: Dictionary = {
 	&"stand": { "speed": 1.0, "turn": 0.0, "coverage": 60.0, "height": 1.0 },
 	&"crouch": { "speed": 0.6, "turn": 5.0, "coverage": 35.0, "height": 0.62 },
@@ -204,11 +204,11 @@ static var leg_radius: float = 3.5
 static var leg_push_impulse: float = 30000.0
 
 # --- Stances (how a hand is held; the held item picks one per hand through Item.hand_stance) ---
-# A hand rests `forward` px ahead of the body center and `lateral` px out to its own side, in the
-# frame it chases the aim in; its grip is `height` body radii off the floor (the arm bends to reach
-# it) and its elbow bends toward `elbow_pole` (out, forward, up). `swing` is the walk's fore-and-aft
-# swing of a free hand (px); a `steady` hand follows the aim closely and only drifts sideways;
-# `recoil_share` is how much of a kick the hand feels when the other hand fires.
+## A hand rests `forward` px ahead of the body center and `lateral` px out to its own side, in the
+## frame it chases the aim in; its grip is `height` body radii off the floor (the arm bends to reach
+## it) and its elbow bends toward `elbow_pole` (out, forward, up). `swing` is the walk's fore-and-aft
+## swing of a free hand (px); a `steady` hand follows the aim closely and only drifts sideways;
+## `recoil_share` is how much of a kick the hand feels when the other hand fires.
 static var stances: Dictionary = {
 	&"relaxed": { "forward": 2.0, "lateral": 13.0, "height": 3.7, "swing": 9.0, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.2, -0.8, -0.2) },
