@@ -1,6 +1,6 @@
 extends Camera2D
 
-## Camera behavior: centers on player, but leads toward the mouse when it approaches screen edges.
+## General domain: the camera. It centers on the player, but leads toward the mouse when it approaches screen edges.
 ## The mouse wheel zooms, in either mode, as a lasting scale on the automatic zoom. In framing mode
 ## (the spectator view) the viewer can also take the camera by hand — pan with the camera keys or by
 ## pushing the mouse to a screen edge — and after `manual_hold` seconds without panning the

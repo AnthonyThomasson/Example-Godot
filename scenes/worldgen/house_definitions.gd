@@ -1,6 +1,6 @@
 class_name HouseDefinitions
 
-## House floorplans, in house-local coordinates (walls run along the rect edges).
+## World Generation domain: house floorplans, in house-local coordinates (walls run along the rect edges).
 ##   rooms: key, type (a recipe in ArrangementDefinitions), rect.
 ##   openings: `pos` is the doorway center ON a wall line; every room whose wall passes
 ##          through it gets that gap cut. Exactly one opening is `front` (the exterior

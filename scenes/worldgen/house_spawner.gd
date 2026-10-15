@@ -1,8 +1,8 @@
 class_name HouseSpawner
 
-## Builds a house from a HouseDefinitions floorplan: walls per room (via the Objects
-## domain's WallFactory, in the GeneralCatalog.WALL style, with every doorway opening cut into
-## each wall it lies on), furniture per room (via RoomFurnisher) and each room's floor (via
+## World Generation domain: builds a house from a HouseDefinitions floorplan: walls per room (via
+## the Objects domain's WallFactory, in the GeneralCatalog.WALL style, with every doorway opening
+## cut into each wall it lies on), furniture per room (via RoomFurnisher) and each room's floor (via
 ## FloorFactory, the one its furnishing palette names). The house is positioned so its front
 ## entrance lands on a point. A plan may also carry `exit` openings (a back/side/garage door).
 

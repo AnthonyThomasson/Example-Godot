@@ -1,7 +1,7 @@
 extends Node2D
 
-## Draws an EnvironmentObject: its pixel art (when it has an `art` painter) or its flat shape
-## and name label, either way through the damage-deformed silhouette.
+## Objects domain: draws an EnvironmentObject: its pixel art (when it has an `art` painter) or its
+## flat shape and name label, either way through the damage-deformed silhouette.
 
 const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
 

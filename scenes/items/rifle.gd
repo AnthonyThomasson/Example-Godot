@@ -1,10 +1,10 @@
 class_name RifleItem extends GunItem
 
-## An assault rifle: a long automatic shouldered with the butt against the shoulder, the trigger hand at the
-## grip and the other hand out on the foregrip, both lying along the barrel. Everything a gun does lives in
-## `GunItem`, tuned by the rifle's `GunConfig` row (heavy, fast, penetrating rounds); this supplies its look and
-## its hold. Its barrel is too long for a wall: touching one, it comes up off the aim, pointing up with the butt
-## still on the shoulder, and cannot fire.
+## Items domain: an assault rifle: a long automatic shouldered with the butt against the shoulder, the trigger
+## hand at the grip and the other hand out on the foregrip, both lying along the barrel. Everything a gun does
+## lives in `GunItem`, tuned by the rifle's `GunConfig` row (heavy, fast, penetrating rounds); this supplies its
+## look and its hold. Its barrel is too long for a wall: touching one, it comes up off the aim, pointing up with
+## the butt still on the shoulder, and cannot fire.
 
 const RiflePainter = preload("res://scenes/items/art/rifle_painter.gd")
 const RifleFlatPainter = preload("res://scenes/items/art/rifle_flat_painter.gd")

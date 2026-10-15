@@ -1,8 +1,8 @@
 class_name SmgItem extends GunItem
 
-## A submachine gun: a compact automatic held in both hands with its butt on the right shoulder, a longer reach
-## than a pistol but nowhere near a rifle. Everything a gun does lives in `GunItem`, tuned
-## by the SMG's `GunConfig` row (fast, light rounds, a wide spread); this supplies its look and its hold. Its
+## Items domain: a submachine gun: a compact automatic held in both hands with its butt on the right shoulder,
+## a longer reach than a pistol but nowhere near a rifle. Everything a gun does lives in `GunItem`, tuned by
+## the SMG's `GunConfig` row (fast, light rounds, a wide spread); this supplies its look and its hold. Its
 ## barrel is too long for a wall: touching one, it points up and cannot fire.
 
 const SmgPainter = preload("res://scenes/items/art/smg_painter.gd")

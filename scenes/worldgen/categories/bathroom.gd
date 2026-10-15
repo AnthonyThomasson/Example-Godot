@@ -1,7 +1,7 @@
 class_name BathroomCatalog
 
-## Bathroom objects, arrangements, and recipe. Shared items (sink, cabinet, and the
-## laundry_pair arrangement with its washing_machine/dryer) live in GeneralCatalog.
+## World Generation domain: bathroom objects, arrangements, and recipe. Shared items (sink, cabinet,
+## and the laundry_pair arrangement with its washing_machine/dryer) live in GeneralCatalog.
 
 const OBJECTS := {
 	"toilet": { "name": "Toilet", "shape": "circle", "size": Vector2(34, 34), "color": Color(0.95, 0.95, 0.95), "material": "ceramic", "art": "toilet", "weight": 35, "coverage": 40, "penetration": 55 },

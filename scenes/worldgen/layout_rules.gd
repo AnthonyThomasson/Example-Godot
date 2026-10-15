@@ -1,7 +1,7 @@
 class_name LayoutRules
 
-## What makes a floorplan logical, as tunable data plus a pure validator. A `class_name` holder of constants
-## and statics — read as `LayoutRules.<name>`; no instance, no autoload.
+## World Generation domain: what makes a floorplan logical, as tunable data plus a pure validator. A
+## `class_name` holder of constants and statics — read as `LayoutRules.<name>`; no instance, no autoload.
 ##
 ## A layout is a set of rooms (`{ key, type, rect }`) joined by doorways (`{ pos, width, front, rooms }`, `rooms`
 ## = the keys of the rooms the doorway touches: one for an exterior door, two for an interior one). The rules:

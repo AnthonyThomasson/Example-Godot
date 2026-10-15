@@ -1,9 +1,9 @@
 class_name GrenadeItem extends Item
 
-## A throwable held in the right hand: the logic the stun and the frag grenade share, driven by its row in
-## `GrenadeConfig` (docs/grenades.md G1 to G6). It is a *count* carried in its slot (`uses_left()`), spent one per
-## throw: left-click (`secondary`) starts a throw, the arm is drawn back in the `throw` stance for `windup` seconds
-## (counted in `tick`), and then the grenade leaves the hand as a `ThrownGrenade` flying to the character's
+## Items domain: a throwable held in the right hand: the logic the stun and the frag grenade share, driven by its
+## row in `GrenadeConfig` (docs/grenades.md G1 to G6). It is a *count* carried in its slot (`uses_left()`), spent
+## one per throw: left-click (`secondary`) starts a throw, the arm is drawn back in the `throw` stance for `windup`
+## seconds (counted in `tick`), and then the grenade leaves the hand as a `ThrownGrenade` flying to the character's
 ## `aim_target()`. The fuse starts on release; there is no cooking. A character that dies, or puts the grenade away,
 ## during the wind-up throws nothing. When the last one is thrown the character empties the slot (`Character`).
 ## A subclass supplies only its look: the kind id, the painter and sizes (`StunGrenadeItem`, `FragGrenadeItem`).

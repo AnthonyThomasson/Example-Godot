@@ -1,8 +1,8 @@
 class_name PistolItem extends GunItem
 
-## A pistol held in the right hand: short enough to fire point-blank at a wall, held at arm's length with the
-## other hand cupping the grip. Everything a gun does lives in `GunItem`, tuned by the pistol's `GunConfig` row;
-## this supplies its look and its hold.
+## Items domain: a pistol held in the right hand: short enough to fire point-blank at a wall, held at arm's
+## length with the other hand cupping the grip. Everything a gun does lives in `GunItem`, tuned by the pistol's
+## `GunConfig` row; this supplies its look and its hold.
 
 const PistolPainter = preload("res://scenes/items/art/pistol_painter.gd")
 const PistolFlatPainter = preload("res://scenes/items/art/pistol_flat_painter.gd")

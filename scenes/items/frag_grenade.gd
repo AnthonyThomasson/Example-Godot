@@ -1,7 +1,7 @@
 class_name FragGrenadeItem extends GrenadeItem
 
-## A frag grenade (blast and fragments): everything it does lives in `GrenadeItem`, tuned by the frag row of
-## `GrenadeConfig`; this supplies its look.
+## Items domain: a frag grenade (blast and fragments): everything it does lives in `GrenadeItem`, tuned by
+## the frag row of `GrenadeConfig`; this supplies its look.
 
 const FragGrenadePainter = preload("res://scenes/items/art/frag_grenade_painter.gd")
 ## The grenade's footprint (px): width across, length from base to fuze.

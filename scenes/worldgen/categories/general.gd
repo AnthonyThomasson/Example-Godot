@@ -1,9 +1,9 @@
 class_name GeneralCatalog
 
-## Shared catalogue: objects and arrangements used by 2+ room categories, the
-## combined room-type recipes (kitchen_living, studio) that draw from several
-## categories, the WOOD/FABRIC material palettes every recipe shares, the FLOORS a
-## palette's `floor` names, and the house WALL style.
+## World Generation domain: shared catalogue: objects and arrangements used by 2+ room categories,
+## the combined room-type recipes (kitchen_living, studio) that draw from several categories, the
+## WOOD/FABRIC material palettes every recipe shares, the FLOORS a palette's `floor` names, and the
+## house WALL style.
 ##
 ## Object fields: name, shape ("circle"|"square"|"rect"), size, color (required);
 ##   material (descriptive tag — "wood"/"fabric" also take the room palette's tone;

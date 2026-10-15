@@ -1,7 +1,7 @@
 class_name BedroomCatalog
 
-## Bedroom objects, arrangements, and recipe. Shared items (nightstand, desk, chair,
-## lamp, armchair via reading_chair) live in GeneralCatalog.
+## World Generation domain: bedroom objects, arrangements, and recipe. Shared items (nightstand,
+## desk, chair, lamp, armchair via reading_chair) live in GeneralCatalog.
 
 const OBJECTS := {
 	"bed": { "name": "Bed", "shape": "rect", "size": Vector2(120, 180), "color": Color(0.7, 0.3, 0.3), "material": "fabric", "art": "bed", "weight": 50, "coverage": 35, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }, { "id": "make", "label": "Make the bed" }] },

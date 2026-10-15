@@ -1,7 +1,7 @@
 class_name DiningRoomCatalog
 
-## Dining-room objects, arrangements, and recipe. Shared items (chair, plant,
-## side_table_lamp) live in GeneralCatalog.
+## World Generation domain: dining-room objects, arrangements, and recipe. Shared items (chair,
+## plant, side_table_lamp) live in GeneralCatalog.
 
 const OBJECTS := {
 	"formal_table": { "name": "Table", "shape": "rect", "size": Vector2(110, 70), "color": Color(0.5, 0.32, 0.18), "material": "wood", "art": "table", "art_opts": { "runner": true }, "weight": 45, "coverage": 45, "penetration": 55, "interactions": [{ "id": "sit_at", "label": "Sit at table", "move_to": true }, { "id": "examine", "label": "Examine" }] },

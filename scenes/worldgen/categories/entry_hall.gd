@@ -1,7 +1,7 @@
 class_name EntryHallCatalog
 
-## Entry-hall recipe. Its pieces (console_wall, bench_coats, entry_area, the runner rug) are shared with the
-## hallway and live in GeneralCatalog.
+## World Generation domain: entry-hall recipe. Its pieces (console_wall, bench_coats, entry_area, the runner
+## rug) are shared with the hallway and live in GeneralCatalog.
 
 const OBJECTS := {}
 

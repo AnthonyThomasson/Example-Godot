@@ -1,6 +1,6 @@
 class_name GarageCatalog
 
-## Garage objects, arrangements, and recipe. All single-category; no shared items.
+## World Generation domain: garage objects, arrangements, and recipe. All single-category; no shared items.
 
 const OBJECTS := {
 	"car": { "name": "Car", "shape": "rect", "size": Vector2(130, 220), "color": Color(0.55, 0.12, 0.12), "material": "metal", "art": "car", "weight": 800, "coverage": 65, "penetration": 90 },

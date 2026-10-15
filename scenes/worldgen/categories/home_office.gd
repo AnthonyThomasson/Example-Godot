@@ -1,7 +1,7 @@
 class_name HomeOfficeCatalog
 
-## Home-office objects, arrangements, and recipe. Shared items (desk, bookshelf,
-## plant, and the reading_chair / bookshelf_wall arrangements) live in GeneralCatalog.
+## World Generation domain: home-office objects, arrangements, and recipe. Shared items (desk,
+## bookshelf, plant, and the reading_chair / bookshelf_wall arrangements) live in GeneralCatalog.
 
 const OBJECTS := {
 	"office_chair": { "name": "Chair", "shape": "square", "size": Vector2(30, 30), "color": Color(0.2, 0.2, 0.24), "material": "plastic", "art": "office_chair", "weight": 8, "coverage": 45, "penetration": 30, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "spin", "label": "Spin around", "move_to": true }] },

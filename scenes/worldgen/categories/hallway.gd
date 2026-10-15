@@ -1,7 +1,8 @@
 class_name HallwayCatalog
 
-## Hallway recipe: the corridor that bedrooms and bathrooms open off, so they are never walked through. It owns
-## no pieces of its own — a console, a coat/shoe area, plants and a runner rug, all shared (GeneralCatalog).
+## World Generation domain: hallway recipe: the corridor that bedrooms and bathrooms open off, so they are
+## never walked through. It owns no pieces of its own — a console, a coat/shoe area, plants and a runner rug,
+## all shared (GeneralCatalog).
 ## Every zone is optional: a hallway is narrow and must never fail to furnish.
 
 const OBJECTS := {}

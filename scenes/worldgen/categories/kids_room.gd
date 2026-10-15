@@ -1,7 +1,7 @@
 class_name KidsRoomCatalog
 
-## Kids-room objects, arrangements, and recipe. Shared items (nightstand, chair,
-## bookshelf, plant) live in GeneralCatalog.
+## World Generation domain: kids-room objects, arrangements, and recipe. Shared items (nightstand,
+## chair, bookshelf, plant) live in GeneralCatalog.
 
 const OBJECTS := {
 	"kids_bed": { "name": "Bed", "shape": "rect", "size": Vector2(80, 140), "color": Color(0.4, 0.6, 0.85), "material": "fabric", "art": "bed", "art_opts": { "pattern": "stars" }, "weight": 20, "coverage": 30, "penetration": 30, "interactions": [{ "id": "lie", "label": "Lie down", "move_to": true }, { "id": "jump", "label": "Jump on bed", "move_to": true }, { "id": "hide", "label": "Hide under bed", "move_to": true }] },

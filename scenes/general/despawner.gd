@@ -1,9 +1,9 @@
 extends Node
 
-## Autoloaded as `Despawner`. Any system that spawns transient world debris (casings,
-## chips) hands the node to `track()`; once the live count passes `max_scene_objects` the
-## oldest are freed, so the scene never accumulates debris without bound. Nodes that free
-## themselves auto-drop out via their `tree_exited` signal.
+## General domain: autoloaded as `Despawner`. Any system that spawns transient world debris
+## (casings, chips) hands the node to `track()`; once the live count passes `max_scene_objects` the
+## oldest are freed, so the scene never accumulates debris without bound. Nodes that free themselves
+## auto-drop out via their `tree_exited` signal.
 
 ## Max number of tracked debris objects allowed at once. Spawning past this frees
 ## the oldest. Owned here (the despawner is the only thing that reads it).

@@ -1,7 +1,7 @@
 class_name KitchenCatalog
 
-## Kitchen objects, arrangements, and recipe. Shared items (chair, sink, cabinet)
-## live in GeneralCatalog.
+## World Generation domain: kitchen objects, arrangements, and recipe. Shared items (chair, sink,
+## cabinet) live in GeneralCatalog.
 
 const OBJECTS := {
 	"kitchen_counter": { "name": "Counter", "shape": "rect", "size": Vector2(100, 50), "color": Color(0.8, 0.7, 0.6), "material": "stone", "art": "counter", "art_opts": { "props": [{ "kind": "cutting_board", "at": Vector2(0.32, 0.55) }] }, "weight": 80, "coverage": 55, "penetration": 70, "interactions": [{ "id": "prep", "label": "Prep food" }, { "id": "examine", "label": "Examine" }] },

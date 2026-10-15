@@ -1,7 +1,7 @@
 class_name StunGrenadeItem extends GrenadeItem
 
-## A stun grenade (flash and bang): everything it does lives in `GrenadeItem`, tuned by the stun row of `GrenadeConfig`;
-## this supplies its look.
+## Items domain: a stun grenade (flash and bang): everything it does lives in `GrenadeItem`, tuned by the stun row of
+## `GrenadeConfig`; this supplies its look.
 
 const StunGrenadePainter = preload("res://scenes/items/art/stun_grenade_painter.gd")
 ## The grenade's footprint (px): width across, length from base to fuze cap.

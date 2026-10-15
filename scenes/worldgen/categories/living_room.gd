@@ -1,7 +1,7 @@
 class_name LivingRoomCatalog
 
-## Living-room objects, arrangements, and recipe. Shared items (lamp, armchair,
-## side_table, plant, bookshelf, coat_rack, shoe_rack) live in GeneralCatalog.
+## World Generation domain: living-room objects, arrangements, and recipe. Shared items (lamp,
+## armchair, side_table, plant, bookshelf, coat_rack, shoe_rack) live in GeneralCatalog.
 
 const OBJECTS := {
 	"tv": { "name": "TV", "shape": "rect", "size": Vector2(80, 30), "color": Color(0.1, 0.1, 0.1), "material": "electronics", "art": "appliance", "art_opts": { "panel": "tv" }, "weight": 12, "coverage": 40, "penetration": 35, "interactions": [{ "id": "watch", "label": "Watch TV" }, { "id": "toggle", "label": "Turn off" }] },

@@ -1,6 +1,6 @@
 class_name RoomFurnisher
 
-## Fills a room's interior with arrangements from its recipe (ArrangementDefinitions).
+## World Generation domain: fills a room's interior with arrangements from its recipe (ArrangementDefinitions).
 ## Arrangements are placed as whole blocks: each one's footprint is fitted against a
 ## wall (or free-standing for "center" placement) without overlapping other placed
 ## blocks or any blocked area (doorway-opening clearances), then its items are spawned.

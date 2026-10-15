@@ -1,7 +1,7 @@
 class_name SoundSurface
 
-## What the ground sounds like underfoot. Floors (the Objects domain) register their world rect with the
-## material and pattern of their tile; `at` answers which kind of surface a world point is on, which is how a
+## Audio domain: what the ground sounds like underfoot. Floors (the Objects domain) register their world rect with
+## the material and pattern of their tile; `at` answers which kind of surface a world point is on, which is how a
 ## footstep picks its sound. Like BloodSurface, Audio imports nothing: the floor's owner hands over plain strings.
 ## A point on no floor is outdoors.
 

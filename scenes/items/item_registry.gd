@@ -1,10 +1,10 @@
 class_name ItemRegistry
 
-## The catalogue of items, keyed by selection slot (the 1–9 number keys). The character
-## asks for an inventory here and otherwise never hard-codes item ids. To add an item:
-## write its Item subclass in this folder and add a case below; to add a gun, also give it a row in
-## `GunConfig` (its slot is that row's `slot`) and a case in `_new_gun`; a grenade, a row in `GrenadeConfig` and a case in
-## `_new_grenade`. Magazines are not slot items: they are carried in the character's magazine store (`create_magazines`).
+## Items domain: the catalogue of items, keyed by selection slot (the 1–9 number keys). The character asks for an
+## inventory here and otherwise never hard-codes item ids. To add an item: write its Item subclass in this folder and add
+## a case below; to add a gun, also give it a row in `GunConfig` (its slot is that row's `slot`) and a case in `_new_gun`;
+## a grenade, a row in `GrenadeConfig` and a case in `_new_grenade`. Magazines are not slot items: they are carried in the
+## character's magazine store (`create_magazines`).
 
 ## Slots of the plain items (guns take theirs from `GunConfig`).
 const UNARMED_SLOT := 1

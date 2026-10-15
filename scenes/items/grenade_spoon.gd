@@ -1,8 +1,8 @@
 class_name GrenadeSpoon extends Item
 
-## A grenade's spoon (the safety lever), the tiny prop that pops off as it is thrown and lies on the floor. It is a
-## `DroppedItem` carrying this item, so it falls, bounces and skids like one; visual only, and the Despawner keeps their
-## number in check. Never held.
+## Items domain: a grenade's spoon (the safety lever), the tiny prop that pops off as it is thrown and lies on the
+## floor. It is a `DroppedItem` carrying this item, so it falls, bounces and skids like one; visual only, and the
+## Despawner keeps their number in check. Never held.
 
 const SpoonPainter = preload("res://scenes/items/art/spoon_painter.gd")
 ## The spoon's footprint lying flat (px): across, along.

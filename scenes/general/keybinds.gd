@@ -1,6 +1,6 @@
 extends Node
 
-## Central place for all input actions, their default bindings and runtime rebinding.
+## General domain: central place for all input actions, their default bindings and runtime rebinding.
 ##
 ## Autoloaded as `Keybinds` (see project.godot [autoload]). Everything that reads
 ## input should go through the constants and helpers here instead of hard-coding

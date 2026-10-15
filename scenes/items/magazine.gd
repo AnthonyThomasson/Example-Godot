@@ -1,7 +1,7 @@
 class_name Magazine extends Item
 
-## A magazine of rounds for a gun. It is carried, never held: it lives in the character's magazine
-## store, not in an inventory slot, so no number key selects it and several can be carried at once.
+## Items domain: a magazine of rounds for a gun. It is carried, never held: it lives in the character's
+## magazine store, not in an inventory slot, so no number key selects it and several can be carried at once.
 ## Different types hold different amounts (`MagazineConfig.types`). A gun is loaded with one, shooting
 ## spends its rounds, and a reload swaps it for another carried one.
 

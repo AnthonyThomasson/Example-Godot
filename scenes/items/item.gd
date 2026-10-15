@@ -1,9 +1,9 @@
 class_name Item extends RefCounted
 
-## Base class for a thing the character can hold and act with. An Item is pure behaviour
-## + a little state (e.g. which fist punches next); it owns what the primary (F) and
-## secondary (LMB) actions do, how each hand is held, how its weapon is rendered, and what it
-## leaves behind when its user dies (drop).
+## Items domain: base class for a thing the character can hold and act with. An Item is pure
+## behaviour + a little state (e.g. which fist punches next); it owns what the primary (F) and
+## secondary (LMB) actions do, how each hand is held, how its weapon is rendered, and what it leaves
+## behind when its user dies (drop).
 ## The character calls into these; an Item talks back only through the small character API
 ## (facing, weapon_facing(), weapon_raise(), punch(), punch_amount(), kick(), hand_position(), hand_world(), muzzle_origin(),
 ## world_root(), report_shot(), aim_target(), aim_sway(), current_item(), and for reloading best_magazine() /

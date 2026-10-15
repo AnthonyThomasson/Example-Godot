@@ -1,10 +1,10 @@
 class_name DroppedItem extends Node2D
 
-## An item let go into the world: a dead character's weapon, or a thrown grenade's spoon. It falls
-## from hand height, bounces, then skids across the floor with a fading spin until it stops, glancing
-## off walls and solid furniture (layer 1). Drawn by the item's own draw_dropped() over a shadow that
-## closes in as it lands. Visual only: nothing picks it up, and a dropped weapon is never despawned
-## (a grenade's spoon is, grenade_spoon.gd).
+## Items domain: an item let go into the world: a dead character's weapon, or a thrown grenade's
+## spoon. It falls from hand height, bounces, then skids across the floor with a fading spin until it
+## stops, glancing off walls and solid furniture (layer 1). Drawn by the item's own draw_dropped()
+## over a shadow that closes in as it lands. Visual only: nothing picks it up, and a dropped weapon
+## is never despawned (a grenade's spoon is, grenade_spoon.gd).
 
 ## Physics layers it glances off (walls + solid furniture).
 const WALL_MASK := PhysicsLayers.SOLID

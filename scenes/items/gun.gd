@@ -1,6 +1,6 @@
 class_name GunItem extends Item
 
-## A gun held in the right hand: the logic every firearm shares, driven by its row in `GunConfig`
+## Items domain: a gun held in the right hand: the logic every firearm shares, driven by its row in `GunConfig`
 ## (damage, fire rate, penetration, muzzle speed, spread, recoil, whether it is automatic and whether its
 ## barrel is too long to use against a wall). F still jabs with the weapon hand (melee); left-click fires a
 ## projectile and ejects a casing. A subclass supplies only its look and how it is held (`PistolItem`,
