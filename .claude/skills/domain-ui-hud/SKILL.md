@@ -53,6 +53,11 @@ The in-game observers: each reads only the Character public API / signals (incl.
   character's `outfit_view()` into one line per slot in the view's order: a garment `Head: Helmet`, a plate `Front plate: Ceramic IV plate 68%`
   (`"%d%%" % roundi(condition * 100)`), `—` for nothing worn. It reads nothing but the view.
 
+- `hud_probe.gd` — the **controller probe** (a `RefCounted` with one static, preloaded by the match HUD and the inspector).
+  `controller_of(character)` returns the character's child in the group `npc_controllers` (the AI controller, which joins it in its `_ready`),
+  or null for the player, a null or a freed character: the node `goal_text()`, `debug_zones()` and `known_contacts_for_display()` are read off.
+  The inspector still checks `has_method("debug_zones")` on it before it picks a tactical point.
+
 - `contact_markers.gd` — the **contact markers** (`ContactMarkers` Node2D, world space, built by the inspector). When an NPC is
   selected it draws a coloured ring + name label at each character that NPC has in memory (visible ones bright, remembered ones
   faded), showing the NPC's own knowledge rather than the contacts' true state. The inspector pushes fresh contacts every frame
