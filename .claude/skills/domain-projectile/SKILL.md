@@ -81,7 +81,8 @@ living and a vehicle's chassis).
 
 Called by Items' `ThrownGrenade` when its fuse is out: `Explosion.frag(at, world, source, row)` and `Explosion.stun(at, world, source, row)`
 (`source` the thrower or null, `row` its `GrenadeConfig` row). Both post `&"explosion"` `{ position, kind, attacker, radius }` first, call
-`Physics.spawn_explosion(world, at, kind)` and then do their work. Spec: `docs/grenades.md` G7 to G12; friendly fire is on (G9), the thrower is struck like anyone.
+`Physics.spawn_explosion(world, at, kind)` and then do their work. The characters they weigh are the group `characters` under `world` (`_characters`, dead
+ones included, in tree order; interface 7). Spec: `docs/grenades.md` G7 to G12; friendly fire is on (G9), the thrower is struck like anyone.
 
 - **The line.** `_reach(space, at, body, characters)` casts a ray from the burst to the body's centre on `PhysicsLayers.SOLID`, skipping the other
   characters, and returns where it met the body (`{ position, normal }`; the hit's contact point) or `{}` when something stops it first:
