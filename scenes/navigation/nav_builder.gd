@@ -561,6 +561,7 @@ static func _await_region(map: RID, region: NavigationRegion2D, probe: Vector2) 
 	region.tree_exited.connect(_forget_region.bind(map, entry), CONNECT_ONE_SHOT)
 
 
+## Drop `entry` from `map`'s awaited regions (its region left the tree).
 static func _forget_region(map: RID, entry: Dictionary) -> void:
 	var waiting: Array = _awaiting.get(map, [])
 	waiting.erase(entry)
