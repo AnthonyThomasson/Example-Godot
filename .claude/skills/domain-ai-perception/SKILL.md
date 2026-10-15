@@ -111,7 +111,9 @@ the first observe; otherwise each must be seen. People are never pre-known.
 ## Memory (`agent_memory.gd`)
 
 A generic event log: `remember(topic, data, ttl, key := "")`; `is_fresh` / `recall` / `recall_all` /
-`recall_aged` / `age_of` / `fresh` read back. A write with a `key` (the event's subject) SUPERSEDES the
+`recall_aged` / `age_of` / `fresh` read back. Its only topic-aware reads are the two the whole perception asks about:
+`under_fire()` / `under_fire_from()` (the direction the last fire came from) and `engaged()`; the snapshot reads them there and the
+face forwards them (`under_fire()`, `engaged_fresh()`). A write with a `key` (the event's subject) SUPERSEDES the
 live event with the same topic + key — something re-observed every tick stays one entry instead of
 flooding the log and volume-evicting every other expirable event. Cleanup on every write: age-expired
 first, then, while over `capacity`, the oldest expirable. Permanent events (ttl ≤ 0) never age out
