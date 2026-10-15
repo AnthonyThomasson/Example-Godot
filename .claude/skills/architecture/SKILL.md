@@ -545,17 +545,17 @@ TestBrowser ──(Back: scene change)──▶ main
 Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
 `Despawner`, `PhysicsLayers`, `DrawLayers`), which every domain may use (World-Gen's only outward code dep is
 the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into thirteen `class_name` static holders: `BallisticsConfig`
-(projectile), `PhysicsConfig` (impact + deformation + the ragdoll solver), `CharacterConfig` (walking
+only on Godot's `Image`). Tuning is split into fourteen `class_name` static holders: `BallisticsConfig`
+(projectile), `PhysicsConfig` (impact, debris and hit particles, deformation, the explosion's look, the ragdoll solver), `CharacterConfig` (walking
 push + punch + being stunned + hit zones, sides and the outfit's weight + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
 floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
 types, capacities and reload times), `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
-muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, look, the armour's zones, sides and protection numbers, a plate's durability), `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands, the vehicles' engine, skid and crash numbers) and `VehicleConfig` (Vehicles: one row per kind — size, mass, engine, brakes, steering, grip, doors and seats — one `looks` row per kind, and the shared getting-in, driving, harm, crash, camera and look numbers). World-Gen's `LayoutRules` (which rooms may
+muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, look, the armour's zones, sides and protection numbers, a plate's durability), `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands, the vehicles' engine, skid and crash numbers), `VehicleConfig` (Vehicles: one row per kind — size, mass, engine, brakes, steering, grip, doors and seats — one `looks` row per kind, and the shared getting-in, driving, harm, crash, camera and look numbers) and `LoadoutConfig` (Items: the setup choices' bounds — spare magazines, grenades — and the default outfit). World-Gen's `LayoutRules` (which rooms may
 hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
-tuning. There is no `Config` autoload. A fourteenth static holder, `PhysicsLayers`
+tuning. There is no `Config` autoload. A fifteenth static holder, `PhysicsLayers`
 (General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
-plays for doorway sides; a fifteenth, `DrawLayers` (General, interface 11), is the shared draw-order ladder every
+plays for doorway sides; a sixteenth, `DrawLayers` (General, interface 11), is the shared draw-order ladder every
 domain's z knob starts from.
 
 ## Cross-cutting conventions
