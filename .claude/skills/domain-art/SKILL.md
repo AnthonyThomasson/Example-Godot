@@ -67,4 +67,5 @@ Shared tuning: `pixel_size`, `light_from`, `turn_steps`, drop shadow (`drop_shad
 the tone ramp, and the surface-finish densities. Domain-specific proportions and colors stay in
 each domain's config (`ObjectArtConfig`, `CharacterConfig.art_*`).
 
-**Interfaces:** 12 (Objects / Character / Items / Vehicles → Art) — signatures in `architecture`.
+**Interfaces:** 12 (Objects / Character / Items / Vehicles → Art) and 13 (a sandbox's own painter, e.g. a `ticket-assets`
+showroom) — signatures in `architecture`.

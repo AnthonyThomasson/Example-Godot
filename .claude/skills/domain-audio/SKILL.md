@@ -14,6 +14,7 @@ gun.gd / projectile.gd / character*.gd / thrown_grenade.gd / explosion.gd / vehi
 Sound ──(engine_state / slip / speed, duck-typed, each frame)──▶ the vehicle a loop follows
 floor.gd ──SoundSurface.register──▶ SoundSurface ◀── Sound (floor under a footfall or a grenade's bounce)
 main.gd ──Sound.focus = the human──▶ Sound (the muffle + tinnitus of a bang)
+a sandbox ──SoundBank.recipe_for / SoundSynth.render──▶ AudioStreamWAV ─▶ its own AudioStreamPlayer2D (Sound hears nothing of it)
 ```
 
 ## Files

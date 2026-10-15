@@ -415,7 +415,11 @@ interfaces it takes part in (by number) and describes how they're implemented.
     its own input through `TestContext.inject` so the lock lets it through; the runner also builds the
     Navigation domain's draw-only `nav_debug.gd` (via the world, kept current by `nav_updater.gd`) and the
     UI's `PerformanceOverlay` for the overlay bar's global toggles. Examples of the knobs: the Physics domain's `BloodConfig.enabled` /
-    `PhysicsConfig.debris_enabled` master switches and the Audio domain's `audio.sound` switch; statics are restored after each test. Main
+    `PhysicsConfig.debris_enabled` master switches and the Audio domain's `audio.sound` switch; statics are restored after each test.
+    A sandbox (`sandboxes/`, e.g. a `ticket-assets` showroom) may also draw through Art (12: its own painter on
+    `PixelCanvas`, rendered by `PixelArt.render` / `render_turned`) and render a sound with
+    `SoundBank.recipe_for(profile)` / `SoundSynth.render(recipe, seed_value) -> AudioStreamWAV`, played on its own
+    `AudioStreamPlayer2D`; the `Sound` service hears nothing of it (16). Main
     reaches it only by changing scene to `testing/test_browser.tscn`, and the browser's Back changes scene back to
     `main.tscn` (the one thing Testing knows of Main); the UI widgets it shows
     (`test_browser_window.gd`, `test_result_hud.gd`) take plain dicts and emit signals. Nothing
@@ -525,6 +529,7 @@ Vehicle (&"vehicle", &"engine", &"skid") ──▶ EventBus ──▶ Sound ─�
 Camera ──(target.vehicle().view_zoom_out(), duck-typed)──▶ Vehicle
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display; DebugUI and the inspector outfit_view)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
+Sandbox (Testing) ──(own painter)──▶ PixelArt / PixelCanvas (Art);  Sandbox ──(recipe_for / render)──▶ SoundBank / SoundSynth (Audio) ─▶ its own AudioStreamPlayer2D
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 TestWorld ─▶ vehicle scenes (TestSetup.vehicle)

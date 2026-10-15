@@ -19,9 +19,11 @@ Use the GitHub CLI: `gh issue view`, `gh issue comment`, `gh issue edit`, `gh is
    | `bug` | `ticket-bug` |
    | `ai` | `ticket-ai` plus `ticket-story` |
    | `harness` | `ticket-harness` plus `ticket-story` |
+   | `assets` / `graphics` / `audio` | `ticket-assets` plus `ticket-story` |
 
-   No `bug` or `spike` label (no label, `ai`, `harness`, or topic tags only): `ticket-story`. A label not in the table
-   (e.g. `physics`) is a topic tag; ignore it. Kind unclear: say so, don't guess.
+   A `bug` or `spike` label wins: the kind rows don't apply. No `bug` or `spike` label (no label, `ai`, `harness`,
+   `assets`, `graphics`, `audio`, or topic tags only): `ticket-story`. A label not in the table (e.g. `physics`) is a
+   topic tag; ignore it. Kind unclear: say so, don't guess.
 3. Work it in phases (below). New kind: add `.claude/skills/ticket-<label>/SKILL.md` and a row here.
 
 ## Work in phases
@@ -34,15 +36,18 @@ Load `orchestration`. You are the coordinator: one task per phase of the kind sk
 - **Build phases go to workers.** A self-contained brief: ticket number and body, accepted plan, skills to load
   (`architecture`, the `domain-<name>` skills, `domain-testing`, `test-debug`), what to produce, how to know it is done,
   "No shortcuts", that anything it cannot decide comes back as an escalation, not a guess, and the heartbeat rule
-  (1–2 sentence `--phase` status) and the `received <id>` ack rule below.
+  (1–2 sentence `--phase` status) and the `received <id>` ack rule below. A showroom brief (`ticket-assets`) names the
+  exhibits, the references, the variants wanted and its load check and lint.
 - **Worker names** (lowercase, hyphens; a split phase adds its stage: `coding-feature-one`,
   `test-preparation-ai-scenarios`):
 
   | Phase | Name |
   |---|---|
+  | the showroom (variants before the plan) | `showroom` |
   | tests first, or a bug's failing repro | `test-preparation` |
   | building the change | `coding` |
   | green run, docs and skills | `wrap-up` |
+  | removing the showroom (before the audit) | `showroom-removal` |
   | the audit | `review` |
   | fixing the audit's findings | `coding-review-fixes` |
   | second audit, of those fixes | `review-fixes` |
@@ -81,7 +86,8 @@ accepted again. Say so when nothing relevant came in or there was nothing to reb
 
 ### Show the user
 
-Then invoke `show-me` so the user has an editor on the worktree, before the first worker starts. It reuses an open one.
+Then invoke `show-me` so the user has an editor on the worktree, before the first worker after acceptance starts. It
+reuses an open one. `ticket-assets`: also before the showroom's first feedback round.
 
 ### Feedback gate (before the audit)
 

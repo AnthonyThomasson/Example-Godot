@@ -1,6 +1,6 @@
 ---
 name: show-me
-description: Open a Godot editor on this worktree with autorun, named after it, so the user can verify the change live. Use once a ticket's plan is accepted (or a bug agreed), when the user should see finished work, and when asked to "show me".
+description: Open a Godot editor on this worktree with autorun, named after it, so the user can verify the change live. Use once a ticket's plan is accepted (or a bug agreed) or a `ticket-assets` showroom is ready, when the user should see finished work, and when asked to "show me".
 model: haiku
 ---
 
@@ -23,4 +23,5 @@ Safe to rerun: it reuses an editor already open on the worktree. Do not run test
    needs Play restarted.
 4. List the tests created or changed for this change (`git status --short tests/`, or the session) by each one's
    `"name"` from `describe()` (e.g. `Falling body keeps its draw order`), one per line, not the file name. None yet
-   (right after planning): say so. Don't run them.
+   (right after planning): say so. Don't run them. A sandbox under `sandboxes/showroom/` (`ticket-assets`): name it by
+   its `describe()` name and say it opens from Tests → SANDBOXES.
