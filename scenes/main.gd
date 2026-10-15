@@ -97,6 +97,7 @@ const PERFORMANCE_OVERLAY := preload("res://scenes/ui/overlays/performance_overl
 ## The settings page (UI), opened over the setup window by its Settings button.
 const SETTINGS_MENU := preload("res://scenes/ui/menus/settings_menu.gd")
 
+## The human player (freed in a spectator match).
 @onready var _player: Node2D = $Player
 ## Pre-game setup window (General). On a fresh launch Main opens it and waits for Start before building
 ## the world; a scripted restart skips it (see `_ready`).

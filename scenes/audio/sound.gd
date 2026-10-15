@@ -58,7 +58,7 @@ var _tinnitus_db := 0.0
 ## How far the muffle is closed (0 open .. 1 shut) and the game bus's index (-1: none).
 var _muffle := 0.0
 var _bus := -1
-var _bus_made := false
+var _bus_made := false  ## Whether this service added the game bus (and so removes it at exit).
 ## Picks variants and jitter (seeded from `SoundConfig.rng_seed`; never the gameplay RNG).
 var _rng := RandomNumberGenerator.new()
 ## Simulated seconds since the service started (advances with the tree, so it stops when the game pauses).

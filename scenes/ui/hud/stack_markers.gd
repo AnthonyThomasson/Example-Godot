@@ -18,7 +18,7 @@ const ALPHA_MINE := 0.95
 const ALPHA_HELD := 0.5
 const ALPHA_FREE := 0.25
 
-var _stack: Node = null
+var _stack: Node = null  ## The watched stack (anything with `view()`); null = none.
 var _slots: Array = []   ## The slots now drawn: { n, point, mine, held }.
 
 

@@ -5,7 +5,7 @@ extends Node2D
 
 const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
 
-@onready var _obj := get_parent()
+@onready var _obj := get_parent()  ## The EnvironmentObject this draws.
 var _art: Texture2D  ## The piece's pixel-art texture, or null for the flat shape + label.
 var _watching := false  ## Whether the Deformable's `changed` is connected yet.
 var _drawn_rotation := NAN  ## The global rotation the current drawing was made for (NAN = not drawn yet).

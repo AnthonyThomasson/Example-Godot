@@ -4,9 +4,9 @@ extends Node
 ## handle) to move `target` (a panel anchored to a screen edge), keeping `target` fully inside the viewport.
 ## Moves the target by shifting its offsets, so its anchors (and so its place on window resize) are kept.
 
-var _handle: Control
-var _target: Control
-var _dragging := false
+var _handle: Control     ## The Control the drag is started on (this node's parent).
+var _target: Control     ## The panel the drag moves.
+var _dragging := false   ## Whether the left button is held down on the handle.
 
 
 ## Make `handle` (this node's parent) drag `target`.

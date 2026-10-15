@@ -32,6 +32,7 @@ var _seg_impacts := {}
 ## collider can be rebuilt to follow the deformed shape. Filled in _build_walls().
 var _seg_colliders := {}
 
+## The WallVisuals child, redrawn when a segment is struck (null without one).
 @onready var _visuals := get_node_or_null("WallVisuals")
 
 

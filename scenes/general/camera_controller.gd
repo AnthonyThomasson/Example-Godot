@@ -63,7 +63,7 @@ var _mouse_in_window: bool = false  ## Edge panning needs a live pointer: not ye
 @export var shake_decay: float = 1.2          ## Trauma lost per second.
 @export var shake_speed: float = 38.0         ## How fast the view is thrown about (rad/s of the fastest wobble).
 var _trauma: float = 0.0                      ## 0..1, how much the camera is shaking now.
-var _shake_clock: float = 0.0
+var _shake_clock: float = 0.0                 ## Phase (rad) of the shake's wobbles, advanced at `shake_speed` while shaking.
 
 
 func _ready() -> void:

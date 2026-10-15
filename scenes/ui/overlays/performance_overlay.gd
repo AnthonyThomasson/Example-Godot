@@ -26,11 +26,11 @@ const TARGET_MS := 16.7
 ## Seconds between text refreshes (the graph samples every frame).
 const REFRESH := 0.25
 
-var _label: Label
-var _graph: Control
+var _label: Label                      ## The text readout, refreshed every `REFRESH` s.
+var _graph: Control                    ## The frame-time graph, redrawn every frame.
 var _frame_ms := PackedFloat32Array()  ## Ring buffer of recent frame times in ms.
 var _next := 0                         ## Slot the next sample is written to (the oldest one).
-var _since_refresh := 0.0
+var _since_refresh := 0.0              ## Seconds since the text was last refreshed.
 
 
 func _ready() -> void:

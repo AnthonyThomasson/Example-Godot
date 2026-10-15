@@ -28,8 +28,8 @@ class_name ArrangementDefinitions
 ## `options` until solid footprints cover `target` (a fraction of the interior), bounded and scaled
 ## by WorldGenConfig. One palette is picked per room and applied to every "wood"/"fabric" object.
 
-static var _arrangements: Dictionary = {}
-static var _recipes: Dictionary = {}
+static var _arrangements: Dictionary = {}  ## Every catalog's ARRANGEMENTS by key, filled on the first lookup.
+static var _recipes: Dictionary = {}       ## Every catalog's RECIPES by room type, filled on the first lookup.
 
 ## GeneralCatalog holds the shared/combined entries; each other catalog owns its
 ## category. Keys are unique across catalogs, so the merge never collides.

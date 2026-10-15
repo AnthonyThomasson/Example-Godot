@@ -9,6 +9,7 @@ class_name ObjectDefinitions
 ## Object fields are the Objects domain's schema (object_factory.gd). A "wood" or "fabric"
 ## `material` also takes the room palette's tone.
 
+## Every catalog's OBJECTS merged by key, filled on the first lookup.
 static var _catalog: Dictionary = {}
 
 ## Keys are unique across catalogs, so the merge never collides.
