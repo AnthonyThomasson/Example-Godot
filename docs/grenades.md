@@ -138,8 +138,9 @@ and then it is as before. `Character.take_stun(blind, deaf)` applies it (and pos
 `stun_level()` (0..1) read it, `stun_view()` gives `{ blind, blind_total, deaf, level }` (seconds left blind and deaf, the blind
 seconds at the burst, the level) to the UI, and a new stun takes the longer of the old and new timers, blind and deaf each. The four numbers live in
 `CharacterConfig` (they tune the body, not the item). A character also tells a controller what it needs to judge a place in time: `posture_coverage(posture)` (the
-height of the body standing and crouched, on the coverage scale) and `run_speed()` (px/s standing and running, slower while stunned or weighed down by the outfit), so the AI keeps no copy of either.
-Tests: `character/stunned_slow_and_sway`, `character/posture_and_run_reads`.
+height of the body standing and crouched, on the coverage scale), `run_speed()` (px/s standing and running, slower while stunned or weighed down by the outfit) and
+`walk_speed()` (px/s walking, slowed the same way: what the AI counts on once its stamina is low), so the AI keeps no copy of any.
+Tests: `character/stunned_slow_and_sway`, `character/posture_and_run_reads`, `ai/grenade/throw_timing_counts_slowed_walk`.
 
 **G14. The stunned player.** The player's screen goes white at the burst and fades back over the blind time through a frozen afterimage
 of the moment of the flash (`StunScreen`, `watch(character)`, `drawn()` -> `{ white, afterimage, remaining }`); a bang that only deafens
@@ -242,7 +243,7 @@ Test: `ai/grenade/grenade_overlay_draws`.
 
 - **Items** (`scenes/items/`): `GrenadeConfig` (the numbers above, one row per kind), `GrenadeItem` (count, wind-up, `throw` stance),
   `ThrownGrenade` (flight, bounce, fuse), the art, `ItemRegistry` (`STUN_SLOT`, `FRAG_SLOT`, `create(id, count)`), `LoadoutConfig`.
-- **Character**: `item_count`, `throw_stats`, `aim_target`, `posture_coverage` and `run_speed` (what the AI judges a place in time by), the stun state
+- **Character**: `item_count`, `throw_stats`, `aim_target`, `posture_coverage`, `run_speed` and `walk_speed` (what the AI judges a place in time by), the stun state
   (`take_stun`, `is_blind`, `is_deaf`, `stun_level`, `stun_view`; its numbers are `CharacterConfig`'s) and its effect on speed, running and aim, `blast_push` for ragdolls.
 - **Projectile**: `Explosion.frag` / `Explosion.stun`, and `ProjectileSpawner.spawn`'s `max_range`. **Physics**: the explosion FX.
   **Audio**, **General** (camera, EventBus topics `throw`, `grenade`, `explosion`, `stun`), **UI** (`StunScreen`, the setup window,
