@@ -282,7 +282,10 @@ interfaces it takes part in (by number) and describes how they're implemented.
    (movement/actions lock) and `interaction_label()` (HUD). It discovers objects through the
    **interactable contract** — every world object implements `get_interactions() -> Array` (plain
    data dicts: `id`, `label`, optional `move_to` / `requires_item`), advertised via the optional
-   `interactions` object field. The character never learns what an interaction *means*.
+   `interactions` object field. The character never learns what an interaction *means*. When an interaction ends the component hands
+   the object to the character's `keep_clear_of(body)`, which keeps their collision exception until the character's circle no longer
+   overlaps it (then drops it; a freed body is forgotten), and calls `stop_clearing(body) -> bool` when the character goes straight back
+   onto that object, so its exception stays.
 
 9. **Main / AI → Navigation** (leaf: builds the map, everyone else just pathfinds)
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
@@ -376,7 +379,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  of each redefining the same magic number — the single point of truth for that layer id. The character's
 	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), a thrown grenade's flight (`items/thrown_grenade.gd`), the
 	  bullet's `collision_mask` (`projectile/projectile.gd`), the blast's lines (`projectile/explosion.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
-	  checks and clearing check (`scenes/vehicle/`) read it too.
+	  checks and pile queries (`scenes/vehicle/`) and the character's clearing check (`keep_clear_of`) read it too.
     - `DrawLayers` (`general/draw_layers.gd`, a `class_name` static holder) — the world's draw-order ladder, one rung per kind of thing,
 	  so what lies on the floor, what a vehicle covers and what flies over it keep one order across domains: `FLOOR` −5 (Objects' `Floor`,
 	  via `ObjectArtConfig.floor_z_index`) < `RUG` −4 (rugs and mats, `ObjectArtConfig.rug_z_index`) < `BLOOD` −3 (Physics: splats, a
@@ -494,7 +497,9 @@ interfaces it takes part in (by number) and describes how they're implemented.
       held item away (`current_item()` null) and disables the collision shape; the fold is the drawn crouch fold (`posture_folded()` reads it);
       and `end_ride()` (on its own feet again, shape on, item back). It also reads `facing`, `radius`, `speed`, `global_position`, and for a
       character it strikes (a body in the group `characters`, interface 7) `is_dead`, `health`, `velocity`, `get_mass()` and calls
-      `apply_impulse` / `take_damage(amount)`; collision exceptions are Godot's own (`add_collision_exception_with` / `remove_...`).
+      `apply_impulse` / `take_damage(amount)`; collision exceptions are Godot's own (`add_collision_exception_with` / `remove_...`); after a
+      ride the vehicle goes to the character's `keep_clear_of(body)` (as in interface 8: the exception is dropped once the body is clear of it),
+      and boarding the vehicle just left calls `stop_clearing(body)`.
     - **The vehicle** (`vehicle.gd`, a `RigidBody2D` on `PhysicsLayers.SOLID`, found by the group `vehicles`): `doors() -> Array`
       (`[{ id, kind` (`swing` / `slide` / `rear`)`, seat, handle, open` (0..1)`, hinge, angle, offset }]`, world space), `seats() -> Array`
       (`[{ id, occupant }]`), `driver() -> Node`, `board(character, door_id) -> RefCounted` (the ride, or null when that door cannot be used
