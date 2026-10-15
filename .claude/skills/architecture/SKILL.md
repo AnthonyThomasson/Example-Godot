@@ -198,7 +198,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `normalize(loadout)` (a `{ weapon, magazine, spares, stuns, frags, outfit }` dict made valid; `outfit_of(loadout)` fills every outfit slot, a missing or unfitting
    id taking `default_outfit`'s: plain clothes, and clears both plates unless the vest holds plates), `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout` and dresses it in the whole
    outfit through `Character.set_outfit`) and `random(rng)` (with `random_outfit(rng)`, drawn after the gun). **Outfits** (`docs/outfits.md`): `OutfitConfig`
-   (static holder: the garment and plate rows, `GARMENT_SLOTS` / `PLATE_SLOTS` (String keys `head body vest pants feet front_plate back_plate`), `ZONES`, `SIDES`,
+   (static holder: the garment and plate rows, `GARMENT_SLOTS` / `PLATE_SLOTS` (String keys `head body vest pants feet front_plate back_plate`),
    `choices(slot)`, `fits(slot, id)`, `name_of(slot, id)`) and `Outfit` (`RefCounted`, one character's worn set: `set_ids(ids)`, `ids()`, `worn(slot)`, `condition(slot)`,
    `layer(zone, side)` (the armour a round meets there: `{}` or `{ stop_power, penetration, material, color, blunt, reduction, blast, plate }`), `wear(zone, side, damage)`,
    `weight()`, `look()` (what the art draws), `view()` (what the UI shows) and `revision` (bumped by every change, which the art watches)). The
