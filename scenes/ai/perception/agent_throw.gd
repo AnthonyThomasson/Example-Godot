@@ -48,6 +48,12 @@ var evade_margin: float = 120.0       ## How far past a frag's blast radius its 
 var _stats := {}                      ## Kind -> what the NPC knows of that grenade (`Character.throw_stats`, `ThrownGrenade.throw_stats`); see `learn`.
 var _stand := 100.0                  ## The height of a standing body on the coverage scale (`Character.posture_coverage`); tall until it is learned.
 var _crouch := 100.0                 ## The same for a crouched one.
+var _character: Node                 ## The NPC's body (`bind`): the grenades it carries, its heights and its pace.
+
+
+## Hand in the NPC's body. Called once by `AgentPerception.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 # --- The grenades it carries ---------------------------------------------------------------------------------
@@ -73,16 +79,16 @@ func learn(stats: Dictionary) -> void:
 		_stats[stats["kind"]] = stats
 
 
-## Learn the numbers of every grenade `character` carries (`Character.throw_stats`).
-func learn_carried(character) -> void:
+## Learn the numbers of every grenade the NPC carries (`Character.throw_stats`).
+func learn_carried() -> void:
 	for slot: int in SLOTS.values():
-		learn(character.throw_stats(slot))
+		learn(_character.throw_stats(slot))
 
+## Learn the heights of a standing and of a crouched body off the NPC's own (`Character.posture_coverage`), the figures furniture is measured against.
 
-## Learn the heights of a standing and of a crouched body off `character` (`Character.posture_coverage`), the figures furniture is measured against.
-func learn_body(character) -> void:
-	_stand = character.posture_coverage(&"stand")
-	_crouch = character.posture_coverage(&"crouch")
+func learn_body() -> void:
+	_stand = _character.posture_coverage(&"stand")
+	_crouch = _character.posture_coverage(&"crouch")
 
 
 ## The height of a standing body on the coverage scale.
@@ -209,8 +215,8 @@ func _candidates(space, burst: Vector2, from: Vector2, out_r: float, exclude: Ar
 
 ## The speed (px/s) the NPC counts on to cover ground when it runs for it (`RUN_RELIABILITY` of `Character.run_speed`), or its walk
 ## (`Character.walk_speed`) once its stamina is low.
-func run_speed(character) -> float:
-	return character.run_speed() * RUN_RELIABILITY if character.stamina_fraction() > RUN_STAMINA else character.walk_speed()
+func run_speed() -> float:
+	return _character.run_speed() * RUN_RELIABILITY if _character.stamina_fraction() > RUN_STAMINA else _character.walk_speed()
 
 
 # --- The lob -------------------------------------------------------------------------------------------------

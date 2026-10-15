@@ -359,7 +359,7 @@ const GUARD_PREVIEW_RANGE := 2000.0
 ## (`resume_point`, `resume_label`), the doorways it is leaving alone (`rearm`: `{ opening, left }`), its `range`, the
 ## next uncleared doorway on the current walk (`ahead`: `{ opening, into, dist, pos }`, or {}), and the rects of the rooms
 ## this NPC regards as cleared (`cleared_rooms`). Computed only when asked; nothing reads it back.
-func debug_entry_view(character) -> Dictionary:
+func debug_entry_view() -> Dictionary:
 	var guard := {
 		"detour": _primitive == &"entry" and not _resume.is_empty(),
 		"resume_point": _resume.get("point", Vector2.INF),
@@ -379,9 +379,9 @@ func debug_entry_view(character) -> Dictionary:
 				guard["cleared_rooms"].append(r["rect"])
 		var walk: Dictionary = _loco.path_ahead() if _primitive != &"entry" else {}
 		if not walk.is_empty():
-			var gate: Dictionary = _perception.threshold_ahead(character, walk["path"], walk["index"], GUARD_PREVIEW_RANGE)
+			var gate: Dictionary = _perception.threshold_ahead(walk["path"], walk["index"], GUARD_PREVIEW_RANGE)
 			if not gate.is_empty():
-				var geo: Dictionary = _perception.entry_geometry(character, gate["opening"], gate["into"])
+				var geo: Dictionary = _perception.entry_geometry(gate["opening"], gate["into"])
 				if not geo.is_empty():
 					gate["pos"] = geo["pos"]
 					guard["ahead"] = gate
@@ -423,7 +423,7 @@ func debug_combat(character) -> Dictionary:
 	var fire_clear := false
 	if engaged and character != null:
 		in_range = character.global_position.distance_to(_engage_pos) <= shoot_range
-		fire_clear = in_range and _perception.has_line_to(character, _engage_node, _engage_pos)
+		fire_clear = in_range and _perception.has_line_to(_engage_node, _engage_pos)
 	var fighting := _primitive in [&"engage", &"melee"]
 	var obj_pos = null
 	if _primitive == &"interact" and is_instance_valid(_target_obj) and _target_obj is Node2D:
@@ -568,7 +568,7 @@ func _walk_bodies(character) -> Array:
 			spots.append(c["pos"])
 	if spots.is_empty():
 		return _known
-	var empty: Array = _perception.visible_points(character, spots)
+	var empty: Array = _perception.visible_points(spots)
 	if empty.is_empty():
 		return _known
 	return _known.filter(func(c): return c["visible"] or not empty.has(c["pos"]))
@@ -783,7 +783,7 @@ func _apply_watch(character, delta: float) -> void:
 			if _entry.phase == "bang":
 				return  # Turned away from the door for the stun: not at a threat in it.
 	var t: Dictionary = _watch.threat(_hostiles, _engage_id)
-	if not t.is_empty() and not t["visible"] and not _perception.has_line_to(character, t["node"], t["pos"]):
+	if not t.is_empty() and not t["visible"] and not _perception.has_line_to(t["node"], t["pos"]):
 		t = {}  # Remembered behind a wall: not worth staring at the wall for.
 	if not t.is_empty():
 		_threat = t
@@ -1051,8 +1051,8 @@ func _entry_guard(character) -> void:
 	var walk: Dictionary = _loco.path_ahead()
 	if walk.is_empty():
 		return
-	var gate: Dictionary = _perception.threshold_ahead(character, walk["path"], walk["index"], entry_guard_range)
-	var passing := _passing_gate(character, walk, gate)
+	var gate: Dictionary = _perception.threshold_ahead(walk["path"], walk["index"], entry_guard_range)
+	var passing := _passing_gate(walk, gate)
 	if not passing.is_empty():
 		gate = passing
 	if gate.is_empty() or float(_guard_off.get(gate["opening"], -1.0)) > _guard_clock:
@@ -1072,7 +1072,7 @@ func _guard_approach(character) -> void:
 	var walk: Dictionary = _loco.path_ahead()
 	if walk.is_empty():
 		return
-	var passing := _passing_gate(character, walk, {})
+	var passing := _passing_gate(walk, {})
 	if passing.is_empty() or passing["opening"] == _entry.opening:
 		return
 	_entry.abandon()
@@ -1082,8 +1082,8 @@ func _guard_approach(character) -> void:
 ## The doorway the walk goes past before it reaches `gate` (the doorway it crosses, {} for none), as a gate to secure (E15), or {}:
 ## one in a room not cleared, nearer along the walk than the crossing, that no teammate is working (an ally on its radio is
 ## entering it) and that was not just secured or given up.
-func _passing_gate(character, walk: Dictionary, gate: Dictionary) -> Dictionary:
-	var passing: Dictionary = _perception.passing_ahead(character, walk["path"], walk["index"], entry_guard_range)
+func _passing_gate(walk: Dictionary, gate: Dictionary) -> Dictionary:
+	var passing: Dictionary = _perception.passing_ahead(walk["path"], walk["index"], entry_guard_range)
 	if passing.is_empty() or (not gate.is_empty() and float(passing["dist"]) >= float(gate["dist"])):
 		return {}
 	if float(_guard_off.get(passing["opening"], -1.0)) > _guard_clock or not _perception.entry_team(passing["opening"]).is_empty():
@@ -1162,7 +1162,7 @@ func _apply_interact(character) -> void:
 ## has begun the throw is committed, standing where it is.
 func _apply_throw(character, delta: float) -> void:
 	if _combat.throw_stage != "away":
-		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(character, character.global_position, _throw_spot)
+		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(character.global_position, _throw_spot)
 		if blocked or _combat.throw_step(character, delta) == &"failed":
 			_end_throw()
 		return

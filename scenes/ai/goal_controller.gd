@@ -492,7 +492,7 @@ func _on_event(topic: StringName, data: Dictionary) -> void:
 func goal_text() -> String:
 	if _perception == null or not is_instance_valid(_character):
 		return goal.replace("{gun}", "gun")
-	return _perception.fill_goal(goal, _character)
+	return _perception.fill_goal(goal)
 
 
 ## Read-only: the decision path the NPC is carrying out, as ids ("combat/t_12/flank/side_left").
@@ -566,7 +566,7 @@ func debug_entry() -> Dictionary:
 func debug_entry_view() -> Dictionary:
 	if _behavior == null or _character == null:
 		return {}
-	return _behavior.debug_entry_view(_character)
+	return _behavior.debug_entry_view()
 
 
 ## Read-only: the behaviour's running search-coverage state (which room sample points it has seen vs.
@@ -581,7 +581,7 @@ func debug_search_coverage() -> Dictionary:
 func debug_sight_end(to: Vector2) -> Vector2:
 	if _perception == null or _character == null:
 		return to
-	return _perception.sight_end(_character, to)
+	return _perception.sight_end(to)
 
 
 ## Read-only: what the NPC has heard and been told (gunfire heard, under-fire direction, ally callouts,
@@ -679,13 +679,13 @@ func control(character, delta: float) -> void:
 		return
 	if _character == null:
 		_character = character
-		_perception.set_faction(character.faction)
+		_perception.bind(character)
 		_client.set_npc_name(_npc_name())
 	_decide_timer -= delta
 	# SENSE.
 	_process_events(character)
 	_perception.openings = openings
-	_perception.observe(character, rooms)
+	_perception.observe(rooms)
 	_react_to_grenades(character)
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
@@ -709,7 +709,7 @@ func control(character, delta: float) -> void:
 		if _force:
 			_maybe_interrupt(character)
 	elif _should_decide():
-		_start_decision(character)
+		_start_decision()
 	# ACT.
 	_behavior.apply(character, delta)
 	for step in _behavior.take_entry_calls():
@@ -745,22 +745,22 @@ func _should_decide() -> bool:
 func _maybe_interrupt(character) -> void:
 	if _behavior.evading() or character.is_blind():
 		return
-	if _planner.entry_for(_perception.quick_facts(character)) != _planner.current_entry():
+	if _planner.entry_for(_perception.quick_facts()) != _planner.current_entry():
 		if Budget.claim():  # Else `_force` stays and the restart is tried again next frame.
-			_start_decision(character)
+			_start_decision()
 	else:
 		_force = false
 
 
 ## Sense the situation and start a decision walk over it. The planner answers asynchronously via
 ## `decided` / `failed` (the latter wired to the behaviour's steady-stance fallback).
-func _start_decision(character) -> void:
+func _start_decision() -> void:
 	_decisions += 1
 	_decision_reason = _force_reason if _force else "cadence"
 	_force = false
 	_decide_timer = decide_interval
 	_apply_config()  # Pick up any export retuned at runtime before sensing + deciding.
-	var snapshot: Dictionary = _perception.sense(character, rooms, goal, _behavior.activity_text())
+	var snapshot: Dictionary = _perception.sense(rooms, goal, _behavior.activity_text())
 	_last_facts = snapshot["facts"]
 	_last_options = snapshot["options"]
 	_planner.begin(snapshot, _behavior.ongoing())
@@ -779,15 +779,15 @@ func _process_events(character) -> void:
 			&"hit":
 				if deaf and ev[1].get("victim") != character:
 					continue
-				if _perception.process_hit(character, ev[1]) and not _behavior.in_combat():
+				if _perception.process_hit(ev[1]) and not _behavior.in_combat():
 					_force_now("attacked")
 			&"callout":
 				if hear_callouts and not deaf:
-					_perception.process_callout(character, ev[1])
+					_perception.process_callout(ev[1])
 			&"grenade":
-				_perception.process_grenade(character, ev[1], deaf)
+				_perception.process_grenade(ev[1], deaf)
 			&"explosion":
-				_perception.process_explosion(character, ev[1])
+				_perception.process_explosion(ev[1])
 	_event_queue.clear()
 
 
@@ -796,7 +796,7 @@ func _process_events(character) -> void:
 ## its sight returns.
 func _react_to_grenades(character) -> void:
 	_behavior.poll_throw(character)
-	_behavior.set_evade(_perception.evade_plan(character))
+	_behavior.set_evade(_perception.evade_plan())
 	for grenade in _perception.grenade_announcements():
 		if send_callouts:
 			_post_grenade_call(grenade)

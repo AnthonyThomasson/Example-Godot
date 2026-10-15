@@ -29,6 +29,12 @@ var max_contacts_in_state: int = 4     ## GoalController.max_contacts_in_state
 var search_memory_ttl: float = 60.0    ## GoalController.search_memory_ttl
 
 var rooms: Array = []  ## The house rooms for the decision being built (set at the top of `AgentSnapshot.build()`).
+var _character: Node   ## The NPC's body, handed in once by `bind`.
+
+
+## Hand in the NPC's body. Called once by `AgentSnapshot.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## A room type as Von reads it ("kitchen_living" → "kitchen living").
@@ -164,10 +170,10 @@ func contact_posture_text(posture: StringName) -> String:
 
 ## What the NPC calls its gun in the text Von reads: its name in lower case ("pistol", "assault rifle"; an
 ## acronym like "SMG" stays as written), or "gun" with none.
-func gun_noun(character, gun: int) -> String:
+func gun_noun(gun: int) -> String:
 	if gun < 0:
 		return "gun"
-	var name: String = character.item_name(gun)
+	var name: String = _character.item_name(gun)
 	return name if name == name.to_upper() else name.to_lower()
 
 ## A flank side's status: "route passes X" when getting there walks past a known hostile, "taken by X"

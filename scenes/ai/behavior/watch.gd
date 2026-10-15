@@ -89,7 +89,7 @@ func travel_point(character) -> Vector2:
 			if walked + d > look_ahead:
 				return best
 			var p := prev.lerp(path[i], d / seg)
-			if not _perception.has_line_to(character, null, p):
+			if not _perception.has_line_to(null, p):
 				return best
 			best = p
 		walked += seg
@@ -143,7 +143,7 @@ func _doors_of(character, room: String) -> Array:
 		return points
 	for d in _perception.room_doorways(room):
 		var p: Vector2 = d["pos"]
-		if here.distance_to(p) >= DOOR_MIN_DISTANCE and _perception.has_line_to(character, null, p):
+		if here.distance_to(p) >= DOOR_MIN_DISTANCE and _perception.has_line_to(null, p):
 			points.append(p)
 	points.sort_custom(func(a, b): return (a - here).angle() < (b - here).angle())
 	return points

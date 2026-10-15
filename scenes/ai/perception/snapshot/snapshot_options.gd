@@ -14,6 +14,7 @@ var know := {}            ## The knowledge the perception hands in for this deci
 var _v: SnapshotVocab  ## The shared vocabulary and tuning; see snapshot_vocab.gd.
 var _memory: RefCounted   ## The agent's event memory (read-only here); see agent_memory.gd.
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
+var _character: Node      ## The NPC's body, handed in once by `bind`.
 var _entry: RefCounted    ## The doorway geometry; see agent_entry.gd.
 var _throw: AgentThrow    ## The grenade geometry (the lob, the danger zone, the escape); see agent_throw.gd.
 
@@ -25,6 +26,11 @@ func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted, entry:
 	_tactics = tactics
 	_entry = entry
 	_throw = throw
+
+
+## Hand in the NPC's body. Called once by `AgentSnapshot.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## Which hostile to fight: one option per known hostile, with what makes it urgent or easy.
@@ -67,10 +73,10 @@ func hostile_group(ctx: Dictionary, hostiles: Array, analyses: Dictionary) -> Di
 
 ## Reloading the gun: one option, offered only while a carried magazine would add rounds, so the
 ## planner takes it without asking (a lone option).
-func reload_group(character, gun: int) -> Dictionary:
+func reload_group(gun: int) -> Dictionary:
 	var options: Array = []
-	if gun >= 0 and character.can_reload(gun):
-		var text := "reload your %s" % _v.gun_noun(character, gun)
+	if gun >= 0 and _character.can_reload(gun):
+		var text := "reload your %s" % _v.gun_noun(gun)
 		options.append({ "id": "reload", "label": text, "desc": text })
 	return { "summary": "a spare magazine is carried", "options": options }
 
@@ -175,7 +181,7 @@ func grenade_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 		var radius := _throw.radius_of(kind)
 		var cornered := false
 		if _throw.in_zone(space, kind, radius, spot, self_pos, _throw.stand_height(), rids):
-			var way: Dictionary = _throw.escape(space, ctx["map"], kind, radius, spot, self_pos, _throw.fuse_of(kind), _throw.run_speed(ctx["character"]), rids)
+			var way: Dictionary = _throw.escape(space, ctx["map"], kind, radius, spot, self_pos, _throw.fuse_of(kind), _throw.run_speed(), rids)
 			cornered = (way["spot"] as Vector2) == Vector2.INF
 		var what := "frag" if kind == &"frag" else "stun"
 		options.append({
@@ -507,7 +513,7 @@ func explore_group(ctx: Dictionary, rooms: Array, entered := {}) -> Dictionary:
 
 ## The object interactions the NPC knows of: one option per DISTINCT action label, pointing at the
 ## nearest known object offering it (item-gated). Not capped — Von ranks them against the goal.
-func interaction_group(character, self_pos: Vector2) -> Dictionary:
+func interaction_group(self_pos: Vector2) -> Dictionary:
 	var known_objs: Dictionary = know["known_object_ids"]
 	var nearest := {}  # action label -> nearest known object + its spec (+ squared distance).
 	for obj in know["interactables"]:
@@ -516,7 +522,7 @@ func interaction_group(character, self_pos: Vector2) -> Dictionary:
 		var d: float = obj.global_position.distance_squared_to(self_pos)
 		for spec in obj.get_interactions():
 			var needed: int = spec.get("requires_item", 0)
-			if needed != 0 and not character.has_item(needed):
+			if needed != 0 and not _character.has_item(needed):
 				continue
 			var label: String = spec.get("label", spec.get("id", ""))
 			if not nearest.has(label) or d < nearest[label]["d"]:

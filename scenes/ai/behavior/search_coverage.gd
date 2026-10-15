@@ -54,7 +54,7 @@ func begin(character) -> void:
 ## turn the gaze toward the nearest unseen point and, when it is far or its line is blocked (behind furniture), walk
 ## toward it so a new vantage reveals it. True once `target_fraction` of the points are seen or the budget runs out.
 func step(character, delta: float) -> bool:
-	for p in _perception.visible_points(character, unseen):
+	for p in _perception.visible_points(unseen):
 		unseen.erase(p)
 	budget -= delta
 	if unseen.size() <= floori(points.size() * (1.0 - target_fraction)) or budget <= 0.0:
@@ -62,7 +62,7 @@ func step(character, delta: float) -> bool:
 	var self_pos: Vector2 = character.global_position
 	target = _nearest(self_pos, unseen)
 	Watch.ease_gaze(character, target, look_rate, delta)
-	if self_pos.distance_to(target) > approach or not _perception.has_line_to(character, null, target):
+	if self_pos.distance_to(target) > approach or not _perception.has_line_to(null, target):
 		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
 	else:
 		character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.

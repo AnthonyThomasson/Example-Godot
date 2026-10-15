@@ -181,7 +181,7 @@ func begin(character, params: Dictionary) -> bool:
 	opening = str(params.get("opening", ""))
 	into = str(params.get("into", ""))
 	secure = bool(params.get("secure", false))
-	_geo = _perception.entry_geometry(character, opening, into)
+	_geo = _perception.entry_geometry(opening, into)
 	if _geo.is_empty():
 		phase = "done"
 		return false
@@ -639,7 +639,7 @@ func _bang_due(character, team: Array, delta: float) -> bool:
 	if _thrower(team) != _self_id:
 		_bang_wait += delta  # Waiting for the thrower to call the bang.
 		return false
-	if not _plan_bang(character):
+	if not _plan_bang():
 		_give_up_bang()
 		return false
 	_bang_stage = "go"
@@ -677,7 +677,7 @@ func _give_up_bang() -> void:
 ## clears the jamb, with `BANG_EDGE_MARGIN` to spare either side). The target is the room's far side, `BANG_DEPTHS` of the way in and
 ## `BANG_ACROSS` of the way across, at least `BANG_MIN_DEPTH` from the door; the first of them that some spot can reach wins, the thrower's
 ## own slot before a step out in front of the door (`BANG_STEP_ALONG`). False when nowhere gives a clear lob.
-func _plan_bang(character) -> bool:
+func _plan_bang() -> bool:
 	var door: Vector2 = _geo["pos"]
 	var out: Vector2 = _geo["out"]
 	var along: Vector2 = _geo["along"]
@@ -695,7 +695,7 @@ func _plan_bang(character) -> bool:
 			if not room.grow(-30.0).has_point(target) or target.distance_to(door) < BANG_MIN_DEPTH:
 				continue
 			for spot: Vector2 in spots:
-				if _clear_lob(character, spot, target):
+				if _clear_lob(spot, target):
 					_bang_spot = spot
 					_bang_target = target
 					_bang_route = [_loco.reachable(door + out * maxf(BANG_STEP_OUT, (spot - door).dot(out)) + along * (_stack_point() - door).dot(along)), spot]
@@ -706,13 +706,13 @@ func _plan_bang(character) -> bool:
 ## Whether a stun thrown from the hand of a thrower standing at `spot` and facing `target` flies to it clear of the jamb: its throwing hand
 ## is `BANG_HAND_REACH` to its right, and the lob must be clear from there and `BANG_EDGE_MARGIN` either side of it. The target is within the
 ## stun's throw reach (`Combat.throw_reach`) of the spot, so the thrower throws from where it stands and does not close in.
-func _clear_lob(character, spot: Vector2, target: Vector2) -> bool:
+func _clear_lob(spot: Vector2, target: Vector2) -> bool:
 	if spot.distance_to(target) > _combat.throw_reach(_perception.grenade_range(&"stun")):
 		return false
 	var toward := (target - spot).normalized()
 	var hand := spot + toward.rotated(PI * 0.5) * BANG_HAND_REACH
 	for lateral: float in [0.0, BANG_EDGE_MARGIN, -BANG_EDGE_MARGIN]:
-		if not _perception.can_lob(character, hand + toward.rotated(PI * 0.5) * lateral, target, &"stun"):
+		if not _perception.can_lob(hand + toward.rotated(PI * 0.5) * lateral, target, &"stun"):
 			return false
 	return true
 
@@ -797,7 +797,7 @@ func _start_pie(character, team: Array) -> void:
 ## Walk the pie arc a step at a time; at each step look through the door until the gaze settles plus `pie_dwell`,
 ## noting what is seen. When the arc is done: alone, slice the other side too; else wait for the stack, then go in.
 func _tick_pie(character, team: Array, delta: float) -> void:
-	_note_seen(character)
+	_note_seen()
 	if not team.is_empty():
 		solo = false  # An ally claimed a slot: no second side, it joins the stack.
 	if hostile_in_view:
@@ -850,8 +850,8 @@ func _stack_ready(team: Array) -> bool:
 
 
 ## Drop every room point and corner now in sight from the unseen sets, and update the share seen.
-func _note_seen(character) -> void:
-	for p in _perception.visible_points(character, _unseen):
+func _note_seen() -> void:
+	for p in _perception.visible_points(_unseen):
 		_unseen.erase(p)
 	if not _points.is_empty():
 		seen_fraction = 1.0 - float(_unseen.size()) / float(_points.size())
@@ -860,7 +860,7 @@ func _note_seen(character) -> void:
 	for i in corners.size():
 		if not _corners_seen.get(i, false):
 			unseen_corners.append(corners[i]["pos"])
-	for p in _perception.visible_points(character, unseen_corners):
+	for p in _perception.visible_points(unseen_corners):
 		for i in corners.size():
 			if corners[i]["pos"] == p:
 				_corners_seen[i] = true
@@ -1024,7 +1024,7 @@ func _watch_doors(character) -> Array:
 	var out: Array = []
 	var room: Rect2 = (_geo["room"] as Rect2).grow(-COVER_INSET)
 	for d in _perception.entry_watch_doors(into, opening):
-		var g: Dictionary = _perception.entry_geometry(character, d["id"], d["into"])
+		var g: Dictionary = _perception.entry_geometry(d["id"], d["into"])
 		if g.is_empty():
 			continue
 		var pos: Vector2 = g["pos"]

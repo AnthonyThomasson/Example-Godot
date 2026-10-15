@@ -88,7 +88,7 @@ func has_line_of_fire(character, target: Dictionary) -> bool:
 	if target.is_empty():
 		return false
 	var pos: Vector2 = target["pos"]
-	return character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(character, target["node"], pos)
+	return character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(target["node"], pos)
 
 
 ## Shoot `target` (a known-contact dict) when it can be shot at (`can_fire_at`), once the facing has settled on it; aims at it
@@ -106,7 +106,7 @@ func fire_at_will(character, target: Dictionary) -> void:
 func ambush(character, node, pos: Vector2) -> void:
 	character.move_input = Vector2.ZERO
 	if character.global_position.distance_to(pos) <= shoot_range \
-			and _perception.has_line_to(character, node, pos) and fire_timer <= 0.0 and _faces(character, pos):
+			and _perception.has_line_to(node, pos) and fire_timer <= 0.0 and _faces(character, pos):
 		shoot(character)
 
 
@@ -129,7 +129,7 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 			dest_timer = 0.0  # Re-pick a firing spot immediately on peeking out.
 		return
 	# PEEK: take the shot if a clear line to the known position is in range, else reposition to get one.
-	if dist <= shoot_range and _perception.has_line_to(character, node, pos):
+	if dist <= shoot_range and _perception.has_line_to(node, pos):
 		character.move_input = Vector2.ZERO
 		# Shoot only once the facing has settled on it. A refused shot (a barrel against a wall stepping back, a reload under
 		# way) keeps the NPC peeking until it fires, rather than ducking without having fired; a click on an empty gun
@@ -342,7 +342,7 @@ func _faces(character, pos: Vector2) -> bool:
 ## when no suitable spot exists this sample. While holding ground, spots are restricted to inside the house and the
 ## peek fallback holds position instead of advancing out.
 func _choose_dest(character, kind: String, node, pos: Vector2, hold_ground: bool) -> Vector2:
-	var spots: Dictionary = _perception.combat_spots(character, node, pos, ring_radius, ring_count)
+	var spots: Dictionary = _perception.combat_spots(node, pos, ring_radius, ring_count)
 	var fire: Array = spots["fire"]
 	var cover: Array = spots["cover"]
 	if hold_ground:

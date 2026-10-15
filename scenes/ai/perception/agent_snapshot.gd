@@ -27,6 +27,7 @@ var _sections := SnapshotSections.new()  ## The state text; see snapshot_section
 var _options := SnapshotOptions.new()    ## The option groups; see snapshot_options.gd.
 var _memory: RefCounted   ## The agent's event memory (read-only here); see agent_memory.gd.
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
+var _character: Node      ## The NPC's body, handed in once by `bind`.
 
 
 ## Capture the collaborators the author reads: the event memory, the combat geometry, the doorway geometry and the grenade geometry.
@@ -39,25 +40,32 @@ func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: Re
 	_options.setup(vocab, memory, tactics, entry, throw)
 
 
+## Hand in the NPC's body, for the author and its three parts. Called once by `AgentPerception.bind()`.
+func bind(character: Node) -> void:
+	_character = character
+	vocab.bind(character)
+	_sections.bind(character)
+	_options.bind(character)
+
+
 ## BUILD pass — run at the start of each decision. Assemble the snapshot the decision planner walks,
 ## from what the agent currently sees and remembers (NOT from ground truth): `goal` is the behaviour
 ## string Von ranks against; `activity` is the behaviour's line for what the NPC is doing now. The
 ## perception hands in the knowledge this reads over: `known` (its `contacts()`), `callouts`, and
 ## `knowledge` (learned rooms/objects, interactables, the NPC's post and entry point, and lost
 ## hostiles — see the perception's `sense()`). Returns { facts, sections, sections_per_target, options }.
-func build(character, rooms: Array, goal: String, activity: String, known: Array, callouts: Array, knowledge: Dictionary) -> Dictionary:
+func build(rooms: Array, goal: String, activity: String, known: Array, callouts: Array, knowledge: Dictionary) -> Dictionary:
 	vocab.rooms = rooms
 	_options.know = knowledge
-	var self_pos: Vector2 = character.global_position
+	var self_pos: Vector2 = _character.global_position
 	var hostiles: Array = known.filter(func(c): return c["hostile"])
 	var allies: Array = known.filter(func(c): return c["ally"] and not c["hostile"])
 	var ctx := {
-		"space": character.get_world_2d().direct_space_state,
-		"map": character.get_world_2d().navigation_map,
+		"space": _character.get_world_2d().direct_space_state,
+		"map": _character.get_world_2d().navigation_map,
 		"self_pos": self_pos,
-		"self_id": character.get_instance_id(),
-		"character": character,
-		"exclude": [character.get_rid()],
+		"self_id": _character.get_instance_id(),
+		"exclude": [_character.get_rid()],
 		"hostiles": hostiles,
 		"allies": allies,
 		"callouts": callouts,
@@ -100,16 +108,16 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var stun_stack: bool = carried.has(&"stun") or callouts.any(func(c): return int(c.get("stuns", 0)) > 0)
 	# With a stun to throw, gunfire or a hostile in a room a doorway of ENTER leads into is the entry's to weigh (quiet or with a bang).
 	var leads := _options.lead_group(ctx, hostiles, entered if stun_stack else {})
-	var dmg: float = character.damage_taken()
+	var dmg: float = _character.damage_taken()
 	# Rounds in the gun it fights with (-1 without one): the AI shoots, reloads and plans around it.
-	var gun: int = character.gun_slot()
-	var ammo: int = character.ammo(gun) if gun >= 0 else -1
+	var gun: int = _character.gun_slot()
+	var ammo: int = _character.ammo(gun) if gun >= 0 else -1
 	var facts := {
 		"hostile_known": not hostiles.is_empty(),
 		"threat_known": not hostiles.is_empty() or _memory.under_fire(),
-		"gun_loaded": ammo > 0 and not character.is_reloading(),
-		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(gun) * vocab.low_ammo_fraction),
-		"can_reload": gun >= 0 and character.can_reload(gun),
+		"gun_loaded": ammo > 0 and not _character.is_reloading(),
+		"weapon_low": ammo >= 0 and ammo <= ceili(_character.ammo_capacity(gun) * vocab.low_ammo_fraction),
+		"can_reload": gun >= 0 and _character.can_reload(gun),
 		"under_fire": _memory.under_fire(),
 		"engaged": _memory.engaged(),
 		"leads": not leads["options"].is_empty(),
@@ -122,9 +130,9 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"exposed": line.get("clear", false) or (primary.is_empty() and _memory.under_fire()),
 	}
 	var sections := {
-		"goal": fill_goal(goal, character),
-		"situation": _sections.situation_text(character, rooms),
-		"loadout": _sections.loadout_text(character, gun, ammo, carried),
+		"goal": fill_goal(goal),
+		"situation": _sections.situation_text(rooms),
+		"loadout": _sections.loadout_text(gun, ammo, carried),
 		"current": ("Current activity: %s." % activity) if activity != "" else "",
 		"odds": _sections.odds_text(hostiles, allies, ctx["callouts"], not leads["options"].is_empty()),
 		"contacts": _sections.contacts_text(self_pos, known),
@@ -137,18 +145,18 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"per_target": per_target,
 		"threat": { "summary": _sections.threat_summary(self_pos, hostiles) },
 		"hostiles": _options.hostile_group(ctx, hostiles, analyses),
-		"reload": _options.reload_group(character, gun),
+		"reload": _options.reload_group(gun),
 		"retreat_positions": _options.retreat_group(ctx, hostiles, known_rooms, dmg),
 		"leads": leads,
 		"shooter": _options.shooter_group(ctx, hostiles),
 		"entries": entries,
 		"search_rooms": _options.search_group(ctx, known_rooms, rooms, entered),
 		"explore": _options.explore_group(ctx, rooms, entered),
-		"interactions": _options.interaction_group(character, self_pos),
+		"interactions": _options.interaction_group(self_pos),
 		"rooms": _options.room_group(ctx, known_rooms, rooms),
 	}
 	return { "facts": facts, "sections": sections, "sections_per_target": per_sections, "options": options,
-		"gun": vocab.gun_noun(character, gun) }
+		"gun": vocab.gun_noun(gun) }
 
 
 ## The combat geometry around hostile `t`: its frame (front bearing), the line between the NPC and it,
@@ -173,7 +181,7 @@ func _analyze(ctx: Dictionary, t: Dictionary) -> Dictionary:
 	}
 
 
-## The goal text with `{gun}` replaced by what `character` calls its gun ("shoot them with your {gun}" reads
+## The goal text with `{gun}` replaced by what the NPC calls its gun ("shoot them with your {gun}" reads
 ## "...your pistol" or "...your assault rifle"), so one goal serves every weapon.
-func fill_goal(goal: String, character) -> String:
-	return goal.replace("{gun}", vocab.gun_noun(character, character.gun_slot()))
+func fill_goal(goal: String) -> String:
+	return goal.replace("{gun}", vocab.gun_noun(_character.gun_slot()))

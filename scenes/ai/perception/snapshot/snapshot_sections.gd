@@ -9,6 +9,7 @@ const SnapshotVocab = preload("res://scenes/ai/perception/snapshot/snapshot_voca
 var _v: SnapshotVocab  ## The shared vocabulary and tuning; see snapshot_vocab.gd.
 var _memory: RefCounted   ## The agent's event memory (read-only here); see agent_memory.gd.
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
+var _character: Node      ## The NPC's body, handed in once by `bind`.
 
 
 ## Capture the collaborators the sections read. Called once by `AgentSnapshot.setup()`.
@@ -18,37 +19,42 @@ func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted) -> voi
 	_tactics = tactics
 
 
+## Hand in the NPC's body. Called once by `AgentSnapshot.bind()`.
+func bind(character: Node) -> void:
+	_character = character
+
+
 ## Where the NPC is, whether it is free, what it holds and how hurt it is.
-func situation_text(character, rooms: Array) -> String:
-	var room := SnapshotVocab.room_at(character.global_position, rooms)
+func situation_text(rooms: Array) -> String:
+	var room := SnapshotVocab.room_at(_character.global_position, rooms)
 	var where := ("in the %s, inside the house" % _v.room_name(room["type"])) if not room.is_empty() else "outside the house"
-	var busy := (" You are busy: %s." % character.interaction_label()) if character.is_busy() else ""
+	var busy := (" You are busy: %s." % _character.interaction_label()) if _character.is_busy() else ""
 	return "You are %s, holding a %s.%s%s You are %s." % [
-		where, character.current_item().display_name, busy, _v.own_posture_text(character.posture()),
-		_v.health_band(character.damage_taken())]
+		where, _character.current_item().display_name, busy, _v.own_posture_text(_character.posture()),
+		_v.health_band(_character.damage_taken())]
 
 
 ## The gun's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
 ## reloaded; once it runs low, whether spare magazines are carried. Then the grenades carried (`grenades`: the kinds, a frag
 ## first): "You carry a frag grenade and a stun grenade." Empty without a gun or a grenade.
-func loadout_text(character, gun: int, ammo: int, grenades: Array = []) -> String:
+func loadout_text(gun: int, ammo: int, grenades: Array = []) -> String:
 	var lines: Array = []
 	if ammo >= 0:
-		lines.append(_gun_text(character, gun, ammo))
+		lines.append(_gun_text(gun, ammo))
 	if not grenades.is_empty():
 		lines.append("You carry %s." % " and ".join(grenades.map(func(k): return "a %s grenade" % k)))
 	return " ".join(lines)
 
 
 ## The gun's state, as `loadout_text` words it.
-func _gun_text(character, gun: int, ammo: int) -> String:
-	var noun := _v.gun_noun(character, gun)
-	if character.is_reloading():
+func _gun_text(gun: int, ammo: int) -> String:
+	var noun := _v.gun_noun(gun)
+	if _character.is_reloading():
 		return "You are reloading your %s." % noun
-	var spares := "You carry spare magazines." if character.spare_magazines() > 0 else "You are out of spare magazines."
+	var spares := "You carry spare magazines." if _character.spare_magazines() > 0 else "You are out of spare magazines."
 	if ammo == 0:
 		return "Your %s is empty. %s" % [noun, spares]
-	if ammo <= ceili(character.ammo_capacity(gun) * _v.low_ammo_fraction):
+	if ammo <= ceili(_character.ammo_capacity(gun) * _v.low_ammo_fraction):
 		return "Your %s is nearly empty. %s" % [noun, spares]
 	return "Your %s is loaded." % noun
 

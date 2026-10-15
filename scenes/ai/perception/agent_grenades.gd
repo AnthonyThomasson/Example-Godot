@@ -35,6 +35,7 @@ var enabled: bool = true               ## Whether the NPC reacts to grenades at 
 var hear_grenade: float = 300.0        ## How far (px) a grenade coming down is heard.
 var throw: AgentThrow                  ## The danger-zone and escape geometry.
 
+var _character: Node  ## The NPC's body, handed in once by `bind`.
 var _known := {}   ## Grenade node instance id -> { node, kind, radius, point, source, landed }.
 var _plans := {}   ## Grenade node instance id -> { id, point, kind, radius, spot, crouch, at (the physics frame it was made in) }.
 var _told := {}    ## Grenade node instance id -> { point, rested }: where it was last radioed, and whether that was after it came to rest.
@@ -45,22 +46,27 @@ func setup(geometry: AgentThrow) -> void:
 	throw = geometry
 
 
+## Hand in the NPC's body. Called once by `AgentPerception.bind()`.
+func bind(character: Node) -> void:
+	_character = character
+
+
 # --- Knowing grenades ----------------------------------------------------------------------------------------
 
 ## The SEE pass, every tick: the NPC's own grenades (always known) and the live ones in its view cone with a clear line
 ## (`vision` is the sight sense), their points following them; `blind` sees none that it did not know. Gone ones are forgotten.
-func observe(character, vision: RefCounted, space, exclude: Array, blind: bool) -> void:
+func observe(vision: RefCounted, space, exclude: Array, blind: bool) -> void:
 	_forget_gone()
 	if not enabled:
 		return
-	var tree: SceneTree = character.get_tree()
+	var tree: SceneTree = _character.get_tree()
 	if tree.get_node_count_in_group(GROUP) == 0:
 		return
-	var self_pos: Vector2 = character.global_position
-	var facing: Vector2 = character.facing
+	var self_pos: Vector2 = _character.global_position
+	var facing: Vector2 = _character.facing
 	for node: Node2D in tree.get_nodes_in_group(GROUP):
-		if node.get("thrower") == character:
-			_note_own(character, node)
+		if node.get("thrower") == _character:
+			_note_own(node)
 		elif not blind and vision.can_see_node(node, self_pos, facing, space, exclude):
 			_note(node, node.global_position, &"seen", false)
 
@@ -68,12 +74,12 @@ func observe(character, vision: RefCounted, space, exclude: Array, blind: bool) 
 ## The NPC's own grenade, always known: it knows where it threw it. Until it has come down (a bounce marks it `landed`) its spot is
 ## where it was aimed (no further than a throw reaches), not the hand it just left, so the zone it is in is the one the burst will have;
 ## after that, wherever it lies.
-func _note_own(character, node: Node2D) -> void:
+func _note_own(node: Node2D) -> void:
 	var rec: Dictionary = _known.get(node.get_instance_id(), {})
 	if rec.is_empty():
 		var from := node.global_position
 		throw.learn(node.call("throw_stats"))
-		_note(node, from + (character.aim_target() - from).limit_length(throw.range_of(node.get("kind"))), &"own", false)
+		_note(node, from + (_character.aim_target() - from).limit_length(throw.range_of(node.get("kind"))), &"own", false)
 	else:
 		_note(node, node.global_position if rec["landed"] else rec["point"], &"own", false)
 
@@ -81,7 +87,7 @@ func _note_own(character, node: Node2D) -> void:
 ## A grenade came down (`&"grenade"` bounce or rest, `data` `{ position, kind, stage }`): the ones known already are marked down at
 ## that spot (seen coming down, deaf or not), and one within `hear_grenade` of a NPC that is not `deaf` is heard (so known) even if
 ## it was never seen.
-func hear(character, data: Dictionary, deaf: bool) -> void:
+func hear(data: Dictionary, deaf: bool) -> void:
 	if not enabled or not data.get("stage") in [&"bounce", &"rest"]:
 		return
 	var at: Vector2 = data.get("position", Vector2.INF)
@@ -91,23 +97,23 @@ func hear(character, data: Dictionary, deaf: bool) -> void:
 			rec["landed"] = true
 			rec["rested"] = data.get("stage") == &"rest"
 			rec["point"] = at
-	if deaf or character.global_position.distance_to(at) > hear_grenade:
+	if deaf or _character.global_position.distance_to(at) > hear_grenade:
 		return
-	var node := _find(character.get_tree(), data.get("kind", &""), at, HEARD_NEAR)
+	var node := _find(_character.get_tree(), data.get("kind", &""), at, HEARD_NEAR)
 	if node != null:
 		_note(node, at, &"heard", true)
 
 
 ## An ally's radio call about a live grenade (`data` the callout: `status`, `point`, `kind`): known by the call, at the
 ## spot it names (a better source for a grenade it knows already wins: it keeps what it saw or heard itself).
-func called(character, data: Dictionary) -> void:
+func called(data: Dictionary) -> void:
 	if not enabled:
 		return
 	var kind: StringName = CALL_KINDS.get(StringName(str(data.get("status", ""))), &"")
 	if kind == &"":
 		kind = data.get("kind", &"")
 	var at: Vector2 = data.get("point", Vector2.INF)
-	var node := _find(character.get_tree(), kind, at, CALLED_NEAR)
+	var node := _find(_character.get_tree(), kind, at, CALLED_NEAR)
 	if node != null:
 		_note(node, at, &"called", true)
 
@@ -195,11 +201,11 @@ func known() -> Array:
 ## in time) and `crouch` whether it is behind cover that shields a crouched body only. {} with nothing to run from. A plan is
 ## made when the NPC is first inside a grenade's zone, made again as the grenade moves, and kept while it lives, so the NPC
 ## holds its spot until the burst. `exclude` is every character's rid (a body shields nothing); `map` the navigation map.
-func plan(character, space, map: RID, exclude: Array) -> Dictionary:
+func plan(space, map: RID, exclude: Array) -> Dictionary:
 	if _known.is_empty():
 		return {}
-	var self_pos: Vector2 = character.global_position
-	var height := float(character.get_surface().get("coverage", throw.stand_height()))
+	var self_pos: Vector2 = _character.global_position
+	var height := float(_character.get_surface().get("coverage", throw.stand_height()))
 	var now := Engine.get_physics_frames()
 	var best := {}
 	var best_fuse := INF
@@ -211,9 +217,9 @@ func plan(character, space, map: RID, exclude: Array) -> Dictionary:
 		if plan_.is_empty():
 			if not throw.in_zone(space, rec["kind"], rec["radius"], point, self_pos, height, exclude):
 				continue
-			plan_ = _make(character, space, map, exclude, id, rec, fuse)
+			plan_ = _make(space, map, exclude, id, rec, fuse)
 		elif (plan_["point"] as Vector2).distance_to(point) >= REPLAN_DIST and now - int(plan_["at"]) >= ceili(REPLAN_EVERY * Engine.physics_ticks_per_second):
-			plan_ = _make(character, space, map, exclude, id, rec, fuse)
+			plan_ = _make(space, map, exclude, id, rec, fuse)
 		_plans[id] = plan_
 		if fuse < best_fuse:
 			best_fuse = fuse
@@ -226,9 +232,9 @@ func plan(character, space, map: RID, exclude: Array) -> Dictionary:
 
 
 ## A fresh plan for grenade `id` (record `rec`) from where the NPC stands.
-func _make(character, space, map: RID, exclude: Array, id: int, rec: Dictionary, fuse: float) -> Dictionary:
-	var found: Dictionary = throw.escape(space, map, rec["kind"], rec["radius"], rec["point"], character.global_position, fuse,
-		throw.run_speed(character), exclude)
+func _make(space, map: RID, exclude: Array, id: int, rec: Dictionary, fuse: float) -> Dictionary:
+	var found: Dictionary = throw.escape(space, map, rec["kind"], rec["radius"], rec["point"], _character.global_position, fuse,
+		throw.run_speed(), exclude)
 	return { "id": id, "point": rec["point"], "kind": rec["kind"], "radius": rec["radius"], "spot": found["spot"],
 		"crouch": found["crouch"], "at": Engine.get_physics_frames() }
 

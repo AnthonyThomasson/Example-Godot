@@ -33,12 +33,13 @@ func run(t: TestContext) -> void:
 	OutfitProbe.wear(plated, OutfitProbe.PLATED_KIT)
 	var stunned := t.actor(&"stunned")
 	stunned.take_stun(4.0, 0.0)
-	var throw := AgentThrow.new()
 	var counted := {}
 	for id: StringName in LANES:
 		var c := t.actor(id)
 		c.stamina = 0.0  # below RUN_STAMINA: it is taken to walk
-		counted[id] = throw.run_speed(c)
+		var throw := AgentThrow.new()
+		throw.bind(c)
+		counted[id] = throw.run_speed()
 	var bare := t.actor(&"bare")
 	t.check(is_equal_approx(counted[&"bare"], bare.speed), "the bare body counts on its tuned walk (%.0f px/s of %.0f)" % [counted[&"bare"], bare.speed])
 	t.check(is_equal_approx(counted[&"stunned"], bare.speed * CharacterConfig.stun_speed),
