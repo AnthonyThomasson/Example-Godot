@@ -2,12 +2,12 @@ class_name ArrangementDefinitions
 
 ## Aggregator over the per-category catalogs in scenes/worldgen/categories/. Merges
 ## every catalog's ARRANGEMENTS and RECIPES into two cached lookups and exposes the
-## same API RoomFurnisher already uses. Shared arrangements/recipes live in
+## lookups RoomFurnisher uses. Shared arrangements/recipes live in
 ## GeneralCatalog; each room category owns the rest. To add an arrangement, drop it
 ## in the matching catalog (or GeneralCatalog if used by 2+ categories) and list it
 ## in a recipe zone.
 ##
-## Authoring conventions for an arrangement (unchanged):
+## Authoring conventions for an arrangement:
 ## An arrangement is authored in a local frame AS IF PLACED AGAINST THE TOP WALL:
 ##   x runs along the wall (0..footprint.x), y is depth into the room (0..footprint.y).
 ## Item `pos` is the item's center. `rotated` swaps an item's width/height (90° turn).

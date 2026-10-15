@@ -1,16 +1,13 @@
 class_name ObjectDefinitions
 
 ## Aggregator over the per-category catalogs in scenes/worldgen/categories/. Merges
-## every catalog's OBJECTS into one cached lookup and exposes the same API that
-## ObjectFactory / RoomFurnisher already use. Shared objects (used by 2+ categories)
-## live in GeneralCatalog; each room category owns the rest. To add an object, drop
-## it in the matching catalog (or GeneralCatalog if used by 2+ categories).
+## every catalog's OBJECTS into one cached lookup and exposes the lookup RoomFurnisher
+## and WorldGen use. Shared objects (used by 2+ categories) live in GeneralCatalog; each
+## room category owns the rest. To add an object, drop it in the matching catalog (or
+## GeneralCatalog if used by 2+ categories).
 ##
-## Object fields: name, shape ("circle"|"square"|"rect"), size, color (required);
-##   material (descriptive tag — "wood"/"fabric" also take the room palette's tone,
-##     others like "metal"/"glass"/"ceramic" are descriptive only);
-##   coverage (0–100 height/cover proxy); penetration (0–100 shoot-through resistance);
-##   solid (optional, default true; false = walk-over decor drawn under everything).
+## Object fields are the Objects domain's schema (object_factory.gd). A "wood" or "fabric"
+## `material` also takes the room palette's tone.
 
 static var _catalog: Dictionary = {}
 
