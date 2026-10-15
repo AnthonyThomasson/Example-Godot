@@ -4,7 +4,8 @@ class_name WorldGen
 ## floorplan, and where the front entrance should land, it picks a plan, seeds one RNG for the
 ## whole run (the plan pick is its first draw, so a seed reproduces everything), and builds
 ## the house via HouseSpawner. Callers (Main) never touch HouseDefinitions/HouseSpawner
-## directly — this is the whole surface World-Gen exposes (plus read-only catalogue lookups).
+## directly — `generate`, `get_rooms`, `get_openings`, `annotate_layout` and the read-only
+## catalogue lookups are the whole surface World-Gen exposes.
 
 ## Build a house and return its root Node2D (parented under `parent`). `rng_seed` of 0 picks a
 ## fresh random layout each run; `force_plan` ("" = random) pins a specific floorplan. Every
