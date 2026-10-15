@@ -27,7 +27,7 @@ vehicle ──(&"vehicle", &"engine", &"skid")──▶ EventBus ──▶ Sound
 | `vehicle_drive.gd` | `RefCounted` (preloaded): the bicycle model, stepped inside `_integrate_forces`. Holds `steer_share`, `wheel_angle`, `braking`, `slip`, `rpm`, `engine_load`; `lock(row, speed)` is the full lock at a speed. |
 | `vehicle_door.gd` | `RefCounted`: one door in the vehicle's frame: eased open amount, its pose (`angle()` / `offset()`), `stand_point`, `entry_point`, `is_clear`, `info`. |
 | `vehicle_boarding.gd` | `RefCounted`: one character's ride, a timed phase machine from E beside the vehicle to its last step out. |
-| `character_vehicle_use.gd` | `Node` composed by `character.gd` in code (like `CharacterInteraction`): finds vehicles, picks the door, steps the ride after the controller, abandons it on death, restores collision once the body is clear. |
+| `character_vehicle_use.gd` | `Node` composed by `character.gd` in code (like `CharacterInteraction`): finds vehicles, picks the door, steps the ride after the controller, abandons it on death, hands the vehicle left to the character's `keep_clear_of`. |
 | `vehicle_visuals.gd` | Draw, on the `Chassis` (`DrawLayers.UNDER_VEHICLE`, −1) and `Roof` (`DrawLayers.ABOVE`, +1) children (`layer` export), which sandwich the occupants (`STANDING`, 0) and cover what lies on the floor (`LYING`, −2: a dead body, casings, a dropped item). |
 | `art/vehicle_art.gd` | The painters' shared helpers (vehicle frame → canvas, cached convex regions, door frames, side glass, tail lamps, seats, dashboard, sills). |
 | `art/car_painter.gd`, `art/van_painter.gd` | A body, `opts.part` `chassis` or `roof`. |
@@ -135,9 +135,9 @@ character `set_ride_pose(world point, facing, fold, step)`, `step` = the motion 
 (1 − fold), so the legs step with the pose and not with the vehicle. **Death** (`Character._die` → `abandon()`): the seat
 is freed, the door left as it is, `end_ride()`.
 
-**After the ride** the character's exception with the vehicle stays until its circle (+`CLEAR_MARGIN` 3 px) no longer
-overlaps the body (`CharacterVehicleUse._physics_process`), so stepping out never shoves the vehicle; boarding the same
-vehicle again keeps it.
+**After the ride** `CharacterVehicleUse` hands the vehicle to the character's `keep_clear_of(body)` (interface 19): the exception stays
+until the character's circle (+`CLEAR_MARGIN` 3 px) no longer overlaps the body, checked once a physics frame after its move, so stepping
+out never shoves the vehicle; boarding the same vehicle again calls `stop_clearing(body)` and keeps it.
 
 ## Contacts and harm (V6)
 

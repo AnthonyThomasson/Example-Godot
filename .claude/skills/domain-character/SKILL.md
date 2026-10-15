@@ -187,7 +187,12 @@ disables the collision shape (`set_deferred`); each pose sets `global_position`,
 firing, nothing drawn in the hands) and `_ride_frame` replaces the rest of the frame: no movement, knockback or push, stamina refilling,
 legs and kick cleared, and `pose.update` with `_ride_step` as the motion (the legs step with the pose through the vehicle's frame, not
 with the vehicle). `end_ride()` clears `_riding`, re-enables the shape, zeroes the step and points the aim along the facing. The collision
-exception with the vehicle is the component's (added at boarding, dropped once the body is clear of it after the ride).
+exception with the vehicle is added at boarding; after the ride the component hands the vehicle to `keep_clear_of(body)`, below.
+
+**Clearing a body just left** (interfaces 8 and 19). `keep_clear_of(body)` keeps the collision exception with an object an interaction's
+`move_to` put the character on, or a vehicle it rode, until the character's circle (+`CLEAR_MARGIN` 3 px, on `PhysicsLayers.SOLID`) no
+longer overlaps it, checked once a physics frame after the move (`_restore_cleared`), then drops it; a freed body is forgotten. Going
+straight back onto that object or into that vehicle calls `stop_clearing(body) -> bool`, so the exception stays.
 Tests: `tests/vehicle/` (`domain-vehicle`), `tests/general/use_vehicle_key_test.gd`.
 
 ## Walking into furniture
