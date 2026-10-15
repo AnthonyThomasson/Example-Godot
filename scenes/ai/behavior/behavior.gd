@@ -42,45 +42,45 @@ const THROW_WAIT_MARGIN := 1.0
 const WALK_BODY_RANGE := 450.0
 
 # --- Config fields the controller copies from its exports before setup(). ---
-var interaction_dwell: float = 3.0
-var max_commit_time: float = 6.0
+var interaction_dwell: float = 3.0 ## Copy of GoalController.interaction_dwell.
+var max_commit_time: float = 6.0 ## Copy of GoalController.max_commit_time.
 var search_look_rate: float = 2.5 ## Gaze turn speed (rad/s) while a searcher looks around a room it is covering.
 var search_coverage_spacing: float = 64.0 ## Room sample-grid spacing (px): smaller = finer coverage, more sight rays.
 var search_coverage_target: float = 1.0 ## Fraction of sampled points that must be SEEN to call a room covered (1 = all).
 var search_coverage_budget: float = 8.0 ## Max seconds spent covering one room before giving up and re-deciding (safety cap).
 var search_coverage_approach: float = 300.0 ## Walk toward an unseen point beyond this range (or whose line is blocked); else just turn to it.
 var search_coverage_margin: float = 24.0 ## Inset (px) from the room's walls where sampling starts, so points sit off the walls.
-var tactic_interval: float = 3.0
-var shoot_range: float = 500.0
-var punch_range: float = 48.0
-var combat_ring_radius: float = 80.0
-var combat_ring_count: int = 12
-var cover_time: float = 1.2
-var fire_cooldown: float = 0.5
+var tactic_interval: float = 3.0 ## Copy of GoalController.tactic_interval.
+var shoot_range: float = 500.0 ## Copy of GoalController.shoot_range.
+var punch_range: float = 48.0 ## Copy of GoalController.punch_range.
+var combat_ring_radius: float = 80.0 ## Copy of GoalController.combat_ring_radius.
+var combat_ring_count: int = 12 ## Copy of GoalController.combat_ring_count.
+var cover_time: float = 1.2 ## Copy of GoalController.cover_time.
+var fire_cooldown: float = 0.5 ## Copy of GoalController.fire_cooldown.
 ## Rounds an automatic gun fires per trigger pull (paced by the gun's own fire rate); a single-shot gun fires one.
 var fire_burst: int = 3
 ## Seconds spent stepping back when the gun's barrel is against a wall or object and cannot fire.
 var back_off_time: float = 0.45
-var reposition_interval: float = 0.5
+var reposition_interval: float = 0.5 ## Copy of GoalController.reposition_interval.
 # Locomotion config (forwarded to the Locomotion child in setup()).
-var arrive_dist: float = 10.0
+var arrive_dist: float = 10.0 ## Copy of GoalController.arrive_dist.
 # Running: whether the NPC may sprint on the way to a destination (see `_should_run`).
 var run_enabled: bool = true ## May sprint at all.
 var run_min_distance: float = 150.0 ## Only run when farther than this (px) from the destination.
 var run_start_fraction: float = 0.5 ## Stamina needed to START a run (once running it goes on until dry).
 var auto_reload: bool = true ## An empty gun with a spare magazine is reloaded on its own while holding or ducked in cover.
 # Posture: whether the NPC may crouch in a fight (see `_wanted_posture`), and how long it keeps one before changing.
-var posture_enabled: bool = true
-var posture_dwell: float = 0.7
+var posture_enabled: bool = true ## Copy of GoalController.posture_enabled.
+var posture_dwell: float = 0.7 ## Copy of GoalController.posture_dwell.
 # Tactical entry (see entry.gd).
-var entry_ready_timeout: float = 6.0
-var entry_follow_gap: float = 0.3
-var entry_pie_dwell: float = 0.35
-var entry_corner_dwell: float = 0.6
-var rear_security_time: float = 10.0
-var entry_cover_time: float = 8.0
-var entry_watch_dwell: float = 0.8
-var entry_approach_time: float = 20.0
+var entry_ready_timeout: float = 6.0 ## Copy of GoalController.entry_ready_timeout.
+var entry_follow_gap: float = 0.3 ## Copy of GoalController.entry_follow_gap.
+var entry_pie_dwell: float = 0.35 ## Copy of GoalController.entry_pie_dwell.
+var entry_corner_dwell: float = 0.6 ## Copy of GoalController.entry_corner_dwell.
+var rear_security_time: float = 10.0 ## Copy of GoalController.rear_security_time.
+var entry_cover_time: float = 8.0 ## Copy of GoalController.entry_cover_time.
+var entry_watch_dwell: float = 0.8 ## Copy of GoalController.entry_watch_dwell.
+var entry_approach_time: float = 20.0 ## Copy of GoalController.entry_approach_time.
 ## The entry guard: any walk into a room that is not cleared goes in by tactical entry (`_entry_guard`; `docs/tactical-entry.md` E9).
 var entry_guard: bool = true
 var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).

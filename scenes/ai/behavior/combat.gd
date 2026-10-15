@@ -23,17 +23,17 @@ const THROW_RELEASE_CAP := 1.5
 const THROW_RANGE_SLACK := 15.0
 
 # --- Config fields `Behavior.apply_config()` copies in. ---
-var shoot_range: float = 500.0
-var punch_range: float = 48.0
+var shoot_range: float = 500.0  ## Copy of GoalController.shoot_range.
+var punch_range: float = 48.0  ## Copy of GoalController.punch_range.
 var ring_radius: float = 80.0  ## Radius of the ring of candidate firing / cover spots around the target.
 var ring_count: int = 12       ## Candidate spots on that ring.
-var cover_time: float = 1.2
-var fire_cooldown: float = 0.5
+var cover_time: float = 1.2  ## Copy of GoalController.cover_time.
+var fire_cooldown: float = 0.5  ## Copy of GoalController.fire_cooldown.
 ## Rounds an automatic gun fires per trigger pull (paced by the gun's own fire rate); a single-shot gun fires one.
 var fire_burst: int = 3
 ## Seconds spent stepping back when the gun's barrel is against a wall or object and cannot fire.
 var back_off_time: float = 0.45
-var reposition_interval: float = 0.5
+var reposition_interval: float = 0.5  ## Copy of GoalController.reposition_interval.
 var auto_reload: bool = true   ## An empty gun with a spare magazine is reloaded on its own while holding or ducked in cover.
 
 var phase := "peek"            ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
