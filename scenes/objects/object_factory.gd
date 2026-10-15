@@ -7,7 +7,7 @@ class_name ObjectFactory
 ##
 ## Definition fields: name, shape ("circle"|"square"|"rect"), size, color (required);
 ##   material, coverage, penetration, weight, solid, interactions (all optional);
-##   art (pixel-art painter id: "sofa"|"table"|"chair"; omitted = flat shape + label) and
+##   art (an `ObjectArt` painter id, e.g. "sofa"; omitted = flat shape + label) and
 ##   art_opts (painter overrides, see ObjectArtConfig) (optional).
 ## `opts`:
 ##   name:    String  — node name (readable hit labels; defaults to the definition name).
