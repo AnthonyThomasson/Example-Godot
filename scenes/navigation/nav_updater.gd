@@ -3,7 +3,7 @@ extends Node
 ## Navigation domain: keeps the baked navigation map in step with furniture that has been shoved
 ## around. The holes `NavBuilder.build` carves are a snapshot of where the furniture stood at bake
 ## time; as pieces are bulldozed off their spots those holes go stale and paths route around empty
-## floor. This node re-bakes the map on an interval (`NavBuilder.rebake`) so the holes follow the
+## floor. This node re-bakes the map on an interval (`NavBuilder.rebake_async`) so the holes follow the
 ## furniture's CURRENT positions and paths route around scattered objects. The living characters are
 ## holes in the STEERING region (`NavBuilder.rebake_steering`), so it follows them as they walk, appear
 ## and die. It only re-bakes when a piece or a character has actually moved past `move_threshold`, so an
