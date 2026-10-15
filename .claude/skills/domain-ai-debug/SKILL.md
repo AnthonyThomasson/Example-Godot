@@ -99,7 +99,9 @@ The controller is the single authoring/observer surface: it forwards `debug_stat
 `current_act()`) from the behaviour sub-domain, builds `debug_zones()` from the last perception snapshot
 it holds (the flattening is `zone_list.gd` in this folder: a static `ZoneList.from_options(options)`, which also owns the `waypoint` tagging), forwards `debug_room_zones()` from the perception's `room_status()` and
 `debug_search_coverage()` from the behaviour's `debug_coverage()`, and holds the Vision group exports —
-so these overlays need no reference into the perception/behaviour internals.
+so these overlays need no reference into the perception/behaviour internals. Every overlay calls those getters directly, with no
+`has_method` guard: the overlays live only under `ai/npc.tscn`, whose controller defines every one, so a renamed getter is an error
+rather than an overlay that silently draws nothing.
 
 ## The behaviour overlays (all default off; toggled from the UI toggle bar)
 
