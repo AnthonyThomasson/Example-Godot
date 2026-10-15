@@ -5,8 +5,9 @@ description: Deep implementation detail for the Physics System domain (scenes/ph
 
 # Physics System domain
 
-Stateless helpers + reusable Node components, sharing no imports with other domains (a leaf).
-Objects, the character and a vehicle *compose* these components; Physics imports nothing outward.
+Stateless helpers + reusable Node components (a leaf).
+Objects, the character and a vehicle *compose* these components; Physics imports nothing from other domains but General's
+infrastructure (`Despawner`, `PhysicsLayers`, `DrawLayers`).
 
 - `HitInfo` — the one data packet a striker fills in (`position, normal, direction, damage,
   speed_factor, penetrated, has_exit, exit_position, exit_normal, blood, height, source`); `height` is the 0..100 height the striker flew at
