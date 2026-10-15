@@ -120,7 +120,7 @@ Each is a child of the NPC in `ai/npc.tscn`, found by its `show_<x>` property (r
 The getters are read-only and added to the controller: `debug_memory()` (perception memory: gunfire,
 under-fire, callouts, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
 state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
-and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
+and the last force reason, facts), `debug_progress()` (locomotion's `{ stalled_for, trail }`, kept by `sample()` — observation only, nothing
 reacts to a stall), `debug_sent_callout()`, `debug_grenades()` (perception's known grenades, the behaviour's evade spot and, from the throw primitive, the throw planned until the grenade leaves the hand (`Behavior.throw_plan`): `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: not running to one), throw: {} }`) and `debug_entry_view()` (behaviour `debug_entry_view`: the running entry as
 world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`; the guard's
 look-ahead along the walk is computed only when asked). `debug_zones()` entries also carry the option's `tags`
