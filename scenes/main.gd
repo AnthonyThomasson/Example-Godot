@@ -1,7 +1,7 @@
 extends Node2D
 
-## Top-down demo scene and composition root: the one place that wires the domains
-## together. On start it asks the World Generation domain (WorldGen.generate) for a
+## Top-down demo scene and the game's composition root (with the test runner, the only code that
+## knows every domain): it wires the domains together. On start it asks the World Generation domain (WorldGen.generate) for a
 ## procedurally furnished house just ahead of the player, front entrance first.
 
 ## Seed for the house layout; 0 = a new random seed each run, resolved to a concrete value at
@@ -24,8 +24,8 @@ extends Node2D
 ## twice this from anyone already placed. A body spawned inside a piece is ejected along with it, and the
 ## piece's momentum flings the character across the map.
 @export var spawn_clearance: float = 20.0
-## Spectator match mode: run as a 2-AI contest (defender vs invader) with no human player — frees the
-## Player and its HUD, frames both NPCs, and shows the match HUD. Off = the normal player-driven scene.
+## Spectator match mode: run as an AI-only contest (the defenders vs the invaders) with no human player —
+## frees the Player and its HUD, frames every NPC, and shows the match HUD. Off = the normal player-driven scene.
 @export var spectator_mode: bool = true
 ## Which side a human player takes when there is one ("defender" / "invader"). The player joins that
 ## side on top of its NPC count, carrying the side's loadout.
