@@ -63,7 +63,7 @@ func step(character, delta: float) -> bool:
 	target = _nearest(self_pos, unseen)
 	Watch.ease_gaze(character, target, look_rate, delta)
 	if self_pos.distance_to(target) > approach or not _perception.has_line_to(null, target):
-		_loco.move_to(character, _loco.reachable(target))  # Relocate to see a far / occluded part of the room.
+		_loco.move_to(_loco.reachable(target))  # Relocate to see a far / occluded part of the room.
 	else:
 		character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.
 	return false

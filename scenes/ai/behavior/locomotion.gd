@@ -112,6 +112,7 @@ var _stall_speed := 0.0           ## Speed (px/s) measured over the last full wi
 var _stalled_for := 0.0           ## Seconds the NPC has been trying to move without progressing.
 var _trail_clock := 0.0           ## Seconds since the last trail point.
 var _trail: Array = []            ## Recent world positions, oldest first.
+var _character: Node              ## The NPC's body, handed in once by `bind`: what a walk steers.
 
 
 ## The key of the room containing world point `p`, or "" when `p` is in no room.
@@ -141,6 +142,11 @@ func setup(agent: NavigationAgent2D) -> void:
 		_plan_map = body.get_world_2d().navigation_map
 	_steering_map = NavBuilder.steering_map(_plan_map)
 	_reach = agent.target_desired_distance
+
+
+## Hand in the NPC's body. Called once by `Behavior.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## Snap a world point onto the navigation mesh so it is actually reachable — a room's geometric
@@ -202,15 +208,15 @@ func path_ahead() -> Dictionary:
 ## Observation only: sample the character's progress each tick. While it is trying to move
 ## (`move_input` set) it compares displacement over `STALL_WINDOW`; a speed under `STALL_SPEED` grows
 ## `_stalled_for`. Nothing reacts to it — `debug_progress()` exposes it to the stuck overlay.
-func sample(character, delta: float) -> void:
-	var pos: Vector2 = character.global_position
+func sample(delta: float) -> void:
+	var pos: Vector2 = _character.global_position
 	_trail_clock += delta
 	if _trail_clock >= TRAIL_STEP:
 		_trail_clock = 0.0
 		_trail.append(pos)
 		if _trail.size() > TRAIL_MAX:
 			_trail.pop_front()
-	if (character.move_input as Vector2).length() < 0.1:
+	if (_character.move_input as Vector2).length() < 0.1:
 		_stall_clock = 0.0
 		_stall_pos = pos
 		_stalled_for = 0.0
@@ -237,12 +243,12 @@ func _point(p: Vector2) -> Array:
 ## Whether the NPC has reached `point`: the walk there is done (at the point, or at the free spot it took near it when a
 ## body stands on the point), or within arrive_dist straight-line with no agent. Never while the walk is held short.
 ## `within` (px) asks for a closer arrival than the agent's own (`move_to`).
-func reached(character, point: Vector2, within := 0.0) -> bool:
+func reached(point: Vector2, within := 0.0) -> bool:
 	if _agent != null:
 		_begin(point, within)
 		_agent.target_position = _goal
 		return _way != Way.HELD and _agent.is_navigation_finished()
-	return character.global_position.distance_to(point) < arrive_dist
+	return _character.global_position.distance_to(point) < arrive_dist
 
 
 ## Whether the walk stands, or steps aside, for a body this frame: held short of one in its way (or on its destination),
@@ -270,31 +276,31 @@ func take_blocked() -> bool:
 ## baked hole) is shoved aside by the character's own push physics. Falls back to plain straight-line steering when there
 ## is no agent. `within` (px, 0 = the agent's own arrival distance) makes the walk end closer to `dest`: a spot others
 ## stand beside (a stack slot), where a stride short is on the next one.
-func move_to(character, dest: Vector2, within := 0.0) -> void:
+func move_to(dest: Vector2, within := 0.0) -> void:
 	if _agent == null:
-		var straight: Vector2 = dest - character.global_position
-		character.move_input = Vector2.ZERO if straight.length() < arrive_dist else straight.normalized()
+		var straight: Vector2 = dest - _character.global_position
+		_character.move_input = Vector2.ZERO if straight.length() < arrive_dist else straight.normalized()
 		return
 	_begin(dest, within)
 	_agent.target_position = _goal
 	_kept_off = false
 	_yielding = false
 	if _agent.is_navigation_finished() and _way != Way.HELD:
-		character.move_input = Vector2.ZERO
+		_character.move_input = Vector2.ZERO
 		return
 	# Always steer toward the next navmesh waypoint — never the raw destination, which can lie across a wall. `next` is
 	# wall-safe, and for an unreachable target it steps toward the closest reachable point.
 	var next := _agent.get_next_path_position()
-	if _check(character):
+	if _check():
 		next = _agent.get_next_path_position()  # The walk changed map or goal: steer by its new path.
-	var here: Vector2 = character.global_position
+	var here: Vector2 = _character.global_position
 	var desired: Vector2 = next - here
 	desired = desired.normalized() if desired.length() > 0.001 else Vector2.ZERO
 	if _way == Way.HELD and (here.distance_to(_blocker) <= STOP_GAP or _agent.is_navigation_finished()):
 		desired = Vector2.ZERO  # Held: stand short of the body, waiting for it to move.
-	character.move_input = desired
-	_give_way(character)
-	keep_off(character)
+	_character.move_input = desired
+	_give_way()
+	keep_off()
 
 
 ## Start a walk to `dest`, arriving within `within` px (0 = the agent's own distance), unless it is the walk under way (a
@@ -335,13 +341,13 @@ func _set_way(way: int) -> void:
 ## - Going round, a body on the steering path (one that map has not carved yet) holds the walk the same way.
 ## - Held, the walk goes on the plain way once nothing known is on it, or round once the steering map has a way round
 ##   (looked for every `RECHECK` s); after `WAIT` s it re-plans (`_replan`).
-func _check(character) -> bool:
+func _check() -> bool:
 	var frame := Engine.get_physics_frames()
 	if frame == _checked_frame:
 		return false
 	_checked_frame = frame
 	var delta := get_physics_process_delta_time()
-	var from: Vector2 = character.global_position
+	var from: Vector2 = _character.global_position
 	var resting := _resting(from, LOOKAHEAD + PASS_CLEARANCE)
 	var was_map := _agent.get_navigation_map()
 	var was_goal := _goal
@@ -477,9 +483,9 @@ func _free_spot(from: Vector2) -> Vector2:
 ## (`GIVE_IMMINENT`). Giving way, it steps aside off the walker's line when it stands on it (a spot on open floor, clear of
 ## the other bodies it knows of, never toward the walker), else waits where it is, until the walker has gone by; at most
 ## `GIVE_MAX` s for one walker.
-func _give_way(character) -> void:
-	var me: Vector2 = character.global_position
-	var mine: Vector2 = character.move_input * maxf(character.get_real_velocity().length(), PACE_FLOOR)
+func _give_way() -> void:
+	var me: Vector2 = _character.global_position
+	var mine: Vector2 = _character.move_input * maxf(_character.get_real_velocity().length(), PACE_FLOOR)
 	var other := {}
 	var nearest := INF
 	var imminent_only := false
@@ -492,7 +498,7 @@ func _give_way(character) -> void:
 			continue
 		if not _converging(gap, vel - mine):
 			continue
-		var has_way := _has_way(character, b)
+		var has_way := _has_way(b)
 		if has_way and gap.length() >= GIVE_IMMINENT:
 			continue
 		other = b
@@ -519,22 +525,22 @@ func _give_way(character) -> void:
 		if _yield_spot == Vector2.INF:
 			_yield_spot = _side_step(me, at, line, off, int(other["id"]))
 		if _yield_spot != Vector2.INF and me.distance_to(_yield_spot) > 4.0:
-			character.move_input = (_yield_spot - me).normalized()
+			_character.move_input = (_yield_spot - me).normalized()
 			_yielding = true
 			return
-	character.move_input = Vector2.ZERO
+	_character.move_input = Vector2.ZERO
 	_yielding = true
 
 
 ## The last word on a step: drop the part of `move_input` that heads into a known body closer than `KEEP_OFF` (the one a
 ## melee closes on aside), so the NPC slides past it instead; stopped when nothing of the step is left. Every walk ends
 ## with it, and so does any other step a behaviour module takes (`Combat.apply_back_off`).
-func keep_off(character) -> void:
+func keep_off() -> void:
 	_kept_off = false
-	var step: Vector2 = character.move_input
+	var step: Vector2 = _character.move_input
 	if step == Vector2.ZERO:
 		return
-	var me: Vector2 = character.global_position
+	var me: Vector2 = _character.global_position
 	for b in bodies:
 		if int(b.get("id", 0)) == ignore_id:
 			continue
@@ -545,10 +551,10 @@ func keep_off(character) -> void:
 		if step.dot(toward) > 0.0:
 			step -= toward * step.dot(toward)
 	if step.length() < 0.1:
-		character.move_input = Vector2.ZERO
+		_character.move_input = Vector2.ZERO
 		_kept_off = true
 		return
-	character.move_input = step.normalized()
+	_character.move_input = step.normalized()
 
 
 ## Whether two bodies `gap` apart (the other minus this one) closing at relative velocity `rel_vel` come within
@@ -564,11 +570,11 @@ func _converging(gap: Vector2, rel_vel: Vector2) -> bool:
 ## Whether the NPC has the right of way over walker `b`: `b` sees it (it is near, or within `b`'s view by its facing) and
 ## the NPC's instance id is the lower. Both reckon the same, so of two walkers that see each other one gives way; one that
 ## does not see the NPC cannot give way to it, so the NPC gives way.
-func _has_way(character, b: Dictionary) -> bool:
-	var to_me: Vector2 = character.global_position - (b["pos"] as Vector2)
+func _has_way(b: Dictionary) -> bool:
+	var to_me: Vector2 = _character.global_position - (b["pos"] as Vector2)
 	var facing: Vector2 = b.get("facing", Vector2.ZERO)
 	var sees := to_me.length() <= SEES_NEAR or (facing != Vector2.ZERO and facing.normalized().dot(to_me.normalized()) >= SEES_COS)
-	return sees and character.get_instance_id() < int(b["id"])
+	return sees and _character.get_instance_id() < int(b["id"])
 
 
 ## A spot to step aside to, off the line `line` a walker at `at` comes along (the NPC stands `off` from it): on the side

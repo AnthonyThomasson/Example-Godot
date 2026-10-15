@@ -62,7 +62,7 @@ class FakePerception extends Node:
 
 ## Locomotion that goes nowhere.
 class FakeLoco extends Node:
-	func move_to(_character, _dest: Vector2) -> void:
+	func move_to(_dest: Vector2) -> void:
 		pass
 
 

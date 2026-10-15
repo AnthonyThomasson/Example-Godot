@@ -168,6 +168,12 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_entry.setup(_loco, perception, _coverage, _watch, _combat)
 
 
+## Hand in the NPC's body, which the behaviour's modules drive from then on. The controller calls this once it knows which
+## character it drives.
+func bind(character: Node) -> void:
+	_loco.bind(character)
+
+
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
 ## fields are read live, so only what those hold needs pushing. Idempotent, so the controller may call it each
 ## decision to pick up an export retuned at runtime.
@@ -704,7 +710,7 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 ## Carry out the running primitive this tick.
 func apply(character, delta: float) -> void:
 	_combat.tick(delta)
-	_loco.sample(character, delta)  # Observation only (stuck overlay); never alters the tick.
+	_loco.sample(delta)  # Observation only (stuck overlay); never alters the tick.
 	_loco.bodies = _walk_bodies(character)  # Every walk accounts for the characters the NPC knows of, and only those.
 	_loco.ignore_id = _engage_id if _primitive == &"melee" else 0  # A melee closes on its target: no walk round it.
 	if not _evade.is_empty():
@@ -894,14 +900,14 @@ func _apply_move(character, delta: float) -> void:
 		if _arrive_room != "" and not _look_around:
 			_arrived = _loco.room_key_at(character.global_position) == _arrive_room
 		if not _arrived:
-			_arrived = _loco.reached(character, _point)
+			_arrived = _loco.reached(_point)
 		if _arrived:
 			if _look_around:
 				_coverage.begin(character)
 			else:
 				_resolved = true
 	if not _arrived:
-		_loco.move_to(character, _point)
+		_loco.move_to(_point)
 	elif _look_around:
 		if _coverage.step(character, delta):  # Look around until the room is covered by sight.
 			_look_around = false
@@ -947,9 +953,9 @@ func _apply_engage(character, delta: float) -> void:
 	character.aim_point = _engage_pos  # Aim at where we last saw them, not their true position.
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
 	if not _arrived:
-		_arrived = _loco.reached(character, _point)
+		_arrived = _loco.reached(_point)
 		if not _arrived:
-			_loco.move_to(character, _point)
+			_loco.move_to(_point)
 			return
 		_tactic_timer = tactic_interval  # In position: the tactic gets its full run from here.
 		_perception.note_engaged()
@@ -1139,7 +1145,7 @@ func _apply_interact(character) -> void:
 		return
 	if not _interaction_in_reach(character):
 		character.aim_point = _hostiles[0]["pos"] if not _hostiles.is_empty() else _target_obj.global_position
-		_loco.move_to(character, _target_obj.global_position)
+		_loco.move_to(_target_obj.global_position)
 		return
 	character.move_input = Vector2.ZERO
 	character.aim_point = _target_obj.global_position  # face the object to perform the interaction
@@ -1301,9 +1307,9 @@ func _apply_evade(character, delta: float) -> void:
 	var running := false
 	if spot != Vector2.INF:
 		if not _evade_arrived:
-			_evade_arrived = _loco.reached(character, spot)
+			_evade_arrived = _loco.reached(spot)
 		if not _evade_arrived:
-			_loco.move_to(character, spot)
+			_loco.move_to(spot)
 			running = run_enabled and (character.is_running() or character.stamina_fraction() >= run_start_fraction)
 	if spot == Vector2.INF or _evade_arrived:
 		character.move_input = Vector2.ZERO

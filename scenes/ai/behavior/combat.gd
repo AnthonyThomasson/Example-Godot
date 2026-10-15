@@ -122,7 +122,7 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 		if dest_timer <= 0.0:
 			dest = _choose_dest(character, "cover", node, pos, hold_ground)
 			dest_timer = reposition_interval
-		_loco.move_to(character, dest)
+		_loco.move_to(dest)
 		reload_if_dry(character)
 		if cover_timer <= 0.0:
 			phase = "peek"
@@ -144,7 +144,7 @@ func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) 
 	if dest_timer <= 0.0:
 		dest = _choose_dest(character, "peek", node, pos, hold_ground)
 		dest_timer = reposition_interval
-	_loco.move_to(character, dest)
+	_loco.move_to(dest)
 
 
 ## Start a throw of the grenade in `slot` (it comes down `max_range` px away at most) at world point `spot` (the GRENADE tactic's `throw`
@@ -183,7 +183,7 @@ func throw_step(character, delta: float) -> StringName:
 			character.select_slot(_throw_slot)
 			character.aim_point = _throw_spot
 			if character.global_position.distance_to(_throw_spot) > throw_reach(_throw_range):
-				_loco.move_to(character, _throw_spot)
+				_loco.move_to(_throw_spot)
 				return &""
 			if character.current_slot() == _throw_slot and _faces(character, _throw_spot):
 				_throw_before = character.item_count(_throw_slot)
@@ -213,7 +213,7 @@ func throw_released(character) -> bool:
 func melee(character, pos: Vector2, hold_ground: bool) -> void:
 	if character.global_position.distance_to(pos) > punch_range:
 		if not hold_ground:
-			_loco.move_to(character, pos)
+			_loco.move_to(pos)
 		else:
 			character.move_input = Vector2.ZERO
 		return
@@ -296,7 +296,7 @@ func apply_back_off(character, delta: float) -> void:
 		return
 	_back_off_timer -= delta
 	character.move_input = -character.facing
-	_loco.keep_off(character)  # Never back into a body it knows of.
+	_loco.keep_off()  # Never back into a body it knows of.
 	character.run_input = false
 
 

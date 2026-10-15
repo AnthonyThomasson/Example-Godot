@@ -494,14 +494,14 @@ func _tick_approach(character, team: Array, delta: float) -> void:
 		return  # The rest of the stack is in place: the thrower goes straight to throw, rather than into its slot first.
 	_aim_travel(character)
 	while not _waypoints.is_empty() and (character.global_position.distance_to(_waypoints[0]) <= WAYPOINT_REACH \
-			or _loco.reached(character, _waypoints[0])):
+			or _loco.reached(_waypoints[0])):
 		_waypoints.pop_front()  # Got there, or to the free spot beside it when a body stands on it.
 	if not _waypoints.is_empty():
-		_loco.move_to(character, _waypoints[0])
+		_loco.move_to(_waypoints[0])
 		return
 	var spot := _stack_point()
 	if not _at(character, spot, SLOT_REACH):
-		_loco.move_to(character, spot, SLOT_REACH)
+		_loco.move_to(spot, SLOT_REACH)
 		return
 	character.move_input = Vector2.ZERO
 	_set_phase(character, "stack")
@@ -514,7 +514,7 @@ func _tick_approach(character, team: Array, delta: float) -> void:
 func _tick_stack(character, team: Array, delta: float) -> void:
 	var spot := _stack_point()
 	if character.global_position.distance_to(spot) > WAYPOINT_REACH:
-		_loco.move_to(character, spot, SLOT_REACH)  # Shoved out of the slot: step back in.
+		_loco.move_to(spot, SLOT_REACH)  # Shoved out of the slot: step back in.
 	else:
 		character.move_input = Vector2.ZERO
 	if _covers_rear(team):
@@ -736,7 +736,7 @@ func _tick_bang(character, team: Array, delta: float) -> void:
 			while _bang_route.size() > 1 and character.global_position.distance_to(_bang_route[0]) <= WAYPOINT_REACH:
 				_bang_route.pop_front()
 			if not _at(character, _bang_spot):
-				_loco.move_to(character, _bang_route[0])
+				_loco.move_to(_bang_route[0])
 				_look_toward(character, _bang_target, delta, 3.0)
 				return
 			character.move_input = Vector2.ZERO
@@ -754,7 +754,7 @@ func _tick_bang(character, team: Array, delta: float) -> void:
 		_:
 			var spot := _stack_point()
 			if character.global_position.distance_to(spot) > WAYPOINT_REACH:
-				_loco.move_to(character, spot, SLOT_REACH)  # Back in its slot (or, shoved out of it, a step back in).
+				_loco.move_to(spot, SLOT_REACH)  # Back in its slot (or, shoved out of it, a step back in).
 			else:
 				character.move_input = Vector2.ZERO
 			_look_toward(character, away, delta, 3.0)
@@ -819,7 +819,7 @@ func _tick_pie(character, team: Array, delta: float) -> void:
 		return
 	var spot: Vector2 = _pie_queue[0]
 	if not _at(character, spot):
-		_loco.move_to(character, spot)
+		_loco.move_to(spot)
 		_look_toward(character, _through_door(character.global_position), delta)
 		_clock = 0.0
 		return
@@ -919,7 +919,7 @@ func _pick_corner(corners: Array, on: int, hard_first: bool) -> Vector2:
 ## Through the threshold to the corner without stopping, gaze across the room; `in` once in the room and off the
 ## door's axis, then on to the corner.
 func _tick_cross(character, delta: float) -> void:
-	_loco.move_to(character, corner, CORNER_REACH)
+	_loco.move_to(corner, CORNER_REACH)
 	if character.move_input == Vector2.ZERO and not _loco.holding():
 		character.move_input = (corner - character.global_position).normalized()  # Never stand in the funnel (unless a body is in the way).
 	_look_toward(character, _across_from(corner), delta, 3.0)
@@ -943,7 +943,7 @@ func _across_from(p: Vector2) -> Vector2:
 func _tick_corner(character, team: Array, delta: float) -> void:
 	_look_toward(character, _across_from(corner), delta, 3.0)
 	if not _at(character, corner, CORNER_REACH) and _clock < CROSS_CAP:
-		_loco.move_to(character, corner, CORNER_REACH)
+		_loco.move_to(corner, CORNER_REACH)
 		_dwell = 0.0
 		return
 	character.move_input = Vector2.ZERO
@@ -1093,7 +1093,7 @@ func _tick_cover(character, team: Array, delta: float) -> void:
 	if covering != was:
 		_radio("cover", { "covering": covering })
 	if not _at(character, _cover_spot):
-		_loco.move_to(character, _cover_spot)
+		_loco.move_to(_cover_spot)
 	else:
 		character.move_input = Vector2.ZERO
 	_look_toward(character, _cover_aim, delta, 3.0)
@@ -1103,7 +1103,7 @@ func _tick_cover(character, team: Array, delta: float) -> void:
 ## `rear_time` runs out.
 func _tick_rear(character, team: Array, delta: float) -> void:
 	if not _at(character, _rear_spot):
-		_loco.move_to(character, _rear_spot)
+		_loco.move_to(_rear_spot)
 	else:
 		character.move_input = Vector2.ZERO
 	_look_toward(character, (_geo["pos"] as Vector2) + (_geo["out"] as Vector2) * 300.0, delta, 3.0)
@@ -1144,7 +1144,7 @@ func _set_phase(character, next: String) -> void:
 ## Whether the character has got to `p`: close by, or at the end of its nav path there (arriving within `within` px when
 ## given, `Locomotion.move_to`).
 func _at(character, p: Vector2, within := 0.0) -> bool:
-	return character.global_position.distance_to(p) <= (within if within > 0.0 else WAYPOINT_REACH * 0.6) or _loco.reached(character, p, within)
+	return character.global_position.distance_to(p) <= (within if within > 0.0 else WAYPOINT_REACH * 0.6) or _loco.reached(p, within)
 
 
 ## This NPC's stack slot on the team's side.

@@ -680,6 +680,7 @@ func control(character, delta: float) -> void:
 	if _character == null:
 		_character = character
 		_perception.bind(character)
+		_behavior.bind(character)
 		_client.set_npc_name(_npc_name())
 	_decide_timer -= delta
 	# SENSE.
