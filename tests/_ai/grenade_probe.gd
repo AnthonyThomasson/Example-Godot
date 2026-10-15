@@ -65,11 +65,11 @@ static func view(c: Node) -> Dictionary:
 	return c.call("stun_view") if c.has_method("stun_view") else {}
 
 
-## Stun `c` as a burst at `from` would (`Character.take_stun(blind, deaf, from)`); false while it does not exist.
-static func stun(c: Node, blind_s: float, deaf_s: float, from: Vector2) -> bool:
+## Stun `c` as a grenade's burst would (`Character.take_stun(blind, deaf)`); false while it does not exist.
+static func stun(c: Node, blind_s: float, deaf_s: float) -> bool:
 	if not c.has_method("take_stun"):
 		return false
-	c.call("take_stun", blind_s, deaf_s, from)
+	c.call("take_stun", blind_s, deaf_s)
 	return true
 
 

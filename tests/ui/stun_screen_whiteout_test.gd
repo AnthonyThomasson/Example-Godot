@@ -33,15 +33,15 @@ func run(t: TestContext) -> void:
 	var rest: Dictionary = screen.drawn()
 	t.check(float(rest.get("white", 1.0)) == 0.0 and not bool(rest.get("afterimage", true)), "nothing is drawn while the human sees")
 
-	Probe.stun(t.actor(&"other"), 4.0, 4.0, Vector2(600, 100))
+	Probe.stun(t.actor(&"other"), 4.0, 4.0)
 	await t.frames(3)
 	t.check(float(screen.drawn().get("white", 1.0)) == 0.0, "someone else's flash does not whiten this screen")
-	Probe.stun(human, 0.0, 4.0, Vector2(200, 100))
+	Probe.stun(human, 0.0, 4.0)
 	await t.frames(3)
 	t.check(float(screen.drawn().get("white", 1.0)) == 0.0, "a bang that only deafens does not either")
 	await t.until(func(): return not Probe.deaf(human), 6.0)
 
-	if not t.require(Probe.stun(human, 4.0, 4.0, Vector2(200, 100)), "Character.take_stun exists"):
+	if not t.require(Probe.stun(human, 4.0, 4.0), "Character.take_stun exists"):
 		return
 	await t.frames(3)
 	var burst: Dictionary = screen.drawn()

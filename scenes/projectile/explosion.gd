@@ -49,7 +49,7 @@ static func stun(at: Vector2, world: Node, source: Node, row: Dictionary) -> voi
 		var blind := _blind_time(row, c, at, d) if seen else 0.0
 		var deaf := float(row.get("max_deaf", 0.0)) * clampf(1.0 - d / maxf(bang_radius, 0.01), 0.0, 1.0) \
 				* (float(row.get("wall_factor", 1.0)) if walled else 1.0)
-		c.call("take_stun", blind, deaf, at)
+		c.call("take_stun", blind, deaf)
 		if d < float(row.get("point_blank", 0.0)):
 			c.call("take_damage", float(row.get("point_blank_damage", 0.0)))
 

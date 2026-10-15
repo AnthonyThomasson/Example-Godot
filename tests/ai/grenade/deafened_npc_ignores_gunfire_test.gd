@@ -5,7 +5,7 @@ extends GameTest
 ## Real Von; everything else is on.
 ##
 ## Premises: the gunfire is one shot heard from the kitchen (a `hit` event with nobody known behind it, as tests/_ai/investigate_probe.gd
-## posts it); the deafness is `take_stun(0, 8, ...)` on one defender, as a bang's would be (the grenade's own bang is tested elsewhere).
+## posts it); the deafness is `take_stun(0, 8)` on one defender, as a bang's would be (the grenade's own bang is tested elsewhere).
 ## No behaviour is switched off: the only characters are the two household defenders, allies of each other, so trespass hostility (a stranger in
 ## the house) has nobody to fall on and the shot is the only thing that can draw them.
 
@@ -32,7 +32,7 @@ func configure(s: TestSetup) -> void:
 
 func run(t: TestContext) -> void:
 	var deaf := t.actor(&"deaf")
-	if not t.require(Probe.stun(deaf, 0.0, 8.0, Vector2(250, 390)), "Character.take_stun(blind, deaf, from) exists"):
+	if not t.require(Probe.stun(deaf, 0.0, 8.0), "Character.take_stun(blind, deaf) exists"):
 		return
 	await t.frames(3)
 	t.require(Probe.deaf(deaf), "set-up: the defender is deaf (is_deaf)")

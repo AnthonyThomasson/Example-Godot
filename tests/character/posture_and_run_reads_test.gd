@@ -48,5 +48,5 @@ func run(t: TestContext) -> void:
 	t.check(c.run_speed() > c.speed * 1.3, "faster than its walk (%.0f px/s)" % c.speed)
 	puppet.stop()
 	var free: float = c.run_speed()
-	c.take_stun(2.0, 0.0, c.global_position + Vector2.LEFT * 100.0)
+	c.take_stun(2.0, 0.0)
 	t.check(c.run_speed() < free, "and slower while stunned (%.0f against %.0f)" % [c.run_speed(), free])

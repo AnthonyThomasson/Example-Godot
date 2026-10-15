@@ -70,7 +70,7 @@ func _stray(t: TestContext, shots: int) -> float:
 
 func run(t: TestContext) -> void:
 	var walker := t.actor(&"walker")
-	if not t.require(walker.has_method("take_stun") and walker.has_method("stun_level"), "Character.take_stun(blind, deaf, from) and stun_level() exist"):
+	if not t.require(walker.has_method("take_stun") and walker.has_method("stun_level"), "Character.take_stun(blind, deaf) and stun_level() exist"):
 		return
 	t.puppet(&"shooter").aim_at(t.actor(&"target"))
 	t.puppet(&"walker").aim_at(Vector2(1100, 150))
@@ -91,14 +91,14 @@ func run(t: TestContext) -> void:
 
 	# --- The shooter is stunned for 6 s: its zero-spread shots stray, and are only the sway.
 	await _top_up(t)
-	Probe.stun(t.actor(&"shooter"), 6.0, 6.0, Vector2(-300, 500))
+	Probe.stun(t.actor(&"shooter"), 6.0, 6.0)
 	await t.seconds(0.3)
 	var stray := await _stray(t, 11)
 	t.check(stray >= 5.0, "its shots go astray: the aim sways %.1f degrees at the worst" % stray)
 	t.check(stray <= 28.0, "but never more than the 25 degree sway (%.1f)" % stray)
 
 	# --- The walker is stunned for 4 s.
-	Probe.stun(walker, 4.0, 4.0, Vector2(-300, 150))
+	Probe.stun(walker, 4.0, 4.0)
 	await t.seconds(0.3)
 	t.check(Probe.level(walker) >= 0.95, "the stun is at its full level at first (%.2f)" % Probe.level(walker))
 	var slow := await _walk_speed(t, 0.8)
@@ -128,10 +128,10 @@ func run(t: TestContext) -> void:
 
 	# --- A new stun takes the longer of the old and the new timers.
 	var other := t.actor(&"target")
-	Probe.stun(other, 4.0, 4.0, Vector2.ZERO)
-	Probe.stun(other, 1.0, 1.0, Vector2.ZERO)
+	Probe.stun(other, 4.0, 4.0)
+	Probe.stun(other, 1.0, 1.0)
 	var kept := Probe.view(other)
 	t.check(float(kept.get("blind", 0.0)) > 3.5 and float(kept.get("deaf", 0.0)) > 3.5, "a shorter stun does not cut a longer one short (blind %.1f, deaf %.1f)" % [kept.get("blind", 0.0), kept.get("deaf", 0.0)])
-	Probe.stun(other, 6.0, 6.0, Vector2.ZERO)
+	Probe.stun(other, 6.0, 6.0)
 	var longer := Probe.view(other)
 	t.check(float(longer.get("blind", 0.0)) > 5.5 and float(longer.get("deaf", 0.0)) > 5.5, "a longer one replaces it (blind %.1f, deaf %.1f)" % [longer.get("blind", 0.0), longer.get("deaf", 0.0)])

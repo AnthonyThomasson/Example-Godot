@@ -904,11 +904,10 @@ func report_shot(body: Node, damage: float) -> void:
 
 # --- The stun (a grenade's flash and bang; docs/grenades.md G13) -------------------------
 
-## Blind and deafen the character for `blind` and `deaf` seconds by a burst at `from` (a grenade's). A new stun takes the
-## longer of the old and the new timers, blind and deaf each, and posts `&"stun"` `{ character, position, blind, deaf,
-## from }`. While either lasts the character is disoriented (`stun_level()`): slowed, drifting, unable to run and its
+## Blind and deafen the character for `blind` and `deaf` seconds (a grenade's burst). A new stun takes the longer of the
+## old and the new timers, blind and deaf each, and posts `&"stun"` `{ character, position, blind, deaf }`. While either lasts the character is disoriented (`stun_level()`): slowed, drifting, unable to run and its
 ## aim swaying. A stun that is neither does nothing; a dead character cannot be stunned.
-func take_stun(blind: float, deaf: float, from: Vector2 = Vector2.ZERO) -> void:
+func take_stun(blind: float, deaf: float) -> void:
 	if is_dead or (blind <= 0.0 and deaf <= 0.0):
 		return
 	if stun_level() <= 0.0:
@@ -918,7 +917,7 @@ func take_stun(blind: float, deaf: float, from: Vector2 = Vector2.ZERO) -> void:
 		_blind_left = blind
 		_blind_total = blind
 	_deaf_left = maxf(_deaf_left, deaf)
-	EventBus.post(&"stun", { "character": self, "position": global_position, "blind": blind, "deaf": deaf, "from": from })
+	EventBus.post(&"stun", { "character": self, "position": global_position, "blind": blind, "deaf": deaf })
 
 
 ## True while flash-blinded.

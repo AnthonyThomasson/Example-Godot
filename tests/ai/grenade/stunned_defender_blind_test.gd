@@ -5,7 +5,7 @@ extends GameTest
 ## 25 degrees off); and when the blindness lifts it re-decides from what it sees. A defender is fighting a hostile it can see; the flash
 ## hits it; the hostile then walks across its front.
 ##
-## Premises: the flash is `take_stun(6, 6, ...)` called on the defender, as a grenade's flash would (the grenade's own throw is
+## Premises: the flash is `take_stun(6, 6)` called on the defender, as a grenade's flash would (the grenade's own throw is
 ## tested elsewhere); the hostile is an invader *puppet* that cannot be killed and never shoots. Real Von; everything else is on.
 
 const Probe := preload("res://tests/_ai/grenade_probe.gd")
@@ -47,7 +47,7 @@ func run(t: TestContext) -> void:
 		return
 	var seen_at: Vector2 = _known(brain, p).get("pos", FIRST_SPOT)
 
-	if not t.require(Probe.stun(d, BLIND, BLIND, FIRST_SPOT + Vector2(0, -100)), "Character.take_stun(blind, deaf, from) exists"):
+	if not t.require(Probe.stun(d, BLIND, BLIND), "Character.take_stun(blind, deaf) exists"):
 		return
 	var flashed := t.time
 	t.puppet(&"p").walk_to(SECOND_SPOT)
