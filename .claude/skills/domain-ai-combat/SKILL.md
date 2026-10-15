@@ -11,11 +11,12 @@ back-off counters) and executes every combat action on the character. `Behavior`
 contact (node, last-known position) and the `hold_ground` flag — and passes them in each call, so combat never picks a target. It reads
 the world only through the perception (`has_line_to`, `combat_spots`, `note_engaged`) and `Locomotion` (`move_to`, `inside_house`).
 
-API (all take the `character`): `tick(delta)` (cooldown), `begin_fight()` (reset to the peek phase), `can_fire_at(character, target)` (a
-loaded gun, the known contact in range on a clear line: a shot is on), `fire_at_will(character, target)`
-(shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due(character)`, `has_line_of_fire(character, target) -> bool` (in range on a clear line, whatever the gun's state; what `can_fire_at` adds a loaded gun to, and the entry reads for E14), `top_off(character) -> bool` (a tactical reload of a part-spent gun, called by the entry at the stack: starts it, true while it runs or is wanted; `docs/tactical-entry.md` E11), `ambush(character, node, pos)`,
-`peek_cover(character, delta, node, pos, hold_ground)`, `melee(character, pos, hold_ground)`, `shoot(character) -> bool`,
-`punch(character)`, `continue_burst(character)`, `apply_back_off(character, delta)`, `reload_if_dry(character)`; `signal dry`
+`bind(character)` (from `Behavior.bind`) hands it the NPC's body once; no other function takes the character. API: `tick(delta)`
+(cooldown), `begin_fight()` (reset to the peek phase), `can_fire_at(target)` (a
+loaded gun, the known contact in range on a clear line: a shot is on), `fire_at_will(target)`
+(shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due()`, `has_line_of_fire(target) -> bool` (in range on a clear line, whatever the gun's state; what `can_fire_at` adds a loaded gun to, and the entry reads for E14), `top_off() -> bool` (a tactical reload of a part-spent gun, called by the entry at the stack: starts it, true while it runs or is wanted; `docs/tactical-entry.md` E11), `ambush(node, pos)`,
+`peek_cover(delta, node, pos, hold_ground)`, `melee(pos, hold_ground)`, `shoot() -> bool`, `strike()` / `punch()` / `kick()`,
+`continue_burst()`, `apply_back_off(delta)`, `reload_if_dry()`; `signal dry`
 (an empty gun was pulled on — `Behavior` flags the task resolved so the controller re-decides). Tunables (copied from the controller
 exports): `shoot_range`, `punch_range`, `combat_ring_radius` / `combat_ring_count` (the ring of candidate spots), `cover_time`,
 `fire_cooldown`, `fire_burst`, `back_off_time`, `reposition_interval`, `auto_reload`.
@@ -32,7 +33,7 @@ the house, the peek fallback holds instead of advancing, and melee won't chase o
 **No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
 lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
 
-**Firing** (`Combat.shoot(character) -> bool`, true = a round left the barrel; the fists are `Combat.punch`). It holds fire at a run or mid-reload (cooldown kept);
+**Firing** (`Combat.shoot() -> bool`, true = a round left the barrel; the fists are `Combat.punch`). It holds fire at a run or mid-reload (cooldown kept);
 a dry gun is a click (below); otherwise it equips the gun and, **if `weapon_blocked()` (the barrel is against a wall or object), sets
 `_back_off_timer = back_off_time`, keeps the cooldown and returns false**, else calls `shoot()` and, only on success, notes engagement and starts
 the cooldown. `Behavior.apply()` ends each tick with `Combat.apply_back_off`: while the timer runs it overrides `move_input = -facing` (away from where the gun
@@ -45,7 +46,7 @@ Tests: `tests/ai/combat/blocked_gun_steps_back_test.gd` (a rifle with a chair ag
 Not modelled: a rifleman cornered with a wall behind it can still stall (bounded by the back-off timer and re-decisions); cover logic treats walls as
 bulletproof though a rifle shoots through them.
 
-**Throwing a grenade** (`begin_throw(slot, spot, max_range)`, `throw_reach(max_range)`, `throw_step(character, delta)`, `throw_released(character)`, `end_throw()`; `throw_stage` `""` / `"aim"` / `"windup"` / `"away"`): the `throw` primitive's hands (`docs/grenades.md` G17), also used by the
+**Throwing a grenade** (`begin_throw(slot, spot, max_range)`, `throw_reach(max_range)`, `throw_step(delta)`, `throw_released()`, `end_throw()`; `throw_stage` `""` / `"aim"` / `"windup"` / `"away"`): the `throw` primitive's hands (`docs/grenades.md` G17), also used by the
 bang entry's thrower. Standing still (but for the last few px: a thrower farther than `throw_reach(max_range)` = `max_range - THROW_RANGE_SLACK` 15 px from the spot, because it moved on since the spot was offered, walks toward it first, within the same `THROW_START_CAP`; the bang's thrower plans a spot already within the reach), it selects the grenade's slot (`select_slot`), aims at the spot (`aim_point`; the item throws to `Character.aim_target()`) and clicks `shoot()` once the facing has settled (`_faces`); `shoot()` answers true when the
 throw STARTS (`GrenadeItem.secondary`), not for a round leaving a barrel. It gives up after `THROW_START_CAP` (2 s) without a start or `THROW_RELEASE_CAP` (1.5 s) without the grenade leaving the hand (`throw_step` returns `&"failed"`).
 `throw_released` is true once, on the tick the carried count has dropped (the wind-up is over); it takes the gun back in hand (`select_slot(gun_slot())`, a last grenade empties its slot by itself). It is polled by `Behavior.poll_throw`

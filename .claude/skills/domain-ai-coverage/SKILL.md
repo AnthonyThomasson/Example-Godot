@@ -6,8 +6,9 @@ description: Deep implementation detail for the AI SEARCH COVERAGE module (scene
 # AI · Search coverage module (`scenes/ai/behavior/search_coverage.gd`)
 
 A `RefCounted` that `Behavior` owns. A `look_around` move (search / explore) ignores the `arrive_room` early-out and walks all the way INTO the
-room (its interior `point`); on arrival `Behavior` calls `begin(character)` and from then on `step(character, delta)` every tick until it
-returns true, then flags the task resolved so the controller re-decides. `max_commit_time` still caps the walk INTO the room before
+room (its interior `point`); on arrival `Behavior` calls `begin()` and from then on `step(delta)` every tick until it
+returns true, then flags the task resolved so the controller re-decides. It holds the NPC's body from one `bind(character)` (from
+`Behavior.bind`). `max_commit_time` still caps the walk INTO the room before
 coverage starts.
 
 - **Sample:** `begin` locks the room (`Locomotion.room_key_at`) and grid-samples it (`spacing`, inset `margin` off the walls, dropping any point off the

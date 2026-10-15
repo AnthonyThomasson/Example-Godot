@@ -11,8 +11,10 @@ holds no state between calls, and never writes memory, decides or picks. `agent_
 and calls `build()` once per decision; it sets the tunables on `snapshot.vocab` from `apply_config()`.
 
 Files:
-- `agent_snapshot.gd` — `build(character, rooms, goal, activity, known, callouts, knowledge) -> { facts, sections, sections_per_target,
-  options, gun }`: the **facts** literal, the per-hostile loop (`_analyze`), and the assembly of the dict; `fill_goal(goal, character)`.
+- `agent_snapshot.gd` — `build(rooms, goal, activity, known, callouts, knowledge) -> { facts, sections, sections_per_target,
+  options, gun }`: the **facts** literal, the per-hostile loop (`_analyze`), and the assembly of the dict; `fill_goal(goal)`;
+  `bind(character)` (from the perception's own `bind`) hands the NPC's body to it and to the vocabulary, the sections and the option
+  groups, each holding it as `_character`, so none of their functions takes the character.
 - `snapshot/snapshot_vocab.gd` — the shared vocabulary and tuning: `COMPASS`, `SIDE_WORDS`, every tunable the perception copies in
   (`shoot_range`, `punch_range`, `recency_bands`, `route_buckets`, `aim_cone`, `still_speed`, `flank_ally_radius`,
   `investigate_distance`, `extrapolate_cap`, `max_options_per_level`, `hurt_threshold`, `critical_threshold`, `low_ammo_fraction`,
@@ -35,9 +37,9 @@ Add a **fact** in the `facts` literal of `build()`; a **section** as a `*_text` 
 
 ## The snapshot (what the planner walks) — built by `agent_snapshot.gd`
 
-The face's `sense(character, rooms, goal, activity)` gathers the knowledge (contacts, callouts,
+The face's `sense(rooms, goal, activity)` gathers the knowledge (contacts, callouts,
 learned rooms/objects, lost hostiles) and hands it to `agent_snapshot.gd`'s
-`build(character, rooms, goal, activity, known, callouts, knowledge)`, which assembles the snapshot
+`build(rooms, goal, activity, known, callouts, knowledge)`, which assembles the snapshot
 below from that knowledge + the tactics geometry. The author reads the memory and tactics modules
 only; it writes no memory and holds no policy. Everything in this section and the wording rules below
 lives in `agent_snapshot.gd`.

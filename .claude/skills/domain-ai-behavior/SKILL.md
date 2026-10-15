@@ -22,7 +22,8 @@ Files:
 The controller sets the behaviour's config fields from its exports, calls `setup(perception, nav_agent)`
 once to build its `Locomotion`, `SearchCoverage`, `Combat`, `Watch` and `Entry` modules, then `apply_config()` to push the tunables they hold
 in — re-calling `apply_config()` each decision so a runtime retune takes effect. (The behaviour's own
-fields are read live, so only those modules need the push.)
+fields are read live, so only those modules need the push.) On its first `control()` the controller calls `bind(character)`: the
+behaviour keeps the NPC's body and hands it to each module's own `bind`, so none of their functions takes the character.
 
 ## The primitives (a leaf = `{ path, labels, primitive, params }`)
 
@@ -94,17 +95,17 @@ The entry phase machine, its team radio, the entry guard's detours and the entry
 ## Public interface (what the orchestrator calls)
 
 - `setup(perception, nav_agent)` (build the Locomotion, coverage, combat, watch and entry modules), `apply_config()` (push their tunables
-  in; re-callable each decision); config fields; `rooms` (set each tick; forwarded to Locomotion).
+  in; re-callable each decision), `bind(character)` (the body, once); config fields; `rooms` (set each tick; forwarded to Locomotion).
 - `set_leaf(leaf)` — adopt: snap the point onto the navmesh, capture the target (a fight whose target
   is no longer known drops to hold and forces a re-decision), commit.
 - `update_known(known, delta) -> bool` — adopt the perception's hostiles; retarget a lost engaged
   contact to the nearest other; with none left, a leaf that needs a target ends → true (re-decide).
-- `salient_key()`, `service_interaction(character, delta, force)`, `take_resolved()` (with `resolve_reason()`, read just before it:
+- `salient_key()`, `service_interaction(delta, force)`, `take_resolved()` (with `resolve_reason()`, read just before it:
   "way blocked" when a body seals the only way of the walk and stays, "" for a finished task; the controller forces its decision with it),
-  `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
+  `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(delta)`,
   `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
-  start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view(character)`,
-  `debug_combat(character)`, `debug_coverage()`, `debug_progress()`, `path_label()`, `throw_plan()` (the throw about to be made,
+  start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view()`,
+  `debug_combat()`, `debug_coverage()`, `debug_progress()`, `path_label()`, `throw_plan()` (the throw about to be made,
   `{ from, to, kind, radius }`, `{}` once the grenade is away: the grenades overlay's `throw`).
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.
@@ -118,7 +119,7 @@ The entry phase machine, its team radio, the entry guard's detours and the entry
 
 ## Locomotion (`locomotion.gd`)
 
-All movement flows through `move_to(character, dest, within := 0)` on a `NavigationAgent2D` (`within`: arrive closer than the agent's
+All movement flows through `move_to(dest, within := 0)` on a `NavigationAgent2D` (`within`: arrive closer than the agent's
 own 16 px; the entry's stack slots use `SLOT_REACH` 6 px, since a member a stride short of its slot stands on the next one). `path_ahead()` returns the walk it was just given
 (`{ path, index }`, or {}), which the behaviour's entry guard reads. The Navigation
 domain bakes furniture in as navmesh holes and rings the house with a walkable outdoor strip.
@@ -126,7 +127,7 @@ Steering always aims at `get_next_path_position()` — a navmesh waypoint, so it
 an unreachable target it steps toward the closest reachable point. Furniture physically on the route
 (a piece shoved off its baked hole) is bulldozed by the character's own push physics; there is no RVO
 avoidance and no straight-at-the-destination fallback. `reachable(p)` snaps a point onto the navmesh
-(every leaf destination goes through it); `reached(character, point, within := 0)` reports arrival (at the free spot it took, below; never while held).
+(every leaf destination goes through it); `reached(point, within := 0)` reports arrival (at the free spot it took, below; never while held).
 Falls back to straight-line steering with no agent. It also holds the house `rooms` (set by `Behavior`) and answers `room_key_at(p)` /
 `inside_house(p)` for the move's `arrive_room` test and the coverage and combat modules. `reachable` / `on_navmesh` always use the plain map.
 

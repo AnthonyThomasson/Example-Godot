@@ -22,7 +22,9 @@ skill for detail.
 AI domain). It is the single **authoring surface** (every tunable is an export here, so a defender or
 invader preset is all data on this one node), it wires the sub-domains and pushes its exports into
 them — building them once, then re-pushing the config each decision so a tunable retuned at runtime
-(a behaviour test, the dev command server) takes effect without a rebuild — and it runs the
+(a behaviour test, the dev command server) takes effect without a rebuild, and on its first `control(character, delta)` hands the NPC's
+body to perception and behaviour once (`bind(character)`, which each passes on to its modules), so no sub-domain function takes the
+character — and it runs the
 **SENSE → THINK → ACT** loop plus the decide cadence, salient-event detection, interrupting a decision
 walk the situation has overtaken, and the EventBus intake (`&"hit"`, allies' `&"callout"`s, `&"grenade"` landings and
 `&"explosion"`s, queued and handed to perception on the next tick) and its own callouts.

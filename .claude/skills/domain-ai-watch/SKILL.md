@@ -27,12 +27,14 @@ place a threat is shot at, whichever primitive or entry phase is running.
 
 ## Watch (`watch.gd`, a `RefCounted` built in `Behavior.setup`, tunables via `apply_config`)
 
+It holds the NPC's body from one `bind(character)` (from `Behavior.bind`); only the static `ease_gaze` takes a character.
+
 - `threat(hostiles, engaged_id)` — the pick above. `lost_gaze` (`watch_lost_gaze`, 2 s).
-- `travel_point(character)` — where a walker looks: the farthest point, up to `look_ahead` (`watch_look_ahead`, 150 px) down the walk
+- `travel_point()` — where a walker looks: the farthest point, up to `look_ahead` (`watch_look_ahead`, 150 px) down the walk
   the nav agent was just given (`Locomotion.path_ahead()`), sampled every 30 px, that it has a clear line to (`has_line_to`); INF with
   none. `Behavior._aim_move`'s default branch and `Entry._aim_travel` use it and fall back to the steering vector. (The next waypoint
   alone hugs the door jamb, so facing it looks at the jamb.)
-- `idle_gaze(character, delta)` — turns among `perception.room_doorways(room)` (outer doors included; each with a clear line and not
+- `idle_gaze(delta)` — turns among `perception.room_doorways(room)` (outer doors included; each with a clear line and not
   under 60 px), nearest first on entering a room then round the NPC by angle, `door_dwell` (`watch_door_dwell`, 2.5 s) apiece, eased at
   `look_rate` (= `search_look_rate`) from the actual facing. Nothing outdoors or with no door in line; an unset `aim_point` (ZERO) becomes
   "where the body points". `reset()` on every new order.
