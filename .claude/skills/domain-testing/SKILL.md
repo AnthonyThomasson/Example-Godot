@@ -204,7 +204,8 @@ func run(t: TestContext) -> void:
   - Waits, all in sim time: `await t.seconds(s)`, `await t.frames(n)`,
     `await t.until(cond, timeout, msg := "") -> bool` (with `msg`, a timeout records a failed check).
   - Lookup: `t.actor(id)`, `t.puppet(id)` (the ScriptedController), `t.object(id)`, `t.vehicle(id)`,
-    `t.controller(id, method)` (e.g. `&"current_act"` for an NPC brain), `t.world`, `t.rooms`, `t.time`.
+    `t.controller(id, method)` (e.g. `&"current_act"` for an NPC brain; `TestContext.controller_of(character, method := &"control")`
+    is the same for a character that is not a test actor, e.g. a match's NPC spawned in `run`), `t.world`, `t.rooms`, `t.time`.
   - Event log: `t.events_of(topic, filter)`, `t.happened(topic, filter)`, `t.spawned(name_part)`.
     Topics are every EventBus topic (`&"hit"`: position, victim, source, attacker, direction, damage;
     `&"callout"`), `&"died"` / `&"hit_landed"` per actor (`actor` = its id; hit_landed adds body,
@@ -486,8 +487,9 @@ the engine log file (`debug/file_logging/log_path`) from an offset marked at run
 
 One data table. A row maps a name to existing knobs:
 
-- `actor: { child, props }` sets those props to `on` on that child of every actor, before it
-  enters the tree;
+- `actor: { child, props }` sets those props to `on` on that child of every actor (`child` `""` = the character itself), before it
+  enters the tree; `controller: true` in place of `child` targets the actor's controller child (the one with `control`,
+  interface 7, found by `TestContext.controller_of`), which is how every `ai.*` row reaches the AI controller's exports;
 - `world: { node, props }` sets props on a world node;
 - `static: [[Script, prop]]` sets that `static var` to `on`;
 - `[Script, prop, off_value]` is for a non-bool knob: on keeps its tuning, off sets `off_value`.
