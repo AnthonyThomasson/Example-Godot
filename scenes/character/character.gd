@@ -721,6 +721,12 @@ func run_speed() -> float:
 	return _speed_in(&"stand", true)
 
 
+## The speed (px/s) it would cover ground at walking, standing, as it is now (slowed while stunned or weighed down by the
+## outfit): what a controller counts on when it does not run.
+func walk_speed() -> float:
+	return _speed_in(&"stand", false)
+
+
 ## `facing` turned toward the unit vector `want`: at once standing, but no faster than the posture's `turn` rate
 ## (rad/s) crouched, so a low body takes longer to come round. The aim point itself is never held back.
 func _turned_toward(want: Vector2, delta: float) -> Vector2:

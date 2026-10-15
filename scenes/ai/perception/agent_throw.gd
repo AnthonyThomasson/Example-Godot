@@ -207,10 +207,10 @@ func _candidates(space, burst: Vector2, from: Vector2, out_r: float, exclude: Ar
 	return out
 
 
-## The speed (px/s) the NPC counts on to cover ground when it runs for it (`RUN_RELIABILITY` of `Character.run_speed`), or its walk once its
-## stamina is low.
+## The speed (px/s) the NPC counts on to cover ground when it runs for it (`RUN_RELIABILITY` of `Character.run_speed`), or its walk
+## (`Character.walk_speed`) once its stamina is low.
 func run_speed(character) -> float:
-	return character.run_speed() * RUN_RELIABILITY if character.stamina_fraction() > RUN_STAMINA else character.speed
+	return character.run_speed() * RUN_RELIABILITY if character.stamina_fraction() > RUN_STAMINA else character.walk_speed()
 
 
 # --- The lob -------------------------------------------------------------------------------------------------
