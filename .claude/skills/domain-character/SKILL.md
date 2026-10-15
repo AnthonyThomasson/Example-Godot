@@ -163,7 +163,7 @@ Tests: `tests/character/hit_zone_by_bullet_height_test.gd`, `outfit_weight_slows
 
 `item_count(slot := -1)` reads a grenade slot's count; `throw_stats(slot := -1)` forwards the item's `throw_stats()` (a grenade's `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot), which the AI throws by. `_empty_spent_slots` (after the items tick) erases a grenade slot whose last grenade is thrown and, if it was held,
 selects `gun_slot()` (else the fists). `aim_target()` is the aim point swayed by `aim_sway()`; `GunItem.secondary` turns each shot by `aim_sway()` (0 unless stunned).
-`take_stun(blind, deaf, from)` takes the longer of the old and new timers (blind and deaf each) and posts `&"stun"`; `stun_level()` (0..1) is the longer remaining timer over
+`take_stun(blind, deaf)` takes the longer of the old and new timers (blind and deaf each) and posts `&"stun"` (`{ character, position, blind, deaf }`); `stun_level()` (0..1) is the longer remaining timer over
 `CharacterConfig.recover_tail` (the four stun numbers, `stun_speed`, `stun_sway`, `recover_tail` and `stun_drift`, are the body's tuning and live in `CharacterConfig`: the
 Character reads nothing of `GrenadeConfig`), and while it is above 0 `_move_speed()` scales to `stun_speed`, running is refused, the walk drifts (`_stun_drift`) and the aim sways (`aim_sway`: two
 out-of-step sines, up to `stun_sway` degrees x the level). `stun_view()` feeds the UI (`StunScreen`). `blast_push(from, impulse)` is an explosion's hook: a living body is knocked
