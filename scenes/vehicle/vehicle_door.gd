@@ -65,11 +65,6 @@ func is_open() -> bool:
 	return _progress >= 1.0
 
 
-## True while shut and not opening.
-func is_shut() -> bool:
-	return _progress == 0.0 and _target == 0.0
-
-
 ## How far a swing or rear door is turned (rad, signed); 0 for a sliding door.
 func angle() -> float:
 	return 0.0 if kind == &"slide" else _turn * open_angle * amount()
@@ -88,13 +83,6 @@ func handle_now() -> Vector2:
 	if kind == &"slide":
 		return handle + offset()
 	return hinge + (handle - hinge).rotated(angle())
-
-
-## The door's free edge where it is now (local): the tip of a turned door, the back edge of a sliding one.
-func tip_now() -> Vector2:
-	if kind == &"slide":
-		return hinge + Vector2(-length, 0.0) + offset()
-	return handle_now()
 
 
 ## Where a character of `radius` stands to use the door (local): out from the body beyond its radius, and on past the
