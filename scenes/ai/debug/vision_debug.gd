@@ -20,8 +20,8 @@ const BUBBLE_RAYS := 48
 ## Fill colour for the near-awareness bubble's line-of-sight area.
 @export var bubble_color: Color = Color(1.0, 0.9, 0.3, 0.5)
 
-var _cone_poly: PackedVector2Array = PackedVector2Array()
-var _bubble_poly: PackedVector2Array = PackedVector2Array()
+var _cone_poly: PackedVector2Array = PackedVector2Array()   ## The view cone's visible area, local points (rebuilt each frame).
+var _bubble_poly: PackedVector2Array = PackedVector2Array() ## The awareness bubble's visible area, local points.
 
 
 ## Rebuild the visibility polygons every frame so they track the NPC's movement and facing (the base runs

@@ -22,8 +22,8 @@ const CACHE_TTL := 0.5
 const WEDGE_RANGE := 170.0
 
 var _cache: Dictionary = {}  ## point (Vector2) → PackedVector2Array route from the NPC.
-var _cache_ms := 0
-var _cache_from := Vector2.ZERO
+var _cache_ms := 0  ## When (msec) the cached routes were fetched.
+var _cache_from := Vector2.ZERO  ## Where the NPC stood when they were fetched (moving more than 24 px away refetches them).
 
 
 ## Whether this overlay's toggle is on.
