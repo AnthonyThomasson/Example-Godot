@@ -18,7 +18,7 @@ its own child `Node2D`.
 - **Control** (`character.gd`, root body) owns state + physics: computes `facing`, moves, and
   forwards intent from its controller. Never draws.
 - **Animate and draw** live in `scenes/character/body/` — **`domain-character-body`**: `character_hands.gd` (hand geometry, punch,
-  punch hit detection), `character_pose.gd` (the living motion, each hand's stance), `character_rig.gd` (the standing skeleton),
+  punch hit detection), `character_kick.gd` (the leg kick and its hit detection), `character_pose.gd` (the living motion, each hand's stance), `character_rig.gd` (the standing skeleton),
   `character_legs.gd` (feet against walls), `body_sweep.gd` (the collide-and-slide hands and legs share), `character_ragdoll.gd` (the fall) and `character_visuals.gd` + the painters (appearance).
   Load that skill for anything about how the character moves, holds a weapon, looks or falls.
 
@@ -113,7 +113,7 @@ The run's legs, arms and shoulders (stride blend, `run` stance, shoulder sway an
 The character carries spare magazines (`_magazines`, `Magazine` items) beside its inventory: they are never in
 `_items`, so no number key or interaction can select them. They come from the exports `spare_magazine_types`
 (`MagazineConfig.types` ids, default two standard magazines for each gun) and `start_rounds` (what the starting gun is loaded with;
-negative = full), which tests and sandboxes set through `actor(..., props)`. `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` re-arms a character after the fact (a match gives an NPC or the scene-placed player its gun this way; `loaded_magazine` picks the type the gun starts loaded with). `reload()` (R, or the AI's reload
+negative = full), which tests and sandboxes set through `actor(..., props)`. `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` re-arms a character after the fact (a match gives an NPC or the scene-placed player its gun this way; `loaded_magazine` picks the type the gun starts loaded with). `reload()` (R, or the AI's reload
 primitive) starts a timer of the held item's `reload_time()` on it if its `can_reload(self)` says a carried
 magazine would add rounds, and sets the item's `reloading` flag (a gun's support hand eases to the `reload`
 stance while it is up). `_update_reload` runs right after the controller: it cancels the reload when the character
@@ -129,7 +129,7 @@ is still cycling between rounds. `_physics_process` ticks every carried item (`I
 cooldown is in step with the frame that pulls the trigger. A controller re-presses `shoot()` every frame while the trigger is held when
 `is_automatic()` (`player_controller.gd` reads `Keybinds.is_fire_pressed()`; the test puppet has `hold_fire(on)`).
 
-**Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)`, the carried
+**Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades)`, the carried
 magazines and the held slot (dropping any reload, re-judging the raise). Main uses it (through `LoadoutConfig.apply`) to arm the player and every NPC with its side's loadout — a chosen gun, or one random gun by default
 (`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
 

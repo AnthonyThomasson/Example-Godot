@@ -1,12 +1,12 @@
 ---
 name: domain-character-body
-description: Deep implementation detail for the Character body sub-domain (scenes/character/body/) — the standing skeleton and its solved joints (CharacterRig), the living motion of head, shoulders, hips and hands (CharacterPose), leg/foot clamping against walls (CharacterLegs), hand geometry, the punch and its hit detection (CharacterHands), the ragdoll fall on death, and all the drawing (CharacterVisuals: standing body, fallen body, shadows, wounds) through the body/head/hand/limb/torso/vest pixel-art painters, and the outfit's look (garments, vest, plate wear). Use when editing scenes/character/body/ or working on the walk cycle, run pose, crouch look, how a weapon is held (stances), punch detection, the fallen body, the character's pixel art, how an outfit is drawn or the redraw key. Complements the `domain-character` overview and the `architecture` skill.
+description: Deep implementation detail for the Character body sub-domain (scenes/character/body/) — the standing skeleton and its solved joints (CharacterRig), the living motion of head, shoulders, hips and hands (CharacterPose), leg/foot clamping against walls (CharacterLegs), hand geometry, the punch and its hit detection (CharacterHands), the leg kick (CharacterKick), the ragdoll fall on death, and all the drawing (CharacterVisuals: standing body, fallen body, shadows, wounds) through the body/head/hand/limb/torso/vest pixel-art painters, and the outfit's look (garments, vest, plate wear). Use when editing scenes/character/body/ or working on the walk cycle, run pose, crouch look, how a weapon is held (stances), punch detection, the fallen body, the character's pixel art, how an outfit is drawn or the redraw key. Complements the `domain-character` overview and the `architecture` skill.
 ---
 
 # Character · Body sub-domain (`scenes/character/body/`)
 
-Everything that gives the character a body: `character_rig, character_legs, character_pose, character_ragdoll, character_hands`
-(animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso / vest` painters (draw). `character.gd` (the root body, see
+Everything that gives the character a body: `character_rig, character_legs, character_pose, character_ragdoll, character_hands,
+character_kick` (animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso / vest` painters (draw). `character.gd` (the root body, see
 `domain-character`) owns state and physics and steps these each frame; nothing here decides what the character *does*. Cross-domain
 edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), the character's `Outfit` (Items: `look()`, `revision`), and
 `CharacterConfig` (this domain's tuning holder, in `character/`). `character_base.tscn` attaches
