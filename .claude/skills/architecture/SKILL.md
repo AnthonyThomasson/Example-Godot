@@ -126,7 +126,10 @@ interfaces it takes part in (by number) and describes how they're implemented.
    - `Deformation` (static): silhouette/collider polygons + drawing (`draw_shape` and
 	 `draw_wall` optionally textured — `draw_shape` also turned by `texture_angle`, its hit marks
 	 optional for a caller drawing them over later layers with `draw_marks` — so pixel art is drawn
-	 through the dented silhouette).
+	 through the dented silhouette). The polygons are `base_ring(shape, size)` (a primitive's undented ring),
+	 `shape_polygon(shape, size, impacts)` (a piece's or the character's dented silhouette, cached), `wall_polygon(a, b, thickness, impacts)`
+	 (a dented wall segment), `is_valid_polygon(poly)` (callers skip a self-touching one that frame) and `convex_shapes(polygon)` (the
+	 convex pieces a dented collider is rebuilt from); `NO_COLOR` is the sentinel a caller passes to take a drawing call's default colour.
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects and a vehicle)
 	 `BloodWound` (Node child, character: `record(hit)` on a hit throws a splatter spray and owes drips, one
 	 `BloodSplat` every `BloodConfig.drip_interval_min..max` s from the body's blood origin; `stop()` on death)
