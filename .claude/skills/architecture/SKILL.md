@@ -287,7 +287,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 place at the pieces' **current** positions; `rebake_async(region, house, rooms, agent_radius, done)` does it with the
 	 bake on the NavigationServer's worker thread (what the Navigation domain's own `nav_updater.gd` drives).
    - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
-	 polygons, which Main snapshots for the `nav_debug.gd` debug overlay (draw-only).
+	 polygons: what the Navigation domain's draw-only `nav_debug.gd` overlay draws and its `nav_updater.gd` watches for a
+	 moved piece, and what Main's `match_spawner.gd` keeps a spawn's clearance from.
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
 	 living characters at rest under the region's parent), `NavBuilder.steering_map(planning_map) -> RID` (a map of its own, holding
 	 the furniture *and* those holes; named from the frame `build` returns, before it has synchronized (`ready` tells when it answers);
