@@ -1,25 +1,26 @@
 extends Node
 
-## AI domain ORCHESTRATOR: a generic, goal-driven controller for a non-player character. It is the AI's
-## own composition root (the `main.gd` of the AI domain): it wires the three AI sub-domains and runs the
-## SENSE → THINK → ACT loop, but holds almost no behaviour itself. It satisfies the character's
-## controller contract (`control(character, delta)`) and writes only the intent the player controller
-## writes (`move_input`/`aim_point`) plus the same public actions — all of that done by the behaviour
-## sub-domain. It is the single authoring surface: every tunable below is an export here (so a defender
-## or invader preset is all data on this one node), pushed into the sub-modules it builds — and
-## re-pushed each decision, so a tunable retuned at runtime (a behaviour test, the dev command server)
-## takes effect without a rebuild.
+## AI domain ORCHESTRATOR: a generic, goal-driven controller for a non-player character. It is the AI's own
+## composition root (the `main.gd` of the AI domain): it wires the three sub-domains it builds (the fourth,
+## debug/, reads its `debug_*` getters) and runs the SENSE → THINK → ACT loop, but holds almost no
+## behaviour itself. It satisfies the character's controller contract (`control(character, delta)`) and
+## writes only the intent the player controller writes (`move_input`/`aim_point`) plus the same public
+## actions — all of that done by the behaviour sub-domain. It is the single authoring surface: every
+## tunable below is an export here (so a defender or invader preset is all data on this one node), pushed
+## into the sub-modules it builds — and re-pushed each decision, so a tunable retuned at runtime (a
+## behaviour test, the dev command server) takes effect without a rebuild.
 ##
-## The three sub-domains (see their `domain-ai-<name>` skills):
+## The three sub-domains it builds (see their `domain-ai-<name>` skills; the fourth, DEBUG (debug/), is the
+## draw-only overlays, children of the NPC that read this node's `debug_*` getters):
 ##   • PERCEPTION (perception/) — SENSE. What the NPC knows: sight, hostility, event memory, the
 ##     known-contacts view, combat geometry, and the decision SNAPSHOT (state sections, facts and
 ##     option groups). The NPC is NOT omniscient — it acts on last-KNOWN positions and forgets what decays.
 ##   • DECISION (decision/) — THINK. The decision TREE and its planner: Von picks top-down, one `choice`
 ##     request per level — a broad mode (combat / investigate / search / idle), the hostile, a tactic
 ##     (engage / flank / advance / retreat / reload …), then a concrete option — ending in one behaviour primitive.
-##   • BEHAVIOUR (behavior/) — ACT. Runs the chosen primitive (move / engage / melee / interact / hold) as
-##     movement + actions, and holds the System-Two state Von lacks: the engaged contact,
-##     peek-and-cover, the interaction in progress, and the commitment that keeps a choice running.
+##   • BEHAVIOUR (behavior/) — ACT. Runs the chosen primitive (move / engage / melee / interact / reload /
+##     entry / throw / hold) as movement + actions, and holds the System-Two state Von lacks: the engaged
+##     contact, peek-and-cover, the interaction in progress, and the commitment that keeps a choice running.
 ##
 ## This file keeps only the ORCHESTRATION: the control loop, the decide cadence, forcing a re-decision
 ## on a salient event or a finished task (interrupting a walk in flight when the situation now calls for
@@ -247,7 +248,7 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var watch_lost_gaze: float = 2.0
 
 @export_group("Vision")
-## Whether sight is gated at all. Off = the NPC is omniscient (pre-vision behaviour), for debugging.
+## Whether sight is gated at all. Off = everything is visible (omniscient), for debugging.
 @export var vision_enabled: bool = true
 ## Maximum distance (px) at which the NPC can see anything.
 @export var view_distance: float = 2520.0
