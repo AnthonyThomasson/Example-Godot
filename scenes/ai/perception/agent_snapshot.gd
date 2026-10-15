@@ -115,8 +115,6 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"leads": not leads["options"].is_empty(),
 		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
 			and leads["options"].any(func(o): return not o["tags"]["inside"]),
-		"has_frag": carried.has(&"frag"),
-		"has_stun": carried.has(&"stun"),
 		"grenade_ready": per_target.values().any(func(g): return not g["grenade_throws"]["options"].is_empty()),
 		"stack_has_stun": stun_stack,
 		"hurt": dmg >= vocab.hurt_threshold,
