@@ -15,7 +15,8 @@ extends Node
 ##
 ## This is the PERCEPTION sub-domain's public face: it OWNS the sight sense (agent_vision.gd), the
 ## hostility rules (agent_hostility.gd), the event memory (agent_memory.gd), the combat geometry
-## (agent_tactics.gd) and the snapshot author (agent_snapshot.gd) as internal modules, and surfaces
+## (agent_tactics.gd), the doorway geometry (agent_entry.gd), the grenade geometry (agent_throw.gd), the live
+## grenades known (agent_grenades.gd) and the snapshot author (agent_snapshot.gd) as internal modules, and surfaces
 ## knowledge only through its own methods. It holds NO policy: it never decides, gates by goal or
 ## picks — and the measured wording Von reads lives in the snapshot author, not here. The controller
 ## configures it (all tunables live on the GoalController, the single authoring surface) then calls
