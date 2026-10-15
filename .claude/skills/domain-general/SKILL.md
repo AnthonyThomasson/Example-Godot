@@ -13,8 +13,8 @@ HUDs and menus are the **UI domain** (`scenes/ui/`) — see the `domain-ui` skil
 `class_name` static holders) names physics-layer bits so they aren't redefined as magic numbers
 per caller. `SOLID := 1` is the layer walls, solid furniture and bodies sit on — read by Interaction's reach query
 (`character_interaction.gd`), AI perception's sight/line-of-fire rays (`agent_vision.gd`), the character's hand queries and leg sweeps (`character/body/`), a dropped
-item's glance (`items/dropped_item.gd`), the bullet (`projectile/projectile.gd`), `PhysicsConfig.wall_mask` and a vehicle's body, door and
-clearing queries (`scenes/vehicle/`).
+item's glance (`items/dropped_item.gd`), a thrown grenade's flight (`items/thrown_grenade.gd`), the bullet (`projectile/projectile.gd`), an
+explosion's line (`projectile/explosion.gd`), `PhysicsConfig.wall_mask` and a vehicle's body, door and clearing queries (`scenes/vehicle/`).
 
 `draw_layers.gd` (`class_name DrawLayers`, the same kind of holder) is the world's draw-order ladder (interface 11): `FLOOR` −5,
 `RUG` −4, `BLOOD` −3 (blood and scorch decals), `LYING` −2 (a dead body, casings, a dropped item, a grenade at rest),
@@ -58,11 +58,11 @@ defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skippe
 ## Saved settings
 
 `settings.gd` (`class_name Settings`, a static holder like the config holders — no instance, no autoload)
-keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays) and the key-binding
-overrides in one JSON file, `Settings.path` (`user://settings.json`):
+keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays), the setup window's last choices, the overlay
+toggles and the key-binding overrides in one JSON file, `Settings.path` (`user://settings.json`):
 `{ "debug": bool, "setup": { side, seed, defenders, invaders }, "overlays": { show_<x>: bool }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
 the defaults are stored, so a changed default still reaches an action the player never touched.
-- **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`; a
+- **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`, `setup` and `overlays`; a
   missing file keeps the defaults, an unreadable one `push_warning`s and does the same, and a file that
   doesn't name `debug` leaves it as it was.
 - **Main calls it, not `Keybinds._ready`**, once in `_ready` (after seeding `Settings.debug` from its own
@@ -155,8 +155,9 @@ consumed by allied AIs.
 - `game_log.gd` (`GameLog`, a `class_name` static holder) — the one way any domain logs what is happening:
   `GameLog.say(message)` prints while `GameLog.enabled` (default true). The batch test runner turns it off
   unless `--verbose`; never route errors/warnings through it.
-- `despawner.gd` (autoload) — global cap for transient bodies (flying debris chips, casings, blood splatters and pools);
-  domains register spawns with it. The Physics domain's `DebrisLayer` reads `max_scene_objects` as the cap on landed chips too.
+- `despawner.gd` (autoload) — global cap for transient bodies (flying debris chips, `HitParticles`, the `ExplosionFx` nodes, casings, blood
+  splatters and pools, a grenade's `GrenadeSpoon`); domains register spawns with it. The Physics domain's `DebrisLayer` and `ScorchDecals` read
+  `max_scene_objects` as the cap on landed chips and scorch marks too.
 
 HUDs and menus (`debug_ui.gd`, `match_hud.gd`, `setup_menu.gd`, `seed_display.gd`) belong to
 `scenes/ui/` — see the `domain-ui` skill for their implementation detail.
