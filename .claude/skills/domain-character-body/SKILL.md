@@ -324,7 +324,7 @@ kick is already under way), then a STRIKE (`kick_strike_time`, the foot thrown o
 The rig lifts the kicking ankle to `kick_foot_height` (body radii) first and throws it out along `facing` (never past `kick_reach` or the
 leg's length at that height), the knee bent up toward the aim and the toes following; the other leg keeps striding. During the strike a
 circle of `kick_radius` at `kick_reach * amount()` ahead of the body centre is queried on `PhysicsLayers.SOLID` (the punch's
-`body_strike.gd` strike): each body is hit once per kick, shoved by `kick_impulse` along `facing` at the foot (`apply_impulse(impulse, at)`, so a piece kicked near an end turns) and dealt `kick_damage` (`take_damage`) at full strength, then
-`kicked(body, damage)` → the character posts `hit_landed(body, damage, 2)` and the `&"hit"` event with outcome `punch` (so it sounds like
+`body_strike.gd` strike, at most one body a frame): each body is hit once per kick, shoved by `kick_impulse` along `facing` at the foot (`apply_impulse(impulse, at)`, so a piece kicked near an end turns), reported as
+`kicked(body, damage)` and then dealt `kick_damage` (`take_damage`) at full strength; on `kicked` the character posts `hit_landed(body, damage, 2)` and the `&"hit"` event with outcome `punch` (so it sounds like
 a punch; louder for its damage), like a punch it never deforms. The legs layer rests the thrown foot against walls like any other. Cleared
 on an interaction and on death. Tuning: `CharacterConfig.kick_*`. Tests: `tests/character/kick_*_test.gd`.
