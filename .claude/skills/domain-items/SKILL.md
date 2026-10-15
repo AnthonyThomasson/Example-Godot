@@ -101,7 +101,7 @@ magazine and carrying `spares` of it; `random` draws a gun from `rng`) and `Char
 wore) and returns the gun id, `random(rng)` draws a valid loadout, its outfit (`random_outfit(rng)`: each slot any of its choices, None
 included, then made valid by `outfit_of`, so a plate drawn without a carrier is cleared) drawn after the gun, so a seed's gun does not depend on it. `ItemRegistry.create` / `inventory_for` take an optional loaded-`magazine` override.
 
-## Outfits (`outfit_config.gd`, `outfit.gd`; spec `docs/outfits.md` O1 to O11)
+## Outfits (`outfit_config.gd`, `outfit.gd`; spec `docs/outfits.md` O1 to O14)
 
 What a character wears. `OutfitConfig` (static holder; tests retune it with `set_static`) has the slots — `GARMENT_SLOTS` `head body vest pants feet`
 and `PLATE_SLOTS` `front_plate back_plate`, String keys like a loadout's; `PLATE_SIDE` (the torso side each plate covers), `ZONES` (`feet legs torso head`),
