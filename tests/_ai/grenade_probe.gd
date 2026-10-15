@@ -22,12 +22,11 @@ const MAX_BLIND := 5.0
 const BANG_RADIUS := 350.0
 const MAX_DEAF := 6.0
 const WALL_FACTOR := 0.4
-## G16: how far past the blast radius a frag's danger zone reaches (`evade_margin`), how far off a landing is heard
-## (`hear_grenade`) and the zone of a stun (its flash radius).
+## G16: how far past the blast radius a frag's danger zone reaches (`evade_margin`) and how far off a landing is heard
+## (`hear_grenade`).
 const EVADE_MARGIN := 120.0
 const FRAG_ZONE := BLAST_RADIUS + EVADE_MARGIN
 const HEAR_GRENADE := 300.0
-const STUN_ZONE := FLASH_RADIUS
 const FUSE_FRAG := 3.0
 const FUSE_STUN := 1.5
 const WINDUP := 0.3
@@ -269,9 +268,3 @@ static func shielded(t: TestContext, burst: Vector2, c: Node2D) -> bool:
 			return true
 		exclude.append(hit["rid"])
 	return false
-
-
-## The sim time of the first `explosion` of `kind`, or INF.
-static func boom_time(t: TestContext, kind: StringName) -> float:
-	var b := booms(t, kind)
-	return float(b[0]["time"]) if not b.is_empty() else INF
