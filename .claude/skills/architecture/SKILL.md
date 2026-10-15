@@ -158,8 +158,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 (`deform_depth_per_damage`, `deform_max_depth`, `deform_chunk_damage`, `deform_max_impacts`,
 	 `deform_update_collider`) that Objects reads directly when recording damage, and the ragdoll
 	 solver's `ragdoll_*` tuning (read only by `Ragdoll` itself).
-   Physics imports nothing from other domains but General's infrastructure (`Despawner` for debris and casings,
-   `PhysicsLayers` for `PhysicsConfig.wall_mask`).
+   Physics imports nothing from other domains but General's infrastructure (`Despawner` for debris, hit particles, blood and
+   the explosion effects, `PhysicsLayers` for `PhysicsConfig.wall_mask`, `DrawLayers` for its z knobs).
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v, at = Vector2.ZERO)` + `get_mass()`,
    `at` the contact offset from the piece's origin (in world orientation; omitted = a central shove).
@@ -518,7 +518,7 @@ Character ─▶ CharacterVehicleUse (Vehicles) ─▶ Vehicle   (the ride and a
 Vehicle ─▶ Deformable / Physics.impact_impulse / Physics.spawn_debris (Physics);  Vehicle ─▶ PhysicsLayers (General)
 Objects / Character / Item / Vehicle ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
-Physics debris / casings ─▶ Despawner
+Physics debris / hit particles / blood / explosion fx, Projectile casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"callout": the human's claim)──▶ allied AIControllers;  StackMarkers (UI) ──(view())──▶ PlayerStack
