@@ -1,6 +1,6 @@
 extends Node2D
 
-## A spent shell tossed out when a gun fires: colliderless world-space debris that tweens
+## Projectile System: a spent shell tossed out when a gun fires: colliderless world-space debris that tweens
 ## out, spins, and rests. Despawner-tracked. Drawing lives in casing_visuals.gd.
 
 ## Brass fill color.

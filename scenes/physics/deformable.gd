@@ -1,6 +1,6 @@
 class_name Deformable extends Node
 
-## Reusable damage-deformation component for a single primitive-shaped body (furniture, a
+## Physics System: reusable damage-deformation component for a single primitive-shaped body (furniture, a
 ## character or a vehicle). Add it as a child of the drawable body; on each `record(hit)` it converts the
 ## world contact into a local impact (dent, or a carved "missing piece" for a hard hit) and
 ## emits `changed`, so the owner can redraw its silhouette and, if it wants, rebuild its

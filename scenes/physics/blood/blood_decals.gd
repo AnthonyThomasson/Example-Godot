@@ -1,12 +1,12 @@
 class_name BloodDecals
 extends "res://scenes/physics/chunked_layer.gd"
 
-## A layer of bloody footprints and smears under a world node, batching every print (a polygon) and
-## ribbon (a smear's feathered, varying-width trail) so thousands of marks cost a few draw calls instead
-## of thousands of nodes. Marks are grouped in `CHUNK`-px squares and only the chunk that gained a mark
-## (or whose ribbon grew) redraws (`chunked_layer.gd`). They dry from `BloodConfig.color` to `dried_color` over
-## `print_dry_time` (chunks holding wet marks redraw at `DRY_REDRAW` Hz), and the oldest are dropped past
-## `BloodConfig.print_max`. Kept off the shared Despawner so a trail can't evict casings and splatters.
+## Physics System, blood: a layer of bloody footprints and smears under a world node, batching every print (a polygon)
+## and ribbon (a smear's feathered, varying-width trail) so thousands of marks cost a few draw calls instead of
+## thousands of nodes. Marks are grouped in `CHUNK`-px squares and only the chunk that gained a mark (or whose ribbon
+## grew) redraws (`chunked_layer.gd`). They dry from `BloodConfig.color` to `dried_color` over `print_dry_time` (chunks
+## holding wet marks redraw at `DRY_REDRAW` Hz), and the oldest are dropped past `BloodConfig.print_max`. Kept off the
+## shared Despawner so a trail can't evict casings and splatters.
 
 ## Redraws per second of a chunk that still holds wet marks.
 const DRY_REDRAW := 2.0

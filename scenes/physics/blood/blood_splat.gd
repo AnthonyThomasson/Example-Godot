@@ -1,14 +1,13 @@
 extends Node2D
 
-## One splatter of blood where a drop (or a spray droplet) hit the floor: an irregular core with tapered
-## crown spikes radiating from it, some ending in a tail droplet, and small satellite droplets scattered
-## around. Built once by `setup`, then static; colliderless and Despawner-tracked. The outline is
-## stretched and flung along the drop's travel by `energy` (a still drop leaves a round crown, a fast
-## one an elongated, forward-thrown splat). Satellites and spike tips are clipped by walls and furniture,
-## so blood never lands across them. All shapes are merged into opaque outlines before drawing, so
-## overlaps don't darken; the splat then dries from `BloodConfig.color` to `dried_color`.
-## Draws at `BloodConfig.z_index` (`DrawLayers.BLOOD`): over the floor and rugs, under what lies there (a body, casings)
-## and the standing world.
+## Physics System, blood: one splatter of blood where a drop (or a spray droplet) hit the floor: an irregular core with
+## tapered crown spikes radiating from it, some ending in a tail droplet, and small satellite droplets scattered around.
+## Built once by `setup`, then static; colliderless and Despawner-tracked. The outline is stretched and flung along the
+## drop's travel by `energy` (a still drop leaves a round crown, a fast one an elongated, forward-thrown splat).
+## Satellites and spike tips are clipped by walls and furniture, so blood never lands across them. All shapes are merged
+## into opaque outlines before drawing, so overlaps don't darken; the splat then dries from `BloodConfig.color` to
+## `dried_color`. Draws at `BloodConfig.z_index` (`DrawLayers.BLOOD`): over the floor and rugs, under what lies there (a
+## body, casings) and the standing world.
 
 ## Vertices in the core blob's outline.
 const CORE_VERTS := 16

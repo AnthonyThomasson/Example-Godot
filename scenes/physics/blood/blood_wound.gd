@@ -1,13 +1,12 @@
 class_name BloodWound
 extends Node
 
-## A wounded body's bleeding, composed by the character like Knockback / Deformable. Each hit throws a
-## quick spray of splatters out of the wound (`record`) and adds to a budget of drips; then, while the
-## budget lasts, one drop falls every BloodConfig.drip_interval_min..max seconds from where the body's blood
-## leaves it, landing as a BloodSplat (a moving body's drops land ahead of it and stretch with its speed).
-## `stop` ends the dripping (the body died; its bleed-out pool takes over). Splatters are added to the
-## body's parent and capped per body (BloodConfig.max_splats_per_body, oldest freed first).
-## Nothing happens while BloodConfig.enabled is off.
+## Physics System, blood: a wounded body's bleeding, composed by the character like Knockback / Deformable. Each hit
+## throws a quick spray of splatters out of the wound (`record`) and adds to a budget of drips; then, while the budget
+## lasts, one drop falls every BloodConfig.drip_interval_min..max seconds from where the body's blood leaves it, landing
+## as a BloodSplat (a moving body's drops land ahead of it and stretch with its speed). `stop` ends the dripping (the
+## body died; its bleed-out pool takes over). Splatters are added to the body's parent and capped per body
+## (BloodConfig.max_splats_per_body, oldest freed first). Nothing happens while BloodConfig.enabled is off.
 
 ## Drips still owed, and seconds until the next one.
 var _drips := 0

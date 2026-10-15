@@ -1,9 +1,8 @@
 extends Node2D
 
-## Draw layer for a bleed-out pool: its flow's cells drawn through a threshold shader (see `_draw_flow`).
-## Draws at its pool's z_index (`BloodConfig.z_index`, set on the pool by the spawner): beneath what lies on the floor,
-## the player and furniture.
-## Reads the flow from its parent control node (blood_pool.gd).
+## Physics System, blood: draw layer for a bleed-out pool: its flow's cells drawn through a threshold shader (see
+## `_draw_flow`). Draws at its pool's z_index (`BloodConfig.z_index`, set on the pool by the spawner): beneath what lies
+## on the floor, the player and furniture. Reads the flow from its parent control node (blood_pool.gd).
 
 ## The threshold runs per screen pixel on the bilinearly magnified field (edge width ~1 px via
 ## fwidth), so the outline is crisp yet smooth rather than a blurred alpha ramp.

@@ -1,7 +1,7 @@
 class_name BloodFlow
 extends RefCounted
 
-## A liquid flood-fill for a dead body's bleed-out: blood claims grid cells outward from where it
+## Physics System, blood: a liquid flood-fill for a dead body's bleed-out: blood claims grid cells outward from where it
 ## leaves the body, cheapest-first, so the puddle is one continuous shape. Noise makes some
 ## directions cheap and others dear (fingers and bays instead of a disc), and cells overlapping a
 ## wall or furniture collider are never filled, so the blood wraps around them and creeps into

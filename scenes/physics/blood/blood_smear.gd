@@ -1,15 +1,14 @@
 class_name BloodSmear
 extends Node
 
-## Smears blood along the floor for a RigidBody2D that slides through it (a Node child of the body,
-## composed like Knockback). The owner gives the body's footprint (`set_footprint`, a polygon in the
-## body's local space); across it sits a grid of "fingers", fixed to the body so they turn with it.
-## While the body moves, each finger soaks up wet blood (BloodField) under it and, every
-## `smear_segment_length` px, extends a ribbon (BloodDecals) behind it. A ribbon is wider than the finger
-## spacing so neighbours merge into one smudge, wanders sideways on smooth noise, thins with the finger's
-## load (`smear_decay_per_px`), tapers to a point where it ends and, once the load is low, breaks into
-## dry-brush dashes. Over blood already on the floor a ribbon is see-through and it eases in along its
-## first px, so the smear flows out of a puddle with no edge. Nothing is laid with BloodConfig.smear_enabled off.
+## Physics System, blood: smears blood along the floor for a RigidBody2D that slides through it (a Node child of the
+## body, composed like Knockback). The owner gives the body's footprint (`set_footprint`, a polygon in the body's local
+## space); across it sits a grid of "fingers", fixed to the body so they turn with it. While the body moves, each finger
+## soaks up wet blood (BloodField) under it and, every `smear_segment_length` px, extends a ribbon (BloodDecals) behind
+## it. A ribbon is wider than the finger spacing so neighbours merge into one smudge, wanders sideways on smooth noise,
+## thins with the finger's load (`smear_decay_per_px`), tapers to a point where it ends and, once the load is low,
+## breaks into dry-brush dashes. Over blood already on the floor a ribbon is see-through and it eases in along its first
+## px, so the smear flows out of a puddle with no edge. Nothing is laid with BloodConfig.smear_enabled off.
 
 ## A finger's decay, width and pickup vary by up to this fraction, so streaks end and thicken unevenly.
 const VARIATION := 0.5

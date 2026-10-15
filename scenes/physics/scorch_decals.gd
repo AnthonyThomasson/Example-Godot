@@ -1,12 +1,12 @@
 class_name ScorchDecals
 extends "res://scenes/physics/chunked_layer.gd"
 
-## A layer of scorch marks (the black burn a frag leaves on the floor) under a world node, batching every mark so a floor
-## full of them costs a few draw calls and no nodes of their own (`chunked_layer.gd`, as `DebrisLayer` and `BloodDecals`).
-## A mark is stepped rows of `PhysicsConfig.explosion_pixel` px, ragged at the edge, a darker core inside a lighter rim, with
-## a few specks flung out round it. Marks are grouped in `CHUNK`-px squares and only the chunk that gained or lost one
-## redraws. The oldest are dropped past `Despawner.max_scene_objects`, the same bound every other kept mark answers to.
-## Drawn at the blood decals' depth, under the furniture and the living.
+## Physics System: a layer of scorch marks (the black burn a frag leaves on the floor) under a world node, batching
+## every mark so a floor full of them costs a few draw calls and no nodes of their own (`chunked_layer.gd`, as
+## `DebrisLayer` and `BloodDecals`). A mark is stepped rows of `PhysicsConfig.explosion_pixel` px, ragged at the edge, a
+## darker core inside a lighter rim, with a few specks flung out round it. Marks are grouped in `CHUNK`-px squares and
+## only the chunk that gained or lost one redraws. The oldest are dropped past `Despawner.max_scene_objects`, the same
+## bound every other kept mark answers to. Drawn at the blood decals' depth, under the furniture and the living.
 
 const NODE_NAME := "ScorchDecals"
 ## The rim is this share of the core's alpha, and the core this share of the mark's radius.

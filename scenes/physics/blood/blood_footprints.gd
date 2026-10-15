@@ -1,12 +1,12 @@
 class_name BloodFootprints
 extends Node
 
-## Bloody footprints for a walker (a Node child of the host, composed like BloodWound). The owner reports
-## each footfall with `step`; a foot that lands in wet blood (BloodField) soaks up a load of it, and every
-## footfall after that stamps a sole print whose opacity follows the load, which drops a little per
-## print, so the trail fades out over a dozen steps. A low load prints broken and patchy (the arch and
-## edges drop out); a fast, heavy foot slips a little forward. Prints go to the world's BloodDecals.
-## Nothing is stamped in blood that is already thick, nor with BloodConfig.footprints_enabled off.
+## Physics System, blood: bloody footprints for a walker (a Node child of the host, composed like BloodWound). The owner
+## reports each footfall with `step`; a foot that lands in wet blood (BloodField) soaks up a load of it, and every
+## footfall after that stamps a sole print whose opacity follows the load, which drops a little per print, so the trail
+## fades out over a dozen steps. A low load prints broken and patchy (the arch and edges drop out); a fast, heavy foot
+## slips a little forward. Prints go to the world's BloodDecals. Nothing is stamped in blood that is already thick, nor
+## with BloodConfig.footprints_enabled off.
 
 ## Points along the sole outline, per side.
 const SOLE_STEPS := 14

@@ -1,10 +1,10 @@
 class_name BloodField
 
-## Where wet blood lies on the floor, for anything that walks or slides through it (BloodFootprints,
-## BloodSmear). Splatters and pools register themselves; `wetness_at` answers 0..1 at a world point:
-## a splatter is a thin film (`splat_wetness`) that dries to nothing over `splat_dry_time`, a pool is its
-## flow fill, wet for `pool_wet_time`. Dried blood returns 0, so it leaves no prints. Ages run on physics
-## frames so they follow game time. Entries drop out when their node leaves the tree.
+## Physics System, blood: where wet blood lies on the floor, for anything that walks or slides through it
+## (BloodFootprints, BloodSmear). Splatters and pools register themselves; `wetness_at` answers 0..1 at a world point: a
+## splatter is a thin film (`splat_wetness`) that dries to nothing over `splat_dry_time`, a pool is its flow fill, wet
+## for `pool_wet_time`. Dried blood returns 0, so it leaves no prints. Ages run on physics frames so they follow game
+## time. Entries drop out when their node leaves the tree.
 
 ## Side (px) of a spatial-hash cell for splatters.
 const CELL := 64.0

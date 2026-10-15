@@ -1,9 +1,9 @@
 extends Node2D
 
-## A dead body's bleed-out pool: a BloodFlow flood-fill claims grid cells in per-frame batches, wrapping
-## around walls and furniture into one continuous irregular puddle, then a front eases outward through
-## them over the bleed-out duration. Started by `seed_bleed_out` at the point the body's blood leaves it.
-## Despawner-tracked. Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
+## Physics System, blood: a dead body's bleed-out pool: a BloodFlow flood-fill claims grid cells in per-frame batches,
+## wrapping around walls and furniture into one continuous irregular puddle, then a front eases outward through them
+## over the bleed-out duration. Started by `seed_bleed_out` at the point the body's blood leaves it. Despawner-tracked.
+## Drawing lives in blood_pool_visuals.gd; this control node owns the fill only.
 
 ## Flow cells claimed per physics frame.
 const FLOW_CLAIMS_PER_FRAME := 60

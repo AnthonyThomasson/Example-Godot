@@ -1,6 +1,6 @@
 class_name HitParticles
 
-## One-shot particle bursts where a projectile enters and leaves an object, styled by the struck
+## Physics System: one-shot particle bursts where a projectile enters and leaves an object, styled by the struck
 ## surface's material. Stateless statics like DebrisSpawner; each burst is a CPUParticles2D (headless
 ## safe, deterministic) that frees itself once its particles have died, is placed by world position and
 ## is Despawner-tracked. Switched by PhysicsConfig.hit_particles_enabled (+ hit_particles_scale / _max).

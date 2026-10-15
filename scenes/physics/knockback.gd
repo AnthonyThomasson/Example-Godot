@@ -1,6 +1,6 @@
 class_name Knockback extends Node
 
-## Reusable physics adapter for a shoveable RigidBody2D. Add it as a child of the body. It
+## Physics System: reusable physics adapter for a shoveable RigidBody2D. Add it as a child of the body. It
 ## configures the body for top-down play (no gravity, mass, damping, sleep, origin-pinned
 ## center of mass), and its `apply_impulse(v, at_world)` is how the owner's `take_hit` shoves
 ## the body. The "pushable" contract itself is the body's native `apply_impulse(v, at)` /

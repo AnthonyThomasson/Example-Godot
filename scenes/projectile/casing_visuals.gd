@@ -1,6 +1,6 @@
 extends Node2D
 
-## Draw layer for a casing: a tiny brass rectangle. Reads `color` from the casing.
+## Projectile System: draw layer for a casing: a tiny brass rectangle. Reads `color` from the casing.
 
 @onready var _control := get_parent()  ## The casing (control node).
 
