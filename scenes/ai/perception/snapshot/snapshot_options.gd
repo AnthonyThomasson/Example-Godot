@@ -27,11 +27,6 @@ func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted, entry:
 	_throw = throw
 
 
-## Whether the NPC is currently under fire (a recent incoming/nearby hit) — a read of the memory the perception folds hits into.
-func _under_fire() -> bool:
-	return _memory.is_fresh(&"under_fire")
-
-
 ## Which hostile to fight: one option per known hostile, with what makes it urgent or easy.
 func hostile_group(ctx: Dictionary, hostiles: Array, analyses: Dictionary) -> Dictionary:
 	var options: Array = []
@@ -258,7 +253,7 @@ func advance_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 ## route and the ally a spot lies toward. Threats are the known hostiles, else where fire came from.
 func retreat_group(ctx: Dictionary, hostiles: Array, known_rooms: Array, dmg: float) -> Dictionary:
 	var threats: Array = hostiles.map(func(h): return h["pos"])
-	if threats.is_empty() and _under_fire():
+	if threats.is_empty() and _memory.under_fire():
 		threats.append(_shot_origin(ctx, false))
 	if threats.is_empty():
 		return { "summary": "", "options": [] }
@@ -328,8 +323,8 @@ func lead_group(ctx: Dictionary, hostiles: Array, entered := {}) -> Dictionary:
 			"desc": "gunfire heard to the %s, %s — %s — %s route" % [_v.compass(pos - self_pos), _v.place(pos),
 				_v.recency(rec["age"]), _v.route_band(_route_len(ctx, pos))],
 			"point": NavBuilder.snap(ctx["map"], pos) })
-	if _under_fire() and hostiles.is_empty():
-		var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
+	if _memory.under_fire() and hostiles.is_empty():
+		var from: Vector2 = _memory.under_fire_from()
 		var origin: Vector2 = _shot_origin(ctx)
 		leads.append({ "age": 0.0, "id": "lead_shooter", "label": "where the shots came from",
 			"desc": "where the shots at you came from — the %s, just now" % _v.compass(from), "point": origin })
@@ -363,9 +358,9 @@ func _entered_at(entered: Dictionary, p: Vector2) -> bool:
 ## Under fire from someone the NPC cannot see: the one way to find them — toward where the shots came
 ## from. Empty unless under fire with no hostile known.
 func shooter_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
-	if not _under_fire() or not hostiles.is_empty():
+	if not _memory.under_fire() or not hostiles.is_empty():
 		return { "summary": "", "options": [] }
-	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
+	var from: Vector2 = _memory.under_fire_from()
 	var origin: Vector2 = _shot_origin(ctx)
 	var dir := _v.compass(from)
 	return { "summary": "the shots came from the %s" % dir, "options": [{
@@ -630,7 +625,7 @@ func _retreat_summary(options: Array, dmg: float) -> String:
 ## from the NPC toward where the shots came from, snapped onto the navmesh unless `snap_to_navmesh` is false
 ## (the retreat group wants the raw direction as a threat position, not a reachable spot).
 func _shot_origin(ctx: Dictionary, snap_to_navmesh := true) -> Vector2:
-	var from: Vector2 = _memory.recall(&"under_fire").get("from", Vector2.ZERO)
+	var from: Vector2 = _memory.under_fire_from()
 	var p: Vector2 = (ctx["self_pos"] as Vector2) + from.normalized() * _v.investigate_distance
 	return NavBuilder.snap(ctx["map"], p) if snap_to_navmesh else p
 

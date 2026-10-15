@@ -18,11 +18,6 @@ func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted) -> voi
 	_tactics = tactics
 
 
-## Whether the NPC is currently under fire (a recent incoming/nearby hit) — a read of the memory the perception folds hits into.
-func _under_fire() -> bool:
-	return _memory.is_fresh(&"under_fire")
-
-
 ## Where the NPC is, whether it is free, what it holds and how hurt it is.
 func situation_text(character, rooms: Array) -> String:
 	var room := SnapshotVocab.room_at(character.global_position, rooms)
@@ -69,7 +64,7 @@ func odds_text(hostiles: Array, allies: Array, callouts: Array, trouble: bool) -
 	var ally_text := ", ".join(names) if not names.is_empty() else "none"
 	if hostiles.is_empty():
 		var lead := "All quiet so far."
-		if _under_fire():
+		if _memory.under_fire():
 			lead = "Someone you cannot see is shooting at you."
 		elif trouble:
 			lead = "There is trouble nearby, out of your sight."
@@ -117,9 +112,9 @@ func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array 
 
 ## Exposure when under fire from someone the NPC cannot see.
 func unseen_fire_text() -> String:
-	if not _under_fire():
+	if not _memory.under_fire():
 		return ""
-	return "You are being shot at by someone you cannot see, from the %s; you are exposed to their fire." % _v.compass(_memory.recall(&"under_fire").get("from", Vector2.ZERO))
+	return "You are being shot at by someone you cannot see, from the %s; you are exposed to their fire." % _v.compass(_memory.under_fire_from())
 
 
 ## The NPC's allies: where each perceived ally is — and which side of hostile `t` it holds, in `t`'s
@@ -168,9 +163,9 @@ func flanks_text(t: Dictionary, a: Dictionary) -> String:
 ## fight it is just the fight).
 func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 	var out: Array = []
-	if _under_fire():
+	if _memory.under_fire():
 		var uf: Dictionary = _memory.recall(&"under_fire")
-		var dir := _v.compass(uf.get("from", Vector2.ZERO))
+		var dir := _v.compass(_memory.under_fire_from())
 		out.append(("You are being hit, from the %s!" if uf.get("hit", false) else "You are under fire: shots are landing near you, from the %s!") % dir)
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		if not fighting and rec["age"] <= _v.recency_bands.y:
@@ -182,8 +177,8 @@ func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 ## The COMBAT branch summary: the threat in one line.
 func threat_summary(self_pos: Vector2, hostiles: Array) -> String:
 	if hostiles.is_empty():
-		if _under_fire():
-			return "shots from the %s" % _v.compass(_memory.recall(&"under_fire").get("from", Vector2.ZERO))
+		if _memory.under_fire():
+			return "shots from the %s" % _v.compass(_memory.under_fire_from())
 		return ""
 	var t: Dictionary = hostiles[0]
 	var desc := "%s, %s" % ["in sight" if t["visible"] else "last seen %s" % _v.recency(t["age"]), _v.dist_band(self_pos.distance_to(t["pos"]))]

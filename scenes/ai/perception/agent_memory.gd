@@ -5,7 +5,8 @@ extends RefCounted
 ## lifetime. Many events coexist, including many of the same topic; nothing is capped per topic.
 ## Behaviours (the controller) write events with `remember()` and read them back by topic to drive
 ## decisions; the perception renders fresh events into the decision state. It holds NO policy — it
-## does not know what any topic means.
+## does not know what any topic means, beyond naming the reads of the two the whole perception asks about
+## (`under_fire()` / `under_fire_from()`, `engaged()`).
 ##
 ## Cleanup is a configurable policy, not a per-topic limit: `capacity` caps the total stored. Eviction
 ## runs on every write: age-expired events are dropped first, then, if still over capacity, the
@@ -114,6 +115,21 @@ func recall(topic: StringName) -> Dictionary:
 		if not _expired(entry, now):
 			return entry["data"]
 	return {}
+
+
+## Whether the agent is under fire: an `under_fire` event (a recent hit on or near it) is fresh.
+func under_fire() -> bool:
+	return is_fresh(&"under_fire")
+
+
+## The direction the latest shots came from (the freshest `under_fire` event's `from`), or `Vector2.ZERO` when none is remembered.
+func under_fire_from() -> Vector2:
+	return recall(&"under_fire").get("from", Vector2.ZERO)
+
+
+## Whether the agent is still committed to a fight: an `engaged` event is fresh.
+func engaged() -> bool:
+	return is_fresh(&"engaged")
 
 
 ## Every non-expired event's `data` for `topic`, newest first.

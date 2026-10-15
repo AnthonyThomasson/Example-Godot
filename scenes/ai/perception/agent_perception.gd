@@ -322,12 +322,12 @@ func note_engaged() -> void:
 
 ## Whether the NPC is still committed to a fight (an `engaged` event is fresh).
 func engaged_fresh() -> bool:
-	return _memory.is_fresh(&"engaged")
+	return _memory.engaged()
 
 
 ## Whether the NPC is currently under fire (a recent incoming/nearby hit).
 func under_fire() -> bool:
-	return _memory.is_fresh(&"under_fire")
+	return _memory.under_fire()
 
 
 ## The cheap facts the controller needs between decisions (e.g. to see whether a new situation should

@@ -106,12 +106,12 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 	var ammo: int = character.ammo(gun) if gun >= 0 else -1
 	var facts := {
 		"hostile_known": not hostiles.is_empty(),
-		"threat_known": not hostiles.is_empty() or _under_fire(),
+		"threat_known": not hostiles.is_empty() or _memory.under_fire(),
 		"gun_loaded": ammo > 0 and not character.is_reloading(),
 		"weapon_low": ammo >= 0 and ammo <= ceili(character.ammo_capacity(gun) * vocab.low_ammo_fraction),
 		"can_reload": gun >= 0 and character.can_reload(gun),
-		"under_fire": _under_fire(),
-		"engaged": _engaged_fresh(),
+		"under_fire": _memory.under_fire(),
+		"engaged": _memory.engaged(),
 		"leads": not leads["options"].is_empty(),
 		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
 			and leads["options"].any(func(o): return not o["tags"]["inside"]),
@@ -119,7 +119,7 @@ func build(character, rooms: Array, goal: String, activity: String, known: Array
 		"stack_has_stun": stun_stack,
 		"hurt": dmg >= vocab.hurt_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),
-		"exposed": line.get("clear", false) or (primary.is_empty() and _under_fire()),
+		"exposed": line.get("clear", false) or (primary.is_empty() and _memory.under_fire()),
 	}
 	var sections := {
 		"goal": fill_goal(goal, character),
@@ -177,14 +177,3 @@ func _analyze(ctx: Dictionary, t: Dictionary) -> Dictionary:
 ## "...your pistol" or "...your assault rifle"), so one goal serves every weapon.
 func fill_goal(goal: String, character) -> String:
 	return goal.replace("{gun}", vocab.gun_noun(character, character.gun_slot()))
-
-
-## Whether the NPC is currently under fire (a recent incoming/nearby hit) — a read of the memory the
-## perception folds hits into. The perception owns the public `under_fire()`; this is the author's copy.
-func _under_fire() -> bool:
-	return _memory.is_fresh(&"under_fire")
-
-
-## Whether the NPC is still committed to a fight (an `engaged` event is fresh).
-func _engaged_fresh() -> bool:
-	return _memory.is_fresh(&"engaged")
