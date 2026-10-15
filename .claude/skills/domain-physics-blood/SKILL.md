@@ -10,7 +10,7 @@ blood_pool_visuals, blood_flow, blood_smear, blood_footprints, blood_wound, bloo
 `physics/` (hit packet, knockback, deformation, debris, hit particles, ragdoll) reaches it only through `Physics.spawn_debris`
 (a hit that carries blood; the bloody mark a bullet's `HitInfo.blood` leaves on an object is drawn by the core's
 `Deformation.draw_marks`) and `Physics.bleed_out`; every other domain meets it through the classes in interface 4, all
-resolved by `class_name`. It imports nothing outside Physics except `Despawner` (General).
+resolved by `class_name`. It imports nothing outside Physics except `Despawner` and `DrawLayers` (General).
 
 **Master switches** (`BloodConfig.enabled`, and under it `footprints_enabled` / `smear_enabled`, `surface_flow`): off, `BloodWound.record` /
 `Physics.bleed_out` spawn nothing (`bleed_out` returns null); used by the Testing domain's `physics.blood` switch. `BloodSpawner` adds each
