@@ -1,12 +1,13 @@
 ---
 name: ticket-story
-description: Work a standard ticket (no `bug` or `spike` label; also `ai` and `harness`) in seven phases - grill, plan on the ticket, tests first, build, green + feedback gate, audit, report. Invoked from `ticket`.
+description: Work a standard ticket (no `bug` or `spike` label; also `ai`, `harness`, `assets`, `graphics` and `audio`) in seven phases - grill, plan on the ticket, tests first, build, green + feedback gate, audit, report. Invoked from `ticket`.
 ---
 
 # Ticket: story
 
 Seven phases (`ticket`, "Work in phases"). You run 1, 2, 7, the feedback gate and the findings question; 3–6 may go
-to workers, the audit always does. Label `ai`: also `ticket-ai`; `harness`: also `ticket-harness`.
+to workers, the audit always does. Label `ai`: also `ticket-ai`; `harness`: also `ticket-harness`; `assets` /
+`graphics` / `audio`: also `ticket-assets`.
 
 ## 1. Orient and grill
 
@@ -32,7 +33,8 @@ A plan someone else could build from:
 - **Phases:** build order and what each produces.
 - **Out of scope** and **open risks**.
 
-Revise until accepted. Then `ticket` → "Rebase after acceptance", "Plan on the ticket", "Show the user".
+`ticket-assets`: the plan follows the showroom picks. Revise until accepted. Then `ticket` → "Rebase after
+acceptance", "Plan on the ticket", "Show the user".
 
 ## 3. Tests first
 
@@ -40,7 +42,8 @@ Before any production code, write the tests (`domain-testing`, `test-debug`). Ex
 near-duplicate (`tools/run_tests.sh --list <words>`). One test per plan rule, through published interfaces only. Run
 each alone, Bash sandbox disabled (`tools/run_tests.sh --id=<domain>/<name>`); it must **fail for the right reason**
 (the feature is missing, not a parse error, race or setup mistake). Passes at once: too loose or already built; tighten
-or say so. `git status` shows only test files. Tell the user which tests are red and why.
+or say so. `git status` shows only test files (plus `sandboxes/showroom/` and any variant switch, `ticket-assets`).
+Tell the user which tests are red and why.
 
 ## 4. Build
 

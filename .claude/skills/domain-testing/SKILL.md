@@ -139,7 +139,7 @@ folder (so `--domain=ai` and `--changed` see it), the descriptor's `category` is
 row per topic under the domain. The file name keeps its topic prefix (`entry_waits_for_stack_test.gd`), the name
 the specs quote.
 
-**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one).
+**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one). `sandboxes/showroom/` holds a ticket's temporary showroom (`ticket-assets`), deleted before its audit.
 
 ```gdscript
 extends GameTest

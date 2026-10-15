@@ -13,6 +13,7 @@ the `Sound` service (an autoload) listens and plays. There are no audio files: e
 gun.gd / projectile.gd / character*.gd / thrown_grenade.gd / explosion.gd ──EventBus──▶ Sound ─▶ SoundBank ─▶ SoundSynth ─▶ AudioStreamWAV
 floor.gd ──SoundSurface.register──▶ SoundSurface ◀── Sound (floor under a footfall or a grenade's bounce)
 main.gd ──Sound.focus = the human──▶ Sound (the muffle + tinnitus of a bang)
+a sandbox ──SoundBank.recipe_for / SoundSynth.render──▶ AudioStreamWAV ─▶ its own AudioStreamPlayer2D (Sound hears nothing of it)
 ```
 
 ## Files
