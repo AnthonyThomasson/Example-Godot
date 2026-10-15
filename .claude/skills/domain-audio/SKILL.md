@@ -66,11 +66,11 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 
 | Topic | Posted by | Payload (Audio reads) |
 |---|---|---|
-| `&"shot"` | `GunItem.secondary` (Items) | `position` (muzzle), `gun`, `power` (+ `attacker`, `automatic`, `damage`) |
+| `&"shot"` | `GunItem.secondary` (Items) | `position` (muzzle), `gun`, `power` (+ `attacker`) |
 | `&"hit"` | `Projectile._deal` (Projectile), `Character._post_melee_hit` (Character: a punch or a kick) | `position`, `outcome` (`blocked`/`penetrate`/`ricochet`/`punch`), `material`, `power`, `speed_factor`, `damage`. A hit **without an `outcome`** is not a sound. A fly-over posts nothing, so it is silent. |
 | `&"footfall"` | `CharacterFootsteps._report` (Character) | `position` (the sole), `foot` (0 left / 1 right), `speed`, `running` |
 | `&"reload"` | `Character._post_reload` (Character) | `position`, `gun`, `power`, `stage`: `start` → the `out` sound, `done` → the `in` sound; any other stage is silent. A cancelled reload never posts `done`. |
-| `&"throw"` | `GrenadeItem.secondary` (Items) as the grenade leaves the hand | `position`, `kind` → `throw/<kind>` |
+| `&"throw"` | `GrenadeItem._release` (Items) as the grenade leaves the hand, at the end of the windup | `position`, `kind` → `throw/<kind>` |
 | `&"grenade"` | `ThrownGrenade._post` (Items) | `position`, `kind`, `stage`: `bounce` → `grenade/<kind>/<floor under it>`; `rest` is silent. |
 | `&"explosion"` | `Explosion.frag` / `.stun` (Projectile) | `position`, `kind` → `explosion/<kind>`. The same event shakes the camera (General). |
 | `&"stun"` | `Character.take_stun` (Character) | `character`, `deaf`, `position`: voiced only for the `focus` character and a `deaf` > 0 (the tinnitus). A blind-only stun, or another character's, is silent. |
