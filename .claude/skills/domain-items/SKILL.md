@@ -104,13 +104,13 @@ included, then made valid by `outfit_of`, so a plate drawn without a carrier is 
 ## Outfits (`outfit_config.gd`, `outfit.gd`; spec `docs/outfits.md` O1 to O14)
 
 What a character wears. `OutfitConfig` (static holder; tests retune it with `set_static`) has the slots — `GARMENT_SLOTS` `head body vest pants feet`
-and `PLATE_SLOTS` `front_plate back_plate`, String keys like a loadout's; `PLATE_SIDE` (the torso side each plate covers), `ZONES` (`feet legs torso head`),
-`SIDES` (`front flank back`), `optional_slots` (head, vest; the plate slots may always be empty) — and two tables of rows by StringName id
+and `PLATE_SLOTS` `front_plate back_plate`, String keys like a loadout's; `PLATE_SIDE` (the torso side each plate covers),
+`optional_slots` (head, vest; the plate slots may always be empty) — and two tables of rows by StringName id
 (`&""` = nothing worn):
 
 - `garments`: `name`, `slot`, `weight` (kg), `plates` (true = holds a front and back plate: the plate carrier only), `look` (`kind`, the painter's style name:
   `cap`, `helmet`, `short_sleeves`, `long_sleeves`, `vest`, `carrier`, `jeans`, `tactical`, `shoes`, `boots`; and `color`, absent for the t-shirt and shirt, which
-  take the team colour) and, for the helmet, the tactical vest and the plate carrier, `armour`: `zones`, optional `sides` (absent = all round) and the
+  take the team colour) and, for the helmet, the tactical vest and the plate carrier, `armour`: `zones` (of `feet legs torso head`), optional `sides` (of `front flank back`; absent = all round) and the
   protection numbers.
 - `plates` (soft IIIA insert, steel III, ceramic IV): the protection numbers plus `name`, `weight` and `durability`.
 
