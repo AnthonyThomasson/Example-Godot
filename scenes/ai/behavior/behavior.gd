@@ -174,6 +174,7 @@ func bind(character: Node) -> void:
 	_loco.bind(character)
 	_coverage.bind(character)
 	_watch.bind(character)
+	_combat.bind(character)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
@@ -740,9 +741,9 @@ func apply(character, delta: float) -> void:
 	_apply_watch(character, delta)
 	_guard_clock += delta
 	_entry_guard(character)
-	_combat.continue_burst(character)
+	_combat.continue_burst()
 	character.run_input = _should_run(character)
-	_combat.apply_back_off(character, delta)
+	_combat.apply_back_off(delta)
 	_apply_posture(character, delta)
 	_running = character.is_running()
 	_posture = character.posture()
@@ -797,9 +798,9 @@ func _apply_watch(character, delta: float) -> void:
 		_threat = t
 		_gaze = "threat"
 		character.aim_point = t["pos"]
-		_combat.fire_at_will(character, t)
+		_combat.fire_at_will(t)
 		if not _entry.committed():
-			_combat.reload_if_dry(character)
+			_combat.reload_if_dry()
 		return
 	if _resting():
 		_gaze = "doors"
@@ -887,7 +888,7 @@ func _should_run(character) -> bool:
 	if character.global_position.distance_to(dest) <= run_min_distance:
 		return false
 	if not _threat.is_empty() and not bool(_params.get("run_through_fire", false)) \
-			and (_combat.can_fire_at(character, _threat) or _combat.reload_due(character)):
+			and (_combat.can_fire_at(_threat) or _combat.reload_due()):
 		return false  # A shot (or the reload an empty gun needs) is on: a running character can do neither, so walk and take it.
 	return character.is_running() or character.stamina_fraction() >= run_start_fraction
 
@@ -962,9 +963,9 @@ func _apply_engage(character, delta: float) -> void:
 		_tactic_timer = tactic_interval  # In position: the tactic gets its full run from here.
 		_perception.note_engaged()
 	if _params.get("style", &"peek_cover") == &"ambush":
-		_combat.ambush(character, _engage_node, _engage_pos)
+		_combat.ambush(_engage_node, _engage_pos)
 		return
-	_combat.peek_cover(character, delta, _engage_node, _engage_pos, _hold_ground)
+	_combat.peek_cover(delta, _engage_node, _engage_pos, _hold_ground)
 
 
 ## Melee: close to punch range and swing on the fire cooldown (no cover cycle for fists). While
@@ -975,14 +976,14 @@ func _apply_melee(character) -> void:
 		return
 	character.aim_point = _engage_pos
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
-	_combat.melee(character, _engage_pos, _hold_ground)
+	_combat.melee(_engage_pos, _hold_ground)
 
 
 ## Entry: start the entry on the first tick (it needs the character), then run its phases (the watch stage shoots a threat in
 ## sight in every one of them). Done (the room clear, or the entry given up) → re-decide.
 func _apply_entry(character, delta: float) -> void:
 	_entry.gaze_held = not _threat.is_empty()
-	_entry.hostile_in_view = _hostile_in_view(character)
+	_entry.hostile_in_view = _hostile_in_view()
 	if _entry_pending:
 		_entry_pending = false
 		if not _entry.begin(character, _params):
@@ -995,9 +996,9 @@ func _apply_entry(character, delta: float) -> void:
 ## Whether a hostile stands in view for the entry's purposes (E14): the threat holding the NPC's eyes is seen now, or was a moment ago
 ## (`watch_lost_gaze` s), and there is a line of fire to it from here, so it can be engaged from outside. A hostile remembered from
 ## longer ago, or one seen but behind a wall or out of range (nothing to engage it with from outside), does not hold an entry outside.
-func _hostile_in_view(character) -> bool:
+func _hostile_in_view() -> bool:
 	return not _threat.is_empty() and (bool(_threat["visible"]) or float(_threat["age"]) <= watch_lost_gaze) \
-		and _combat.has_line_of_fire(character, _threat)
+		and _combat.has_line_of_fire(_threat)
 
 
 ## The entry is over, or could not start. As the NPC's own order (ENTER) it resolves and the NPC re-decides. As a detour
@@ -1171,7 +1172,7 @@ func _apply_interact(character) -> void:
 func _apply_throw(character, delta: float) -> void:
 	if _combat.throw_stage != "away":
 		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(character.global_position, _throw_spot)
-		if blocked or _combat.throw_step(character, delta) == &"failed":
+		if blocked or _combat.throw_step(delta) == &"failed":
 			_end_throw()
 		return
 	character.move_input = Vector2.ZERO
@@ -1188,8 +1189,8 @@ func _apply_throw(character, delta: float) -> void:
 ## Called every tick before the evade reflex is handed its plan: whether the grenade being thrown has left the hand (the end of the
 ## wind-up). Then it is radioed, and the wait for the burst begins. This has to come first: a grenade just thrown is a live one the
 ## thrower may be inside the zone of, and the evade replaces the throw order the same tick.
-func poll_throw(character) -> void:
-	if _primitive == &"throw" and _combat.throw_released(character):
+func poll_throw() -> void:
+	if _primitive == &"throw" and _combat.throw_released():
 		_throw_calls.append({ "kind": _throw_kind, "point": _throw_spot })
 		_throw_wait = _perception.grenade_fuse(_throw_kind) + THROW_WAIT_MARGIN
 
@@ -1221,7 +1222,7 @@ func throw_plan(character) -> Dictionary:
 ## empty gun is reloaded meanwhile, so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold(character) -> void:
 	character.move_input = Vector2.ZERO
-	_combat.reload_if_dry(character)
+	_combat.reload_if_dry()
 
 
 ## Reload: stand and swap magazines, its eyes where the watch stage puts them (a threat, else the doors); when the reload

@@ -54,12 +54,18 @@ var _burst_left := 0           ## Rounds still to fire in the automatic gun's cu
 var _back_off_timer := 0.0     ## Seconds left stepping back from whatever the gun's barrel is against.
 var _loco: Node                ## The Locomotion child (pathing, rooms).
 var _perception: Node          ## The perception sub-domain (line of fire, candidate spots, engagement memory).
+var _character: Node           ## The NPC's body, handed in once by `bind`: whose hands fight.
 
 
 ## Capture the locomotion and the perception. Called once by `Behavior.setup()`.
 func setup(loco: Node, perception: Node) -> void:
 	_loco = loco
 	_perception = perception
+
+
+## Hand in the NPC's body. Called once by `Behavior.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## A fight begins: the cycle starts in its peek phase and a firing spot is picked at once.
@@ -75,74 +81,74 @@ func tick(delta: float) -> void:
 
 ## Whether `target` (a known-contact dict) can be shot at now: a loaded gun not mid-reload, and `has_line_of_fire`. The cooldown, the
 ## facing and a run are not counted: they pass in a moment, this says the NPC is in a position to fire.
-func can_fire_at(character, target: Dictionary) -> bool:
-	var gun: int = character.gun_slot()
-	if gun < 0 or character.ammo(gun) == 0 or character.is_reloading() or target.is_empty():
+func can_fire_at(target: Dictionary) -> bool:
+	var gun: int = _character.gun_slot()
+	if gun < 0 or _character.ammo(gun) == 0 or _character.is_reloading() or target.is_empty():
 		return false
-	return has_line_of_fire(character, target)
+	return has_line_of_fire(target)
 
 
 ## Whether `target` (a known-contact dict) stands within range on a clear line to where it is known to be: a shot at it is possible
 ## from here whatever the gun's state (the entry reads it as "engaged from outside", docs/tactical-entry.md E14).
-func has_line_of_fire(character, target: Dictionary) -> bool:
+func has_line_of_fire(target: Dictionary) -> bool:
 	if target.is_empty():
 		return false
 	var pos: Vector2 = target["pos"]
-	return character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(target["node"], pos)
+	return _character.global_position.distance_to(pos) <= shoot_range and _perception.has_line_to(target["node"], pos)
 
 
 ## Shoot `target` (a known-contact dict) when it can be shot at (`can_fire_at`), once the facing has settled on it; aims at it
 ## meanwhile. No-op otherwise.
-func fire_at_will(character, target: Dictionary) -> void:
-	if not can_fire_at(character, target):
+func fire_at_will(target: Dictionary) -> void:
+	if not can_fire_at(target):
 		return
 	var pos: Vector2 = target["pos"]
-	character.aim_point = pos
-	if fire_timer <= 0.0 and _faces(character, pos):
-		shoot(character)
+	_character.aim_point = pos
+	if fire_timer <= 0.0 and _faces(pos):
+		shoot()
 
 
 ## Ambush: hold the covered spot and fire the moment a line to the known position opens.
-func ambush(character, node, pos: Vector2) -> void:
-	character.move_input = Vector2.ZERO
-	if character.global_position.distance_to(pos) <= shoot_range \
-			and _perception.has_line_to(node, pos) and fire_timer <= 0.0 and _faces(character, pos):
-		shoot(character)
+func ambush(node, pos: Vector2) -> void:
+	_character.move_input = Vector2.ZERO
+	if _character.global_position.distance_to(pos) <= shoot_range \
+			and _perception.has_line_to(node, pos) and fire_timer <= 0.0 and _faces(pos):
+		shoot()
 
 
 ## Peek-and-cover shooting at the known contact (`node` at `pos`): in the PEEK phase, move to a spot with a clear shot and
 ## fire, then duck; in the COVER phase, hold behind a shielding object for `cover_time` before peeking again. The
 ## fire/cover destination is committed for `reposition_interval` rather than re-picked every frame, so the NPC steers
 ## smoothly instead of vibrating between near-equal candidates. `hold_ground` keeps the chosen spots inside the house.
-func peek_cover(character, delta: float, node, pos: Vector2, hold_ground: bool) -> void:
-	var dist: float = character.global_position.distance_to(pos)
+func peek_cover(delta: float, node, pos: Vector2, hold_ground: bool) -> void:
+	var dist: float = _character.global_position.distance_to(pos)
 	dest_timer -= delta
 	if phase == "cover":
 		cover_timer -= delta
 		if dest_timer <= 0.0:
-			dest = _choose_dest(character, "cover", node, pos, hold_ground)
+			dest = _choose_dest("cover", node, pos, hold_ground)
 			dest_timer = reposition_interval
 		_loco.move_to(dest)
-		reload_if_dry(character)
+		reload_if_dry()
 		if cover_timer <= 0.0:
 			phase = "peek"
 			dest_timer = 0.0  # Re-pick a firing spot immediately on peeking out.
 		return
 	# PEEK: take the shot if a clear line to the known position is in range, else reposition to get one.
 	if dist <= shoot_range and _perception.has_line_to(node, pos):
-		character.move_input = Vector2.ZERO
+		_character.move_input = Vector2.ZERO
 		# Shoot only once the facing has settled on it. A refused shot (a barrel against a wall stepping back, a reload under
 		# way) keeps the NPC peeking until it fires, rather than ducking without having fired; a click on an empty gun
 		# ducks, where the cover phase reloads it.
-		if fire_timer <= 0.0 and _faces(character, pos):
-			var fired := shoot(character)
-			if fired or character.ammo(character.gun_slot()) == 0:
+		if fire_timer <= 0.0 and _faces(pos):
+			var fired := shoot()
+			if fired or _character.ammo(_character.gun_slot()) == 0:
 				phase = "cover"
 				cover_timer = cover_time
 				dest_timer = 0.0  # Pick a cover spot immediately after shooting.
 		return
 	if dest_timer <= 0.0:
-		dest = _choose_dest(character, "peek", node, pos, hold_ground)
+		dest = _choose_dest("peek", node, pos, hold_ground)
 		dest_timer = reposition_interval
 	_loco.move_to(dest)
 
@@ -172,26 +178,26 @@ func end_throw() -> void:
 ## stands past `THROW_RANGE_SLACK` short of the grenade's range (it moved on since the spot was offered) walks the last few px toward the
 ## spot first, within the same `THROW_START_CAP`. Returns `&"failed"` when it never could (none left, the hand busy, the wind-up cut
 ## short), else `&""`.
-func throw_step(character, delta: float) -> StringName:
+func throw_step(delta: float) -> StringName:
 	_throw_clock += delta
-	character.move_input = Vector2.ZERO
+	_character.move_input = Vector2.ZERO
 	match throw_stage:
 		"aim":
-			if character.item_count(_throw_slot) <= 0 or _throw_clock > THROW_START_CAP:
+			if _character.item_count(_throw_slot) <= 0 or _throw_clock > THROW_START_CAP:
 				throw_stage = "away"
 				return &"failed"
-			character.select_slot(_throw_slot)
-			character.aim_point = _throw_spot
-			if character.global_position.distance_to(_throw_spot) > throw_reach(_throw_range):
+			_character.select_slot(_throw_slot)
+			_character.aim_point = _throw_spot
+			if _character.global_position.distance_to(_throw_spot) > throw_reach(_throw_range):
 				_loco.move_to(_throw_spot)
 				return &""
-			if character.current_slot() == _throw_slot and _faces(character, _throw_spot):
-				_throw_before = character.item_count(_throw_slot)
-				if character.shoot():
+			if _character.current_slot() == _throw_slot and _faces(_throw_spot):
+				_throw_before = _character.item_count(_throw_slot)
+				if _character.shoot():
 					throw_stage = "windup"
 					_throw_clock = 0.0
 		"windup":
-			character.aim_point = _throw_spot
+			_character.aim_point = _throw_spot
 			if _throw_clock > THROW_RELEASE_CAP:
 				throw_stage = "away"
 				return &"failed"  # The wind-up was cut short (it died, or put the grenade away).
@@ -200,26 +206,26 @@ func throw_step(character, delta: float) -> StringName:
 
 ## Whether the grenade being thrown has left the hand since the last call (true once): the end of the wind-up. The gun is taken
 ## back in hand then (a last grenade empties its slot by itself).
-func throw_released(character) -> bool:
-	if throw_stage != "windup" or character.item_count(_throw_slot) >= _throw_before:
+func throw_released() -> bool:
+	if throw_stage != "windup" or _character.item_count(_throw_slot) >= _throw_before:
 		return false
 	throw_stage = "away"
-	character.select_slot(character.gun_slot())
+	_character.select_slot(_character.gun_slot())
 	return true
 
 
 ## Melee at the known position `pos`: close to punch range and strike on the fire cooldown (no cover cycle for fists).
 ## While holding ground it won't chase a contact out of the house — it only swings if one is already in reach.
-func melee(character, pos: Vector2, hold_ground: bool) -> void:
-	if character.global_position.distance_to(pos) > punch_range:
+func melee(pos: Vector2, hold_ground: bool) -> void:
+	if _character.global_position.distance_to(pos) > punch_range:
 		if not hold_ground:
 			_loco.move_to(pos)
 		else:
-			character.move_input = Vector2.ZERO
+			_character.move_input = Vector2.ZERO
 		return
-	character.move_input = Vector2.ZERO
+	_character.move_input = Vector2.ZERO
 	if fire_timer <= 0.0:
-		strike(character)
+		strike()
 
 
 ## Equip the character's gun and fire it, refreshing the combat engagement so an active fight stays
@@ -230,118 +236,118 @@ func melee(character, pos: Vector2, hold_ground: bool) -> void:
 ##   - with the barrel against a wall or object (`weapon_blocked()`) it cannot fire, so it steps back until
 ##     it can, keeping the cooldown;
 ##   - an automatic gun's pull is a burst (`fire_burst` rounds, `continue_burst`), the rest at the gun's own rate.
-func shoot(character) -> bool:
-	if character.is_running() or character.is_reloading():
+func shoot() -> bool:
+	if _character.is_running() or _character.is_reloading():
 		return false
-	var gun: int = character.gun_slot()
+	var gun: int = _character.gun_slot()
 	if gun < 0:
 		return false
-	if character.ammo(gun) == 0:
+	if _character.ammo(gun) == 0:
 		fire_timer = fire_cooldown
 		dry.emit()
 		return false
-	character.select_slot(gun)
-	if character.weapon_blocked():
+	_character.select_slot(gun)
+	if _character.weapon_blocked():
 		_back_off_timer = back_off_time
 		return false
-	if not character.shoot():
+	if not _character.shoot():
 		return false
 	_perception.note_engaged()
 	fire_timer = fire_cooldown
-	_burst_left = maxi(fire_burst - 1, 0) if character.is_automatic() else 0
+	_burst_left = maxi(fire_burst - 1, 0) if _character.is_automatic() else 0
 	return true
 
 
 ## Land a blow, refreshing the combat engagement: a standing NPC with a gun in hand keeps it and kicks; otherwise (a
 ## crouched NPC cannot kick) it equips the fists and punches.
-func strike(character) -> void:
-	if character.ammo_capacity() >= 0 and character.posture() == &"stand":
-		kick(character)
+func strike() -> void:
+	if _character.ammo_capacity() >= 0 and _character.posture() == &"stand":
+		kick()
 	else:
-		punch(character)
+		punch()
 
 
 ## Kick with a leg, keeping whatever is held.
-func kick(character) -> void:
+func kick() -> void:
 	_perception.note_engaged()
 	fire_timer = fire_cooldown
-	character.leg_kick()
+	_character.leg_kick()
 
 
 ## Equip the fists and throw a punch, refreshing the combat engagement.
-func punch(character) -> void:
+func punch() -> void:
 	_perception.note_engaged()
 	fire_timer = fire_cooldown
-	character.select_slot(ItemRegistry.FISTS_SLOT)
-	character.melee()
+	_character.select_slot(ItemRegistry.FISTS_SLOT)
+	_character.melee()
 
 
 ## Keep the trigger down for the rest of an automatic gun's burst: one more round each time the gun's own fire
 ## rate allows, until the burst is spent or something stops it (a run, a reload, a swap, a wall, running dry).
-func continue_burst(character) -> void:
+func continue_burst() -> void:
 	if _burst_left <= 0:
 		return
-	if not character.is_automatic() or character.is_running() or character.is_reloading() \
-			or character.weapon_blocked() or character.ammo() <= 0:
+	if not _character.is_automatic() or _character.is_running() or _character.is_reloading() \
+			or _character.weapon_blocked() or _character.ammo() <= 0:
 		_burst_left = 0
 		return
-	if character.shoot():
+	if _character.shoot():
 		_burst_left -= 1
 
 
 ## Step back from whatever the gun's barrel is against (`shoot` set the timer): away from where it points,
 ## walking, until the barrel is clear or the time is up. Applied after the primitive has steered, so it wins.
-func apply_back_off(character, delta: float) -> void:
+func apply_back_off(delta: float) -> void:
 	if _back_off_timer <= 0.0:
 		return
 	_back_off_timer -= delta
-	character.move_input = -character.facing
+	_character.move_input = -_character.facing
 	_loco.keep_off()  # Never back into a body it knows of.
-	character.run_input = false
+	_character.run_input = false
 
 
 ## Reflex: swap in a fresh magazine when the gun is empty and one is carried (`auto_reload`). It
 ## equips the gun first, since a reload works on the held item.
-func reload_if_dry(character) -> void:
-	if not reload_due(character):
+func reload_if_dry() -> void:
+	if not reload_due():
 		return
-	character.select_slot(character.gun_slot())
-	character.reload()
+	_character.select_slot(_character.gun_slot())
+	_character.reload()
 
 
 ## A tactical reload (docs/tactical-entry.md E11): swap a part-spent magazine for a full one in a lull, the way a stack tops its
 ## gun off before it crosses. Starts the reload when the held gun is short of full with a magazine to add; true while it is
 ## under way or wanted, so a caller that must not move on armed waits for false. The caller stands still (a run cancels it).
-func top_off(character) -> bool:
-	var gun: int = character.gun_slot()
+func top_off() -> bool:
+	var gun: int = _character.gun_slot()
 	if gun < 0:
 		return false
-	if character.is_reloading():
+	if _character.is_reloading():
 		return true
-	if character.ammo(gun) >= character.ammo_capacity(gun) or not character.can_reload(gun):
+	if _character.ammo(gun) >= _character.ammo_capacity(gun) or not _character.can_reload(gun):
 		return false
-	character.select_slot(gun)
-	character.reload()
+	_character.select_slot(gun)
+	_character.reload()
 	return true
 
 
 ## Whether the reload reflex is due: `auto_reload` is on and the gun is empty with a spare magazine to put in it. (A reload runs
 ## only while standing, so a run is dropped for it.)
-func reload_due(character) -> bool:
-	var gun: int = character.gun_slot()
-	return auto_reload and gun >= 0 and not character.is_reloading() and character.ammo(gun) == 0 and character.can_reload(gun)
+func reload_due() -> bool:
+	var gun: int = _character.gun_slot()
+	return auto_reload and gun >= 0 and not _character.is_reloading() and _character.ammo(gun) == 0 and _character.can_reload(gun)
 
 
 ## Whether the facing has settled on world point `pos` (within `AIM_TOLERANCE`).
-func _faces(character, pos: Vector2) -> bool:
-	return absf(character.facing.angle_to(pos - character.global_position)) <= AIM_TOLERANCE
+func _faces(pos: Vector2) -> bool:
+	return absf(_character.facing.angle_to(pos - _character.global_position)) <= AIM_TOLERANCE
 
 
 ## The committed destination for the current phase `kind`: the nearest spot with a clear shot ("peek") or the nearest
 ## shielded spot ("cover") around the known contact; falls back to closing on the contact (peek) or holding (cover)
 ## when no suitable spot exists this sample. While holding ground, spots are restricted to inside the house and the
 ## peek fallback holds position instead of advancing out.
-func _choose_dest(character, kind: String, node, pos: Vector2, hold_ground: bool) -> Vector2:
+func _choose_dest(kind: String, node, pos: Vector2, hold_ground: bool) -> Vector2:
 	var spots: Dictionary = _perception.combat_spots(node, pos, ring_radius, ring_count)
 	var fire: Array = spots["fire"]
 	var cover: Array = spots["cover"]
@@ -349,7 +355,7 @@ func _choose_dest(character, kind: String, node, pos: Vector2, hold_ground: bool
 		fire = fire.filter(func(p): return _loco.inside_house(p))
 		cover = cover.filter(func(p): return _loco.inside_house(p))
 	if kind == "cover":
-		return cover[0] if not cover.is_empty() else character.global_position
+		return cover[0] if not cover.is_empty() else _character.global_position
 	if not fire.is_empty():
 		return fire[0]
-	return character.global_position if hold_ground else pos
+	return _character.global_position if hold_ground else pos

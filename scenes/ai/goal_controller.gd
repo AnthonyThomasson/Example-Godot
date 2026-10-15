@@ -796,7 +796,7 @@ func _process_events(character) -> void:
 ## of the live grenade that threatens the NPC (or {}), radio the grenades it has seen or heard come down, and re-decide the moment
 ## its sight returns.
 func _react_to_grenades(character) -> void:
-	_behavior.poll_throw(character)
+	_behavior.poll_throw()
 	_behavior.set_evade(_perception.evade_plan())
 	for grenade in _perception.grenade_announcements():
 		if send_callouts:

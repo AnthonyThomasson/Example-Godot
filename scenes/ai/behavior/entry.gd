@@ -558,7 +558,7 @@ func _covers_rear(team: Array) -> bool:
 func _topping_off(character, delta: float) -> bool:
 	if gaze_held or _top_off_spent >= TOP_OFF_CAP:
 		return false
-	if not _combat.top_off(character):
+	if not _combat.top_off():
 		return false
 	character.move_input = Vector2.ZERO
 	_top_off_spent += delta
@@ -743,12 +743,12 @@ func _tick_bang(character, team: Array, delta: float) -> void:
 			_combat.begin_throw(ItemRegistry.STUN_SLOT, _bang_target, _perception.grenade_range(&"stun"))
 			_bang_stage = "throw"
 		"throw":
-			if _combat.throw_stage != "away" and _combat.throw_step(character, delta) == &"failed":
+			if _combat.throw_stage != "away" and _combat.throw_step(delta) == &"failed":
 				_combat.end_throw()
 				_give_up_bang()
 				_set_phase(character, "stack")
 				return
-			if _combat.throw_released(character):
+			if _combat.throw_released():
 				_combat.end_throw()
 				_bang_stage = "back"
 		_:
