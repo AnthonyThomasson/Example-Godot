@@ -1,13 +1,13 @@
 class_name PixelArt
 
 ## Renders painters into cached pixel-art textures (Art domain: the entry point the Objects,
-## Character and Items domains paint through). A PAINTER is any script with
+## Character, Items and Vehicles domains paint through). A PAINTER is any script with
 ## `static func paint(canvas: PixelCanvas, base: Color, material: String, opts: Dictionary)` that
 ## draws in a canonical frame — front toward +y, width across the front — under `canvas.light`,
 ## the world light already turned into that frame. Two ways to orient the result:
 ##   • render(): `facing` is a cardinal direction and the image itself is turned to it (furniture).
 ##   • render_turned(): the image stays canonical but is lit as if turned by `angle`; the caller
-##     draws it rotated by that angle (freely turning things: characters, held items).
+##     draws it rotated by that angle (freely turning things: characters, held items, vehicles).
 ## Either way the lighting stays consistent in the world. Textures are cached by their inputs
 ## (static, so they survive scene reloads); a piece's random detail is seeded by its inputs minus
 ## its orientation, so it doesn't change as the piece turns.
