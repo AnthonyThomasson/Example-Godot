@@ -368,8 +368,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  (`character_interaction.gd`) and AI perception's sight/line-of-fire rays (`agent_vision.gd`; the
 	  vision overlay asks the controller's `debug_sight_end` instead of casting) raycast on this one shared constant instead
 	  of each redefining the same magic number — the single point of truth for that layer id. The character's
-	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), the
-	  bullet's `collision_mask` (`projectile/projectile.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
+	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), a thrown grenade's flight (`items/thrown_grenade.gd`), the
+	  bullet's `collision_mask` (`projectile/projectile.gd`), the blast's lines (`projectile/explosion.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
 	  checks and clearing check (`scenes/vehicle/`) read it too.
     - `DrawLayers` (`general/draw_layers.gd`, a `class_name` static holder) — the world's draw-order ladder, one rung per kind of thing,
 	  so what lies on the floor, what a vehicle covers and what flies over it keep one order across domains: `FLOOR` −5 (Objects' `Floor`,
