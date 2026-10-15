@@ -41,8 +41,8 @@ The in-game observers: each reads only the Character public API / signals (incl.
   directly beneath the match HUD's goal readout — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
   paused (freeze the match, then inspect). Decoupled like the other observers: reads the combatants'
   public `global_position` and `outfit_view()`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
-  toggles (every per-NPC flag of the overlay registry) by the same
-  duck-typed names `main.gd`'s `_configure_debug` uses. Reads `Keybinds.PAUSE` (Space; shares it with
+  toggles (every per-NPC flag of the overlay registry) through `OverlayRegistry.apply` (`domain-ui-overlays`), as Main does: a selection
+  applies `flags` to the selected NPC and all-off to every other, `set_flag` re-applies `flags` to the selected one. Reads `Keybinds.PAUSE` (Space; shares it with
   `INTERACT`, unused in the player-less match). A mouse-ignoring detail label (with text shadow).
   While an NPC is selected, an outfit panel (22pt, shadowed, mouse-ignoring) lists `<name> — OUTFIT` and `OutfitLines.of(outfit_view())`, at the bottom
   right with its right edge `right_clear + OUTFIT_GAP` (10 px) from the screen edge, clear of the

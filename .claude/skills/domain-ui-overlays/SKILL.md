@@ -20,7 +20,8 @@ The tooling that switches the AI/nav debug overlays on and off and shows engine 
   changed flag emits its own `overlay_toggled`, so Main needs no bulk path. `RESERVED_WIDTH` is the screen width it occupies from the right edge. `setup(flags)` seeds the buttons;
   pressing one emits `overlay_toggled(flag, on)`, which Main applies live (`_on_overlay_toggled`: player
   mode → every NPC's overlay via `_configure_debug` and `OverlayRegistry.apply(npc, flags)` (the one loop that sets each
-  `show_<x>` on the children that have it and redraws them; the Testing world's `set_overlay` uses it too); spectator mode →
+  `show_<x>` on the children that have it and redraws them; the spectator inspector applies a selection through it, and the Testing
+  world each actor's flags at spawn and its `set_overlay` toggles); spectator mode →
   `SpectatorInspector.set_flag`, so
   the selected NPC follows; `show_nav_holes` → the single NavDebug; `show_perf` → the PerformanceOverlay).
   `PROCESS_MODE_ALWAYS` (works while paused); the panel swallows clicks so pressing a button never selects
