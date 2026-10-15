@@ -1,11 +1,13 @@
 extends Node2D
 
-## AI domain, debug: the shared base of the draw-only overlays (contacts / hearing / combat / territory /
-## targets / brain / routes / stuck). Each subclass declares its own `@export var show_<x>` toggle (found
-## by property name, like the older overlays), overrides `_on()` to report it and `_paint()` to draw, and
-## reads only the sibling GoalController's public `debug_*` getters — it senses nothing and feeds nothing
-## back. The base finds the controller and character, runs PROCESS_MODE_ALWAYS so it keeps drawing while
-## the tree is paused, and redraws every frame only while its toggle is on.
+## AI domain, debug: the shared base of every draw-only overlay (vision / agent / tactics / search /
+## contacts / hearing / combat / territory / targets / brain / routes / stuck / grenade / entry / entry
+## team). Each subclass declares its own `@export var show_<x>` toggle(s) (found by property name, the
+## names in the UI's OverlayRegistry), overrides `_on()` to report them and `_paint()` to draw, and reads
+## only the sibling GoalController's public getters and exports (the agent overlay also the
+## NavigationAgent2D's path) — it senses nothing and feeds nothing back. The base finds the controller and
+## character, runs PROCESS_MODE_ALWAYS so it keeps drawing while the tree is paused, redraws every frame
+## only while `_on()` is true and paints only while the NPC is alive.
 
 const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
 
