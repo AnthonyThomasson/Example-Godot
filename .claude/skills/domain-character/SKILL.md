@@ -235,4 +235,4 @@ landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
 `outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
-**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 11 (`DrawLayers.LYING` for the fallen body), 12 (Character → Art), 19 (Character ↔ Vehicle) — signatures in `architecture`.
+**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 11 (`PhysicsLayers.SOLID` for the body's hand, leg and strike queries and the clearing check; `DrawLayers.LYING` for the fallen body), 12 (Character → Art), 18 (`stun_view()`, read off `Sound.focus`), 19 (Character ↔ Vehicle) — signatures in `architecture`.
