@@ -9,8 +9,8 @@ extends Node
 ## if it matches no verb, a GDScript `Expression` evaluated against this node. Movement and actions
 ## are driven by injecting real input (`Input.action_press`/`release`), the exact path a human's
 ## keyboard/mouse uses, so any controller that reads `Keybinds` obeys them with no coupling here.
-## `command_server.gd` is, by design, the second file besides `player_controller.gd` that touches
-## `Keybinds` — it needs the action names to inject input.
+## It is the one file that presses `Keybinds` actions instead of reading them: it needs the action
+## names to inject input.
 
 ## Port to listen on; 0 falls back to the `GODOT_CMD_PORT` environment variable, then the
 ## `application/debug/command_port` project setting, and 0 there too means the server never starts.
