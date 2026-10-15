@@ -175,7 +175,8 @@ Art: `art/stun_grenade_painter.gd`, `frag_grenade_painter.gd` (option `spoon`: t
 
 ## Link into the Projectile System
 
-Guns are the one place Items reach into the Projectile System
-(`ProjectileSpawner` / `CasingSpawner`). No other item crosses that boundary.
+Items reach the Projectile System in two places. A gun calls `ProjectileSpawner.spawn(...) -> Node` (the bullet node), connects that
+node's `hit(body, damage)` signal to `user.report_shot` (for the HUD), and ejects a casing with `CasingSpawner.spawn(at, facing, parent)`.
+A `ThrownGrenade` calls `Explosion.frag` / `Explosion.stun` (`(at, world, source, row)`) when its fuse ends. No other item crosses that boundary.
 
 **Interfaces:** 6 (Items ↔ Character, incl. `Outfit` / `OutfitConfig`), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 11 (`DrawLayers`: a dropped item and a grenade at rest `LYING`, a grenade in flight `ABOVE`), 12 (Items → Art) — signatures in `architecture`.
