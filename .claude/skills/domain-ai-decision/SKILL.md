@@ -74,7 +74,7 @@ mode or tactic = adding a node (+ a perception option group if it needs new plac
 (`entries`, an invader's only, `entry_enabled`); the desc names the nearest ("A doorway leads into a room left to
 search (the doorway to the west — unexplored — short route)") and the question asks for "the shortest route"
 (measured: "the nearest one into an unsearched or unexplored room" lets "unexplored" outweigh a short route). Von chooses only whether and which doorway; the stack, pie, crossing and corners are the
-behaviour's `entry` primitive (`domain-ai-behavior`), which asks Von nothing on the cadence until the entry is over
+behaviour's `entry` primitive (`domain-ai-entry`), which asks Von nothing on the cadence until the entry is over
 (a forced decision — a hit, a hostile belief change — still starts, and replaces the entry or, with Von down, aborts it).
 
 **GRENADE** (`grenade`, a COMBAT child; `docs/grenades.md` G17): offered while some hostile has a `grenade_throws` option (the NPC carries a grenade, the

@@ -177,11 +177,11 @@ steering map, so a slot is never a destination inside a teammate), snapped), `pi
 room's four corners inset `corner_inset`, each `near` (on the door's wall), `side` and `hard` (no sight line from 24 px
 outside the threshold). The statics `claims(id, callouts)` (allies' live entry claims: slot, side, step, covering; `abort` and `done` drop one), `free_slot(team,
 self_id, current)` (the lowest free slot; a tie goes to the lower instance id), `stack_side(g, team, self_pos)` and
-`slot_point(g, side, slot)` are shared with the snapshot's `entries` group and, through the `AgentPerception` wrappers, with the behaviour's `entry.gd`. Tunables: the controller's `entry_*` exports.
+`slot_point(g, side, slot)` are shared with the snapshot's `entries` group and, through the `AgentPerception` wrappers, with the behaviour's `entry.gd` (`domain-ai-entry`). Tunables: the controller's `entry_*` exports.
 
 **Cleared rooms and the entry guard (E9).** `cleared_room` (keyed per room, ttl `search_memory_ttl`) is not `visited_room`:
 standing in a room visits it, but a room is *cleared* only by `mark_cleared(key)`: the behaviour calls it when an entry
-finishes (`entry.gd` `_finish`, own clear or an ally's) and when a search covers its room by sight, and `process_callout`
+finishes (`entry.gd` `_finish`, own clear or an ally's; `domain-ai-entry`) and when a search covers its room by sight, and `process_callout`
 when an ally radios `cleared_room`. `is_cleared(key)` reads it; the snapshot's `entries` group skips only cleared rooms
 (search ranking still uses `visited_room`). `threshold_ahead(character, path, from_idx, max_dist)` (a thin wrapper on
 `AgentEntry.threshold_ahead`) walks a nav path and returns the first doorway whose wall plane a step crosses, within the
