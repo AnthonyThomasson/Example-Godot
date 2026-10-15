@@ -29,6 +29,7 @@ const GOAL_BOTTOM := 356.0
 const OUTFIT_GAP := 10.0
 
 const ContactMarkers := preload("res://scenes/ui/hud/contact_markers.gd")
+const HudProbe := preload("res://scenes/ui/hud/hud_probe.gd")
 const OutfitLines := preload("res://scenes/ui/hud/outfit_lines.gd")
 const OverlayRegistry := preload("res://scenes/ui/overlays/overlay_registry.gd")
 
@@ -145,8 +146,8 @@ func _npc_at(world: Vector2) -> Node:
 ## The selected NPC's tactical zone nearest `world` within ZONE_PICK_RADIUS (its `debug_zones()` entry
 ## `{ point, category, label, desc }`), or an empty dict when the click wasn't on one.
 func _zone_at(world: Vector2) -> Dictionary:
-	var ctrl := _controller_of(_selected)
-	if ctrl == null:
+	var ctrl := HudProbe.controller_of(_selected)
+	if ctrl == null or not ctrl.has_method("debug_zones"):
 		return {}
 	var best := {}
 	var best_d := ZONE_PICK_RADIUS
@@ -183,7 +184,7 @@ func _refresh_outfit() -> void:
 func _select(npc: Node) -> void:
 	_clear_zone()
 	_selected = npc
-	_selected_ctrl = _controller_of(npc) if npc != null else null
+	_selected_ctrl = HudProbe.controller_of(npc)
 	# Show only the selected NPC's own overlays; hide every other NPC's.
 	for c in _combatants:
 		if is_instance_valid(c):
@@ -237,16 +238,6 @@ func _clear_zone() -> void:
 		overlay.clear_focus()
 	if _detail != null:
 		_detail.visible = false
-
-
-## The NPC's GoalController (the child exposing `debug_zones()`), or null.
-func _controller_of(npc: Node) -> Node:
-	if npc == null or not is_instance_valid(npc):
-		return null
-	for child in npc.get_children():
-		if child.has_method("debug_zones"):
-			return child
-	return null
 
 
 ## The NPC's tactics overlay (the child exposing `set_focus()`), or null.

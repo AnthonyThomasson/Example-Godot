@@ -15,6 +15,8 @@ signal match_ended(verdict: String)
 
 const _MAX_FEED := 6                ## Combat-feed lines kept on screen (newest last).
 
+const HudProbe := preload("res://scenes/ui/hud/hud_probe.gd")
+
 var _combatants: Array = []        ## [{ character, controller }] for each side.
 var _elapsed: float = 0.0          ## Match time so far (s); stops once decided.
 var _end_ms: int = -1              ## When it was decided; -1 while ongoing (freezes the timer).
@@ -51,7 +53,7 @@ func begin(combatants: Array, time_limit := 0.0, show_details := true) -> void:
 	_feed_label.visible = show_details
 	for i in combatants.size():
 		var c: Node = combatants[i]
-		_combatants.append({ "character": c, "controller": _controller_of(c) })
+		_combatants.append({ "character": c, "controller": HudProbe.controller_of(c) })
 		if c.has_signal("died"):
 			c.died.connect(_on_died.bind(c))
 	if not EventBus.posted.is_connected(_on_event):
@@ -143,15 +145,6 @@ func _name_of(primary: Variant, fallback: Variant) -> String:
 		if n is Node and is_instance_valid(n):
 			return str(n.name)
 	return "?"
-
-
-## The controller child of `character` (the node with `control`): the AI controller, or the player's (which has no
-## `goal_text`), or null.
-func _controller_of(character: Node) -> Node:
-	for child in character.get_children():
-		if child.has_method("control"):
-			return child
-	return null
 
 
 # --- UI construction (labels anchored like the debug HUD; no scene-side layout) ----------
