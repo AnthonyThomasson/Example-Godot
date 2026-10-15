@@ -127,10 +127,15 @@ static func grenade_counts(loadout: Dictionary) -> Dictionary:
 ## Arm `character` with the loadout (via `Character.set_loadout`): bare hands, fists, the key and one gun —
 ## the chosen one, or for `random` one drawn from `rng` — loaded with the chosen magazine and carrying the
 ## chosen number of spares of it, and the chosen number of stun and frag grenades (the gun stays what is held); and dress it
-## in the loadout's whole outfit (via `Character.set_outfit`), replacing whatever it wore. Returns the gun id it was armed with.
-static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerator) -> StringName:
+## in the loadout's whole outfit (via `Character.set_outfit`), replacing whatever it wore. `style` is how it is all drawn (looks
+## only): `look` (the character's style, with its `seed` and a police unit's `rank`, via `Character.set_style`; absent = the
+## character's style is left as it is) and `weapon` (the weapon style every item it carries is drawn in, `Item.style`; absent =
+## `police`). Returns the gun id it was armed with.
+static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerator, style := {}) -> StringName:
 	var l := normalize(loadout)
 	character.set_outfit(l["outfit"])
+	if style.has("look"):
+		character.set_style(StringName(style["look"]), int(style.get("seed", 0)), int(style.get("rank", 0)))
 	var gun: StringName = l["weapon"]
 	if gun == RANDOM:
 		var random_slot := ItemRegistry.random_gun_slot(rng)
@@ -150,7 +155,7 @@ static func apply(character: Node, loadout: Dictionary, rng: RandomNumberGenerat
 	for option: Dictionary in grenade_options():
 		counts[int(option["slot"])] = l["%ss" % option["id"]]
 	var slots := ItemRegistry.loadout_for(slot, counts.get(ItemRegistry.STUN_SLOT, 0), counts.get(ItemRegistry.FRAG_SLOT, 0))
-	character.set_loadout(slots, slot, spare_types, magazine, counts)
+	character.set_loadout(slots, slot, spare_types, magazine, counts, StringName(style.get("weapon", &"police")))
 	return gun
 
 

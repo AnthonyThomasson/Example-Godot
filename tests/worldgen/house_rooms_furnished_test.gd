@@ -7,8 +7,8 @@ extends GameTest
 const SEEDS := [11, 12, 13]
 const FAR_AWAY := Vector2(5000, 5000)
 const MIN_COVER := 0.08  ## Fraction of a room's interior its solid pieces must cover.
-const MIN_COVER_CORRIDOR := 0.03  ## Hallways and entry halls are mostly walking space.
-const CORRIDORS := ["hallway", "entry_hall"]
+const MIN_COVER_CORRIDOR := 0.03  ## Hallways and security vestibules are mostly walking space.
+const CORRIDORS := ["hallway", "security_vestibule"]
 
 
 func describe() -> Dictionary:

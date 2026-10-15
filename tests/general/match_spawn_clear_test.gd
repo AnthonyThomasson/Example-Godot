@@ -9,7 +9,7 @@ extends GameTest
 const MatchSpawner := preload("res://scenes/match_spawner.gd")
 ## A seed whose bedroom has a solid piece over its centre (checked below, so a world-gen change that moves
 ## it fails loudly instead of quietly testing nothing).
-const SEED := 1
+const SEED := 2
 const ROOM := "bedroom"
 ## The character's body radius: a spawn point closer than this to a footprint overlaps it.
 const BODY_RADIUS := 14.0

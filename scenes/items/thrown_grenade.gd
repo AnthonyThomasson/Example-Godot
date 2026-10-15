@@ -44,7 +44,7 @@ const NOBODY: Array[RID] = []
 ## Which grenade this is (a `GrenadeConfig` id) and who threw it (may be gone by the time it goes off).
 var kind: StringName = &""
 var thrower: Node  ## Who threw it; it may be gone by the time it goes off.
-## The grenade item that draws it.
+## The grenade item that draws it, in the thrown item's weapon style.
 var item: Item
 
 var _row := {}               ## The `GrenadeConfig` row it was thrown with.
@@ -92,14 +92,17 @@ class Motion:
 		return false
 
 
-## Let a grenade of `kind` go from `from` toward `to`, thrown by `by`, into `parent` (the world root).
-static func spawn(grenade: StringName, from: Vector2, to: Vector2, by: Node, parent: Node) -> ThrownGrenade:
+## Let a grenade of `kind` go from `from` toward `to`, thrown by `by`, into `parent` (the world root), drawn in the weapon style
+## `style` of the item it was thrown from (`Item.style`; omitted = the default style, `GrenadeConfig.default_style`).
+static func spawn(grenade: StringName, from: Vector2, to: Vector2, by: Node, parent: Node,
+		style: StringName = GrenadeConfig.default_style) -> ThrownGrenade:
 	var row := GrenadeConfig.row(grenade)
 	var node := ThrownGrenade.new()
 	node.name = "Thrown%s" % grenade.capitalize()
 	node.kind = grenade
 	node.thrower = by
 	node.item = ItemRegistry.create(int(row.get("slot", -1)), 1)
+	node.item.style = style
 	node._row = row.duplicate()
 	node._fuse = float(row.get("fuse", 3.0))
 	node._direction = (to - from).normalized() if from.distance_to(to) > 0.5 else Vector2.RIGHT

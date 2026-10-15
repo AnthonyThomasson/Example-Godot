@@ -3,14 +3,14 @@ class_name Outfit extends RefCounted
 ## What one character wears (Items domain; `docs/outfits.md`): a garment or nothing in each slot of `OutfitConfig`, the plate
 ## carrier's two plates and their condition. The Character owns one (`Character.set_outfit`) and asks it what stands between a
 ## round and the body (`layer`), wears its plates by the hits they take (`wear`) and weighs it (`weight`); the art reads
-## `look()` and the UI `view()`. A new Outfit wears nothing: no protection, no weight, the character's own look.
+## `look(style)` and the UI `view()`. A new Outfit wears nothing: no protection, no weight, the style's own look.
 
 ## Slot (String) -> the id worn there (StringName, `&""` = nothing), every slot of `OutfitConfig.slots()`.
 var _worn := {}
 ## Plate slot -> its condition, 1 new .. 0 spent (only the plates worn).
 var _condition := {}
 ## Counts every change to what is worn or a plate's condition (`set_ids`, `wear`), so a reader that draws the outfit (the
-## Character's art) checks one int each frame and re-reads `look()` only when it moved.
+## Character's art) checks one int each frame and re-reads `look(style)` only when it moved.
 var revision := 0
 
 
@@ -110,15 +110,17 @@ func weight() -> float:
 	return total
 
 
-## What the art draws: each garment slot worn -> `{ id, kind, color? }` (no `color` = the side's team colour), and each plate
-## worn -> `{ id, condition, color }` (the plate's own colour, which shows where its wear tears the carrier). Nothing worn in a
-## slot leaves it out (the character's own look there).
-func look() -> Dictionary:
+## What the art draws in the character style `style` (its `OutfitConfig` row's `looks`; a style it has no row for draws
+## `OutfitConfig.default_style`'s): each garment slot worn -> `{ id, kind, color }` or `{ id, kind, palette }` (a colour the
+## character draws from that palette of its style), and each plate worn -> `{ id, condition, color }` (the plate's own colour,
+## which shows where its wear tears the carrier). Nothing worn in a slot leaves it out (the style's own there).
+func look(style: StringName = OutfitConfig.default_style) -> Dictionary:
 	var out := {}
 	for slot: String in OutfitConfig.GARMENT_SLOTS:
 		if worn(slot) == &"":
 			continue
-		var entry: Dictionary = (OutfitConfig.garment(worn(slot)).get("look", {}) as Dictionary).duplicate()
+		var looks: Dictionary = OutfitConfig.garment(worn(slot)).get("looks", {})
+		var entry: Dictionary = (looks.get(style, looks.get(OutfitConfig.default_style, {})) as Dictionary).duplicate()
 		entry["id"] = worn(slot)
 		out[slot] = entry
 	for slot: String in OutfitConfig.PLATE_SLOTS:

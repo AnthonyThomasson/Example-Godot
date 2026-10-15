@@ -4,11 +4,13 @@ extends RefCounted
 ## Painted in the canonical frame (front toward +y): a rounded enamel or brushed-metal box whose top
 ## shows what the appliance is — a stove's burners and knob strip, a fridge's vent grille and door
 ## handles, a microwave's vents, window and keypad, a washer's glass lid full of laundry or a
-## dryer's solid lid and vents — or a TV's slim screen on its stand. Options (`art_opts`,
-## defaulting to ObjectArtConfig.appliance_*): `panel` ("plain" | "burners" | "fridge" |
-## "microwave" | "washer" | "dryer" | "tv").
+## dryer's solid lid and vents — or a TV: a boxy old CRT, its cracked screen to the front. Run down (decay.gd): grime, rust,
+## stickers and grease. Displays and the CRT's screen give light: drawn glowing, in the cheap screens' green or the piece's
+## neon. Options (`art_opts`, defaulting to ObjectArtConfig.appliance_*): `panel` ("plain" | "burners" | "fridge" |
+## "microwave" | "washer" | "dryer" | "tv"), `neon` (the CRT's screen, or a display lit along the top of any other).
 
 const Props = preload("res://scenes/objects/art/props.gd")
+const Decay = preload("res://scenes/objects/art/decay.gd")
 const _BODY_HEIGHT := 4  ## Heights for cast shadows.
 const _KNOB_HEIGHT := 6
 
@@ -17,9 +19,10 @@ const _KNOB_HEIGHT := 6
 static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionary) -> void:
 	var t := PixelCanvas.tones(base)
 	var panel := String(opts.get("panel", ObjectArtConfig.appliance_panel))
+	var glow := Decay.screen_color(opts)
 	if panel == "tv":
-		_tv(c, base, t)
-		c.cast_shadows()
+		_crt(c, glow)
+		Decay.grime(c)
 		return
 	var body := PixelCanvas.rounded(Rect2i(0, 0, c.w, c.h), 3)
 	c.fill(body, base, _BODY_HEIGHT)
@@ -31,13 +34,20 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 		"fridge":
 			_fridge(c, t)
 		"microwave":
-			_microwave(c, t)
+			_microwave(c, t, glow)
 		"washer":
-			_drum(c, base, t, true)
+			_drum(c, base, t, true, glow)
 		"dryer":
-			_drum(c, base, t, false)
+			_drum(c, base, t, false, glow)
 	c.outline(body, t.outline)
 	c.cast_shadows()
+	Decay.grime(c)
+	Decay.rust(c, 10)
+	Decay.stickers(c, 2)
+	Decay.stain(c, Decay.GREASE, 4)
+	var neon := Decay.neon(opts)
+	if neon.a > 0.0:
+		Decay.display(c, Vector2i(int(c.w * 0.3), 2), Vector2i(int(c.w * 0.7), 2), neon)
 
 
 ## Four burners (ring, cap, cross grate) in a 2×2 grid over a knob strip along the front.
@@ -77,8 +87,8 @@ static func _fridge(c: PixelCanvas, t: Dictionary) -> void:
 
 
 ## A microwave top: vent slots at the back corner; the front lip holds the dark door window and a
-## keypad with a small lit display.
-static func _microwave(c: PixelCanvas, t: Dictionary) -> void:
+## keypad with a small lit display (glowing, in `glow`).
+static func _microwave(c: PixelCanvas, t: Dictionary, glow: Color) -> void:
 	for row in 3:
 		var y := 3 + row * 2
 		for x in range(roundi(c.w * 0.55), c.w - 4, 3):
@@ -90,22 +100,22 @@ static func _microwave(c: PixelCanvas, t: Dictionary) -> void:
 	c.fill(window, ObjectArtConfig.appliance_glass_color)
 	c.glare(window, ObjectArtConfig.appliance_glass_color.lightened(0.35), 1)
 	var pad_x := strip.position.x + roundi(strip.size.x * 0.7)
-	c.line(Vector2i(pad_x, strip.position.y + 1), Vector2i(pad_x + 3, strip.position.y + 1), ObjectArtConfig.prop_colors["glow"])
+	Decay.display(c, Vector2i(pad_x, strip.position.y + 1), Vector2i(pad_x + 3, strip.position.y + 1), glow)
 	for y in range(strip.position.y + 3, strip.end.y - 1, 2):
 		for x in range(pad_x, strip.end.x - 1, 2):
 			c.px(x, y, t.light)
 
 
-## A washer or dryer top: a control panel along the back (dial, display, buttons) and a round
+## A washer or dryer top: a control panel along the back (dial, display glowing in `glow`, buttons) and a round
 ## lid — glass over tumbling laundry for a washer, solid with lint vents for a dryer.
-static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool) -> void:
+static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool, glow: Color) -> void:
 	var panel_h := maxi(4, roundi(c.h * 0.16))
 	c.paint_over(Rect2i(2, 2, c.w - 4, panel_h), t.dark)
 	var metal := ObjectArtConfig.appliance_metal_color
 	var dial := Vector2i(c.w - 4 - int(panel_h / 2.0), 2 + int(panel_h / 2.0))
 	c.fill(PixelCanvas.disc(dial, maxi(1, int(panel_h / 2.0) - 1)), metal, _KNOB_HEIGHT)
 	c.px(dial.x, dial.y - 1, t.outline)
-	c.line(Vector2i(int(c.w / 2.0) - 3, 2 + int(panel_h / 2.0)), Vector2i(int(c.w / 2.0) + 3, 2 + int(panel_h / 2.0)), ObjectArtConfig.prop_colors["glow"])
+	Decay.display(c, Vector2i(int(c.w / 2.0) - 3, 2 + int(panel_h / 2.0)), Vector2i(int(c.w / 2.0) + 3, 2 + int(panel_h / 2.0)), glow)
 	for i in 3:
 		c.px(5 + i * 3, 2 + int(panel_h / 2.0), t.light)
 	var o := Vector2i(int(c.w / 2.0), panel_h + 2 + int((c.h - panel_h - 2) / 2.0))
@@ -129,18 +139,21 @@ static func _drum(c: PixelCanvas, base: Color, t: Dictionary, washer: bool) -> v
 			c.line(Vector2i(4, y), Vector2i(maxi(5, rad), y), t.shadow)
 
 
-## A TV from above: a slim screen bar across the back on a low stand, a lit edge toward the room
-## and a standby LED. Everything else stays floor.
-static func _tv(c: PixelCanvas, base: Color, _t: Dictionary) -> void:
-	var stand := PixelCanvas.rounded(Rect2i(roundi(c.w * 0.32), roundi(c.h * 0.42), roundi(c.w * 0.36), roundi(c.h * 0.42)), 3)
-	var metal := ObjectArtConfig.appliance_metal_color.darkened(0.45)
-	c.fill(stand, metal, 2)
-	c.bevel(stand, 1, 1, metal.lightened(0.25), metal.darkened(0.3))
-	var depth := maxi(3, roundi(c.h * 0.18))
-	var bar_rect := Rect2i(1, roundi(c.h * 0.22), c.w - 2, depth)
-	var bar := PixelCanvas.rounded(bar_rect, 1)
-	c.fill(bar, base, _BODY_HEIGHT + 2)
-	c.bevel(bar, 1, 1, base.lightened(0.3), base.darkened(0.2))
-	c.line(Vector2i(bar_rect.position.x + 1, bar_rect.end.y - 1), Vector2i(bar_rect.end.x - 2, bar_rect.end.y - 1),
-			ObjectArtConfig.prop_colors["glow"])
-	c.px(int(c.w / 2.0), bar_rect.end.y, Color(0.9, 0.25, 0.2))
+## A TV: a boxy old CRT from above, grimy grey plastic, vents over its deep back, its screen to the front glowing in `glow`
+## and cracked across.
+static func _crt(c: PixelCanvas, glow: Color) -> void:
+	var case_col := ObjectArtConfig.appliance_crt_color
+	var t := PixelCanvas.tones(case_col)
+	var box := PixelCanvas.rounded(Rect2i(int(c.w * 0.18), 1, int(c.w * 0.64), c.h - 3), 3)
+	c.fill(box, case_col, _BODY_HEIGHT + 2)
+	c.bevel(box, 1, 2, t.light, t.dark)
+	var back := PixelCanvas.rounded(Rect2i(int(c.w * 0.3), 2, int(c.w * 0.4), int(c.h * 0.4)), 4)
+	c.fill(back, case_col.darkened(0.12), _BODY_HEIGHT + 3)
+	c.bevel(back, 1, 1, t.light, t.shadow)
+	for y in range(4, int(c.h * 0.38), 2):
+		Decay.line(c, Vector2i(int(c.w * 0.36), y), Vector2i(int(c.w * 0.62), y), t.shadow, 1.0)
+	c.outline(box, t.outline)
+	var face := Rect2i(int(c.w * 0.22), c.h - 6, int(c.w * 0.5), 4)
+	Decay.screen(c, face, glow)
+	c.glowing(func() -> void: Decay.line(c, face.position + Vector2i(3, 0), face.position + Vector2i(6, 3), Color(0.9, 1.0, 0.9), 1.0), face)
+	c.cast_shadows()

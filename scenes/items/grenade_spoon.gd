@@ -30,6 +30,7 @@ func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color
 		_opts: Dictionary = {}) -> void:
 	var turn := angle - PI * 0.5
 	var tex := PixelArt.render_turned(SpoonPainter, SIZE, Color(0.62, 0.64, 0.68), PixelArt.snap_angle(turn), "metal")
+	_note_drawn(tex)
 	canvas.draw_set_transform(at, turn, Vector2.ONE)
 	canvas.draw_texture_rect(tex, Rect2(-SIZE * 0.5, SIZE), false, modulate)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

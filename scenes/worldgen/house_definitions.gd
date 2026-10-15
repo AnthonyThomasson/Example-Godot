@@ -9,7 +9,9 @@ class_name HouseDefinitions
 ## What may connect to what (which rooms can hold the front door or an exit, which room types may
 ## share a door, which must be dead ends) is LayoutRules; HouseSpawner warns about a plan that breaks it
 ## and tests/worldgen/house_doorways_connected_test.gd fails on it. Bedrooms and bathrooms open off a
-## hallway (or a living space); a bedroom-to-bathroom door is a private en-suite.
+## hallway (or a living space); a bedroom-to-bathroom door is a private en-suite. The flats are run-down cyberpunk
+## homes: the railroad, micro and corner flats carry the netrunner den, the ripperdoc, the security vestibule and the
+## kitchenette between them.
 
 const PLANS := {
 	"starter_home": {
@@ -89,29 +91,6 @@ const PLANS := {
 		],
 	},
 
-	"family_home": {
-		"wall_thickness": 12.0,
-		"rooms": [
-			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 0, 340, 300) },
-			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(340, 0, 240, 300) },
-			{ "key": "bedroom_2", "type": "bedroom", "rect": Rect2(580, 0, 300, 300) },
-			{ "key": "kids_room", "type": "kids_room", "rect": Rect2(880, 0, 260, 300) },
-			{ "key": "hallway", "type": "hallway", "rect": Rect2(0, 300, 1140, 120) },
-			{ "key": "entry_hall", "type": "entry_hall", "rect": Rect2(0, 420, 260, 340) },
-			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(260, 420, 880, 340) },
-		],
-		"openings": [
-			{ "pos": Vector2(130, 760), "width": 110.0, "front": true },  # entry hall, exterior
-			{ "pos": Vector2(1140, 590), "width": 100.0, "exit": true },  # great room, patio door
-			{ "pos": Vector2(130, 420), "width": 100.0 },  # entry <-> hallway
-			{ "pos": Vector2(260, 590), "width": 100.0 },  # entry <-> great
-			{ "pos": Vector2(170, 300), "width": 90.0 },  # hallway <-> bedroom
-			{ "pos": Vector2(460, 300), "width": 90.0 },  # hallway <-> bathroom
-			{ "pos": Vector2(730, 300), "width": 90.0 },  # hallway <-> bedroom_2
-			{ "pos": Vector2(1010, 300), "width": 90.0 },  # hallway <-> kids_room
-		],
-	},
-
 	"office_loft": {
 		"wall_thickness": 12.0,
 		"rooms": [
@@ -123,25 +102,6 @@ const PLANS := {
 			{ "pos": Vector2(330, 440), "width": 120.0, "front": true },  # great room, exterior
 			{ "pos": Vector2(660, 120), "width": 100.0 },  # great <-> office
 			{ "pos": Vector2(660, 340), "width": 90.0 },  # great <-> bathroom
-		],
-	},
-
-	"dining_house": {
-		"wall_thickness": 12.0,
-		"rooms": [
-			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 0, 300, 340) },
-			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(300, 0, 200, 340) },
-			{ "key": "kitchen", "type": "kitchen", "rect": Rect2(500, 0, 500, 340) },
-			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 340, 500, 360) },
-			{ "key": "dining_room", "type": "dining_room", "rect": Rect2(500, 340, 500, 360) },
-		],
-		"openings": [
-			{ "pos": Vector2(250, 700), "width": 110.0, "front": true },  # living room, exterior
-			{ "pos": Vector2(1000, 170), "width": 100.0, "exit": true },  # kitchen, back door
-			{ "pos": Vector2(500, 520), "width": 100.0 },  # living <-> dining
-			{ "pos": Vector2(750, 340), "width": 100.0 },  # dining <-> kitchen
-			{ "pos": Vector2(150, 340), "width": 100.0 },  # living <-> bedroom
-			{ "pos": Vector2(400, 340), "width": 90.0 },  # living <-> bathroom
 		],
 	},
 
@@ -183,45 +143,58 @@ const PLANS := {
 		],
 	},
 
-	"cottage": {
+	# A railroad flat: four rooms in a row, each opening into the next through doorways that line up along their north
+	# side, from the vestibule on the street to the netrunner's den at the far end.
+	"railroad_flat": {
 		"wall_thickness": 12.0,
 		"rooms": [
-			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(0, 0, 560, 480) },
-			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(560, 0, 380, 280) },
-			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(560, 280, 380, 200) },
+			{ "key": "security_vestibule", "type": "security_vestibule", "rect": Rect2(0, 0, 260, 340) },
+			{ "key": "living_room", "type": "living_room", "rect": Rect2(260, 0, 380, 340) },
+			{ "key": "ripperdoc", "type": "ripperdoc", "rect": Rect2(640, 0, 360, 340) },
+			{ "key": "netrunner_den", "type": "netrunner_den", "rect": Rect2(1000, 0, 340, 340) },
 		],
 		"openings": [
-			{ "pos": Vector2(280, 480), "width": 120.0, "front": true },  # great room, exterior
-			{ "pos": Vector2(280, 0), "width": 100.0, "exit": true },  # great room, back door
-			{ "pos": Vector2(560, 140), "width": 100.0 },  # great <-> bedroom
-			{ "pos": Vector2(750, 280), "width": 90.0 },  # bedroom <-> bathroom (en-suite)
+			{ "pos": Vector2(130, 340), "width": 110.0, "front": true },  # vestibule, exterior
+			{ "pos": Vector2(260, 100), "width": 90.0 },  # vestibule <-> living room
+			{ "pos": Vector2(640, 100), "width": 90.0 },  # living room <-> ripperdoc
+			{ "pos": Vector2(1000, 100), "width": 90.0 },  # ripperdoc <-> den
 		],
 	},
 
-	"luxury_home": {
+	# A micro-flat: one studio, a tiny bathroom and a kitchenette off it.
+	"micro_flat": {
 		"wall_thickness": 12.0,
 		"rooms": [
-			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(0, 0, 360, 340) },
-			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(360, 0, 220, 340) },
-			{ "key": "home_office", "type": "home_office", "rect": Rect2(580, 0, 300, 340) },
-			{ "key": "bedroom_2", "type": "bedroom", "rect": Rect2(880, 0, 320, 340) },
-			{ "key": "bathroom_2", "type": "bathroom", "rect": Rect2(1200, 0, 200, 340) },
-			{ "key": "hallway", "type": "hallway", "rect": Rect2(0, 340, 1400, 120) },
-			{ "key": "entry_hall", "type": "entry_hall", "rect": Rect2(0, 460, 260, 340) },
-			{ "key": "great_room", "type": "kitchen_living", "rect": Rect2(260, 460, 720, 340) },
-			{ "key": "dining_room", "type": "dining_room", "rect": Rect2(980, 460, 420, 340) },
+			{ "key": "studio", "type": "studio", "rect": Rect2(0, 0, 560, 460) },
+			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(560, 0, 260, 230) },
+			{ "key": "kitchenette", "type": "kitchenette", "rect": Rect2(560, 230, 260, 230) },
 		],
 		"openings": [
-			{ "pos": Vector2(130, 800), "width": 110.0, "front": true },  # entry hall, exterior
-			{ "pos": Vector2(1400, 630), "width": 100.0, "exit": true },  # dining room, patio door
-			{ "pos": Vector2(130, 460), "width": 100.0 },  # entry <-> hallway
-			{ "pos": Vector2(260, 630), "width": 100.0 },  # entry <-> great
-			{ "pos": Vector2(980, 630), "width": 100.0 },  # great <-> dining
-			{ "pos": Vector2(180, 340), "width": 90.0 },  # hallway <-> bedroom
-			{ "pos": Vector2(470, 340), "width": 90.0 },  # hallway <-> bathroom
-			{ "pos": Vector2(730, 340), "width": 90.0 },  # hallway <-> home_office
-			{ "pos": Vector2(1040, 340), "width": 90.0 },  # hallway <-> bedroom_2
-			{ "pos": Vector2(1200, 170), "width": 90.0 },  # bedroom_2 <-> bathroom_2 (en-suite)
+			{ "pos": Vector2(280, 460), "width": 110.0, "front": true },  # studio, exterior
+			{ "pos": Vector2(560, 115), "width": 90.0 },  # studio <-> bathroom
+			{ "pos": Vector2(560, 345), "width": 90.0 },  # studio <-> kitchenette
+		],
+	},
+
+	# A corner flat: the vestibule on the street opens onto a short inner hallway; the living room, bedroom, bathroom and
+	# kitchenette are round it.
+	"corner_flat": {
+		"wall_thickness": 12.0,
+		"rooms": [
+			{ "key": "living_room", "type": "living_room", "rect": Rect2(0, 0, 420, 340) },
+			{ "key": "bedroom", "type": "bedroom", "rect": Rect2(420, 0, 340, 340) },
+			{ "key": "bathroom", "type": "bathroom", "rect": Rect2(0, 340, 220, 320) },
+			{ "key": "hallway", "type": "hallway", "rect": Rect2(220, 340, 540, 130) },
+			{ "key": "security_vestibule", "type": "security_vestibule", "rect": Rect2(220, 470, 280, 190) },
+			{ "key": "kitchenette", "type": "kitchenette", "rect": Rect2(500, 470, 260, 190) },
+		],
+		"openings": [
+			{ "pos": Vector2(360, 660), "width": 110.0, "front": true },  # vestibule, exterior
+			{ "pos": Vector2(360, 470), "width": 100.0 },  # vestibule <-> hallway
+			{ "pos": Vector2(320, 340), "width": 90.0 },  # hallway <-> living room
+			{ "pos": Vector2(620, 340), "width": 90.0 },  # hallway <-> bedroom
+			{ "pos": Vector2(220, 405), "width": 80.0 },  # hallway <-> bathroom
+			{ "pos": Vector2(630, 470), "width": 90.0 },  # hallway <-> kitchenette
 		],
 	},
 }

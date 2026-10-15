@@ -2,8 +2,11 @@ extends RefCounted
 
 ## Top-down pixel-art POTTED PLANT painter (Objects domain, private), kept within the inscribed
 ## circle of its round footprint: a terracotta pot with a lit rim around dark soil, and a crown of
-## tapering leaves radiating from the middle in two greens, each with a pale midrib. Options
-## (`art_opts`, defaulting to ObjectArtConfig.plant_*): `leaves`.
+## tapering leaves radiating from the middle in two tones, each with a pale midrib. Run down: the leaves wilted toward
+## dead brown (ObjectArtConfig.plant_wilt) and the whole grimy (decay.gd). Options (`art_opts`, defaulting to
+## ObjectArtConfig.plant_*): `leaves`.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _POT_HEIGHT := 3  ## Heights for cast shadows: leaves arch over the pot.
 const _LEAF_HEIGHT := 7
@@ -21,13 +24,16 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	c.outline(pot, pt.outline)
 	c.fill(PixelCanvas.disc(o, roundi(radius * 0.55)), ObjectArtConfig.plant_soil_color, 1)
 
+	var leaf := base.lerp(ObjectArtConfig.plant_dead_color, ObjectArtConfig.plant_wilt)
 	var n := int(opts.get("leaves", ObjectArtConfig.plant_leaves))
 	var spin := c.rng.randf() * TAU
 	for i in n:
 		var a := spin + TAU * i / n + c.rng.randf_range(-0.25, 0.25)
 		var length := radius * c.rng.randf_range(0.75, 1.0)
-		_leaf(c, o, Vector2(cos(a), sin(a)), length, base if i % 2 == 0 else base.darkened(0.14))
+		_leaf(c, o, Vector2(cos(a), sin(a)), length, leaf if i % 2 == 0 else leaf.darkened(0.14))
 	c.cast_shadows()
+	Decay.grime(c)
+	Decay.blotches(c, 2, 0.3, 3)
 
 
 ## One tapering leaf from `o` along `dir`: widest a third of the way out, with a pale midrib and a

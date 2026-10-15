@@ -1,6 +1,6 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers) and the draw-order ladder (DrawLayers). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant or a draw-order rung. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers), the draw-order ladder (DrawLayers) and the light masks (LightMasks: occluder bits, shadow masks, light layers, the occluder shape). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant, a draw-order rung or a light mask. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
@@ -16,10 +16,20 @@ per caller. `SOLID := 1` is the layer walls, solid furniture and bodies sit on �
 item's glance (`items/dropped_item.gd`), a thrown grenade's flight (`items/thrown_grenade.gd`), the bullet (`projectile/projectile.gd`), an
 explosion's line (`projectile/explosion.gd`), `PhysicsConfig.wall_mask` and a vehicle's body, door and clearing queries (`scenes/vehicle/`).
 
+`light_masks.gd` (`class_name LightMasks`, the same kind of holder, interface 11) is the light masks every domain builds its
+shadows and light layers on (`docs/lighting.md` L6): the occluder bits `WALL` 1, `FURNITURE` 2, `EMITTER` 4 (a solid piece that
+gives light), `CHARACTER` 8; the shadow masks `PIECE_SHADOWS`, `FIXTURE_SHADOWS`, `ALL_SHADOWS` the Lighting domain gives its
+lights; the item light layers `HOUSE` 1 and `STREET` 2; `shadows` (whether occluders are built; the Testing domain's
+`lighting.enabled` turns it off with `LightingConfig.enabled`) and `occluder(polygon, bit)`, the one place an occluder is shaped:
+wound clockwise on screen and culled counter-clockwise, so the shape itself stays lit and only what lies behind it falls dark
+(null while `shadows` is off). Objects' walls and solid pieces and the Character's body build theirs through it; Objects' street
+floors put themselves on `STREET`.
+
 `draw_layers.gd` (`class_name DrawLayers`, the same kind of holder) is the world's draw-order ladder (interface 11): `FLOOR` −5,
 `RUG` −4, `BLOOD` −3 (blood and scorch decals), `LYING` −2 (a dead body, casings, a dropped item, a grenade at rest),
 `UNDER_VEHICLE` −1 (a vehicle's chassis), `STANDING` 0 (the default: the living, furniture, walls), `ABOVE` 1 (a vehicle's roof, a
-grenade in flight, the UI's stack markers), `EFFECTS` 4 (an explosion's flash and smoke). Every domain's z knob starts from its rung (`ObjectArtConfig`,
+grenade in flight, the UI's stack markers), `OVERHEAD` 2 (a piece's overhang: a streetlight's arm and head over the road; a room's ceiling fixture), `EFFECTS` 4
+(an explosion's flash and smoke). Every domain's z knob starts from its rung (`ObjectArtConfig`,
 `BloodConfig`, `CharacterConfig`, the casing, the dropped item and grenade, the vehicle's layers, `ExplosionFx`, the UI's `StackMarkers`), so a new layer is a
 rung here, not a number in a domain.
 
@@ -110,10 +120,10 @@ other. Topics in use: `&"hit"`, posted by the Projectile System for each damagin
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`, plus
 `outcome` / `material` and, for bullets, `speed_factor`, `power`)
 and consumed by the AI for combat awareness, hostility and gunfire heard, by Audio for impacts and by the match HUD's combat feed;
-`&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
+`&"shot"` (a round left a gun; also the Lighting domain's muzzle flash), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
-Items and Character and consumed only by Audio; the grenades' `&"throw"` (consumed by Audio), `&"grenade"` (a bounce or rest, consumed by Audio and the AI), `&"explosion"` (consumed by Audio and the camera shake, and
-by the AI) and `&"stun"` (Audio's tinnitus and the stun screen); the vehicles' `&"vehicle"` (ignition, doors, crashes, a character struck), `&"engine"` and `&"skid"` (consumed by Audio);
+Items and Character and consumed by Audio; the grenades' `&"throw"` (consumed by Audio), `&"grenade"` (a bounce or rest, consumed by Audio and the AI), `&"explosion"` (consumed by Audio, the camera shake, the
+Lighting domain's flash and the AI) and `&"stun"` (Audio's tinnitus and the stun screen); the vehicles' `&"vehicle"` (ignition, doors, crashes, a character struck), `&"engine"` and `&"skid"` (consumed by Audio);
 `&"sound"`, which Audio posts for every sound it
 makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
@@ -171,4 +181,4 @@ human `Player` and `DebugUI`, points the camera at every combatant in framing mo
 for watching and regression-testing both AI agent-types (defender and invader). Composition-root
 wiring lives in `main.gd`; the General observers only read published contracts.
 
-**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`, `DrawLayers`), 14 (`Settings`, the dev command server), 15 (`GameLog`), 19 (the camera's `vehicle().view_zoom_out()`, `USE_VEHICLE`) — signatures in `architecture`.
+**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`, `DrawLayers`, `LightMasks`), 14 (`Settings`, the dev command server), 15 (`GameLog`), 19 (the camera's `vehicle().view_zoom_out()`, `USE_VEHICLE`) — signatures in `architecture`.

@@ -4,19 +4,13 @@
 
 [node name="Defender" instance=ExtResource("1_base")]
 faction = &"household"
+style = &"merc"
 
 [node name="GoalController" parent="."]
 goal = "You are the armed guard of this house. Shoot hostile intruders with your {gun} to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside."
 defend_territory = true
 hostile_on_trespass = true
 hostile_on_attack = true
-
-[node name="Visuals" parent="."]
-body_color = Color(0.5, 0.8, 0.4, 1)
-hair_color = Color(0.18, 0.22, 0.35, 1)
-hair_style = "cap"
-pants_color = Color(0.55, 0.5, 0.36, 1)
-shoe_color = Color(0.3, 0.2, 0.12, 1)
 
 [node name="AgentDebug" parent="."]
 label_color = Color(0.7, 1, 0.6, 1)

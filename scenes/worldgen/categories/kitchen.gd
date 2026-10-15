@@ -89,6 +89,7 @@ const ARRANGEMENTS := {
 
 const RECIPES := {
 	"kitchen": {
+		"clutter": [["trash", 3.0], ["puddle", 2.0], ["cardboard", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.cream, "floor": "checker" },
 			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.sage, "floor": "terracotta_tile" },

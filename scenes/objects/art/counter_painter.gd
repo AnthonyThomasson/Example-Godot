@@ -4,9 +4,11 @@ extends RefCounted
 ## Painted in the canonical frame (front toward +y): a stone or ceramic top with a backsplash
 ## along the back, a bullnose front edge, optionally a sunken basin with drain and mixer tap, and
 ## an island's seating overhang. Options (`art_opts`, defaulting to ObjectArtConfig.counter_*):
-## `basin` ("none" | "single" | "deep"), `backsplash`, `overhang`, `props`.
+## `basin` ("none" | "single" | "deep"), `backsplash`, `overhang`, `props`, `neon` (a neon under-glow along the front,
+## glowing). Run down (decay.gd): grime, food and grease stains, scratches.
 
 const Props = preload("res://scenes/objects/art/props.gd")
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _TOP_HEIGHT := 3     ## Heights for cast shadows.
 const _SPLASH_HEIGHT := 6
@@ -37,8 +39,15 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 
 	c.bevel(body, 2, 2, t.highlight, t.dark)
 	c.outline(body, t.outline)
-	Props.draw_all(c, opts.get("props", []), Rect2i(0, splash, c.w, c.h - splash).grow(-3))
+	Props.draw_all(c, opts.get("props", []), Rect2i(0, splash, c.w, c.h - splash).grow(-3), Decay.screen_color(opts))
 	c.cast_shadows()
+	Decay.grime(c)
+	Decay.stain(c, Decay.STAIN, 4)
+	Decay.stain(c, Decay.FOOD, 3)
+	Decay.scratches(c, 4)
+	var neon := Decay.neon(opts)
+	if neon.a > 0.0:
+		Decay.neon_front(c, neon, 0.7)
 
 
 ## A sunken basin (inverted bevel, so the lit rim falls in shadow), a drain, and a mixer tap with

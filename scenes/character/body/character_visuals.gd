@@ -9,8 +9,9 @@ extends Node2D
 ## nearest lighting step and drawn rotated to its exact angle. Reads the body radius, pose, rig, held
 ## item and wounds from the character and hand positions/size from the hands sibling. Appearance
 ## only — no item-specific weapon logic lives here (that's each Item's draw_weapon()). Once dead it
-## draws the fallen ragdoll instead. What the character wears (its `outfit()`, Items) overrides the look exports for the parts
-## it names (`_dress`): the headwear, the shirt's sleeves, a vest and its plates' wear, the pants and the footwear.
+## draws the fallen ragdoll instead. How it looks is its style (`Character.style`, `look_seed`, `rank`; `docs/outfits.md`,
+## styles) and what it wears drawn in that style (`_dress`, through `character_style.gd`): the headwear, the shirt and its
+## sleeves, a vest and its plates' wear, the pants and the footwear, and its own skin, hair, gloves, pack and implants.
 
 const BodyPainter = preload("res://scenes/character/body/art/body_painter.gd")
 const HeadPainter = preload("res://scenes/character/body/art/head_painter.gd")
@@ -18,27 +19,9 @@ const HandPainter = preload("res://scenes/character/body/art/hand_painter.gd")
 const LimbPainter = preload("res://scenes/character/body/art/limb_painter.gd")
 const TorsoPainter = preload("res://scenes/character/body/art/torso_painter.gd")
 const VestPainter = preload("res://scenes/character/body/art/vest_painter.gd")
+const StyleArt = preload("res://scenes/character/body/art/style_art.gd")
+const CharacterStyle = preload("res://scenes/character/body/character_style.gd")
 const Rig = preload("res://scenes/character/body/character_rig.gd")  # The joint indices, shared with the ragdoll.
-
-# The look exports: what the character wears where its outfit names nothing. Setting one re-resolves the look (`_dress`).
-@export var body_color: Color = Color(0.32549, 0.65098, 1.0):  ## Shirt color (the team colour a t-shirt or shirt takes).
-	set(v): body_color = v; _worn_revision = -1
-@export var hand_color: Color = Color(0.93, 0.76, 0.6)        ## Hands: skin, or a glove color.
-@export var skin_color: Color = Color(0.93, 0.76, 0.6):       ## Face, ears and forearms.
-	set(v): skin_color = v; _worn_revision = -1
-@export var hair_color: Color = Color(0.36, 0.24, 0.14):      ## Hair, or the headwear's color.
-	set(v): hair_color = v; _worn_revision = -1
-## "short", "long", "buzz", "beanie" or "cap".
-@export_enum("short", "long", "buzz", "beanie", "cap") var hair_style: String = "short":
-	set(v): hair_style = v; _worn_revision = -1
-@export var backpack: bool = false:                           ## Wear a backpack.
-	set(v): backpack = v; _worn_revision = -1
-@export var pack_color: Color = Color(0.3, 0.32, 0.26):       ## Backpack color.
-	set(v): pack_color = v; _worn_revision = -1
-@export var pants_color: Color = Color(0.22, 0.27, 0.4):      ## Pants.
-	set(v): pants_color = v; _worn_revision = -1
-@export var shoe_color: Color = Color(0.16, 0.13, 0.12):      ## Shoes.
-	set(v): shoe_color = v; _worn_revision = -1
 
 @onready var _character := get_parent()   ## Character — body radius, pose, rig, held item.
 @onready var _hands := $"../Hands"        ## Sibling — hand positions / size.
@@ -75,21 +58,27 @@ var redraws := 0  ## How many times the standing body has been drawn (tests read
 var draw_order: Array[StringName] = []  ## What the last living draw painted over the body, in order (tests read it).
 var _art: Array[Texture2D] = []  ## The textures the last draw of the body painted, in order (`drawn_art`).
 
-## The look as drawn: the exports, overridden by the outfit's `look()` for the parts it names. Resolved by `_dress` only when
-## the outfit changes (`Outfit.revision`), so the per-frame cost is one int compared.
+## The look as drawn: the character's style and what it wears in it. Resolved by `_dress` only when the outfit
+## (`Outfit.revision`) or the style (`Character.style`, `look_seed`, `rank`) changes, so the per-frame cost is two ints compared.
 var _worn_revision := -1  ## The outfit revision the look was last resolved for.
+var _style_revision := -1  ## The character's look revision (its style, seed and rank) it was last resolved for.
 var _look_key := 0  ## A hash of the resolved look: joins the redraw key, and repaints a settled fallen body when it changes.
-var _shirt := Color.WHITE  ## Sleeves, the trunk and a long sleeve's forearm.
+var _shirt := Color.WHITE  ## The shoulders, the trunk and a sleeve.
 var _pants := Color.WHITE  ## The thighs and shins.
 var _shoes := Color.WHITE  ## The shoes, and a boot's shaft.
 var _boots := false  ## Boots: a laced shaft up the shin over the shoe.
-var _hair := Color.WHITE  ## The hair, or the headwear's colour.
-var _hair_style := ""  ## The hair style, or the headwear (`cap`, `helmet`) in its place.
-var _forearm := {}  ## The forearm segment's `color`, `material` and painter `opts` (skin, or a long sleeve with its cuff).
-var _shoulder_opts := {}  ## BodyPainter's options (backpack, sleeves, vest).
+var _skin := Color.WHITE  ## The neck, the head's skin and bare arms.
+var _glove := Color.WHITE  ## The fists: gloves, or bare skin.
+var _chrome := Color.WHITE  ## A chrome limb.
+var _shoulder_opts := {}  ## BodyPainter's options (the look's handle, the plates and their wear).
 var _torso_opts := {}  ## TorsoPainter's options by face ("front" / "back" / "side").
 var _head_opts := {}  ## HeadPainter's options.
-var _leg_opts: Array[Dictionary] = []  ## Per side: LimbPainter's options by part ("thigh", "knee", "shin", "shaft", "foot").
+## Per side: each arm segment ("upper", "fore") as `{ color, material, opts }`: a sleeve, bare skin or chrome.
+var _arm_parts: Array[Dictionary] = []
+## Per side: LimbPainter's options by leg part ("thigh", "knee", "shin", "shaft", "foot").
+var _leg_opts: Array[Dictionary] = []
+var _chrome_shin: Array[bool] = [false, false]  ## Per side: the shin is chrome.
+var _hand_parts: Array[Dictionary] = []  ## Per hand: the fist's `color` and painter `opts`.
 
 
 func _ready() -> void:
@@ -106,7 +95,7 @@ func _process(_delta: float) -> void:
 		return
 	_offscreen = false
 	var ragdoll = _character.ragdoll
-	if _character.outfit().revision != _worn_revision and _dress():
+	if (_character.outfit().revision != _worn_revision or _character._look_revision != _style_revision) and _dress():
 		_settled_drawn = false  # A body at rest repaints what it now wears.
 	if ragdoll == null:
 		_rig = _character.rig()
@@ -169,60 +158,81 @@ func drawn_art() -> Array:
 	return _art.duplicate()
 
 
-## Resolve the look from what the character wears over the look exports. Each part the outfit names overrides it: the
-## headwear (`cap`, `helmet`) its hair style and colour; the shirt's sleeves (`short_sleeves` a t-shirt: bare forearms, a round
-## neck; `long_sleeves` a shirt: forearms in the shirt with a cuff, collar and buttons), in its colour or the team colour
-## (`body_color`); a vest (`vest`, `carrier`) with its plates and their wear, rounded to `VestPainter.WEAR_STEPS`; the pants
-## (`jeans`, `tactical`) and the footwear (`shoes`, `boots`) in theirs. Returns whether the resolved look changed.
+## Resolve the look: the character's style (`Character.style`, with its `look_seed` and `rank`) and what it wears drawn in that
+## style (`Outfit.look(style)`), through `character_style.gd`, registered for the painters (`style_art.gd`: they get its handle);
+## then what each part is drawn in: the shirt, pants and shoes (boots: a laced shaft up the shin), the skin, the gloves, each
+## arm's sleeve, bare skin or chrome, a chrome shin, each fist, and the plates' colours and wear, rounded to
+## `VestPainter.WEAR_STEPS`. Returns whether the resolved look changed.
 func _dress() -> bool:
 	var outfit: Outfit = _character.outfit()
 	_worn_revision = outfit.revision
-	var look := outfit.look()
-	var head: Dictionary = look.get("head", {})
-	var body: Dictionary = look.get("body", {})
-	var vest: Dictionary = look.get("vest", {})
-	var pants: Dictionary = look.get("pants", {})
-	var feet: Dictionary = look.get("feet", {})
-	_hair_style = String(head.get("kind", hair_style))
-	_hair = head.get("color", hair_color)
-	_shirt = body.get("color", body_color)
-	_pants = pants.get("color", pants_color)
-	_shoes = feet.get("color", shoe_color)
-	_boots = StringName(feet.get("kind", &"")) == &"boots"
-	var sleeves: String = { &"short_sleeves": "short", &"long_sleeves": "long" }.get(StringName(body.get("kind", &"")), "")
-	var dress := { "backpack": backpack, "pack": pack_color }
-	if sleeves != "":
-		dress["sleeves"] = sleeves
-	if not vest.is_empty():
-		dress["vest"] = StringName(vest["kind"])
-		dress["vest_color"] = vest.get("color", _shirt)
-		for side in ["front", "back"]:
-			var plate: Dictionary = look.get(side + "_plate", {})
-			if not plate.is_empty():
-				dress[side + "_plate"] = plate.get("color", Color.GRAY)
-				dress[side + "_wear"] = ceili((1.0 - clampf(float(plate.get("condition", 1.0)), 0.0, 1.0)) * VestPainter.WEAR_STEPS)
+	_style_revision = _character._look_revision
+	var style: StringName = _character.style
+	var worn := outfit.look(style)
+	var look := CharacterStyle.resolve(style, _character.look_seed, _character.rank, worn)
+	var id := StyleArt.register(look)
+	_shirt = _colour(look["shirt"])
+	_pants = _colour(look["pants_col"])
+	_shoes = _colour(look["feet_col"])
+	_boots = look["feet"] == "boots"
+	_skin = look["skin"]
+	_glove = look["glove"]
+	_chrome = look["chrome"]
+	var dress := { "look": id }
+	for side in ["front", "back"]:
+		var plate: Dictionary = worn.get(side + "_plate", {})
+		if not plate.is_empty():
+			dress[side + "_plate"] = plate.get("color", Color.GRAY)
+			dress[side + "_wear"] = ceili((1.0 - clampf(float(plate.get("condition", 1.0)), 0.0, 1.0)) * VestPainter.WEAR_STEPS)
 	_shoulder_opts = dress
 	_torso_opts = {}
 	for face in ["front", "back", "side"]:
 		_torso_opts[face] = { "face": face, "pants": _pants }.merged(dress)
-	_head_opts = { "skin": skin_color, "hair": _hair, "hair_style": _hair_style }
-	_forearm = { "color": skin_color, "material": "", "opts": _PLAIN }
-	if sleeves == "long":
-		_forearm = { "color": _shirt, "material": "fabric", "opts": { "cuff": true } }
-	var pattern := String(pants.get("kind", ""))
+	_head_opts = { "look": id }
+	_arm_parts = []
 	_leg_opts = []
+	_chrome_shin = []
+	_hand_parts = []
 	for i in 2:
+		_arm_parts.append({ "upper": _arm_part(look, id, i, "upper"), "fore": _arm_part(look, id, i, "fore") })
 		var parts := {}
-		for part in ["thigh", "knee", "shin"]:
-			parts[part] = { "pattern": pattern, "part": part, "side": 1 if i == 0 else -1 } if pattern != "" else _PLAIN
-		parts["shaft"] = { "pattern": "boots", "part": "shaft" }
-		parts["foot"] = { "pattern": "boots", "part": "foot" } if _boots else _PLAIN
+		for part in ["thigh", "knee", "shin", "shaft", "foot"]:
+			parts[part] = { "look": id, "part": part, "side": i }
+		_chrome_shin.append(look["chrome_leg"][i])
+		if _chrome_shin[i]:
+			parts["shin"]["chrome"] = true
 		_leg_opts.append(parts)
-	var key := hash([_shirt, _pants, _shoes, _boots, _forearm, _shoulder_opts, _head_opts, _leg_opts])
+		var chrome: bool = look["chrome_arm"][i]
+		var hand := { "look": id, "side": -1 if i == 0 else 1 }
+		if chrome:
+			hand["chrome"] = true
+		_hand_parts.append({ "color": _chrome if chrome else _glove, "opts": hand })
+	var key := hash([_shirt, _pants, _shoes, _boots, _skin, _arm_parts, _shoulder_opts, _head_opts, _leg_opts, _chrome_shin,
+		_hand_parts])
 	if key == _look_key:
 		return false
 	_look_key = key
 	return true
+
+
+## Side `side`'s arm segment `part` ("upper" to the elbow, "fore" to the fist) in `look` (handle `id`): chrome, a sleeve (a long
+## one down to its cuff at the wrist) or bare skin.
+func _arm_part(look: Dictionary, id: int, side: int, part: String) -> Dictionary:
+	var opts := { "look": id, "part": part, "side": side }
+	if look["chrome_arm"][side]:
+		opts["chrome"] = true
+		return { "color": _chrome, "material": "metal", "opts": opts }
+	var sleeve: Variant = look["sleeves"][side]
+	if sleeve != null and (part == "upper" or look["body"] == "long_sleeves"):
+		opts["cuff"] = part == "fore"
+		return { "color": sleeve, "material": "fabric", "opts": opts }
+	opts["skin"] = true
+	return { "color": _skin, "material": "", "opts": opts }
+
+
+## `value` if it is a colour, else a neutral grey (a part its style names no colour for).
+static func _colour(value: Variant) -> Color:
+	return value if value is Color else Color.GRAY
 
 
 func _draw() -> void:
@@ -384,13 +394,13 @@ func _draw_head(pose, rig, impacts: Array, damage_total: float) -> void:
 	var side := float(HeadPainter.canvas_for(HeadPainter.radius_for(roundi(_character.radius * 2.0 / px)))) * px
 	var size := Vector2(side, side)
 	var angle: float = pose.head_angle - PI * 0.5
-	var tex := PixelArt.render_turned(HeadPainter, size, skin_color, PixelArt.snap_angle(angle), "", _head_opts)
+	var tex := PixelArt.render_turned(HeadPainter, size, _skin, PixelArt.snap_angle(angle), "", _head_opts)
 	var at := _rig_xy(rig, Rig.HEAD)  # The pose's offset, plus the neck's pitch in a crouch.
 	var drop := global_transform.basis_xform_inv(-ArtConfig.light_from.normalized()).normalized() \
 		* ArtConfig.cast_shadow_px * px
 	draw_set_transform(at + drop, angle, Vector2.ONE)
 	draw_texture_rect(tex, Rect2(-size * 0.5, size), false, Color(0.0, 0.0, 0.0, ArtConfig.cast_shadow_darken))
-	_draw_part(tex, size, at, angle, impacts, damage_total, skin_color)
+	_draw_part(tex, size, at, angle, impacts, damage_total, _skin)
 
 
 ## A fist at the given hand (0 = right as drawn, 1 = left), turned to `angle`, dented by the shots that
@@ -398,9 +408,9 @@ func _draw_head(pose, rig, impacts: Array, damage_total: float) -> void:
 func _draw_hand(hand: int, angle: float, impacts: Array, damage_total: float) -> void:
 	var diameter: float = _hands.hand_radius * 2.0 + 2.0
 	var size := Vector2(diameter, diameter)
-	var tex := PixelArt.render_turned(HandPainter, size, hand_color, PixelArt.snap_angle(angle), "",
-		{ "side": -1 if hand == 0 else 1 })
-	_draw_part(tex, size, _hands.hand_position(hand), angle, impacts, damage_total, hand_color)
+	var part: Dictionary = _hand_parts[hand]
+	var tex := PixelArt.render_turned(HandPainter, size, part["color"], PixelArt.snap_angle(angle), "", part["opts"])
+	_draw_part(tex, size, _hands.hand_position(hand), angle, impacts, damage_total, part["color"])
 
 
 ## One round part's art (`tex` spanning `size`) at `at`, turned to `angle`: through its silhouette
@@ -587,7 +597,7 @@ func _fallen_parts(rd) -> Array:
 	var chest: Vector3 = rd.point(Rig.CHEST)
 	var neck := CharacterConfig.body_neck_width
 	parts.append(_keyed(_chain([_seg(chest, head, neck, neck,
-		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, skin_color, "")]), "neck"))
+		(CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r, _skin, "")]), "neck"))
 	parts.append(_head_part(rd))
 	parts.append({ "kind": "trunk", "key": "trunk", "height": (chest.z + rd.point(Rig.PELVIS).z) * 0.5 })
 	return parts
@@ -606,24 +616,25 @@ func _keyed(part: Dictionary, key: String) -> Dictionary:
 	return part
 
 
-## Side `i`'s arm as a limb chain from the joints of `j` (the rig or the ragdoll): the sleeve to the
-## elbow, the bare forearm to the center of the fist.
+## Side `i`'s arm as a limb chain from the joints of `j` (the rig or the ragdoll): the upper arm to the elbow, the forearm
+## to the center of the fist, each a sleeve, bare skin or chrome (`_arm_parts`).
 func _arm_chain(j, i: int) -> Dictionary:
 	var r: float = _character.radius
 	var arm: Array = CharacterConfig.body_arm_widths
 	var shoulder: Vector3 = j.point(Rig.SHOULDER[i])
 	var elbow: Vector3 = j.point(Rig.ELBOW[i])
 	var hand: Vector3 = j.point(Rig.HAND[i])
+	var upper: Dictionary = _arm_parts[i]["upper"]
+	var fore: Dictionary = _arm_parts[i]["fore"]
 	return _chain([
-		_seg(shoulder, elbow, arm[0], arm[1], CharacterConfig.body_upper_arm * r, _shirt, "fabric"),
-		_seg(elbow, hand, arm[1], arm[2], CharacterConfig.body_forearm * r, _forearm["color"], _forearm["material"],
-			_forearm["opts"]),
+		_seg(shoulder, elbow, arm[0], arm[1], CharacterConfig.body_upper_arm * r, upper["color"], upper["material"], upper["opts"]),
+		_seg(elbow, hand, arm[1], arm[2], CharacterConfig.body_forearm * r, fore["color"], fore["material"], fore["opts"]),
 	])
 
 
 ## Side `i`'s leg as a limb chain from the joints of `j`: the thigh, the shin in two parts (the
-## calf is wider than the ankle) and the shoe along the way the foot points; in boots the shin's lower part is the boot's shaft
-## and the boot is a little wider.
+## calf is wider than the ankle, and in chrome below the knee on a chrome leg) and the shoe along the way the foot points; in
+## boots the shin's lower part is the boot's shaft and the boot is a little wider.
 func _leg_chain(j, i: int) -> Dictionary:
 	var r: float = _character.radius
 	var leg: Array = CharacterConfig.body_leg_widths
@@ -636,6 +647,8 @@ func _leg_chain(j, i: int) -> Dictionary:
 	var foot := CharacterConfig.body_foot * r
 	var shin := CharacterConfig.body_shin * r
 	var opts: Dictionary = _leg_opts[i]
+	var shin_col := _chrome if _chrome_shin[i] else _pants
+	var shin_finish := "metal" if _chrome_shin[i] else "fabric"
 	var segs := [
 		_seg(hip, knee, leg[0], leg[1], CharacterConfig.body_thigh * r, _pants, "fabric", opts["thigh"]),
 		_seg(knee, calf, leg[1], leg[2], shin * 0.35, _pants, "fabric", opts["knee"]),
@@ -645,11 +658,11 @@ func _leg_chain(j, i: int) -> Dictionary:
 	if _boots:
 		var top := knee.lerp(ankle, BOOT_TOP)
 		var top_width: float = lerpf(leg[2], leg[3], (BOOT_TOP - 0.35) / 0.65) + BOOT_GROW
-		segs.append(_seg(calf, top, leg[2], top_width - BOOT_GROW, shin * (BOOT_TOP - 0.35), _pants, "fabric", opts["shin"]))
+		segs.append(_seg(calf, top, leg[2], top_width - BOOT_GROW, shin * (BOOT_TOP - 0.35), shin_col, shin_finish, opts["shin"]))
 		segs.append(_seg(top, ankle, top_width, leg[3] + BOOT_GROW, shin * (1.0 - BOOT_TOP), _shoes, "", opts["shaft"]))
 		segs.append(_seg(heel, tip, shoe[0] + BOOT_GROW, shoe[1] + BOOT_GROW, foot, _shoes, "", opts["foot"]))
 	else:
-		segs.append(_seg(calf, ankle, leg[2], leg[3], shin * 0.65, _pants, "fabric", opts["shin"]))
+		segs.append(_seg(calf, ankle, leg[2], leg[3], shin * 0.65, shin_col, shin_finish, opts["shin"]))
 		segs.append(_seg(heel, tip, shoe[0], shoe[1], foot, _shoes, "", opts["foot"]))
 	return _chain(segs)
 
@@ -980,8 +993,8 @@ func _draw_fallen_hand(hand: Dictionary) -> void:
 	var angle := flat.angle() - PI * 0.5 if flat.length() > 0.5 else 0.0
 	var diameter: float = _hands.hand_radius * 2.0 + 2.0
 	var size := Vector2(diameter, diameter)
-	var tex := PixelArt.render_turned(HandPainter, size, hand_color, PixelArt.snap_angle(angle), "",
-		{ "side": -1 if hand["side"] == 0 else 1 })
+	var part: Dictionary = _hand_parts[hand["side"]]
+	var tex := PixelArt.render_turned(HandPainter, size, part["color"], PixelArt.snap_angle(angle), "", part["opts"])
 	_art.append(tex)
 	draw_set_transform(_flat(at), angle, Vector2.ONE)
 	draw_texture_rect(tex, Rect2(-size * 0.5, size), false)
@@ -998,7 +1011,7 @@ func _draw_fallen_head(head: Dictionary) -> void:
 	var neck: Vector3 = head["neck"]
 	var look := _flat(face) + _flat(neck).normalized() * absf(face.z)
 	var angle := look.angle() - PI * 0.5 if look.length() > 0.01 else 0.0
-	var tex := PixelArt.render_turned(HeadPainter, size, skin_color, PixelArt.snap_angle(angle), "", _head_opts)
+	var tex := PixelArt.render_turned(HeadPainter, size, _skin, PixelArt.snap_angle(angle), "", _head_opts)
 	_art.append(tex)
 	draw_set_transform(_flat(head["at"]), angle, Vector2.ONE)
 	draw_texture_rect(tex, Rect2(-size * 0.5, size), false)

@@ -4,6 +4,8 @@ extends RefCounted
 ## frame (seat front toward +y): a five-star base with casters peeking out, a rounded padded seat,
 ## armrests at its sides and a curved mesh backrest. No options.
 
+const SofaPainter = preload("res://scenes/objects/art/sofa_painter.gd")
+
 const _BASE_HEIGHT := 1  ## Heights for cast shadows, floor-up.
 const _SEAT_HEIGHT := 3
 const _ARM_HEIGHT := 5
@@ -44,3 +46,4 @@ static func paint(c: PixelCanvas, base: Color, material: String, _opts: Dictiona
 	c.bevel(back, 1, 1, t.light, t.outline)
 	c.outline(back, t.outline)
 	c.cast_shadows()
+	SofaPainter.upholstery(c)

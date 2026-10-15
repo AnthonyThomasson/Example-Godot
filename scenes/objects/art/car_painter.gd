@@ -3,7 +3,10 @@ extends RefCounted
 ## Top-down pixel-art CAR painter (Objects domain, private). Painted in the canonical frame (nose
 ## toward +y): tyres peeking out at the four corners, a glossy rounded body with hood creases and
 ## a gloss highlight, headlights and a grille up front and tail lights behind, a tinted windscreen
-## and rear window around a raised roof, door seams with handles, and wing mirrors. No options.
+## and rear window around a raised roof, door seams with handles, and wing mirrors. A beater: its paint gone to rust-brown
+## (ObjectArtConfig.car_beater), a primer-grey door, rust, scratches and grime (decay.gd). No options.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _TYRE_HEIGHT := 2  ## Heights for cast shadows, floor-up.
 const _BODY_HEIGHT := 6
@@ -11,7 +14,8 @@ const _ROOF_HEIGHT := 10
 
 
 ## Paint a car onto `c` in `base` paint, nose toward +y.
-static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Dictionary) -> void:
+static func paint(c: PixelCanvas, paint_color: Color, _material: String, _opts: Dictionary) -> void:
+	var base := paint_color.lerp(ObjectArtConfig.car_beater_color, ObjectArtConfig.car_beater)
 	var t := PixelCanvas.tones(base)
 	var tyre := ObjectArtConfig.car_tyre_color
 	var tyre_w := maxi(4, roundi(c.w * 0.1))
@@ -66,3 +70,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Diction
 		c.line(Vector2i(x, roof_rect.position.y + 3), Vector2i(x, roof_rect.end.y - 4), glass, _BODY_HEIGHT)
 	c.outline(body, t.outline)
 	c.cast_shadows()
+	Decay.grime(c)
+	Decay.rust(c, 30)
+	Decay.primer(c)
+	Decay.scratches(c, 10)

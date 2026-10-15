@@ -3,8 +3,10 @@ extends RefCounted
 ## Top-down pixel-art RUG painter (Objects domain, private). A woven rug: a contrasting border with
 ## a pale inner line and a stitched band, a patterned field (a stepped central medallion with
 ## corner pieces, or stripes) and fringe at both short ends. A `plush` mat: rounded, densely tufted
-## with a darker rim. Options (`art_opts`, defaulting to ObjectArtConfig.rug_*): `pattern`
-## ("medallion" | "stripes" | "plush").
+## with a darker rim. Run down (decay.gd): grime, stains, moth holes through to the floor. Options (`art_opts`, defaulting
+## to ObjectArtConfig.rug_*): `pattern` ("medallion" | "stripes" | "plush").
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 
 ## Paint a rug onto `c` in `base` fabric.
@@ -12,6 +14,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	var pattern := String(opts.get("pattern", ObjectArtConfig.rug_pattern))
 	if pattern == "plush":
 		_plush(c, base)
+		_worn(c)
 		return
 	var along_x := c.w >= c.h
 	var fringe := clampi(roundi(maxi(c.w, c.h) * 0.025), 2, 5)
@@ -46,6 +49,15 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	else:
 		_medallion(c, field_rect, base, border_col)
 	_fringe(c, body_rect, fringe, along_x)
+	_worn(c)
+
+
+## The run-down finish of a rug: grime, stains, moth holes.
+static func _worn(c: PixelCanvas) -> void:
+	Decay.grime(c)
+	for _i in 3:
+		Decay.stain(c, Decay.STAIN, 6)
+	Decay.holes(c, 3)
 
 
 ## A stepped diamond medallion in the middle of the field, nested in three tones, plus quarter

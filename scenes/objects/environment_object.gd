@@ -7,7 +7,15 @@ extends RigidBody2D
 ## exposes the two contracts the rest of the game talks to it through, and nothing else:
 ##   • get_surface() / take_hit(HitInfo)  — the "hittable" contract (Projectile, melee)
 ##   • apply_impulse(Vector2, at) / get_mass() — the "pushable" contract (blasts, a character's push, legs, punch, kick)
+##   • get_lights() — the lights it gives (object_lights.gd), which the Lighting domain reads duck-typed
+## A solid piece also casts a shadow: a LightOccluder2D over its footprint (on General's `LightMasks`), a child
+## so it follows a shove, built here like its collider.
 ## The force and deformation MATH lives in the Physics domain; this file only wires it up.
+
+const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
+const ObjectLights = preload("res://scenes/objects/object_lights.gd")
+## The sides of a round piece's shadow footprint.
+const OCCLUDER_SIDES := 12
 
 @export var shape_type: String = "circle"  ## "circle", "square", or "rect".
 @export var object_name: String = "Object"  ## Label drawn on the object.
@@ -16,6 +24,9 @@ extends RigidBody2D
 @export var text_color: Color = Color.WHITE  ## Label color.
 ## Non-solid objects (rugs, mats) get no collider and draw beneath everything else.
 @export var solid: bool = true
+## A solid piece that never moves (a streetlight's post): frozen static, so no shove, kick, round or blast moves or turns it;
+## it is still struck, dented and throws debris. Ignored on a non-solid piece (decor is frozen anyway).
+@export var anchored: bool = false
 ## Descriptive material tag (e.g. "wood", "fabric", "metal", "glass"). "wood"/"fabric"
 ## also drive the room-palette recolor. Named `object_material` to avoid colliding with
 ## CanvasItem's built-in `material`.
@@ -43,6 +54,7 @@ var _deformable: Deformable  ## Damage dents/chunks; read by the visuals.
 var _smear: BloodSmear  ## Drags blood out of a puddle as the piece slides through it (solid pieces only).
 var _collider_rebuild_queued := false  ## A deferred `_rebuild_collider` is already waiting.
 var _surface_id := -1  ## BloodSurface registration of a non-solid piece (a rug soaks blood up).
+var _lights: Array = []  ## What `get_lights()` declares (worked out once its visuals are ready).
 
 
 func _ready() -> void:
@@ -54,18 +66,28 @@ func _ready() -> void:
 	add_child(_deformable)
 	_deformable.changed.connect(_on_deformable_changed)
 
+	# The visuals (a child, ready first) have built their light-source overlay, which a light dims with.
+	_lights = ObjectLights.of(self)
 	if solid:
 		_build_collider()
+		_build_occluder()
 		_smear = BloodSmear.new()
 		add_child(_smear)
 		_smear.set_footprint(Deformation.shape_polygon(shape_type, size, _deformable.impacts))
+		if anchored:
+			# Frozen static: the physics server gives it no inverse mass, so every impulse (a push, a kick, a blast) is
+			# ignored and a body striking it stops as at a wall; queries and the hittable contract still find it.
+			freeze_mode = RigidBody2D.FREEZE_MODE_STATIC
+			freeze = true
 	else:
 		# Non-solid decor never moves or collides: freeze it (a shapeless RigidBody2D would
 		# be invalid) and draw it beneath everything else.
 		freeze = true
 		z_index = ObjectArtConfig.rug_z_index
-		# Never moves, so its footprint is fixed: blood that reaches it sinks in (Physics blood).
-		_surface_id = BloodSurface.register(Rect2(global_position - size / 2.0, size), _no_groove, true)
+		# Never moves, so its footprint is fixed: blood that reaches cloth (a rug, a mat) sinks in (Physics blood); it runs
+		# past the rest of the walk-over decor (litter, cables, a puddle, a neon tube).
+		if object_material == "fabric":
+			_surface_id = BloodSurface.register(Rect2(global_position - size / 2.0, size), _no_groove, true)
 
 
 func _exit_tree() -> void:
@@ -80,9 +102,10 @@ func _no_groove(_at: Vector2, _half_width: float) -> float:
 # --- Hittable contract (read/hit by projectiles, melee, …) -----------------------------
 
 ## The object's ballistic surface: how much it covers, how hard it is to shoot through,
-## its material tag and its color (for debris styling). Read by the Projectile System.
+## its material tag and its color (for debris styling: the colour its art is drawn in). Read by the Projectile System.
 func get_surface() -> Dictionary:
-	return { "coverage": coverage, "penetration": penetration, "material": object_material, "color": color }
+	return { "coverage": coverage, "penetration": penetration, "material": object_material,
+		"color": ObjectArt.drawn_color(color) if art != "" else color }
 
 
 ## The hit marks on this object (dicts with `pos`, `depth`, `blood`, …), oldest first.
@@ -91,11 +114,20 @@ func hit_marks() -> Array:
 
 
 ## Take a hit: shove along the impact at the contact point (so an off-center hit spins the
-## object), record the deformation, and spray debris. The striker fills in a HitInfo.
+## object; an anchored piece is not shoved), record the deformation, and spray debris. The striker fills in a HitInfo.
 func take_hit(hit: HitInfo) -> void:
-	_knockback.apply_impulse(Physics.impact_impulse(hit), hit.position)
+	if not anchored:
+		_knockback.apply_impulse(Physics.impact_impulse(hit), hit.position)
 	_deformable.record(hit)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
+
+
+# --- Lights (read duck-typed by the Lighting domain) -----------------------------------
+
+## The lights this piece gives, as plain dicts in its own frame (`offset`, `turn`, `colour`, `energy`, `radius`, `shape`,
+## `rhythm`, `room_light`, `street`, `glow`: see object_lights.gd); empty for a piece that gives none.
+func get_lights() -> Array:
+	return _lights
 
 
 # --- Interactable contract (read by the Interaction domain) ----------------------------
@@ -109,7 +141,7 @@ func get_interactions() -> Array:
 # --- Pushable contract (interface 5: blasts, a character's walking push, legs, punch, kick) ---
 # Both halves are served by RigidBody2D's native methods: apply_impulse(v, at) (`at` the contact offset from the
 # origin, so a shove off the centre turns the piece; omitted = a central shove) and get_mass() (returns `mass`,
-# which Knockback sets from `weight`). Nothing to add.
+# which Knockback sets from `weight`). Nothing to add: an anchored piece is frozen static, which the engine never moves.
 
 
 # --- Collider (built in code; rebuilt to follow the deformed silhouette) ---------------
@@ -138,6 +170,23 @@ func _rebuild_collider() -> void:
 		var col := CollisionShape2D.new()
 		col.shape = shape
 		add_child(col)
+
+
+## The piece's shadow: an occluder over its undented footprint (its rect, or a circle as a `OCCLUDER_SIDES`-gon: a shadow
+## needs no more, and every edge is drawn into each light's shadow map; dents are too small to show in one). A piece that
+## gives light is on `LightMasks.EMITTER`, so its own light, sitting inside it, is never shut in; the rest on `FURNITURE`.
+## None while `LightMasks.shadows` is off.
+func _build_occluder() -> void:
+	var poly := PackedVector2Array()
+	if shape_type == "circle":
+		for k in OCCLUDER_SIDES:
+			poly.append(Vector2.RIGHT.rotated(TAU * k / OCCLUDER_SIDES) * size.x * 0.5)
+	else:
+		var h := size * 0.5
+		poly = PackedVector2Array([-h, Vector2(h.x, -h.y), h, Vector2(-h.x, h.y)])
+	var occ := LightMasks.occluder(poly, LightMasks.EMITTER if not _lights.is_empty() else LightMasks.FURNITURE)
+	if occ != null:
+		add_child(occ)
 
 
 ## Build the initial collider from the object's primitive shape.

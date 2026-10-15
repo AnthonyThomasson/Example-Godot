@@ -11,6 +11,7 @@ const ARRANGEMENTS := {}
 
 const RECIPES := {
 	"hallway": {
+		"clutter": [["trash", 2.0], ["cardboard", 2.0], ["puddle", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.terracotta, "floor": "ash_planks" },
 			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.sage, "floor": "walnut_planks" },

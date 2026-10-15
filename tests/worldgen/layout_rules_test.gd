@@ -2,14 +2,16 @@ extends GameTest
 
 ## The layout validator (LayoutRules.check) accepts a logical layout and reports each kind of illogical one: a
 ## bathroom or bedroom front door, a front door off the south wall, a bathroom with two doors or joined to the
-## kitchen, a pass-through bedroom, a room nothing reaches, an exit in a bathroom. That every generated floorplan
-## passes it (and has at most one exit) is checked per house in house_doorways_connected.
+## kitchen, a pass-through bedroom, a room nothing reaches, an exit in a bathroom; and it knows ticket #61's room types
+## (R11): a front door into a security vestibule is logical, one into a netrunner den is not, and a den walked through
+## to reach another room is a pass-through. That every generated floorplan passes it (and has at most one exit) is
+## checked per house in house_doorways_connected.
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "The layout rules reject illogical layouts",
-		"description": "LayoutRules.check finds nothing in a logical layout and reports each kind of illogical one (front door in a bathroom or bedroom or off the south wall, bathrooms that are not dead ends, pass-through rooms, unreachable rooms, a bathroom exit).",
+		"description": "LayoutRules.check finds nothing in a logical layout and reports each kind of illogical one (front door in a bathroom or bedroom or off the south wall, bathrooms that are not dead ends, pass-through rooms, unreachable rooms, a bathroom exit), and applies the new room types' rules (vestibule front door, den a private dead end).",
 		"tags": ["worldgen", "house", "layout", "doorway"],
 		"timeout": 5.0,
 	}
@@ -99,6 +101,30 @@ func _check_validator(t: TestContext) -> void:
 	t.check(LayoutRules.check(rooms, doors).is_empty(), "a kitchen with a back door is logical")
 
 
+## The new room types' rules (R11): a security vestibule may carry the front door; a netrunner den may not, and is a
+## private dead end that is never walked through.
+func _check_new_room_types(t: TestContext) -> void:
+	var vestibule := [_room("vestibule", "security_vestibule", Rect2(0, 0, 200, 200))]
+	var problems := LayoutRules.check(vestibule, [_door(Vector2(100, 200), ["vestibule"], true)])
+	t.check(problems.is_empty(), "a front door into a security vestibule is logical (%s)" % "; ".join(problems))
+
+	var den := [_room("den", "netrunner_den", Rect2(0, 0, 300, 300))]
+	t.check(_reports(LayoutRules.check(den, [_door(Vector2(150, 300), ["den"], true)]), "front door opens into"), "a netrunner den front door is reported")
+
+	var rooms := [
+		_room("living", "living_room", Rect2(0, 300, 400, 300)),
+		_room("den", "netrunner_den", Rect2(0, 0, 400, 300)),
+		_room("kitchen", "kitchen", Rect2(400, 0, 200, 300)),
+	]
+	var doors := [
+		_door(Vector2(200, 600), ["living"], true),
+		_door(Vector2(200, 300), ["living", "den"]),
+		_door(Vector2(400, 150), ["den", "kitchen"]),
+	]
+	t.check(_reports(LayoutRules.check(rooms, doors), "pass-through"), "a netrunner den you must cross to reach another room is reported")
+
+
 func run(t: TestContext) -> void:
 	_check_validator(t)
+	_check_new_room_types(t)
 	await t.frames(1)

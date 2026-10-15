@@ -1,6 +1,6 @@
 ---
 name: domain-testing
-description: Deep implementation detail for the Testing domain (scenes/testing/ + tests/) — game tests that declare a world (arena, hand-laid room layout or generated house), the actors and objects in it and which behaviours are on, run it, and assert what happened; plus the in-game test browser/runner and the headless CLI runner (tools/run_tests.sh). Use when writing or debugging a test, adding a behaviour switch, running the suite, or editing scenes/testing/. Any engine error/warning during a test fails it. Complements the `architecture` skill (interface 13).
+description: Deep implementation detail for the Testing domain (scenes/testing/ + tests/) — game tests that declare a world (arena, hand-laid room layout or generated house), the actors and objects in it and which behaviours are on, run it, and assert what happened; plus the in-game test browser/runner and the headless CLI runner (tools/run_tests.sh). Use when writing or debugging a test, adding a behaviour switch, running the suite, or editing scenes/testing/. Any engine error/warning during a test fails it. Complements the `architecture` skill (interface 13; the world is lit through interface 20).
 ---
 
 # Testing domain (`scenes/testing/`, cases in `tests/`)
@@ -69,10 +69,10 @@ and controller contract, EventBus and character signals) and never reaches into 
   `--name=value` form.
 - **`--changed`:** the wrapper maps each changed file (`git diff HEAD` plus untracked) to a domain and
   runs those domains plus the ones that compose them (its `affected()` table, from the architecture
-  dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art, general, audio and testing
+  dependency graph) in **one** process; `main.gd`, root scenes, `project.godot`, worldgen, art, general, audio, lighting and testing
   run everything, and `scenes/testing/` / the Von stub add `--self-test`. **An edited test file
   (`tests/<domain>/[<topic>/]<name>_test.gd`) runs only that test** (`--id=<domain>/[<topic>/]<name>`; it can only change its own
-  result), unless its domain is already running; `tests/_ai` and `tests/_audio` helpers run that domain,
+  result), unless its domain is already running; `tests/_ai`, `tests/_audio` and `tests/_lighting` helpers run that domain,
   `tests/_vehicle` runs `vehicle`, `audio` and `general` (its users), `tests/_perf` runs the `perf` domain, `tests/_harness` the self-tests, and an unknown helper folder everything.
   `GAME_TEST_CHANGED_FILES` (newline-separated paths) stands in for git's view of the changes, which is how
   `tools/test_log_gate.py` tests this mapping.
@@ -234,7 +234,7 @@ selector. They are ordinary tests that load other domains, so they live apart fr
 
 | Test | Load |
 |---|---|
-| `perf/match_5v5_stress` | the whole-match case: a generated house, five defenders and five invaders placed by `MatchSpawner`, default loadouts, debug overlays off as in Main, nav re-baker, blood, debris, sound and radio on, scripted Von |
+| `perf/match_5v5_stress` | the whole-match case: a generated house (pinned to the largest plan, `garage_home`, so a catalogue change never shrinks the house it fights in), five defenders and five invaders placed by `MatchSpawner`, default loadouts, debug overlays off as in Main, nav re-baker, blood, debris, sound and radio on, scripted Von |
 | `perf/match_10v10_stress` | the same with ten a side: the largest match the game means to carry, held to the same standard |
 | `perf/npc_crowd_stress` | twelve scripted-Von NPCs sensing, deciding and shooting in one open furnished arena (everyone sees everyone: the decision snapshot's worst case) |
 | `perf/automatic_fire_stress` | SMGs and rifles on the trigger plus pistols clicking into furniture: one run covers the single-shot and the automatic path |
@@ -419,8 +419,9 @@ asserts a behaviour the AI does not show yet is written first, left red and tagg
 
 ## Outfit tests (tag `outfit`)
 
-The rules are `docs/outfits.md` (O1 to O14, each with its tests named under it); `tools/run_tests.sh outfit` runs them. They are spread by domain
-(`tests/character/hit_zone_by_bullet_height`, `outfit_weight_slows`, `outfit_art`; `tests/projectile/helmet_*`, `soft_vest_*`, `plate_*`, `armour_stop_feedback`,
+The rules are `docs/outfits.md` (O1 to O15, each with its tests named under it); `tools/run_tests.sh outfit` runs them. They are spread by domain
+(`tests/character/hit_zone_by_bullet_height`, `outfit_weight_slows`, `outfit_art`, and the styles' `style_look` (tag `style`, with
+`tests/general/match_styles`); `tests/projectile/helmet_*`, `soft_vest_*`, `plate_*`, `armour_stop_feedback`,
 `frag_blast_cut_by_vest`; `tests/items/loadout_outfit`; `tests/ui/setup_menu_config`, `debug_panel_outfit`, `inspector_outfit`), all through
 `tests/_outfit/outfit_probe.gd` (`const OutfitProbe := preload(...)`, not `Outfit`: that is the Items class): `wear` / `view` / `condition` (behind `has_api`),
 `pin_height` (pins `BallisticsConfig.bullet_height`; `STAND` / `CROUCH` are a height in each zone), the spec's numbers (`ZONE_DAMAGE`, `PLATED_KIT`, `PLAIN_CLOTHES`)
@@ -455,6 +456,18 @@ line), `hand_lob_clear` (that lob from the thrower's hand, `Character.throw_rele
 the teleport made a frame later, or the physics step puts a free body back), and the four `bang_fallback_*` tests run a stack of two at the Terrace house's back door through
 `tests/_ai/bang_probe.gd` (`const Bang := preload(...)`: `rules` SEARCH > STUN ENTRY > that doorway, `stack`, `arm`, `radio_mate` for a teammate that is a puppet radioing its part of
 the stack, `note_acts` / `took`).
+
+## Lighting tests (domain `lighting`, `tests/lighting/`)
+
+The rules are `docs/lighting.md` (L1 to L10, each with its tests named under it); `tools/run_tests.sh --domain=lighting` runs the
+nine. The shared helper is `tests/_lighting/lighting_probe.gd` (`const Probe := preload(...)`; not a test): the plan's numbers as
+consts (`AMBIENT`, `ITEM_LIGHTS` 15, `PER_FLOOR` 12, `FLASH_NEAR`), every Lighting read looked up by name at run time
+(`script_of`, `config_value`, `require_lighting`: the test world's `WorldLighting` in the group `world_lighting` with its four reads),
+the light-giving kinds told apart by the pieces' public fields (`light_kind`), a piece's `declared` lights / `lights_of` /
+`dropped_of`, the floors and what reaches them (`floors`, `floor_mask`, `light_box`: a light's texture box, `reaches`), and the
+occluders (`casting`, `holds`, `occluders_at`, `own_occluders`). Everything else is read off plain Godot nodes (LightOccluder2D,
+PointLight2D, CanvasModulate, DirectionalLight2D, the overlays' `material`). `rhythms_seeded_per_piece` builds its room twice, each
+in a `SubViewport` with a World2D of its own, and lights each with `WorldLighting.light(root, seed)` itself.
 
 ## Vehicle tests (domain `vehicle`, `tests/vehicle/`)
 
@@ -538,6 +551,7 @@ Statics are restored after every test (`TestWorld.restore`). Current switches:
 | `physics.smear` | `BloodConfig.smear_enabled`. |
 | `physics.debris` | `PhysicsConfig.debris_enabled`. |
 | `physics.hit_particles` | `PhysicsConfig.hit_particles_enabled`. |
+| `lighting.enabled` | `LightingConfig.enabled` and General's `LightMasks.shadows`: the dusk lighting (ambient, sky, piece lights and fixtures, flashes) and every occluder (walls, pieces, characters). The test world is lit like a match by default; a sandbox that lights itself turns it off. |
 | `projectile.flyover` | `BallisticsConfig.cover_flyover_scale`, 0 when off. A test that needs a chosen outcome instead pins `BallisticsConfig.bullet_height` (0–100) with `set_static`. |
 
 To add a switch, add a row. When the behaviour has no knob yet, add a master `static var` to that
@@ -551,7 +565,7 @@ domain's config holder, guarded at its one spawn point (the way `BloodConfig.ena
 | `game_test.gd` (`GameTest`) | Base class. |
 | `test_setup.gd` (`TestSetup`) | The declarative builder. |
 | `test_context.gd` (`TestContext`, an **Object**) | Waits, lookup, event log, assertions, verdict (`conclude`: PASS / FAIL / TIMEOUT / SKIPPED, and GAP for a `gap`-tagged test that failed as expected). The runner frees it at close, which discards any test coroutine still parked on it. |
-| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. Vehicles (`TestSetup.vehicle`) are placed after the nav wait and before the actors, followed by one more
+| `test_world.gd` | Builds a TestSetup into a sub-tree: statics and switches first, then the house, layout or arena, objects, nav plus updater, the dusk lighting (`WorldLighting.light(self, seed, rooms)`, interface 20; none with `lighting.enabled` off), two physics frames (walls solid, navmesh live), then a wait (real time, at most `NAV_SYNC_MS`) until the shared nav map, and the Navigation domain's steering map, answer with this world's regions, actors (controller injected before `_ready` — `rooms` and the house's `openings` — positioned before they join the tree so one never overlaps origin furniture for a frame), then world switches. Vehicles (`TestSetup.vehicle`) are placed after the nav wait and before the actors, followed by one more
 physics frame so they are in the space. `build` is a coroutine. Also `restore()` and `set_overlay()`. |
 | `arena_builder.gd` | The walled arena via `FloorFactory` / `WallFactory` + `WorldGen.wall_style()`, annotated with `WorldGen.annotate_layout`. |
 | `layout_builder.gd` | A hand-laid layout: per-room floors and walls, doorways cut with `WallFactory.openings_for`, annotated with `WorldGen.annotate_layout` like a house. |

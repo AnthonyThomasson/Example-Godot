@@ -3,9 +3,11 @@ extends RefCounted
 ## Top-down pixel-art FLOOR tile painter (Objects domain, private). Paints one seamless tile that
 ## the floor visuals repeat across a room: staggered wooden `planks`, basket-weave `parquet`,
 ## glazed `tiles`, a two-tone `checker`, small `mosaic` tiles, speckled `carpet` pile or `concrete`
-## slabs with joints and hairline cracks. Every pattern's period divides the tile, and grain and
-## cracks wrap at its edges, so repeats never show a seam. Options (`art_opts`): `pattern`, `alt`
-## (the checker's second color); sizes come from ObjectArtConfig.floor_*.
+## slabs with joints. Every pattern's period divides the tile, and grain wraps at its edges, so repeats never show a seam.
+## Run down, but only evenly: dirt packed into the seams and a fine grime of single pixels over the whole tile, nothing big
+## enough to show the tile's repeat; a floor's damage (broken planks, missing tiles, cracks, stains, oil) is placed in the
+## world over it instead (wear_painter.gd). Options (`art_opts`): `pattern`, `alt` (the checker's second color); sizes come
+## from ObjectArtConfig.floor_*.
 
 
 ## The tile size (world px) for the `pattern` in `opts`.
@@ -90,6 +92,34 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 			_carpet(c, base)
 		"concrete":
 			_concrete(c, base, t)
+	_grimy(c, String(opts.get("pattern", "planks")))
+
+
+## The even dirt of a run-down floor: packed into the seams (between plank rows, round tiles) and a fine grime of single
+## darker and paler pixels; every mark is one pixel and wraps, so the repeats never show one twice.
+static func _grimy(c: PixelCanvas, pattern: String) -> void:
+	match pattern:
+		"planks":
+			var row_h := maxi(3, roundi(ObjectArtConfig.floor_plank_px / ArtConfig.pixel_size))
+			for y in range(0, c.h, row_h):
+				for x in c.w:
+					_dirty(c, x, y, ObjectArtConfig.floor_seam_dirt, 0.6)
+		"tiles", "checker", "mosaic":
+			var cell := maxi(3, roundi(ObjectArtConfig.floor_mosaic_px / ArtConfig.pixel_size)) if pattern == "mosaic" \
+					else maxi(4, roundi(ObjectArtConfig.floor_tile_px / ArtConfig.pixel_size))
+			for y in c.h:
+				for x in c.w:
+					if x % cell == 0 or y % cell == 0:
+						_dirty(c, x, y, ObjectArtConfig.floor_grout_dirt, 0.7)
+	for _i in int(c.w * c.h * ObjectArtConfig.floor_grime_density):
+		var dark := c.rng.randf() < 0.75
+		_dirty(c, c.rng.randi_range(0, c.w - 1), c.rng.randi_range(0, c.h - 1),
+				ObjectArtConfig.floor_grime_dark if dark else ObjectArtConfig.floor_grime_pale, c.rng.randf_range(0.08, 0.2))
+
+
+## Blend the pixel at (x, y) `amount` toward `col`.
+static func _dirty(c: PixelCanvas, x: int, y: int, col: Color, amount: float) -> void:
+	c.img.set_pixel(x, y, c.at(x, y).lerp(col, amount))
 
 
 ## Rows of planks with per-plank tones, wrapped grain, seams between rows and staggered butt joints.
@@ -182,21 +212,10 @@ static func _carpet(c: PixelCanvas, base: Color) -> void:
 	c.speckle(r, base, 0.25, 0.1)
 
 
-## Concrete: speckle, a few faint stains, a control joint along the tile's top and left edges
-## (a slab grid once repeated) and a hairline crack that wraps at the edges.
+## Concrete: speckle and a control joint along the tile's top and left edges (a slab grid once repeated); its cracks and
+## stains are placed in the world (they would repeat with the tile).
 static func _concrete(c: PixelCanvas, base: Color, t: Dictionary) -> void:
 	var r := Rect2i(0, 0, c.w, c.h)
 	c.speckle(r, base, 0.25, 0.05)
-	for _i in 3:
-		var o := Vector2i(c.rng.randi_range(8, c.w - 9), c.rng.randi_range(8, c.h - 9))
-		var stain := base.darkened(0.04)
-		for y in range(-6, 7):
-			for x in range(-9, 10):
-				if (x * x) / 81.0 + (y * y) / 36.0 <= 1.0 and c.rng.randf() < 0.7:
-					c.px(o.x + x, o.y + y, stain)
 	c.line(Vector2i(0, 0), Vector2i(c.w - 1, 0), t.dark)
 	c.line(Vector2i(0, 0), Vector2i(0, c.h - 1), t.dark)
-	var p := Vector2i(c.rng.randi_range(0, c.w - 1), c.rng.randi_range(0, c.h - 1))
-	for _s in int(c.w / 2.0):
-		c.px(posmod(p.x, c.w), posmod(p.y, c.h), t.dark)
-		p += Vector2i(1, c.rng.randi_range(-1, 1))

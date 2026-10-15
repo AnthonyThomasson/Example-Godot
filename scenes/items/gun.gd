@@ -3,8 +3,9 @@ class_name GunItem extends Item
 ## Items domain: a gun held in the right hand: the logic every firearm shares, driven by its row in `GunConfig`
 ## (damage, fire rate, penetration, muzzle speed, spread, recoil, whether it is automatic and whether its
 ## barrel is too long to use against a wall). F still jabs with the weapon hand (melee); left-click fires a
-## projectile and ejects a casing. A subclass supplies only its look and how it is held (`PistolItem`,
-## `SmgItem`, `RifleItem`): the gun id, the painters and sizes, where the hand grips it and the stances.
+## projectile and ejects a casing. It is drawn in its weapon style (`Item.style`) by the row's look (`GunConfig.look`: the
+## painter and colours). A subclass supplies only its sizes and how it is held (`PistolItem`, `SmgItem`, `RifleItem`): the gun
+## id, the art's footprints, where the hand grips it and the stances.
 ## Items reach into the Projectile System in two places: here, via ProjectileSpawner / CasingSpawner (a
 ## shot's `hit` is forwarded back to the character's `report_shot` for the HUD), and ThrownGrenade, via
 ## `Explosion.frag` / `Explosion.stun`.
@@ -24,8 +25,6 @@ const STRIKE_SHORT := 5.0
 
 ## The gun's id: its `GunConfig` row and the kind of magazine it takes (`Magazine.gun`). Set by the subclass.
 var gun: StringName = &""
-## Art color (the metal).
-var color := Color(0.3, 0.3, 0.3)
 ## The magazine it is loaded with (null = unloaded); every shot spends one of its rounds.
 var magazine: Magazine
 
@@ -34,17 +33,7 @@ var magazine: Magazine
 var _cooldown := 0.0
 
 
-# --- What a subclass supplies: look and hold ---------------------------------------------------
-
-## Painter for the gun as held (muzzle toward +y, the grip at the back): a `static paint(canvas, base, material, opts)`.
-func painter() -> Script:
-	return null
-
-
-## Painter for the gun lying flat on its side once dropped (it takes `opts.flip`).
-func flat_painter() -> Script:
-	return null
-
+# --- What a subclass supplies: sizes and hold --------------------------------------------------
 
 ## The held art's footprint (px): width across, length from butt to muzzle.
 func art_size() -> Vector2:
@@ -96,6 +85,11 @@ func damage() -> float:
 ## Seconds between rounds.
 func fire_interval() -> float:
 	return float(stat("fire_interval", 0.0))
+
+
+## How it is drawn: its row's look in its weapon style (`GunConfig.look`: `painter`, colours, `finish`).
+func look() -> Dictionary:
+	return GunConfig.look(gun, style)
 
 
 # --- Item contract --------------------------------------------------------------------------
@@ -260,24 +254,30 @@ func drop(user, velocity: Vector2) -> Node2D:
 	return DroppedItem.spawn(self, at, facing.angle(), velocity, user.world_root(), hand)
 
 
-## The gun lying flat on its side, centered at `at`, its muzzle along `angle`; `opts.flip` picks
-## the side facing up.
+## The gun lying flat on its side, centered at `at`, its muzzle along `angle`, in its look's painter lying (`flat`); `opts.flip`
+## picks the side facing up.
 func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color = Color.WHITE,
 		opts: Dictionary = {}) -> void:
 	var turn := angle - PI * 0.5
 	var size := flat_size()
-	var tex := PixelArt.render_turned(flat_painter(), size, color, PixelArt.snap_angle(turn), "metal",
-		{ "flip": opts.get("flip", false) })
+	var flip: bool = opts.get("flip", false)
+	var drawn := look()
+	var tex := PixelArt.render_turned(drawn["painter"], size, drawn["body"], PixelArt.snap_angle(turn), drawn["finish"],
+		{ "gun": gun, "look": _look_handle(drawn), "flat": true, "flip": flip })
+	_note_drawn(tex)
 	canvas.draw_set_transform(at, turn, Vector2.ONE)
 	canvas.draw_texture_rect(tex, Rect2(-size * 0.5, size), false, modulate)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-## The held art of `size` centered at `centre`, muzzle along `facing`: lit for the nearest lighting
+## The held art of `size` centered at `centre`, muzzle along `facing`, in its look's painter: lit for the nearest lighting
 ## step, drawn rotated to the exact angle.
 func _draw_art(canvas: CanvasItem, centre: Vector2, facing: Vector2, size: Vector2) -> void:
 	var angle := facing.angle() - PI * 0.5
-	var tex := PixelArt.render_turned(painter(), size, color, PixelArt.snap_angle(angle), "metal")
+	var drawn := look()
+	var tex := PixelArt.render_turned(drawn["painter"], size, drawn["body"], PixelArt.snap_angle(angle), drawn["finish"],
+		{ "gun": gun, "look": _look_handle(drawn) })
+	_note_drawn(tex)
 	canvas.draw_set_transform(centre, angle, Vector2.ONE)
 	canvas.draw_texture_rect(tex, Rect2(-size * 0.5, size), false)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)

@@ -20,41 +20,45 @@ const OUTSIDE := "outside"
 
 const DEFAULT_RULE := { "front": false, "exit": false, "through": true, "max_doors": 99 }
 
-## `front` rooms are where a visitor first steps in; `exit` rooms may carry a back/side/garage door. Bedrooms,
-## bathrooms and offices are never walked through to reach something else (an en-suite dead end hanging off
-## them is fine); a bathroom is always a dead end with one door.
+## `front` rooms are where a visitor first steps in (a security vestibule among them); `exit` rooms may carry a
+## back/side/garage door. Bedrooms, bathrooms, offices and a netrunner den are never walked through to reach something
+## else (an en-suite dead end hanging off them is fine); a bathroom and a netrunner den are always dead ends with one
+## door; a ripperdoc (chop shop) is walked through; a kitchenette has at most two doors.
 const ROOMS := {
 	"studio": { "front": true },
 	"living_room": { "front": true, "exit": true },
 	"kitchen_living": { "front": true, "exit": true },
-	"entry_hall": { "front": true },
+	"security_vestibule": { "front": true },
 	"hallway": { "front": true },
 	"kitchen": { "exit": true },
-	"dining_room": { "exit": true },
+	"kitchenette": { "max_doors": 2 },
+	"ripperdoc": { "through": true },
 	"garage": { "exit": true, "max_doors": 2 },
 	"laundry_room": { "exit": true, "max_doors": 2 },
 	"bedroom": { "through": false },
-	"kids_room": { "through": false },
+	"netrunner_den": { "through": false, "max_doors": 1 },
 	"home_office": { "through": false, "max_doors": 2 },
 	"bathroom": { "through": false, "max_doors": 1 },
 }
 
 ## Allowed interior-door pairs. Bathrooms open onto a hallway, a bedroom (en-suite) or a living space — never a
-## kitchen, dining room, laundry or garage; bedrooms never open onto service rooms or another bedroom; a
-## garage opens only onto the kitchen, laundry or a hallway.
+## kitchen, kitchenette, laundry or garage; bedrooms never open onto service rooms or another bedroom; a
+## garage opens only onto the kitchen, laundry or a hallway; a netrunner den hangs off a hallway, a living space, a studio
+## or a ripperdoc; a kitchenette off a studio, a living room or a hallway.
 const LINKS := [
-	["hallway", "entry_hall"], ["hallway", "bedroom"], ["hallway", "kids_room"], ["hallway", "bathroom"],
-	["hallway", "home_office"], ["hallway", "living_room"], ["hallway", "kitchen_living"], ["hallway", "kitchen"],
-	["hallway", "dining_room"], ["hallway", "laundry_room"], ["hallway", "garage"],
-	["entry_hall", "living_room"], ["entry_hall", "kitchen_living"], ["entry_hall", "dining_room"],
-	["entry_hall", "home_office"],
-	["living_room", "kitchen"], ["living_room", "dining_room"], ["living_room", "bedroom"],
-	["living_room", "kids_room"], ["living_room", "bathroom"], ["living_room", "home_office"],
-	["kitchen_living", "bedroom"], ["kitchen_living", "kids_room"], ["kitchen_living", "bathroom"],
-	["kitchen_living", "home_office"], ["kitchen_living", "dining_room"], ["kitchen_living", "laundry_room"],
-	["kitchen", "dining_room"], ["kitchen", "laundry_room"], ["kitchen", "garage"],
-	["bedroom", "bathroom"], ["kids_room", "bathroom"],
-	["studio", "bathroom"],
+	["hallway", "security_vestibule"], ["hallway", "bedroom"], ["hallway", "bathroom"], ["hallway", "home_office"],
+	["hallway", "living_room"], ["hallway", "kitchen_living"], ["hallway", "kitchen"], ["hallway", "kitchenette"],
+	["hallway", "laundry_room"], ["hallway", "garage"], ["hallway", "netrunner_den"], ["hallway", "ripperdoc"],
+	["security_vestibule", "living_room"], ["security_vestibule", "kitchen_living"], ["security_vestibule", "studio"],
+	["security_vestibule", "home_office"], ["security_vestibule", "ripperdoc"],
+	["living_room", "kitchen"], ["living_room", "bedroom"], ["living_room", "bathroom"], ["living_room", "home_office"],
+	["living_room", "kitchenette"], ["living_room", "netrunner_den"], ["living_room", "ripperdoc"],
+	["kitchen_living", "bedroom"], ["kitchen_living", "bathroom"], ["kitchen_living", "home_office"],
+	["kitchen_living", "laundry_room"], ["kitchen_living", "netrunner_den"], ["kitchen_living", "ripperdoc"],
+	["kitchen", "laundry_room"], ["kitchen", "garage"],
+	["bedroom", "bathroom"],
+	["studio", "bathroom"], ["studio", "kitchenette"], ["studio", "netrunner_den"],
+	["ripperdoc", "netrunner_den"],
 	["laundry_room", "garage"],
 ]
 

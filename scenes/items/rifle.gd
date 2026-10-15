@@ -2,12 +2,10 @@ class_name RifleItem extends GunItem
 
 ## Items domain: an assault rifle: a long automatic shouldered with the butt against the shoulder, the trigger
 ## hand at the grip and the other hand out on the foregrip, both lying along the barrel. Everything a gun does
-## lives in `GunItem`, tuned by the rifle's `GunConfig` row (heavy, fast, penetrating rounds); this supplies its
-## look and its hold. Its barrel is too long for a wall: touching one, it comes up off the aim, pointing up with
+## lives in `GunItem`, tuned by the rifle's `GunConfig` row (heavy, fast, penetrating rounds; its look too); this supplies its
+## sizes and its hold. Its barrel is too long for a wall: touching one, it comes up off the aim, pointing up with
 ## the butt still on the shoulder, and cannot fire.
 
-const RiflePainter = preload("res://scenes/items/art/rifle_painter.gd")
-const RifleFlatPainter = preload("res://scenes/items/art/rifle_flat_painter.gd")
 ## The rifle's footprint lying flat on its side (px): its profile across, its length along.
 const FLAT_SIZE := Vector2(12.0, 38.0)
 ## Rifle sprite footprint (px): width across, length from butt to muzzle.
@@ -24,17 +22,7 @@ func _init() -> void:
 	gun = GUN
 	display_name = str(stat("name", "Assault rifle"))
 	reach = 32.0
-	color = Color(0.25, 0.27, 0.25)
 
-
-## The painter for this gun as held.
-func painter() -> Script:
-	return RiflePainter
-
-
-## The painter for this gun lying flat once dropped.
-func flat_painter() -> Script:
-	return RifleFlatPainter
 
 
 ## The held art's footprint (px): width across, length from butt to muzzle.

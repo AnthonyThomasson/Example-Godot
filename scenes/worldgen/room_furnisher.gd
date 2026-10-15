@@ -27,8 +27,10 @@ const WALL_CLEAR := 8.0
 
 
 ## `interior` and `blocked` rects are in `parent`'s coordinate space. Returns the palette picked
-## for the room (its `wood` / `fabric` tones and `floor` key), or {} if the type has no recipe.
-static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: RandomNumberGenerator, parent: Node) -> Dictionary:
+## for the room (its `wood` / `fabric` tones and `floor` key), or {} if the type has no recipe. The footprint of every solid
+## piece it spawns is appended to `solids` (rects in `parent`'s space, from the catalogue's sizes).
+static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: RandomNumberGenerator, parent: Node,
+		solids: Array = []) -> Dictionary:
 	var recipe := ArrangementDefinitions.get_recipe(room_type)
 	if recipe.is_empty():
 		push_error("No furnishing recipe for room type: ", room_type)
@@ -47,7 +49,7 @@ static func furnish(room_type: String, interior: Rect2, blocked: Array, rng: Ran
 	for zone_options in plan["missing"]:
 		push_warning("RoomFurnisher: no room for required zone %s in %s" % [zone_options, room_type])
 	for placement in plan["placements"]:
-		_spawn_items(placement["arrangement"], placement["spot"], palette, parent)
+		_spawn_items(placement["arrangement"], placement["spot"], palette, parent, solids)
 	return palette
 
 
@@ -322,8 +324,9 @@ static func _fits(rect: Rect2, interior: Rect2, occupied: Array) -> bool:
 	return true
 
 
-## Map each item from the arrangement's top-wall frame into the chosen spot and spawn it.
-static func _spawn_items(arrangement: Dictionary, spot: Dictionary, palette: Dictionary, parent: Node) -> void:
+## Map each item from the arrangement's top-wall frame into the chosen spot and spawn it; a solid one's footprint goes on
+## `solids`.
+static func _spawn_items(arrangement: Dictionary, spot: Dictionary, palette: Dictionary, parent: Node, solids: Array) -> void:
 	var fp: Vector2 = arrangement["footprint"]
 	var rect: Rect2 = spot["rect"]
 	var orient: int = spot["orient"]
@@ -360,6 +363,11 @@ static func _spawn_items(arrangement: Dictionary, spot: Dictionary, palette: Dic
 		if palette.has(material):
 			opts["color"] = palette[material]
 		ObjectFactory.spawn(definition, rect.position + mapped, parent, opts)
+		if definition.get("solid", true):
+			var size: Vector2 = definition["size"]
+			if opts["rotated"]:
+				size = Vector2(size.y, size.x)
+			solids.append(Rect2(rect.position + mapped - size * 0.5, size))
 
 
 ## Map a direction from the arrangement's top-wall frame onto the chosen wall, the same way

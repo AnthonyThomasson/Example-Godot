@@ -389,6 +389,8 @@ func _spawn_world() -> void:
 	nav_updater.name = "NavUpdater"
 	_world.add_child(nav_updater)
 	nav_updater.setup(nav_region, house, rooms, nav_debug)
+	# The dusk lighting over the house and the street (interface 20): its lights, fixtures and flashes, seeded by the house.
+	WorldLighting.light(_world, house_seed, rooms)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed
 	for i in defender_count:
@@ -414,18 +416,48 @@ func _spawn_world() -> void:
 const LOADOUT_SEED_SALT := 0x4C4F4144
 
 
+## Salt mixed into the house seed for the style draws, so styling the crews never shifts the guns or the placement ("LOOK").
+const STYLE_SEED_SALT := 0x4C4F4F4B
+
+
 ## Arm the player (when there is one) and every NPC with their side's loadout (`defender_loadout` /
 ## `invader_loadout`): the chosen gun with its magazine and spares, or for "random" one gun drawn per
 ## character, and dress each in the side's outfit. Drawn from the house seed, so a pinned seed pins the random guns too. Tests and sandboxes
 ## build their own characters and never come through here, so they keep the weapon they ask for.
+## Each is styled as it is armed (`docs/outfits.md`, styles), from its own draws off the house seed: the invaders (the human
+## invader too) are one police unit drawn for the match (the first draw), its first the lead and its second the sergeant; each
+## defender is drawn one of the defenders' styles, a look seed of its own and one of its style's weapon styles.
 func _arm_characters(characters: Array) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed ^ LOADOUT_SEED_SALT
+	var looks := RandomNumberGenerator.new()
+	looks.seed = house_seed ^ STYLE_SEED_SALT
+	var units := _styles_of(INVADER_FACTION)
+	var crews := _styles_of(DEFENDER_FACTION)
+	var unit: StringName = units[looks.randi() % units.size()] if not units.is_empty() else CharacterConfig.default_style
+	var rank := 2  # The unit's first is its lead, the next its sergeant, the rest troopers.
 	for character in characters:
 		var defending: bool = character.get("faction") == DEFENDER_FACTION
-		var gun := LoadoutConfig.apply(character, defender_loadout if defending else invader_loadout, rng)
+		var look: StringName = unit
+		if defending and not crews.is_empty():
+			look = crews[looks.randi() % crews.size()]
+		var weapons: Array = CharacterConfig.styles[look].get("weapons", [&"police"])
+		var style := { "look": look, "seed": looks.randi(), "weapon": weapons[looks.randi() % weapons.size()] }
+		if not defending:
+			style["rank"] = rank
+			rank = maxi(rank - 1, 0)
+		var gun := LoadoutConfig.apply(character, defender_loadout if defending else invader_loadout, rng, style)
 		if gun != &"":
 			GameLog.say("%s is armed with the %s" % [character.name, character.item_name()])
+
+
+## The styles (`CharacterConfig.styles` keys) of the side `faction` fights on, in table order.
+static func _styles_of(faction: StringName) -> Array[StringName]:
+	var out: Array[StringName] = []
+	for key: StringName in CharacterConfig.styles:
+		if CharacterConfig.styles[key].get("side", &"") == faction:
+			out.append(key)
+	return out
 
 
 ## Free the match built by `_spawn_world`: the whole `World` node (house, nav map, NPCs, inspector, and

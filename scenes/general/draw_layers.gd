@@ -3,7 +3,7 @@ class_name DrawLayers
 ## General domain: the world's draw-order ladder, shared read-only infrastructure (like `PhysicsLayers`). Every domain
 ## that draws on, under or over the standing world sets its `z_index` from one rung here, so what lies on the floor,
 ## what a vehicle covers and what flies over it keep one order however the domains change. Bottom to top:
-##   FLOOR < RUG < BLOOD < LYING < UNDER_VEHICLE < STANDING < ABOVE < EFFECTS
+##   FLOOR < RUG < BLOOD < LYING < UNDER_VEHICLE < STANDING < ABOVE < OVERHEAD < EFFECTS
 ## Within a rung the scene tree decides (later draws over).
 
 ## The room floors (Objects' `Floor`).
@@ -22,5 +22,8 @@ const UNDER_VEHICLE := -1
 const STANDING := 0
 ## Over the standing world: a vehicle's `Roof` (Vehicles), a grenade in flight (Items) and the stack markers (UI).
 const ABOVE := 1
+## High overhead, over a vehicle's roof: a piece's overhang reaching out beyond its footprint, a streetlight's arm and
+## lamp head over the road (Objects).
+const OVERHEAD := 2
 ## A grenade's burst, its flash, fireball and smoke, over everything (Physics).
 const EFFECTS := 4

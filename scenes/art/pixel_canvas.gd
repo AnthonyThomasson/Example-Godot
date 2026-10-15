@@ -71,23 +71,29 @@ class Shape:
 				out.append_array([bounds.position.y + ly, bounds.position.x + x0, bounds.position.x + x])
 		return out
 
-	## Candidate pixels within `k` of the edge, as flat [x, y] pairs (every inside pixel here;
-	## callers re-check depth).
-	func edge_pixels(_k: int) -> PackedInt32Array:
+	## The inside pixels within `k` of the edge (depth 1..k), each once, as flat [x, y] pairs.
+	func edge_pixels(k: int) -> PackedInt32Array:
+		if _depth.is_empty():
+			_build_edges()
 		var out := PackedInt32Array()
-		var sp := spans()
-		for i in range(0, sp.size(), 3):
-			for x in range(sp[i + 1], sp[i + 2]):
-				out.append_array([x, sp[i]])
+		var i := 0
+		for ly in bounds.size.y:
+			for lx in bounds.size.x:
+				var d := _depth[i]
+				if d != 0 and d <= k:
+					out.append(bounds.position.x + lx)
+					out.append(bounds.position.y + ly)
+				i += 1
 		return out
 
 	## Mask index of (x, y), which must lie inside the bounds.
 	func _index(x: int, y: int) -> int:
 		return (y - bounds.position.y) * bounds.size.x + (x - bounds.position.x)
 
-	## Per step direction, sweep the mask so each pixel learns how many inside pixels run on from
-	## it that way; the first outside pixel is one past that run. Depth is the nearest exit over
-	## the straight steps (diagonals only where strictly sooner); the normal sums the exiting steps.
+	## Per step direction, sweep the mask so each inside pixel learns how many inside pixels run on from it that way; the
+	## first outside pixel is one past that run. Depth is the nearest exit over the straight steps (diagonals only where
+	## strictly sooner); the normal sums the exiting steps. Each sweep walks the rows and columns away from the pixel it
+	## reads, so a pixel's neighbour that way is done before it.
 	func _build_edges() -> void:
 		var bw := bounds.size.x
 		var bh := bounds.size.y
@@ -96,34 +102,61 @@ class Shape:
 		for d in STEPS:
 			var run := PackedInt32Array()
 			run.resize(n)
-			var ys := range(bh - 1, -1, -1) if d.y > 0 else range(bh)
-			var xs := range(bw - 1, -1, -1) if d.x > 0 else range(bw)
-			for y in ys:
-				for x in xs:
-					var qx: int = x + d.x
-					var qy: int = y + d.y
-					if qx >= 0 and qy >= 0 and qx < bw and qy < bh and _mask[qy * bw + qx] == 1:
-						run[y * bw + x] = run[qy * bw + qx] + 1
+			var y_from := bh - 1 if d.y > 0 else 0
+			var y_step := -1 if d.y > 0 else 1
+			var x_from := bw - 1 if d.x > 0 else 0
+			var x_step := -1 if d.x > 0 else 1
+			var x_lo := 1 if d.x < 0 else 0  # The columns whose neighbour that way is inside the bounds.
+			var x_hi := bw - 2 if d.x > 0 else bw - 1
+			var step := d.y * bw + d.x
+			var y := y_from
+			for _row in bh:
+				var qy := y + d.y
+				if qy >= 0 and qy < bh:
+					var i := y * bw + x_from
+					var x := x_from
+					for _col in bw:
+						if x >= x_lo and x <= x_hi and _mask[i] == 1 and _mask[i + step] == 1:
+							run[i] = run[i + step] + 1
+						x += x_step
+						i += x_step
+				y += y_step
 			runs.append(run)
+		var left := runs[0]
+		var right := runs[1]
+		var up := runs[2]
+		var down := runs[3]
+		var up_left := runs[4]
+		var up_right := runs[5]
+		var down_left := runs[6]
+		var down_right := runs[7]
 		_depth.resize(n)
 		_normal.resize(n)
 		for i in n:
 			if _mask[i] == 0:
 				continue
-			var k := 1 << 30
-			for s in 4:
-				k = mini(k, runs[s][i] + 1)
-			var first := 0
-			var k_diag := 1 << 30
-			for s in range(4, 8):
-				k_diag = mini(k_diag, runs[s][i] + 1)
+			var k := mini(mini(left[i], right[i]), mini(up[i], down[i])) + 1
+			var k_diag := mini(mini(up_left[i], up_right[i]), mini(down_left[i], down_right[i])) + 1
+			var sum := Vector2.ZERO
 			if k_diag < k:
 				k = k_diag
-				first = 4
-			var sum := Vector2.ZERO
-			for s in range(first, first + 4):
-				if runs[s][i] + 1 == k:
-					sum += Vector2(STEPS[s])
+				if up_left[i] + 1 == k:
+					sum += Vector2(-1, -1)
+				if up_right[i] + 1 == k:
+					sum += Vector2(1, -1)
+				if down_left[i] + 1 == k:
+					sum += Vector2(-1, 1)
+				if down_right[i] + 1 == k:
+					sum += Vector2(1, 1)
+			else:
+				if left[i] + 1 == k:
+					sum += Vector2(-1, 0)
+				if right[i] + 1 == k:
+					sum += Vector2(1, 0)
+				if up[i] + 1 == k:
+					sum += Vector2(0, -1)
+				if down[i] + 1 == k:
+					sum += Vector2(0, 1)
 			_depth[i] = mini(k, 255)
 			_normal[i] = sum.normalized()
 
@@ -224,6 +257,7 @@ var _cov: Image  ## Coverage layer (R8): non-zero where something is drawn.
 var _hgt: Image  ## Height layer (R8): height above the floor per pixel; drives cast_shadows().
 var _cov_bytes := PackedByteArray()  ## Snapshot of _cov for fast reads; refreshed when stale.
 var _cov_stale := true  ## Whether _cov changed since the snapshot.
+var _emit := PackedByteArray()  ## 1 per pixel a `glowing` drawing changed; empty until one does.
 
 
 func _init(width: int, height: int, seed_value: int, light_from: Vector2) -> void:
@@ -346,6 +380,14 @@ func at(x: int, y: int) -> Color:
 	return img.get_pixel(x, y) if has(x, y) else CLEAR
 
 
+## The coverage as it stands: one byte per pixel, row by row (`y * w + x`), non-zero where something is drawn. A snapshot:
+## drawing after the call does not change it. For a painter that reads the coverage of every pixel (`covered` per pixel is
+## the slow way to do that).
+func coverage() -> PackedByteArray:
+	covered(0, 0)  # Refresh the snapshot.
+	return _cov_bytes
+
+
 ## True if something is drawn at (x, y).
 func covered(x: int, y: int) -> bool:
 	if not has(x, y):
@@ -365,6 +407,48 @@ func px(x: int, y: int, c: Color, height: int = -1) -> void:
 	_cov_stale = true
 	if height >= 0:
 		_hgt.set_pixel(x, y, _height_color(height))
+
+
+## Run `draw` (a Callable taking no arguments, drawing on this canvas) as the drawing of something that gives light (a
+## screen's face, a tube, a bulb, an LED): every pixel it changes within `area` (the whole canvas when empty) is marked
+## emissive, so `emissive()` (and `PixelArt.emissive`) can hand it to a caller that draws it unshaded.
+func glowing(draw: Callable, area := Rect2i()) -> void:
+	var r := Rect2i(0, 0, w, h) if area.size == Vector2i.ZERO else area.intersection(Rect2i(0, 0, w, h))
+	if r.size.x <= 0 or r.size.y <= 0:
+		draw.call()
+		return
+	var before := img.get_region(r).get_data()
+	draw.call()
+	var after := img.get_region(r).get_data()
+	if _emit.is_empty():
+		_emit.resize(w * h)
+	var row := r.size.x * 4
+	for ry in r.size.y:
+		var a := ry * row
+		if before.slice(a, a + row) == after.slice(a, a + row):
+			continue  # A row the drawing left as it was (most of them).
+		var row_start := (r.position.y + ry) * w + r.position.x
+		for rx in r.size.x:
+			var k := a + rx * 4
+			if before.decode_u32(k) != after.decode_u32(k):
+				_emit[row_start + rx] = 1
+
+
+## The emissive pixels (`glowing`) as they stand in the art now, transparent elsewhere, or null when nothing was drawn
+## glowing.
+func emissive() -> Image:
+	if _emit.is_empty():
+		return null
+	var out := Image.create(w, h, false, Image.FORMAT_RGBA8)
+	out.fill(CLEAR)
+	var any := false
+	for i in w * h:
+		if _emit[i] != 0:
+			var x := i % w
+			var y := int(i / float(w))
+			out.set_pixel(x, y, img.get_pixel(x, y))
+			any = true
+	return out if any else null
 
 
 ## Fill a shape; a non-negative `height` also raises those pixels.

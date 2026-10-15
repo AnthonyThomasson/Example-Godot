@@ -4,9 +4,11 @@ extends RefCounted
 ## (front toward +y): a material frame around a shadowed well, filled with what the shelf holds as
 ## seen from above — rows of book tops, cardboard boxes and paint tins, or pairs of shoes. Metal
 ## frames show corner uprights. Options (`art_opts`, defaulting to ObjectArtConfig.shelf_*):
-## `contents` ("books" | "boxes" | "shoes").
+## `contents` ("books" | "boxes" | "shoes"), `neon` (a neon strip round the frame, glowing). Run down like a cabinet.
 
 const Props = preload("res://scenes/objects/art/props.gd")
+const CabinetPainter = preload("res://scenes/objects/art/cabinet_painter.gd")
+const Decay = preload("res://scenes/objects/art/decay.gd")
 const _FRAME_HEIGHT := 5    ## Heights for cast shadows: the frame stands over its contents.
 const _CONTENT_HEIGHT := 3
 
@@ -35,6 +37,10 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 			c.fill(post, t.dark, _FRAME_HEIGHT + 1)
 			c.outline(post, t.outline)
 	c.cast_shadows()
+	CabinetPainter.casegoods(c, material)
+	var neon := Decay.neon(opts)
+	if neon.a > 0.0:
+		Decay.neon_ring(c, 1, neon, 0.4)
 
 
 ## Book tops standing against the back: covers in assorted colors around a pale page block, the

@@ -17,9 +17,9 @@ static func _all() -> Dictionary:
 	if _catalog.is_empty():
 		for src in [GeneralCatalog.OBJECTS, LivingRoomCatalog.OBJECTS,
 				KitchenCatalog.OBJECTS, BedroomCatalog.OBJECTS, BathroomCatalog.OBJECTS,
-				DiningRoomCatalog.OBJECTS, HomeOfficeCatalog.OBJECTS, KidsRoomCatalog.OBJECTS,
-				EntryHallCatalog.OBJECTS, HallwayCatalog.OBJECTS, LaundryRoomCatalog.OBJECTS,
-				GarageCatalog.OBJECTS]:
+				HomeOfficeCatalog.OBJECTS, HallwayCatalog.OBJECTS, LaundryRoomCatalog.OBJECTS,
+				GarageCatalog.OBJECTS, NetrunnerDenCatalog.OBJECTS, RipperdocCatalog.OBJECTS,
+				SecurityVestibuleCatalog.OBJECTS, KitchenetteCatalog.OBJECTS]:
 			_catalog.merge(src)
 	return _catalog
 

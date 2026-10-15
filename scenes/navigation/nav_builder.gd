@@ -249,8 +249,8 @@ static func _source_for(house: Node2D, rooms: Array, agent_radius: float, charac
 	var nav_poly := _new_polygon(agent_radius)
 
 	var source := NavigationMeshSourceGeometryData2D.new()
-	# Obstructions: the house's static colliders (walls). RigidBody2D furniture is not static, so it
-	# is not parsed — only the walls become holes. Parsing resets the source data, so it must run
+	# Obstructions: the house's static colliders (walls). RigidBody2D furniture (an anchored piece too) is not a
+	# StaticBody2D, so it is not parsed — only the walls become holes; the furniture is carved below. Parsing resets the source data, so it must run
 	# before the traversable footprint is added.
 	NavigationServer2D.parse_source_geometry_data(nav_poly, source, house)
 	source.set_obstruction_outlines(_on_grid(source.get_obstruction_outlines()))
@@ -344,12 +344,14 @@ static func _signed_area(ring: PackedVector2Array) -> float:
 ## of a body's collision shapes contributes to its footprint — otherwise a dented piece's hole would
 ## vanish. A body's footprint is the convex hull of those shapes: a dent's notches are far smaller than
 ## the agent, and baked in they leave sub-pixel navmesh edges the NavigationServer cannot merge
-## ("navigation map synchronization error").
+## ("navigation map synchronization error"). Every RigidBody2D with a collider is carved: shoved furniture, and an
+## anchored piece (frozen static: a streetlight's post), which never moves; walk-over decor is frozen too but has no
+## collider, so it leaves no hole.
 static func furniture_holes(house: Node2D) -> Array:
 	var out: Array = []
 	for node in _descendants(house):
 		var body := node as RigidBody2D
-		if body == null or body.freeze:
+		if body == null:
 			continue
 		var hull := _body_hull(body)
 		if not hull.is_empty():
@@ -400,8 +402,8 @@ static func character_holes(root: Node) -> Array:
 ## and paths route AROUND it: furniture (rerouting through another doorway when the near one is blocked,
 ## or leaving it unreachable when a piece seals the only route) and the `characters` footprints. They are
 ## converted into the house-local frame the bake runs in (world minus the house position). Solid
-## furniture is a non-frozen RigidBody2D (non-solid decor freezes itself) with a CollisionShape2D; walls
-## are StaticBody2D and already parsed. They are fused together before they go in, so a character against
+## furniture is a RigidBody2D with a CollisionShape2D (shoved about, or anchored: frozen static; non-solid decor has no
+## collider); walls are StaticBody2D and already parsed. They are fused together before they go in, so a character against
 ## a piece of furniture or against another character is one outline.
 static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D, characters: Array = []) -> void:
 	var outlines: Array = []

@@ -33,6 +33,7 @@ const ARRANGEMENTS := {
 
 const RECIPES := {
 	"garage": {
+		"clutter": [["cables", 2.0], ["cable_nest", 2.0], ["puddle", 2.0], ["cardboard", 1.0], ["trash", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.charcoal, "fabric": GeneralCatalog.FABRIC.slate, "floor": "concrete" },
 			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.navy, "floor": "concrete" },

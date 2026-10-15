@@ -4,7 +4,9 @@ extends RefCounted
 ## frame (front of the seat at +y): a rounded seat with a paler worn centre, cross grain and a
 ## bevelled edge, and across the back a curved crest rail whose ends sag toward the seat, joined
 ## to it by spindles. Options (`art_opts`, defaulting to ObjectArtConfig.chair_*): `back_depth`,
-## `slats`.
+## `slats`. Run down (decay.gd): grime, scratches, cup rings and cigarette burns.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _SEAT_HEIGHT := 1  ## Heights for cast shadows: the back stands over the seat.
 const _SLAT_HEIGHT := 3
@@ -45,3 +47,13 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	c.outline(rail, t.outline)
 
 	c.cast_shadows()
+	worn_wood(c)
+
+
+## The run-down finish of a wooden surface (a chair, a table, a desk): grime, scratches, cup rings, cigarette burns.
+static func worn_wood(c: PixelCanvas) -> void:
+	Decay.grime(c)
+	Decay.scratches(c, maxi(3, int(c.w * c.h / 220.0)))
+	for _i in 2:
+		Decay.stain(c, Decay.STAIN, 3)
+	Decay.burns(c, 3)

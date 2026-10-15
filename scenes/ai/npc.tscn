@@ -21,9 +21,6 @@
 [node name="NPC" instance=ExtResource("1_base")]
 start_slot = 3
 
-[node name="Visuals" parent="."]
-body_color = Color(0.5, 0.5, 0.5, 1)
-
 [node name="GoalController" type="Node" parent="."]
 script = ExtResource("2_controller")
 nav_agent_path = NodePath("../NavigationAgent2D")

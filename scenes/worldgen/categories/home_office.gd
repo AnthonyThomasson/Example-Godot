@@ -28,6 +28,7 @@ const ARRANGEMENTS := {
 
 const RECIPES := {
 	"home_office": {
+		"clutter": [["cables", 3.0], ["cable_nest", 2.0], ["trash", 1.5], ["cardboard", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.slate, "floor": "beige_carpet" },
 			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.navy, "floor": "grey_planks" },

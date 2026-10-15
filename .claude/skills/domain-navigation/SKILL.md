@@ -55,9 +55,10 @@ share a 1 px cell, because a hole meeting a wall leaves vertices a fraction of a
 ("navigation map synchronization error"). A character's hole does it, and so does a piece of furniture's, a turned chair beside a wall for one,
 so the planning re-bake welds too (`tests/navigation/furniture_beside_wall_bakes_clean`, `character_beside_wall_bakes_clean`).
 
-Solid furniture is recognised by engine type alone — a non-frozen `RigidBody2D` with a
-`CollisionShape2D` (walls are `StaticBody2D`; non-solid decor freezes itself) — so Navigation stays a
-leaf that imports nothing.
+Solid furniture is recognised by engine type alone — a `RigidBody2D` with a `CollisionShape2D`: shoved
+furniture, and an anchored piece (frozen static, a streetlight's post: it never moves, and is carved like any other;
+`tests/navigation/anchored_hole`). Walls are `StaticBody2D` (parsed, not carved); non-solid decor is frozen too but has no
+collider, so it leaves no hole — so Navigation stays a leaf that imports nothing.
 
 ## Avoid maps (`avoid_map`): the planning bake plus holes someone wants to keep out of
 

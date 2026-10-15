@@ -43,7 +43,7 @@ static func house(s: TestSetup, furnish := true) -> void:
 	s.layout([
 		{ "key": "living_room", "type": "living_room", "rect": HOUSE_LIVING, "floor": "oak_planks" },
 		{ "key": "kitchen", "type": "kitchen", "rect": HOUSE_KITCHEN, "floor": "oak_planks" },
-		{ "key": "hall", "type": "entry_hall", "rect": HOUSE_HALL, "floor": "oak_planks" },
+		{ "key": "hall", "type": "hallway", "rect": HOUSE_HALL, "floor": "oak_planks" },
 	], [
 		{ "pos": DOOR_LIVING_KITCHEN, "width": 90.0 },
 		{ "pos": DOOR_HALL_LIVING, "width": 80.0 },
@@ -82,7 +82,7 @@ const BOX_ENTRANCE := Vector2(0, 250)
 ## Lay out the box room: a bare corridor and the small room off it.
 static func box_room(s: TestSetup) -> void:
 	s.layout([
-		{ "key": "corridor", "type": "entry_hall", "rect": BOX_CORRIDOR },
+		{ "key": "corridor", "type": "hallway", "rect": BOX_CORRIDOR },
 		{ "key": "box_room", "type": "bedroom", "rect": BOX_ROOM },
 	], [
 		{ "pos": DOOR_BOX, "width": 70.0 },
@@ -115,7 +115,7 @@ const CORRIDOR_DEAD_END := Vector2(850, 250)
 ## each room.
 static func spine(s: TestSetup, furnish := true) -> void:
 	s.layout([
-		{ "key": "corridor", "type": "entry_hall", "rect": SPINE_CORRIDOR },
+		{ "key": "corridor", "type": "hallway", "rect": SPINE_CORRIDOR },
 		{ "key": "room_a", "type": "bedroom", "rect": SPINE_ROOM_A },
 		{ "key": "room_b", "type": "home_office", "rect": SPINE_ROOM_B },
 		{ "key": "room_c", "type": "kitchen", "rect": SPINE_ROOM_C },

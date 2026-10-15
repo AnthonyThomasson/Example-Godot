@@ -19,6 +19,7 @@ const ARRANGEMENTS := {
 
 const RECIPES := {
 	"laundry_room": {
+		"clutter": [["puddle", 3.0], ["trash", 1.0], ["cables", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.white, "fabric": GeneralCatalog.FABRIC.slate, "floor": "slate_tile" },
 			{ "wood": GeneralCatalog.WOOD.ash, "fabric": GeneralCatalog.FABRIC.aqua, "floor": "white_tile" },

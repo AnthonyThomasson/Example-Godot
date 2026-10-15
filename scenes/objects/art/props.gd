@@ -4,22 +4,24 @@ extends RefCounted
 ## mugs, books, bowls, tools and the like, drawn by the table / cabinet / counter painters from a
 ## piece's `art_opts.props` list. Each prop is painted in the host's canonical frame (front toward
 ## +y), raised so it casts a shadow onto the surface, with sizes in art px scaled by
-## ArtConfig.pixel_size and colors from ObjectArtConfig.prop_colors.
+## ArtConfig.pixel_size and colors from ObjectArtConfig.prop_colors. A monitor's lit screen edge is drawn `glowing` (it gives
+## light), in the host's screen colour.
 
 const _HEIGHT := 7  ## Props stand above the surface they sit on (cast-shadow height).
 
 
-## Draw each `{ "kind": String, "at": Vector2 }` entry of `props`; `at` is relative to `area`.
-static func draw_all(c: PixelCanvas, props: Array, area: Rect2i) -> void:
+## Draw each `{ "kind": String, "at": Vector2 }` entry of `props`; `at` is relative to `area`. A screen glows in `glow`
+## (transparent: the prop palette's `glow`).
+static func draw_all(c: PixelCanvas, props: Array, area: Rect2i, glow := Color(0, 0, 0, 0)) -> void:
 	for p: Dictionary in props:
 		var at: Vector2 = p.get("at", Vector2(0.5, 0.5))
-		draw(c, String(p.get("kind", "")), area.position + Vector2i((Vector2(area.size) * at).round()))
+		draw(c, String(p.get("kind", "")), area.position + Vector2i((Vector2(area.size) * at).round()), glow)
 
 
-## Draw one prop of `kind` centred on `o`.
-static func draw(c: PixelCanvas, kind: String, o: Vector2i) -> void:
+## Draw one prop of `kind` centred on `o` (a screen glowing in `glow`, transparent: the palette's).
+static func draw(c: PixelCanvas, kind: String, o: Vector2i, glow := Color(0, 0, 0, 0)) -> void:
 	match kind:
-		"monitor": _monitor(c, o)
+		"monitor": _monitor(c, o, glow if glow.a > 0.0 else _col("glow"))
 		"keyboard": _keyboard(c, o)
 		"mug": _mug(c, o)
 		"papers": _papers(c, o)
@@ -72,14 +74,16 @@ static func _block(c: PixelCanvas, r: Rect2i, radius: int, col: Color) -> PixelC
 	return s
 
 
-## A monitor: a slim screen bar with a lit front edge on a neck and oval foot.
-static func _monitor(c: PixelCanvas, o: Vector2i) -> void:
+## A monitor: a slim screen bar with a lit front edge (glowing, in `glow`) on a neck and oval foot.
+static func _monitor(c: PixelCanvas, o: Vector2i, glow: Color) -> void:
 	c.fill(PixelCanvas.ellipse(_box(o, 10, 6, 0, 1)), _col("metal").darkened(0.25), _HEIGHT - 2)
 	c.fill(PixelCanvas.rounded(_box(o, 3, 3, 0, -1), 0), _col("metal").darkened(0.4), _HEIGHT)
 	var bar := _box(o, 24, 3, 0, -3)
 	var screen := _block(c, bar, 1, _col("plastic_dark"))
 	c.outline(screen, _col("plastic_dark").darkened(0.4))
-	c.line(Vector2i(bar.position.x + 1, bar.end.y - 1), Vector2i(bar.end.x - 2, bar.end.y - 1), _col("glow"))
+	var edge := bar.end.y - 1
+	c.glowing(func() -> void: c.line(Vector2i(bar.position.x + 1, edge), Vector2i(bar.end.x - 2, edge), glow),
+			Rect2i(bar.position.x, edge, bar.size.x, 1))
 
 
 ## A keyboard: a pale slab dotted with keys.

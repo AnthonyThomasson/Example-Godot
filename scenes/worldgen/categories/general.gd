@@ -14,9 +14,13 @@ class_name GeneralCatalog
 ##     solid (optional, default true; false = walk-over decor under all);
 ##   art (optional pixel-art painter id, e.g. "sofa", "cabinet", "appliance"; omitted =
 ##     flat shape + label) and art_opts (optional painter variant/overrides, e.g.
-##     { "front": "drawers", "count": 3 } or { "props": [...] }).
+##     { "front": "drawers", "count": 3 } or { "props": [...] });
+##   anchored (optional, default false: a solid piece that never moves, the street lamps' posts) and overhang (optional
+##     `{ size, reach }`: an overhead part drawn beyond the footprint above the characters, a street lamp's arm and head).
 ## Arrangements/recipes: see ArrangementDefinitions for the authoring conventions.
-## Objects and arrangements used by 2+ room categories (bench, console_wall, bookshelf_wall, the rugs, …) live here.
+## Objects and arrangements used by 2+ room categories (bench, console_wall, bookshelf_wall, the rugs, …) live here, and the
+## run-down dressing every room shares: the walk-over CLUTTER a recipe strews (its `clutter`, or this default) and the neon
+## tube on a wall (RoomDresser), and the STREET round the house with its street lamps.
 
 const OBJECTS := {
 	"chair": { "name": "Chair", "shape": "square", "size": Vector2(28, 28), "color": Color(0.5, 0.33, 0.18), "material": "wood", "art": "chair", "weight": 6, "coverage": 45, "penetration": 50, "interactions": [{ "id": "sit", "label": "Sit", "move_to": true }, { "id": "stand_on", "label": "Stand on it", "move_to": true }] },
@@ -38,7 +42,24 @@ const OBJECTS := {
 	"mirror": { "name": "Mirror", "shape": "rect", "size": Vector2(44, 12), "color": Color(0.7, 0.82, 0.85), "material": "glass", "art": "fixture", "art_opts": { "kind": "mirror" }, "weight": 6, "coverage": 40, "penetration": 20 },
 	"rug_large": { "name": "Rug", "shape": "rect", "size": Vector2(250, 170), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "art": "rug", "art_opts": { "pattern": "medallion" }, "weight": 5, "solid": false, "coverage": 0, "penetration": 5 },
 	"runner": { "name": "Runner", "shape": "rect", "size": Vector2(220, 56), "color": Color(0.6, 0.35, 0.35), "material": "fabric", "art": "rug", "art_opts": { "pattern": "stripes" }, "weight": 3, "solid": false, "coverage": 0, "penetration": 5 },
+	# Walk-over clutter (RoomDresser strews it, 0-2 a room): non-solid, coverless, never carved into the nav map.
+	"trash": { "name": "Trash", "shape": "rect", "size": Vector2(30, 24), "color": Color(0.1, 0.1, 0.11), "material": "plastic", "art": "decor", "art_opts": { "kind": "trash" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	"cables": { "name": "Cables", "shape": "rect", "size": Vector2(84, 14), "color": Color(0.1, 0.1, 0.1), "material": "plastic", "art": "decor", "art_opts": { "kind": "cables" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	"cable_nest": { "name": "Cables", "shape": "rect", "size": Vector2(60, 48), "color": Color(0.1, 0.1, 0.1), "material": "plastic", "art": "decor", "art_opts": { "kind": "cable_nest" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	"cardboard": { "name": "Cardboard", "shape": "rect", "size": Vector2(40, 28), "color": Color(0.62, 0.48, 0.3), "material": "fabric", "art": "decor", "art_opts": { "kind": "cardboard" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	"puddle": { "name": "Puddle", "shape": "rect", "size": Vector2(48, 30), "color": Color(0.14, 0.12, 0.08), "material": "", "art": "decor", "art_opts": { "kind": "puddle" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	# A neon tube along the foot of a wall (RoomDresser, about every other room); its `tone` is picked per room.
+	"neon_tube": { "name": "Neon", "shape": "rect", "size": Vector2(64, 7), "color": Color(0.8, 0.9, 1.0), "material": "glass", "art": "decor", "art_opts": { "kind": "neon_tube" }, "weight": 1, "solid": false, "coverage": 0, "penetration": 0 },
+	# The street lamps along the front of the house (HouseSpawner, `streetlight_*` in WorldGenConfig), every other one a neon
+	# sign (its `neon` picked per lamp): a thin steel post, anchored, as tall as anything on the street (never flown over),
+	# as hard to shoot through as a thin steel post; its arm and head (or sign) hang overhead out over the road (`overhang`,
+	# across x out, its front the way the piece faces).
+	"streetlight": { "name": "Street lamp", "shape": "circle", "size": Vector2(14, 14), "color": Color(0.34, 0.33, 0.27), "material": "metal", "art": "streetlight", "art_opts": { "head": "cobra" }, "overhang": { "size": Vector2(16, 40), "reach": 20.0 }, "anchored": true, "weight": 250, "coverage": 100, "penetration": 85 },
+	"street_sign": { "name": "Neon sign", "shape": "circle", "size": Vector2(14, 14), "color": Color(0.34, 0.33, 0.27), "material": "metal", "art": "streetlight", "art_opts": { "head": "sign" }, "overhang": { "size": Vector2(24, 40), "reach": 20.0 }, "anchored": true, "weight": 250, "coverage": 100, "penetration": 85 },
 }
+
+## The clutter a room strews when its recipe names none (`[key, weight]`; RoomDresser draws 0-2, no key twice).
+const CLUTTER := [["trash", 3.0], ["cables", 2.0], ["cardboard", 1.5], ["puddle", 1.5], ["cable_nest", 1.0]]
 
 const ARRANGEMENTS := {
 	"plant_corner": {
@@ -178,12 +199,22 @@ const FLOORS := {
 	"concrete": { "art": "floor", "color": Color(0.55, 0.55, 0.53), "material": "stone", "art_opts": { "pattern": "concrete" } },
 }
 
-## The house wall style handed to WallFactory: a plaster cap (see ObjectArtConfig.wall_*).
-const WALL := { "art": "wall", "color": Color(0.86, 0.84, 0.79), "art_opts": { "pattern": "plaster" } }
+## The street round a house (FloorFactory definitions, laid by HouseSpawner): asphalt out to the edge and a sidewalk ring
+## hugging the walls. Neither registers a SoundSurface, so footsteps out there stay the open ground's (`outdoor`), and both
+## are drawn on the street's light layer (lit by the street lamps and the street's sky, never by the house's lights).
+const STREET := {
+	"asphalt": { "art": "street", "color": Color(0.24, 0.21, 0.17), "material": "stone", "sound_surface": false, "light_layer": "street", "art_opts": { "kind": "asphalt" } },
+	"sidewalk": { "art": "street", "color": Color(0.42, 0.38, 0.32), "material": "stone", "sound_surface": false, "light_layer": "street", "art_opts": { "kind": "sidewalk" } },
+}
+
+## The house wall style handed to WallFactory: a plaster cap (see ObjectArtConfig.wall_*), nicotine-yellow (drawn run-down
+## and dun, like every colour the Objects painters take).
+const WALL := { "art": "wall", "color": Color(0.87, 0.81, 0.49), "art_opts": { "pattern": "plaster" } }
 
 ## Combined room types that pull arrangements from several categories.
 const RECIPES := {
 	"kitchen_living": {
+		"clutter": [["trash", 3.0], ["cables", 2.0], ["puddle", 1.5], ["cardboard", 1.0]],
 		"palettes": [
 			{ "wood": WOOD.oak, "fabric": FABRIC.terracotta, "floor": "checker" },
 			{ "wood": WOOD.walnut, "fabric": FABRIC.cream, "floor": "white_tile" },
@@ -200,6 +231,7 @@ const RECIPES := {
 		"fill": { "target": 0.4, "options": ["bookshelf_wall", "shelf_single", "lamp_corner", "lamp_corner", "plant_corner", "plant_corner", "side_table_lamp", "sofa_wall", "lounge_group", "storage_wall", "counter_run", "pantry", "entry_area"] },
 	},
 	"studio": {
+		"clutter": [["trash", 3.0], ["cables", 2.0], ["cardboard", 1.5], ["cable_nest", 1.0]],
 		"palettes": [
 			{ "wood": WOOD.oak, "fabric": FABRIC.terracotta, "floor": "walnut_planks" },
 			{ "wood": WOOD.walnut, "fabric": FABRIC.cream, "floor": "ash_planks" },

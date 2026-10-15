@@ -1,16 +1,20 @@
 extends GameTest
 
-## Performance guard for the thing a player watches: a 5v5 match in a generated house, set up the way Main sets
-## one up (the match spawner's placement, every NPC armed from the default random loadout, nav re-baker, blood,
-## debris, sound and team radio all on) with Von scripted so no server is needed. After a warm-up that brings the
-## sides into contact, 300 frames are measured: the average frame must fit in one 60 fps frame, with no spike over
-## two. Headless measures CPU only; rendering is not in these numbers.
+## Performance guard for the thing a player watches: a 5v5 match in a generated house (the largest plan, `PLAN`), set up
+## the way Main sets one up (the match spawner's placement, every NPC armed from the default random loadout, nav
+## re-baker, blood, debris, sound and team radio all on) with Von scripted so no server is needed. After a warm-up that
+## brings the sides into contact, 300 frames are measured: the average frame must fit in one 60 fps frame, with no spike
+## over two. Headless measures CPU only; rendering is not in these numbers.
 
 const Perf := preload("res://tests/_perf/perf_probe.gd")
 const MatchSpawner := preload("res://scenes/match_spawner.gd")
 const OverlayRegistry := preload("res://scenes/ui/overlays/overlay_registry.gd")
 
 const SEED := 7
+## The house is the largest plan by floor area (garage_home: five rooms, 760k px²), pinned rather than drawn from the
+## seed: the match is measured in a full-size house whatever the catalogue holds, and a plan added or dropped changes
+## no seed's load. A small flat would put both sides in each other's sight from the start, which is a different load.
+const PLAN := "garage_home"
 const PER_SIDE := 5
 const WARMUP_S := 6.0
 const MEASURE_FRAMES := 300
@@ -31,7 +35,7 @@ func describe() -> Dictionary:
 
 
 func configure(s: TestSetup) -> void:
-	s.house(SEED)
+	s.house(SEED, PLAN)
 	s.von_script([{ "pick": "combat" }, { "pick": "engage" }])
 	s.switch(&"ai.callouts", true)
 	s.switch(&"ai.vision", true)

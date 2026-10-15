@@ -3,7 +3,9 @@ extends RefCounted
 ## Top-down pixel-art TOILET painter (Objects domain, private). Painted in the canonical frame
 ## (bowl toward +y, cistern against the wall) and kept within the inscribed circle of its round
 ## footprint: a glazed cistern with a flush button, and an oval bowl whose seat ring frames the
-## water. No options.
+## water. Run down (decay.gd: `porcelain`): grime, limescale, rust round the fittings, a crack. No options.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _BOWL_HEIGHT := 4  ## Heights for cast shadows.
 const _TANK_HEIGHT := 7
@@ -31,3 +33,12 @@ static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Diction
 	var button := PixelCanvas.disc(tank_rect.position + tank_rect.size / 2, 1)
 	c.fill(button, ObjectArtConfig.counter_tap_color, _TANK_HEIGHT + 1)
 	c.cast_shadows()
+	porcelain(c)
+
+
+## The run-down finish of bathroom porcelain (a toilet, a tub, a shower tray): grime, limescale, rust, a crack.
+static func porcelain(c: PixelCanvas) -> void:
+	Decay.grime(c)
+	Decay.stain(c, Decay.LIMESCALE, 3)
+	Decay.rust(c, 4)
+	Decay.crack(c)

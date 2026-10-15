@@ -4,8 +4,10 @@ extends RefCounted
 ## (seat front at +y): a backrest with a rolled top and a row of back cushions, rolled armrests
 ## at both ends, puffy seat cushions lined up under the back cushions, optional throw pillows in
 ## the back corners, and a speckled weave over the upholstery. Raised parts shade the seat beside
-## them. Options (`art_opts`, defaulting to ObjectArtConfig.sofa_*): `back_depth`, `arm_width`,
-## `cushion_width`, `max_cushions`, `pillows`.
+## them. Run down (decay.gd): grimy, torn to the stuffing, patched with tape, stained. Options (`art_opts`, defaulting to
+## ObjectArtConfig.sofa_*): `back_depth`, `arm_width`, `cushion_width`, `max_cushions`, `pillows`.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _FRAME_HEIGHT := 1  ## Heights for cast shadows, floor-up.
 const _SEAT_HEIGHT := 2
@@ -66,6 +68,17 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 		c.speckle(bounds, tone, ArtConfig.fabric_speckle)
 	c.cast_shadows()
 	c.outline(full, t.outline)
+	upholstery(c)
+
+
+## The run-down finish of an upholstered seat (a sofa, an armchair, an office chair): grime, a tear or two to the stuffing,
+## a strip of tape, a stain.
+static func upholstery(c: PixelCanvas) -> void:
+	Decay.grime(c)
+	for _i in maxi(1, int(c.w * c.h / 1600.0)):
+		Decay.tear(c, 3)
+	Decay.tape(c)
+	Decay.stain(c, Decay.STAIN, 5)
 
 
 ## One puffy cushion in `tone`: a paler centre, light-aware bevel and a seam ring.

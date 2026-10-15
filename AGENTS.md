@@ -1,12 +1,12 @@
 # AGENTS.md — Forced-Entry
 
-A small top-down Godot 4.4 demo, organized into fifteen isolated domains under `scenes/`.
+A small top-down Godot 4.4 demo, organized into sixteen isolated domains under `scenes/`.
 
 **Always load the `architecture` skill before planning any change or exploring the codebase.**
-It is the map: the fifteen domains, the cross-cutting conventions, and the whole sanctioned
+It is the map: the sixteen domains, the cross-cutting conventions, and the whole sanctioned
 cross-domain interface surface. When working *inside* a domain, also load that domain's
 `domain-<name>` skill for its deep implementation detail. Behaviour specs that tests assert live in
-`docs/` (`docs/flanking-behavior.md`, `docs/cover-and-stance.md`, `docs/tactical-entry.md`, `docs/gaze-and-fire.md`, `docs/grenades.md`, `docs/hearing.md`, `docs/outfits.md`, `docs/vehicles.md`).
+`docs/` (`docs/flanking-behavior.md`, `docs/cover-and-stance.md`, `docs/tactical-entry.md`, `docs/gaze-and-fire.md`, `docs/grenades.md`, `docs/hearing.md`, `docs/outfits.md`, `docs/vehicles.md`, `docs/lighting.md`).
 
 **If you are working on a GitHub ticket (issue), invoke the `ticket` skill first.** It reads the
 ticket's label and tells you which `ticket-<label>` skill to invoke (e.g. `spike` → `ticket-spike`).

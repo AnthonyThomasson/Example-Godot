@@ -1,19 +1,47 @@
 extends Node2D
 
 ## Objects domain: draws an EnvironmentObject: its pixel art (when it has an `art` painter) or its
-## flat shape and name label, either way through the damage-deformed silhouette.
+## flat shape and name label, either way through the damage-deformed silhouette. What in the art gives light (a screen's
+## face, a tube, a bulb: `emissive()`) is drawn again over it by a child `Emissive` layer (emissive_layer.gd), through the
+## same silhouette: the light-source overlay.
 
 const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
+const EmissiveLayer = preload("res://scenes/objects/emissive_layer.gd")
 
 @onready var _obj := get_parent()  ## The EnvironmentObject this draws.
 var _art: Texture2D  ## The piece's pixel-art texture, or null for the flat shape + label.
 var _watching := false  ## Whether the Deformable's `changed` is connected yet.
 var _drawn_rotation := NAN  ## The global rotation the current drawing was made for (NAN = not drawn yet).
+var _emissive: Texture2D  ## The art's light-giving pixels, or null when nothing in it gives light.
+var _emissive_layer: Node2D  ## The child drawing `_emissive` over the art (null without one).
 
 func _ready() -> void:
 	if _obj.art != "":
 		texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_art = ObjectArt.texture(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.object_material, _obj.art_opts)
+		_emissive = ObjectArt.emissive(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.object_material, _obj.art_opts)
+		if _emissive:
+			_emissive_layer = EmissiveLayer.new().setup(self)
+
+
+## What in the piece's art gives light (a screen's face, a tube, a bulb), in the art's frame and colours, transparent
+## elsewhere; null when nothing in it does. Drawn over the art by the `Emissive` child.
+func emissive() -> Texture2D:
+	return _emissive
+
+
+## The `Emissive` child layer drawing `emissive()` (null when the piece has nothing that gives light).
+func emissive_layer() -> Node2D:
+	return _emissive_layer
+
+
+## Draw the light-giving pixels onto `layer` (the `Emissive` child) through the piece's deformed silhouette.
+func draw_emissive(layer: CanvasItem) -> void:
+	var deformable = _obj._deformable
+	var impacts: Array = deformable.impacts if deformable else []
+	Deformation.draw_shape(layer, _obj.shape_type, _obj.size, _obj.color, _obj.color, impacts,
+			deformable.damage_total if deformable else 0.0, Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR,
+			_emissive, 0.0, false)
 
 ## Redraws only when the picture can have changed: a recorded impact (the object's `Deformable` says so) or a turn, which
 ## swings the drop shadow (its offset is fixed in world space). A piece at rest, or just shoved sideways, keeps its drawing.
@@ -22,6 +50,8 @@ func _process(_delta: float) -> void:
 		var deformable = _obj._deformable  # created by the object's _ready, which runs after this node's
 		if deformable:
 			deformable.changed.connect(queue_redraw)
+			if _emissive_layer:
+				deformable.changed.connect(_emissive_layer.queue_redraw)
 			_watching = true
 	if global_rotation != _drawn_rotation:
 		_drawn_rotation = global_rotation

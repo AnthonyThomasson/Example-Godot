@@ -13,15 +13,6 @@ hostile_on_sight = true
 hostile_on_trespass = false
 entry_enabled = true
 
-[node name="Visuals" parent="."]
-body_color = Color(0.85, 0.35, 0.3, 1)
-skin_color = Color(0.78, 0.58, 0.44, 1)
-hand_color = Color(0.16, 0.16, 0.18, 1)
-hair_color = Color(0.16, 0.16, 0.18, 1)
-hair_style = "beanie"
-backpack = true
-pants_color = Color(0.15, 0.17, 0.22, 1)
-
 [node name="AgentDebug" parent="."]
 label_color = Color(1, 0.6, 0.55, 1)
 path_color = Color(0.85, 0.35, 0.3, 0.8)

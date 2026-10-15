@@ -5,9 +5,11 @@ extends RefCounted
 ## glazed (showing stacked plates) or a hinged lid with straps, and along the front a lip strip
 ## showing the doors or drawers with their handles. Options (`art_opts`, defaulting to
 ## ObjectArtConfig.cabinet_*): `front` ("doors" | "drawers" | "lid" | "none"), `count`,
-## `front_depth`, `crown`, `top` ("solid" | "glass" | "lid"), `labels`, `handle` (a Color), `props`.
+## `front_depth`, `crown`, `top` ("solid" | "glass" | "lid"), `labels`, `handle` (a Color), `props`, `neon` (a neon
+## under-glow along the front, glowing). Run down (decay.gd: `casegoods`): grime, scratches, stickers, rust on metal.
 
 const Props = preload("res://scenes/objects/art/props.gd")
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _BODY_HEIGHT := 4  ## Cast-shadow height of the carcass (props stand above it).
 
@@ -37,8 +39,21 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	_front(c, Rect2i(0, c.h - lip, c.w, lip), String(opts.get("front", ObjectArtConfig.cabinet_front)),
 			int(opts.get("count", ObjectArtConfig.cabinet_count)), bool(opts.get("labels", false)), base, t, handle)
 	c.outline(body, t.outline)
-	Props.draw_all(c, opts.get("props", []), top_rect.grow(-3))
+	Props.draw_all(c, opts.get("props", []), top_rect.grow(-3), Decay.screen_color(opts))
 	c.cast_shadows()
+	casegoods(c, material)
+	var neon := Decay.neon(opts)
+	if neon.a > 0.0:
+		Decay.neon_front(c, neon, 0.7)
+
+
+## The run-down finish of storage (a cabinet, a shelf): grime, scratches, a couple of stickers, rust on metal.
+static func casegoods(c: PixelCanvas, material: String) -> void:
+	Decay.grime(c)
+	Decay.scratches(c, 4)
+	if material == "metal":
+		Decay.rust(c, 8)
+	Decay.stickers(c, 2)
 
 
 ## The front lip: a face shaded by how it meets the light, split into `count` doors or drawers.

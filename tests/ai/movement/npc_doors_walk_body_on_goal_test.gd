@@ -36,7 +36,7 @@ func describe() -> Dictionary:
 
 func configure(s: TestSetup) -> void:
 	s.layout([
-		{ "key": "hall", "type": "entry_hall", "rect": HALL },
+		{ "key": "hall", "type": "hallway", "rect": HALL },
 		{ "key": "store", "type": "bedroom", "rect": STORE },
 	], [
 		{ "pos": STORE_DOOR, "width": 60.0 },

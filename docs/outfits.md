@@ -1,7 +1,7 @@
 # Outfits
 
 What a character wears, for the player and for NPCs: a garment in each of five slots, two armour plates in a plate carrier, and what
-that does to a round that strikes the body. Behaviours O1 to O14 are the spec; each has the tests named under it, following the
+that does to a round that strikes the body. Behaviours O1 to O15 are the spec; each has the tests named under it, following the
 convention of `docs/grenades.md` and `docs/tactical-entry.md`. The tests are in `tests/character/`, `tests/projectile/`, `tests/items/` and
 `tests/ui/` (`tools/run_tests.sh outfit`: every one is tagged `outfit`) and reach the game through `tests/_outfit/outfit_probe.gd`, which
 also fires real gun and fragment rounds down shooting lanes, each with a witness standing behind the target to show whether a round came out.
@@ -24,7 +24,7 @@ plate carrier), `pants` (jeans, tactical pants), `feet` (shoes, boots), `front_p
 ceramic IV plate). Ids are StringNames, `&""` = nothing worn. Head, vest and both plates may be left empty; once an outfit is chosen the
 body, pants and feet are always worn. A plate is worn only in a garment that holds plates (the plate carrier): one put in any other vest,
 or with no vest, is dropped. `Character.set_outfit(ids)` replaces the whole outfit; `outfit_view()` reads it (O13). A character never
-dressed (the scene defaults, tests) wears nothing: no protection, no weight and its own look (its look exports); only O2 and O3 apply to it.
+dressed (the scene defaults, tests) wears nothing: no protection, no weight and its style's own clothes (O15); only O2 and O3 apply to it.
 Tests: `items/loadout_outfit`, `character/hit_zone_by_bullet_height` (nobody dressed), `character/outfit_weight_slows` (the bare body).
 
 ### Where a round strikes
@@ -119,8 +119,7 @@ rng, so every outfit takes the same number of draws). In the setup window a side
 are enabled again when one is picked, and a disabled plate is reported as `""` by `current_config()` and `start_requested`. The window reads only
 those marks (plain data), never the ids. Defaults: **defenders** wear plain clothes (t-shirt, jeans, shoes: `default_outfit`); **invaders** a helmet, a shirt, a plate
 carrier with a steel III plate front and back, tactical pants and boots (`Main.invader_loadout`). Endless draws each side's outfit with its gun.
-The t-shirt and shirt take the character's own body colour (`body_color` on its visuals: the NPC scenes author their side's; the
-human player keeps the character's default).
+How each garment looks depends on the wearer's style (O15), never on the side's loadout.
 Tests: `items/loadout_outfit` (the options and their `plates` mark, normalize and its clearing of plates without a carrier, apply, and varied
 `random` outfits), `ui/setup_menu_config` (the picks, reported and restored; the plate picks off and on with the vest, reported as none while off).
 The side defaults, the saving and Endless are wired in Main, which no test reaches.
@@ -136,10 +135,11 @@ debug panel's lines), plate condition and health as they change.
 front); short sleeves (bare forearms) and a round neckband, or long sleeves with a cuff, a collar and buttons; the tactical vest (a padded panel
 with a velcro patch, the shoulder caps bare) or the plate carrier (front and back panels past the shoulders, straps, three magazine pouches in
 front, a drag handle on the back, a raised panel over each plate, the cummerbund on the flank); jeans (orange-stitched seams, a faded thigh) or
-tactical pants (a cargo pocket, knee pads); shoes or taller laced boots. Plate wear shows in **4** steps of 2 marks each (cracks and scuffs torn
-through to the plate's colour), each step adding to the last. A body that wears nothing is drawn with its look exports (the painters get
-only their base option keys). For every body, dressed or not, the crouched and falling trunk map the most visible of its chest, back and
-flank under the shoulders' art. A change of outfit or of a plate's wear step repaints the body, a settled fallen one included.
+tactical pants (a cargo pocket, knee pads); shoes or taller laced boots, each drawn in the wearer's style (O15). Plate wear shows in **4**
+steps of 2 marks each (cracks and scuffs torn through to the plate's colour), each step adding to the last. A slot nothing is worn in (the body,
+pants or feet of a body never dressed) is drawn in the style's own bare clothes. For every body, dressed or not, the crouched and falling trunk
+map the most visible of its chest, back and flank under the shoulders' art. A change of outfit, of style or of a plate's wear step repaints the
+body, a settled fallen one included.
 Test: `character/outfit_art` (each garment paints something plain clothes never do, standing and crouched; a worn ceramic plate repaints; a
 crouched carrier shows on the back; a fallen body's carrier taken off changes its drawing, put back restores it exactly).
 
@@ -151,6 +151,36 @@ Tests: `ui/debug_panel_outfit`, `ui/inspector_outfit` (nothing listed before a c
 **O14. The AI is unaware.** NPCs do not know what anyone wears: nothing worn enters their decisions, the snapshot Von reads or their aim. A
 stopped round still posts its `&"hit"` (an NPC hears it and is "attacked"), but it raises no `damage_taken()`, so it is not a visible wound.
 No test: there is nothing new to assert.
+
+**O15. Styles.** Every character is drawn in a style, `Character.style`: the invaders are cyberpunk police, one unit a
+match, **Zenitex** (`zenitex`: cool charcoal with light grey edges on every garment, two white stripes across each shoulder cap, segmented
+shoulder plates on a shirt, a white stencil along the vest's front and back edges with a red lamp, white forearm stripes and knee-pad bars, a
+faceless helmet with a light rim and a white glint on its visor, gloves, a pack) or **Trauma Team** (`trauma`: a white helmet red over the
+crown with a blue lamp, a green suit, a white vest with red crosses, red gloves and forearm guards, red soles, a white medic pack); the
+defenders are a crew of cybernetic criminals, each a **scavenger merc** (`merc`: mismatched drab scraps, a patched sleeve, goggles or
+multi-lens optics, a headset, a webbed chest rig with flank pouches, muddy boots) or a **heavy borg** (`borg`: chrome arms, a chrome shin,
+glowing optics, a chrome face plate, a spine rig and cables, torn sleeves, welded steel and rivets, steel toe caps). What a garment looks like
+in a style is its `OutfitConfig` row's `looks` (the same garment kind in every style; a police unit's livery colour, or the name of the palette
+a crew member draws its colour from); the rest of the look and each character's own variety (skin, hair and hair style, gloves, a pack, eyes and
+face, tattoos, inlays, a headset, a spine rig, cables, chrome arms and shin, the colours a crew member found its clothes in) is the style's row
+in `CharacterConfig.styles`, drawn from the character's `look_seed`. A police unit's rank shows: the lead's stripe across the helmet
+(`Character.rank` 2), the sergeant's chevrons (1). `Character.set_style(style, seed, rank := 0)` sets them (or the exported `style` and
+`look_seed` before `_ready`); a character never given a style is a `zenitex` (a test's puppet, a dummy, the gun range), the defender NPC scene a
+`merc`. A style is looks only: the armour layers, the weight, the surfaces a round meets, the setup window's choices and the garment names are
+the same in every style. A match styles its crews as it arms them (`Main._arm_characters`, from the house seed through its own salted RNG,
+so the styles never shift the guns or the placement): one unit drawn for every invader, the human invader too, its first the lead and its
+second the sergeant; each defender, the human defender too, drawn merc or borg with a look seed of its own. `LoadoutConfig.apply(character,
+loadout, rng, style)` passes the style on (`{ look, seed, rank, weapon }`), and `weapon` is the weapon style every item the character carries
+is drawn in (`Item.style`: `police` for the invaders, `scrap` or `pipe` drawn per defender; an item never given one is `police`).
+A gun or grenade is drawn in it held, dropped (either side up) and, a grenade, in flight and at rest: **police issue** (gunmetal, a red and
+blue light bar, a white serial; gunmetal grenades with red and blue marks), **taped scrap** (rusted steel, a wooden stock, grey tape, a rust
+magazine; a taped rusty olive frag, a taped tin-can stun) or **pipe guns** (a pipe barrel with clamp bands, a plank stock, copper wire, welds;
+a capped pipe bomb with a red fuse, a wired soda-can stun). A dropped gun and a thrown grenade keep it; what an item does never changes with it.
+Tests: `character/style_look` (one outfit drawn differently in each style with the same armour, weight and surfaces; no style draws as a
+zenitex), `general/match_styles` (one unit per match drawn from the seed, defenders mixed merc and borg with seeds of their own, every item
+in its wielder's weapon style), `items/weapon_style_look` (each gun and grenade drawn differently in each weapon style, held and lying; no style
+draws as police), `items/weapon_style_kept` (a dropped scrap gun and a thrown pipe frag keep their style) and `items/weapon_style_function`
+(the same shots, damage, sounds, throws and bursts in every style).
 
 ## Numbers
 
@@ -172,14 +202,16 @@ a soft panel).
 ## How the rules are enforced
 
 - **Items** (`scenes/items/`): `OutfitConfig` (the rows above, the slots, zones and sides), `Outfit` (the worn set, `layer`, `wear`, `weight`,
-  `look`, `view`), `LoadoutConfig` (`outfit_options`, `outfit_of`, `random_outfit`, `default_outfit`, the outfit in `normalize` / `apply` / `random`).
+  `look(style)`, `view`), `LoadoutConfig` (`outfit_options`, `outfit_of`, `random_outfit`, `default_outfit`, the outfit in `normalize` / `apply` /
+  `random`, and the style `apply` passes on), `Item.style` (stamped by `ItemRegistry.inventory_for`).
 - **Character**: `set_outfit`, `outfit()`, `outfit_view()`, `get_surface_at`, `hit_zone`, `hit_side`, and `take_hit`'s zone, armour, wear and
-  blast steps; the weight in `_speed_in` and the run's stamina; the zone and weight numbers in `CharacterConfig`. The art (`character/body/`:
-  `character_visuals.gd` and the painters, `vest_painter.gd` among them) draws from `outfit().look()`.
+  blast steps; the weight in `_speed_in` and the run's stamina; the zone and weight numbers in `CharacterConfig`. The style: `style`,
+  `look_seed`, `rank`, `set_style`, `CharacterConfig.styles`. The art (`character/body/`: `character_visuals.gd`, `character_style.gd` which
+  resolves the style's look, and the painters, `vest_painter.gd` among them) draws from `outfit().look(style)`.
 - **Projectile**: `_surface_for` asks `get_surface_at`, the armour step in `_resolve`, `HitInfo.height` filled; `Explosion`'s blast hits carry
   height -1. **Physics**: `HitInfo.height`. **Audio**: the `composite` impact material.
 - **UI** (the setup window's picks, `outfit_lines.gd` for the debug panel and the inspector) and **Main** (the side defaults, the outfit through
-  the setup window and the settings file).
+  the setup window and the settings file, the crews' styles in `_arm_characters`).
 - **Damage reported** in the `&"hit"` event, `hit_landed` and `report_shot` is the striker's, before the body's zone, blunt and reduction scaling.
 
 ## This game's own rules
@@ -193,5 +225,5 @@ plain clothes and the linear slowing; the default outfits of each side.
 ## Not modelled
 
 AI awareness of armour (aiming for the head or the flank, preferring a rifle against plates); looting armour or plates from the dead; a
-helmet's hearing protection against a stun; armour on the arms, neck or groin; gloves (the hands keep the character's colour); spall
+helmet's hearing protection against a stun; armour on the arms, neck or groin; gloves as a garment (a style's gloves are looks only); spall
 and backface wounds; plates that crack apart or are swapped mid-match; a HUD widget for the player's own armour beyond the debug panel.

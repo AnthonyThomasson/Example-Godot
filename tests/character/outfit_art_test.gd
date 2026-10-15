@@ -21,9 +21,10 @@ const CROUCHED_CHANGES := [
 	["a tactical vest", { "vest": &"tactical_vest" }],
 	["tactical pants", { "pants": &"tactical_pants" }],
 ]
-## Pixels of a garment's colour a texture needs before it counts as painting that garment (the shoulders' art of a carrier
-## holds about 30, a trunk face's panel hundreds).
-const GARMENT_PIXELS := 20
+## Pixels of a garment's colour a texture needs before it counts as painting that garment (the default style's carrier on
+## the crouched body's shoulders' art holds about 13, between its edge sheen, stencil and pouches; a trunk face's panel over a
+## hundred).
+const GARMENT_PIXELS := 8
 const CHANGES := [
 	["a hat", { "head": &"hat" }],
 	["a helmet", { "head": &"helmet" }],
@@ -97,7 +98,7 @@ func run(t: TestContext) -> void:
 	t.puppet(&"crouched").set_posture(&"crouch")
 	OutfitProbe.wear(crouched, OutfitProbe.PLAIN_CLOTHES.merged({ "vest": &"plate_carrier", "front_plate": &"steel_iii", "back_plate": &"steel_iii" }, true))
 	await t.seconds(1.0)
-	var carrier_color: Color = OutfitConfig.garment(&"plate_carrier")["look"]["color"]
+	var carrier_color: Color = OutfitConfig.garment(&"plate_carrier")["looks"][crouched.style]["color"]  # Its look in the body's style.
 	var in_carrier := _painted_in(crouched, carrier_color)
 	t.check(in_carrier >= 2, "crouched, the plate carrier shows on the folded back as well as round the neck (textures in its colour: %d)" % in_carrier)
 

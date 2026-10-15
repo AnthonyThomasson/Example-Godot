@@ -62,6 +62,8 @@ func build(setup: TestSetup) -> void:
 	for flag in OVERLAY_REGISTRY.defaults():
 		_overlay_flags[flag] = setup.overlays.has(flag)
 	_build_nav()
+	# The dusk lighting, as Main lights a match (none while `lighting.enabled` is off).
+	WorldLighting.light(self, int(setup.resolved_world().get("seed", 0)), rooms)
 	await get_tree().physics_frame
 	await get_tree().physics_frame
 	await _await_nav_sync()

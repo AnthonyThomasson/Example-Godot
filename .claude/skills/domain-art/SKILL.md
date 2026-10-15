@@ -15,9 +15,12 @@ A painter is any script with
 draws in a **canonical frame** — front toward +y, width across the front — under `canvas.light`,
 the world light already turned into that frame, so its shading lands correctly after the art is
 turned. Painters live in their own domain: Objects (`objects/art/*_painter.gd` + the `ObjectArt`
-registry), Character (`character/body/art/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`,
-`vest_painter.gd`), Items (`items/art/pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd` and the three `*_flat_painter.gd` for a gun lying
-dropped; the grenades' `stun_grenade_painter.gd`, `frag_grenade_painter.gd` and `spoon_painter.gd`), Vehicles (`vehicle/art/car_painter.gd`, `van_painter.gd`, `door_painter.gd`, `wheel_painter.gd`, `lamp_painter.gd`, through
+registry: the furniture (the cyberpunk rooms' `tech`, `recliner`, `clinic`, `security` and `hotplate` among them), the `streetlight` (its post,
+and with `part: "overhang"` its arm and head drawn overhead), `decor` (clutter, neon tubes), the tiling `floor`, `street` and `wall`,
+and `wear` (world-placed marks), all in the run-down look through the shared `decay.gd`), Character (`character/body/art/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`,
+`vest_painter.gd`), Items (`items/art/`, one painter per weapon style for the guns, held and lying dropped, `police_gun_painter.gd`,
+`scrap_gun_painter.gd`, `pipe_gun_painter.gd`, and for the frag and stun grenades, `police_grenade_painter.gd`, `scrap_grenade_painter.gd`,
+`pipe_grenade_painter.gd`, through the shared `weapon_art.gd`; and the spoon's `spoon_painter.gd`), Vehicles (`vehicle/art/car_painter.gd`, `van_painter.gd`, `door_painter.gd`, `wheel_painter.gd`, `lamp_painter.gd`, through
 the shared `vehicle_art.gd`; see `domain-vehicle`). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
 
 ## PixelArt (`pixel_art.gd`) — the renderer
@@ -30,6 +33,9 @@ the shared `vehicle_art.gd`; see `domain-vehicle`). Knobs follow `opts.get(key, 
   `Deformation.draw_shape(..., texture_angle)`). Callers pass `snap_angle(angle)` (one of
   `ArtConfig.turn_steps` lighting steps) and rotate to the exact angle when drawing — smooth
   turning, few cached textures, world-consistent light. Characters, hands, the guns, a vehicle's body, doors, wheels and lamps.
+- `emissive(painter, size, color, facing, material, opts)` — the emissive twin of `render`'s texture for the same inputs: what
+  the painter drew `glowing` (PixelCanvas), in the art's colours, transparent elsewhere, same size and turn; null when nothing in
+  it glows. Kept from the same paint (`_emissive`, beside `_cache`), so asking costs no second paint. `render_turned` keeps none.
 - Static cache keyed by painter path + inputs (+ orientation); survives scene reloads. Each
   piece's random detail is seeded by its inputs *without* orientation, so it doesn't change as the
   piece turns.
@@ -45,13 +51,22 @@ through snapshots).
 - **Shapes:** `rounded(r, radius)`, `ellipse(r)`, `disc(c, radius)` are `ConvexShape`s (one span
   per row/column: native row fills, O(1) depth-from-edge + normal, edge band enumerated
   directly); `bowed(r, radius, bow)` is a mask `Shape` (run-length sweeps).
-- **Cost:** a mask `Shape` tests every pixel of its bounds when built and keeps a per-pixel mask, depth and normal; a
+- **Cost:** a mask `Shape` tests every pixel of its bounds when built and keeps a per-pixel mask, depth and normal (eight
+  sweeps of its inside pixels, on first use), and hands `bevel` / `outline` only its edge band (`edge_pixels(k)`: depth 1..k),
+  pinned to the plain per-pixel scan by `tests/art/shape_edges_match_plain_scan_test.gd`; a
   `ConvexShape` keeps one span per row and per column, so its fill, bevel and outline cost its edge. A shape that is convex along
   both axes but not a rounded rect or ellipse can be built from outside with `PixelCanvas.ConvexShape.new(rect, x0, x1, y0, y1)`
   (per row: first inside x and one past the last; per column the same in y): the Vehicles domain's `vehicle_art.convex` does, once
   per geometry, for its windscreens and side windows. `cast_shadows()` walks the whole canvas, so a large canvas painted for every
   lighting step (a vehicle body) skips it and shades with bevels.
 - **Drawing:** `fill(shape, color, height)`, `clear`, `paint_over(rect, color)`, `line`, `px`.
+- **What gives light:** `glowing(draw: Callable, area := Rect2i())` runs a drawing (a screen's face, a tube, a bulb, an LED)
+  and marks every pixel it changed within `area` (the whole canvas when empty) as emissive; `emissive()` returns those pixels as
+  they stand in the finished art (null when none). It compares the image before and after (skipping the rows left as they
+  were), so pass a small `area` for a small drawing on a big canvas. Nothing else in the engine reads it: `PixelArt.emissive`
+  hands it to callers. `tests/art/glowing_marks_changed_pixels_test.gd` pins the marks to the plain per-pixel comparison.
+- **Reading coverage:** `covered(x, y)` for a pixel; `coverage()` (a snapshot: one byte per pixel, `y * w + x`, non-zero where
+  drawn) for a painter that reads every pixel's neighbourhood (Objects' neon strip), where a `covered` call per pixel is slow.
 - **Shading:** `bevel(shape, from_k, to_k, lit, unlit)` (light-facing edges lit, far edges
   shaded; swap for a recess), `bevel_relative` / `outline_relative` (shade what's drawn — shapes
   in several colors), `outline`, `glare`, `cast_shadows()` (a taller part shades lower pixels on

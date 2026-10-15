@@ -79,6 +79,10 @@ static var ROWS := {
 		"description": "Hits burst material particles at the entry and exit points.",
 		"static": [[PhysicsConfig, &"hit_particles_enabled"]],
 	},
+	&"lighting.enabled": {
+		"description": "The dusk lighting: ambient, sky, piece lights and fixtures, flashes, and every occluder (off = the art alone).",
+		"static": [[LightingConfig, &"enabled"], [LightMasks, &"shadows"]],
+	},
 	&"projectile.flyover": {
 		"description": "Bullets may fly over partial cover (off = every shot meets what it reaches).",
 		"static": [[BallisticsConfig, &"cover_flyover_scale", 0.0]],

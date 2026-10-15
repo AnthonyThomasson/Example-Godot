@@ -52,6 +52,7 @@ const ARRANGEMENTS := {
 
 const RECIPES := {
 	"living_room": {
+		"clutter": [["trash", 3.0], ["cables", 2.0], ["cardboard", 1.5], ["puddle", 1.0]],
 		"palettes": [
 			{ "wood": GeneralCatalog.WOOD.walnut, "fabric": GeneralCatalog.FABRIC.navy, "floor": "ash_planks" },
 			{ "wood": GeneralCatalog.WOOD.oak, "fabric": GeneralCatalog.FABRIC.terracotta, "floor": "walnut_planks" },

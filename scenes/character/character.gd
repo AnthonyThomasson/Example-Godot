@@ -23,6 +23,20 @@ extends CharacterBody2D
 @export var faction: StringName = &"player"
 ## Maximum health. Characters start at this value; configurable per character in the inspector.
 @export var max_health: float = 50.0
+## The style it is drawn in (`docs/outfits.md`, styles; a key of `CharacterConfig.styles`): `zenitex` or `trauma` (the invaders'
+## police units), `merc` or `borg` (the defenders' crew). What it wears is drawn in the style, and its own variety (skin, hair,
+## implants, the colours a defender found its garments in) is drawn from `look_seed`. Looks only: nothing it does changes. A
+## character never given one is a `zenitex`. Set before `_ready` (as a prop) or with `set_style`.
+@export var style: StringName = &"zenitex":
+	set(v): style = v; _look_revision += 1
+## The seed of its own variety within its style.
+@export var look_seed: int = 0:
+	set(v): look_seed = v; _look_revision += 1
+## A police unit's rank marks: 0 a trooper, 1 the sergeant (chevrons on the shoulder), 2 the lead (a stripe across the helmet).
+var rank: int = 0:
+	set(v): rank = v; _look_revision += 1
+## Bumped by every change of `style`, `look_seed` or `rank`: the visuals re-resolve the look when it moves.
+var _look_revision := 0
 
 ## Emitted once when health drops to zero.
 signal died
@@ -142,6 +156,9 @@ var _interaction: Node  ## The CharacterInteraction child, built in _ready().
 var _vehicle_use: Node  ## The CharacterVehicleUse child, built in _ready().
 ## The bodies just left (an interaction's object, a vehicle) whose collision exception waits for the body to clear them.
 var _clearing: Array = []  # untyped: a body freed while waiting stays in it until the next check
+## The living body's shadow (a LightOccluder2D child on `LightMasks.CHARACTER`, turned with `facing`); null while
+## `LightMasks.shadows` is off, and freed on death.
+var _occluder: LightOccluder2D
 
 
 func _ready() -> void:
@@ -184,10 +201,35 @@ func _ready() -> void:
 	_vehicle_use = CharacterVehicleUse.new()
 	add_child(_vehicle_use)
 
+	_occluder = LightMasks.occluder(_shadow_footprint(), LightMasks.CHARACTER)
+	if _occluder != null:
+		add_child(_occluder)
+		_occluder.rotation = facing.angle()
+
 
 func _physics_process(delta: float) -> void:
 	_physics_step(delta)
 	_restore_cleared()
+	_turn_shadow()
+
+
+## The living body's shadow footprint, in its own frame with +x along the facing (CharacterConfig.shadow_*).
+func _shadow_footprint() -> PackedVector2Array:
+	var poly := PackedVector2Array()
+	var sides := maxi(3, CharacterConfig.shadow_sides)
+	for k in sides:
+		var a := TAU * k / sides
+		poly.append(Vector2(cos(a) * radius * CharacterConfig.shadow_depth, sin(a) * radius * CharacterConfig.shadow_width))
+	return poly
+
+
+## Turn the shadow with the facing (it moves with the body, its parent); only when the facing has turned.
+func _turn_shadow() -> void:
+	if _occluder == null:
+		return
+	var angle := facing.angle()
+	if not is_equal_approx(_occluder.rotation, angle):
+		_occluder.rotation = angle
 
 
 ## One physics frame of the body: a dead one's ragdoll, else the controller's intent, the ride or interaction, and the walk.
@@ -561,11 +603,12 @@ func gun_slot() -> int:
 ## `spare_types` (`MagazineConfig.types` ids): how a spawner arms a character with its gun. Starts every gun
 ## loaded as `start_rounds` says (in `loaded_magazine` when that type fits the gun, else the gun's own); a reload
 ## in progress is dropped. Safe after `add_child`, so a spawner can re-arm a scene-placed character. A grenade slot among
-## `slots` holds `grenades[slot]` of them (else `start_rounds`, or one).
+## `slots` holds `grenades[slot]` of them (else `start_rounds`, or one). Every item carries the weapon style `weapon_style`
+## (`Item.style`: how it is drawn, never what it does).
 func set_loadout(slots: Array, hold_slot: int, spare_types: Array, loaded_magazine: StringName = &"",
-		grenades := {}) -> void:
+		grenades := {}, weapon_style: StringName = &"police") -> void:
 	_cancel_reload()
-	_items = ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades)
+	_items = ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades, weapon_style)
 	_magazines = ItemRegistry.create_magazines(spare_types)
 	_current_slot = hold_slot if hold_slot in _items else (_items.keys()[0] if not _items.is_empty() else hold_slot)
 	_raise = 0.0
@@ -579,7 +622,15 @@ func set_outfit(ids: Dictionary) -> void:
 	_outfit.set_ids(ids)
 
 
-## What the character wears (the `Outfit` the art reads its `look()` from).
+## Draw the character in `new_style` (a key of `CharacterConfig.styles`) with its own variety from `seed_value`, and a police unit's
+## `new_rank` (0 trooper, 1 sergeant, 2 lead): how Main styles a spawn (through `LoadoutConfig.apply`). Looks only.
+func set_style(new_style: StringName, seed_value: int, new_rank := 0) -> void:
+	style = new_style
+	look_seed = seed_value
+	rank = new_rank
+
+
+## What the character wears (the `Outfit` the art reads its `look(style)` from).
 func outfit() -> Outfit:
 	return _outfit
 
@@ -1154,6 +1205,9 @@ func _die(direction: Vector2) -> void:
 	# blocked, and draw it beneath them.
 	collision_layer = 0
 	z_index = CharacterConfig.ragdoll_z_index
+	if _occluder != null:  # A body on the floor casts no shadow.
+		_occluder.queue_free()
+		_occluder = null
 	end_interaction()
 	_vehicle_use.abandon()  # Killed boarding or getting out: the ride ends where the body is.
 	var momentum := move_input * _move_speed() * _push_slow + _knockback

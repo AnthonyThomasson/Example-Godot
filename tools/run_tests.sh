@@ -261,7 +261,8 @@ affected() {
     # The character composes the vehicle's CharacterVehicleUse; the camera (general) and Sound (audio) read the vehicle.
     vehicle) echo vehicle character items interaction projectile physics objects ai perf audio general ;;
     ui) echo ui ;;
-    worldgen|art|general|testing|audio) echo all ;;  # audio: the Sound autoload runs in every test
+    # audio: the Sound autoload runs in every test; lighting: every test world is lit (WorldLighting).
+    worldgen|art|general|testing|audio|lighting) echo all ;;
     *) echo all ;;  # anything unknown is treated as risky
   esac
 }
@@ -308,6 +309,7 @@ if [[ $CHANGED -eq 1 ]]; then
       tests/_harness/*) self_test=1 ;;
       tests/_ai/*) exact="$exact ai" ;;
       tests/_audio/*) exact="$exact audio" ;;
+      tests/_lighting/*) exact="$exact lighting" ;;
       tests/_vehicle/*) exact="$exact vehicle audio general" ;;   # also feeds audio/vehicle_sounds and the general vehicle tests
       tests/_perf/*) perf=1 ;;
       tests/_*/*) domains="$domains all" ;;    # an unknown helper folder: assume the worst

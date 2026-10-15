@@ -37,9 +37,9 @@ static func _all_arrangements() -> Dictionary:
 	if _arrangements.is_empty():
 		for src in [GeneralCatalog.ARRANGEMENTS, LivingRoomCatalog.ARRANGEMENTS,
 				KitchenCatalog.ARRANGEMENTS, BedroomCatalog.ARRANGEMENTS, BathroomCatalog.ARRANGEMENTS,
-				DiningRoomCatalog.ARRANGEMENTS, HomeOfficeCatalog.ARRANGEMENTS, KidsRoomCatalog.ARRANGEMENTS,
-				EntryHallCatalog.ARRANGEMENTS, HallwayCatalog.ARRANGEMENTS, LaundryRoomCatalog.ARRANGEMENTS,
-				GarageCatalog.ARRANGEMENTS]:
+				HomeOfficeCatalog.ARRANGEMENTS, HallwayCatalog.ARRANGEMENTS, LaundryRoomCatalog.ARRANGEMENTS,
+				GarageCatalog.ARRANGEMENTS, NetrunnerDenCatalog.ARRANGEMENTS, RipperdocCatalog.ARRANGEMENTS,
+				SecurityVestibuleCatalog.ARRANGEMENTS, KitchenetteCatalog.ARRANGEMENTS]:
 			_arrangements.merge(src)
 	return _arrangements
 
@@ -48,9 +48,9 @@ static func _all_recipes() -> Dictionary:
 	if _recipes.is_empty():
 		for src in [GeneralCatalog.RECIPES, LivingRoomCatalog.RECIPES,
 				KitchenCatalog.RECIPES, BedroomCatalog.RECIPES, BathroomCatalog.RECIPES,
-				DiningRoomCatalog.RECIPES, HomeOfficeCatalog.RECIPES, KidsRoomCatalog.RECIPES,
-				EntryHallCatalog.RECIPES, HallwayCatalog.RECIPES, LaundryRoomCatalog.RECIPES,
-				GarageCatalog.RECIPES]:
+				HomeOfficeCatalog.RECIPES, HallwayCatalog.RECIPES, LaundryRoomCatalog.RECIPES,
+				GarageCatalog.RECIPES, NetrunnerDenCatalog.RECIPES, RipperdocCatalog.RECIPES,
+				SecurityVestibuleCatalog.RECIPES, KitchenetteCatalog.RECIPES]:
 			_recipes.merge(src)
 	return _recipes
 

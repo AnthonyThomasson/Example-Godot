@@ -24,7 +24,7 @@ func configure(s: TestSetup) -> void:
 	s.layout([
 		{ "key": "west", "type": "living_room", "rect": Rect2(0, 0, 400, 300) },
 		{ "key": "middle", "type": "kitchen", "rect": Rect2(400, 0, 400, 300) },
-		{ "key": "east", "type": "entry_hall", "rect": Rect2(800, 0, 400, 300) },
+		{ "key": "east", "type": "security_vestibule", "rect": Rect2(800, 0, 400, 300) },
 	], [{ "pos": Vector2(400, 150), "width": 90.0 }])
 	s.von_down()
 	s.object(&"seen_sofa", "sofa", SEEN_SOFA)

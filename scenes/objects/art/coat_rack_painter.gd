@@ -2,7 +2,9 @@ extends RefCounted
 
 ## Top-down pixel-art COAT RACK painter (Objects domain, private), kept within the inscribed circle
 ## of its round footprint: three coats hanging from the hooks, splayed outward with a pale collar,
-## a hat on top and the wooden post cap with its hook arms. No options.
+## a hat on top and the wooden post cap with its hook arms, grimy (decay.gd). No options.
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _COAT_HEIGHT := 5  ## Heights for cast shadows, floor-up.
 const _HAT_HEIGHT := 8
@@ -35,6 +37,7 @@ static func paint(c: PixelCanvas, base: Color, _material: String, _opts: Diction
 		c.line(o, o + Vector2i((Vector2(cos(a), sin(a)) * radius * 0.35).round()), t.dark, _POST_HEIGHT)
 	c.fill(PixelCanvas.disc(o, 1), t.light, _POST_HEIGHT)
 	c.cast_shadows()
+	Decay.grime(c)
 
 
 ## A random coat color.

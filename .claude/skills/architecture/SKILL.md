@@ -1,6 +1,6 @@
 ---
 name: architecture
-description: The architecture map for this Godot project (Forced-Entry) — the fifteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
+description: The architecture map for this Godot project (Forced-Entry) — the sixteen isolated domains, the cross-cutting conventions, the whole sanctioned cross-domain interface surface, and the dependency graph. Load this BEFORE planning any change or exploring the codebase, and whenever you need to know where something lives or how two domains are allowed to talk. Points to each domain's `domain-<name>` skill for that domain's deep implementation detail.
 ---
 
 # Forced-Entry architecture
@@ -9,7 +9,8 @@ A small top-down Godot 4.4 demo: a pixel-art character you walk with WASD (run o
 procedurally furnished house, aiming at the mouse, with a punch on **F**, a kick on **V**, a gun (pistol, SMG or assault rifle)
 that fires on left-click and reloads on **R**, stun and frag grenades thrown on left-click, items picked on **1**–**9**, object
 interactions on **Space** (sit, lie, …) and, in the sandbox, a car or van to get into on **E**. The code is
-organized into **fifteen isolated domains** so each can be changed on its own.
+organized into **sixteen isolated domains** so each can be changed on its own. The world is lit at dusk with real 2D
+lights and shadows (the Lighting domain).
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
 interfaces), and the dependency graph. Keep changes inside a domain, and cross a boundary only
@@ -18,12 +19,12 @@ through the interfaces listed here. **When working *inside* a domain, also load 
 sub-domains keeps a short overview skill and one `domain-<domain>-<sub>` skill per sub-domain (listed in the table below); the
 composition root is `domain-main`.
 
-## The fifteen domains (one folder each under `scenes/`)
+## The sixteen domains (one folder each under `scenes/`)
 
 | Domain | Folder | Skill | Owns |
 |---|---|---|---|
-| **World Generation** | `worldgen/` | `domain-worldgen` | Picking a logical floorplan (front door, exits, hallways) and building/furnishing a house. |
-| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors): their data, how they're hit/pushed, and their painters (what each piece looks like). |
+| **World Generation** | `worldgen/` | `domain-worldgen` | Picking a logical floorplan (front door, exits, hallways) and building/furnishing a house, and placing its run-down dressing (clutter, neon, where wear gathers) and the street round it with its street lamps. |
+| **Objects** | `objects/` | `domain-objects` | The world's objects (furniture, walls, floors, the street), their wear and decals: their data, how they're hit/pushed, and their painters (what each piece looks like, in the run-down style). |
 | **Items** | `items/` | `domain-items` | The things the character holds and the actions they perform, and what it wears (outfits: garments, armour plates). |
 | **Character** | `character/` | `domain-character` (+ `domain-character-body` for `character/body/`) | The player character (built so other character types can exist). |
 | **Interaction** | `interaction/` | `domain-interaction` | Object interactions: finding a reachable object and running one of its actions (sit, lie, …). |
@@ -31,8 +32,9 @@ composition root is `domain-main`.
 | **Physics System** | `physics/` | `domain-physics` (+ `domain-physics-blood` for `physics/blood/`) | Physical reactions: forces, knockback, deformation, debris and hit particles, a grenade burst's look (flash, fireball, smoke, scorch: `Physics.spawn_explosion`), ragdoll, and blood (its own sub-folder, `physics/blood/`). |
 | **Art** | `art/` | `domain-art` | The procedural pixel-art engine every painter draws through: the canvas, the cached renderer, the shared light/tone/surface tuning. |
 | **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads, a grenade's throw, bounce, burst, a vehicle's ignition, doors, crashes, engine and skid loops) and played by the `Sound` autoload through a capped pool of positional voices; a deafened `Sound.focus` (the human) gets a muffle and a tinnitus whine. |
+| **Lighting** | `lighting/` | `domain-lighting` | The world's dusk lighting, a leaf like Audio (`docs/lighting.md`): the ambient and the sky, a light per light-giving piece (declared by the piece) and per room fixture within a per-floor budget, their seeded rhythms, the shot and explosion flashes, and who stands in a light. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), the event bus (`EventBus`), the log (`GameLog`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`) and the draw-order ladder (`DrawLayers`). |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), the event bus (`EventBus`), the log (`GameLog`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`), the draw-order ladder (`DrawLayers`) and the light masks (`LightMasks`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus, one sub-domain per folder: menus (pre-game setup window, settings page), hud (debug player panel, match HUD, seed readout, spectator inspector and its contact markers, stun screen, stack markers), overlays (overlay registry, toggle bar, performance overlay) and testing (test browser window, test result banner). |
 | **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-entry`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Plus `ai/team/`, the human's side of the entry radio (`PlayerStack`, interface 17). Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Vehicles** | `vehicle/` | `domain-vehicle` | Drivable vehicles (a car and a van, only in the sandbox): the rigid body and its driving model, doors and seats, getting in and out (the character's `CharacterVehicleUse` component and the ride), collisions and the harm to a character struck, the dents, the vehicle art and its events. |
@@ -40,8 +42,9 @@ composition root is `domain-main`.
 
 `scenes/main.gd` (`main.tscn`) is the **composition root** — with the Testing domain's runner
 (interface 13), the only code that knows every domain. It asks World-Gen for a house, places the NPCs (`scenes/match_spawner.gd`),
-arms every character with its side's loadout and wires the HUDs, overlays and settings page; the setup window's **Tests** button
-sends it to the test browser instead. Match lifecycle (Start / Watch / Endless, teardown, the Von-server wait), the placement rules and
+arms and styles every character for its side (its loadout; the match's police unit or a defender's crew style and weapon style, read off
+`CharacterConfig.styles`) and wires the HUDs, overlays and settings page; the setup window's **Tests** button
+sends it to the test browser instead. It lights the match (`WorldLighting.light`, interface 20) right after the nav bake. Match lifecycle (Start / Watch / Endless, teardown, the Von-server wait), the placement rules and
 the exports are the **`domain-main`** skill. `project.godot` autoloads only `Keybinds`, `Despawner` and `EventBus` (all General) and
 `Sound` (Audio).
 
@@ -59,6 +62,17 @@ interfaces it takes part in (by number) and describes how they're implemented.
    - `WorldGen.get_openings(house) -> Array` — the house's doorways as `{ pos, width, front, exit, rooms }` dicts
 	 (world-space `pos`, `rooms` = keys of the rooms it joins; `front` = the one front entrance, on the south
 	 wall, `exit` = a back/side/garage door, each with one room), read from the house's `openings` metadata.
+   - The run-down dressing a generated house carries, read from its `wear`, `clutter` and `street` metadata the same way (empty
+	 for a hand-laid layout): `WorldGen.get_wear(house) -> Array` — `{ room, pos, layer }` per wear cluster (0-3 a room, by a wall,
+	 a corner or furniture; `pos` its world-space centre, `layer` the CanvasItem drawing that room's wear, one per room);
+	 `WorldGen.get_clutter(house) -> Array` — `{ room, key, node }` per walk-over clutter piece (0-2 a room, no `key` twice; a
+	 non-solid catalogue piece, never carved into the nav map); `WorldGen.get_street(house) -> Array` — `{ kind, rect, node }` per
+	 piece of the street ring round the house (`kind` `street` or `sidewalk`, world-space `rect`, `node` the floor drawing it;
+	 none registers a `SoundSurface`, interface 16, so footsteps out there stay `outdoor`); `WorldGen.get_streetlights(house) -> Array`
+	 (its `streetlights` metadata) — `{ pos, node }` per street lamp along the front sidewalk (`pos` its world-space centre, `node` the
+	 placed piece under the house: a solid, anchored metal post, carved into the nav map, its arm and head an overhang; about
+	 `WorldGenConfig.streetlight_every` px apart, none within `streetlight_door_clear` px of a front or exit doorway's centre nor in the
+	 strip straight out of one: a lamp that would be is dropped).
    - Read-only catalogue lookups (used by the Testing domain to place single pieces):
 	 `WorldGen.object_definition(key) -> Dictionary` (for `ObjectFactory.spawn`),
 	 `WorldGen.floor_definition(key) -> Dictionary` (for `FloorFactory.spawn`) and
@@ -73,11 +87,25 @@ interfaces it takes part in (by number) and describes how they're implemented.
    entry); it never touches world-gen internals.
 
 2. **World Generation → Objects** (the only way world-gen makes entities)
-   - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node`
+   - `ObjectFactory.spawn(definition: Dictionary, position, parent, opts) -> Node` — `opts`: `name`, `rotated`, `color`, `facing`,
+	 and `neon` (`"cyan"` / `"magenta"` / `""`: the piece's neon trim or screen; omitted, Objects picks it per piece for a share of
+	 the light-giving pieces, from where it stands). Two definition fields shape a piece beyond its look: `anchored` (true: a solid
+	 piece that never moves, frozen static: no push, kick, round or blast shoves or turns it, it is still struck, dented and throws
+	 debris) and `overhang` (`{ size, reach }`: an overhead part drawn beyond the footprint by the piece's painter with
+	 `part: "overhang"`, `size` across x out, centred `reach` px out along its facing; a child CanvasItem named `Overhang` with
+	 `get_rect() -> Rect2` (the area it draws, in its own frame), at `DrawLayers.OVERHEAD` above the characters, with no collider).
    - `WallFactory.spawn(rect: Rect2, thickness, openings, name, parent, style = {}) -> Node` —
 	 `style` is the cap's look (`art`, `color`, `art_opts`); empty = a flat gray line.
    - `FloorFactory.spawn(rect: Rect2, definition: Dictionary, name, parent) -> Node` — a room's
-	 floor (no collider), from a floor definition (`art`, `color`, `material`, `art_opts`).
+	 floor or a piece of the street (no collider), from a floor definition (`art`, `color`, `material`, `art_opts`, and optionally
+	 `sound_surface` (false: registers no `SoundSurface`, the street), `marks` (`{ seed, lane, edges }`: the street's world-placed
+	 marks, curb and gutter litter, laid by Objects over the piece), `tile_from` (the point in `parent`'s space its repeating
+	 tile is laid from, so neighbouring pieces share one grid) and `light_layer` (`"street"`: the piece and its canvas items on
+	 `LightMasks.STREET`, interface 20)).
+   - `WearFactory.spawn(rect: Rect2, floor_definition: Dictionary, wall_thickness, clusters: Array, name, parent) -> Node2D` — a
+	 room's wear: World-Gen places the clusters (`{ pos, wall, seed }`: centre, the free stretch of wall `[a, b]` it is by or `[]`,
+	 the seed of its marks, in `parent`'s space); Objects decides each cluster's marks (on the floor, following its pattern, and
+	 often on that wall) and draws them. Built after the house's floors and walls; one node per room.
    - `WallFactory.openings_for(rect: Rect2, doors: Array) -> Array` — the `{ pos, width }` doorways that lie
 	 on `rect`'s walls, as the `openings` `spawn` takes (World-Gen and the Testing domain's layouts use it).
    - `Wall.Side` — the enum inside those `openings` (callers get them from `openings_for`).
@@ -192,32 +220,42 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `raises_at_contact()` / `raised_stance(hand)` (a long gun's barrel against a wall or object: held pointing up, cannot fire),
    `draw_weapon(canvas, user)`, `drop(user, velocity) -> Node2D` (let go
    as its user dies: a gun leaves a skidding `DroppedItem` in the world, the default leaves
-   nothing) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
-   is which side landed up). The character
+   nothing; the dropped node's `DroppedItem.item` is that very item) and `draw_dropped(canvas, at, angle, modulate, opts)` (how it looks lying loose; `opts.flip`
+   is which side landed up), and `drawn_art() -> Array` (the textures its last draw, `draw_weapon` or `draw_dropped`, painted: every call in
+   the frame it was last drawn, e.g. a lying item's shadow and art; pixel art is cached by what it depicts, so a test compares drawings by
+   them, like `CharacterVisuals.drawn_art()`). The character
    calls `drop` on death and removes the item from its inventory if a node came back. `ItemRegistry.create(id, rounds, magazine)` / the slot ids `UNARMED_SLOT`, `FISTS_SLOT` and `KEY_SLOT` (the AI selects its fists with `ItemRegistry.FISTS_SLOT`, and names its grenades by `STUN_SLOT` / `FRAG_SLOT` (`AgentThrow.SLOTS`, the bang entry's stun); the debug panel lists the grenade rows through `LoadoutConfig.grenade_options()`; an interaction's `requires_item` is a slot id, the key's) /
-   `default_inventory()` / `inventory_for(slots, rounds, magazine, grenades)` (an optional `magazine` type the gun starts loaded with; `grenades` = slot -> count) /
+   `default_inventory()` / `inventory_for(slots, rounds, magazine, grenades, style := &"police")` (an optional `magazine` type the gun starts loaded with; `grenades` = slot -> count; `style` the weapon style stamped on every item made) /
    `create_magazines(type_ids)` (full `Magazine`s for those `MagazineConfig` types: the character's spare-magazine store) /
    `random_gun_slot(rng)` / `loadout_for(gun_slot, stuns, frags)` / `spares_for(gun_slot)`. The grenades (`docs/grenades.md`) are `Item`s too: slots `ItemRegistry.STUN_SLOT` 7 / `FRAG_SLOT` 8, a *count*
    carried (`Item.uses_left()`, -1 = unlimited for every other item; `Item.is_throwable()`; `Item.throw_stats() -> Dictionary` (`{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }` for a grenade, from its `GrenadeConfig` row via `GrenadeConfig.stats_of`; `{}` default; `ThrownGrenade.throw_stats()` answers the same for a live one); `ItemRegistry.create(slot, count)`), thrown by `secondary` after a `windup` in the `throw` stance (the `GrenadeItem` posts `&"throw"` as it leaves the hand) as a `ThrownGrenade`
-   (a world node in the group `live_grenades`: `kind`, `fuse_left()`, `throw_stats()`, `thrower`) that posts `&"grenade"` events and, when its fuse ends, calls the Projectile System's `Explosion.frag` / `Explosion.stun` (`(at, world, source, row)`, `row` = its `GrenadeConfig` row). `LoadoutConfig` (static holder) is what Main
+   (a world node in the group `live_grenades`: `kind`, `fuse_left()`, `throw_stats()`, `thrower`, and `item`, the grenade item that draws it, in
+   the thrown item's weapon style) that posts `&"grenade"` events and, when its fuse ends, calls the Projectile System's `Explosion.frag` / `Explosion.stun` (`(at, world, source, row)`, `row` = its `GrenadeConfig` row). `LoadoutConfig` (static holder) is what Main
    hands a character: `options()` (plain dicts for the setup window: `RANDOM`, then every `GunConfig` gun with its magazines),
    `grenade_options()` (the Stun and Frag rows: `{ id, label, slot, max }`; a loadout names their counts `stuns` / `frags`, 0..3), `grenade_counts(loadout)`,
    `outfit_options()` (the outfit rows: `[{ slot, label, choices: [{ id, label }] }]`, one per slot, a "None" choice `id` `&""` first where the slot may be empty; the
    vest choice that holds plates marked `plates: true`, each plate row `plate: true`),
    `normalize(loadout)` (a `{ weapon, magazine, spares, stuns, frags, outfit }` dict made valid; `outfit_of(loadout)` fills every outfit slot, a missing or unfitting
-   id taking `default_outfit`'s: plain clothes, and clears both plates unless the vest holds plates), `apply(character, loadout, rng) -> gun id` (arms it through `Character.set_loadout` and dresses it in the whole
-   outfit through `Character.set_outfit`) and `random(rng)` (with `random_outfit(rng)`, drawn after the gun). **Outfits** (`docs/outfits.md`): `OutfitConfig`
-   (static holder: the garment and plate rows, `GARMENT_SLOTS` / `PLATE_SLOTS` (String keys `head body vest pants feet front_plate back_plate`),
-   `choices(slot)`, `fits(slot, id)`, `name_of(slot, id)`) and `Outfit` (`RefCounted`, one character's worn set: `set_ids(ids)`, `ids()`, `worn(slot)`, `condition(slot)`,
+   id taking `default_outfit`'s: plain clothes, and clears both plates unless the vest holds plates), `apply(character, loadout, rng, style := {}) -> gun id` (arms it through `Character.set_loadout` and dresses it in the whole
+   outfit through `Character.set_outfit`; `style` = how it is all drawn, looks only: `look` / `seed` /
+   `rank` passed to `Character.set_style`, absent = the character's style left as it is, and `weapon`, the weapon style passed to
+   `Character.set_loadout`, absent = `police`) and `random(rng)` (with `random_outfit(rng)`, drawn after the gun). **Weapon style:** every `Item` has a `style`
+   (`&"police"` for the invaders, `&"scrap"` / `&"pipe"` for a defender; default `police`), the look it is drawn in, never what it does: a gun
+   or grenade draws its `GunConfig` / `GrenadeConfig` row's `looks` row for it (the painter and its colours; `GunConfig.look(gun, style)` /
+   `GrenadeConfig.look(kind, style)`, `default_style` `police` for a style it has no row for), held, dropped (either side up) and, for a
+   grenade, in flight and at rest; a dropped gun is the item it was, and a thrown grenade's `item` takes its thrower's item's style. **Outfits** (`docs/outfits.md`): `OutfitConfig`
+   (static holder: the garment and plate rows, a garment's `looks` per character style (`zenitex`, `trauma`, `merc`, `borg`: its `kind` and a `color`
+   or a `palette` name, `default_style` for a style it has no row for), `GARMENT_SLOTS` / `PLATE_SLOTS` (String keys `head body vest pants feet
+   front_plate back_plate`), `choices(slot)`, `fits(slot, id)`, `name_of(slot, id)`) and `Outfit` (`RefCounted`, one character's worn set: `set_ids(ids)`, `ids()`, `worn(slot)`, `condition(slot)`,
    `layer(zone, side)` (the armour a round meets there: `{}` or `{ stop_power, penetration, material, color, blunt, reduction, blast, plate }`), `wear(zone, side, damage)`,
-   `weight()`, `look()` (what the art draws), `view()` (what the UI shows) and `revision` (bumped by every change, which the art watches)). The
+   `weight()`, `look(style)` (what the art draws, in that character style), `view()` (what the UI shows) and `revision` (bumped by every change, which the art watches)). The
    character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)` (0..1, how far that hand is thrown: a long gun swings round by it),
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
    `world_root()` (also read by the AI: the characters it perceives are the group `characters` under it), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
    `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`), `aim_target()` (the aim point a grenade is thrown to) / `aim_sway()` (rad, the stun's wandering turn of every shot and throw; 0 unstunned) and `weapon_raise()` (0..1, how far
    a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
    `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
-   `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their look and hold. **Ammo:** `Item` has inert hooks
+   `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their sizes and hold (the look is the row's `looks`, above). **Ammo:** `Item` has inert hooks
    `rounds_loaded()` / `ammo_capacity()` (-1 = no ammo), `reload_time()`, `can_reload(user)`, `finish_reload(user)` and a
    `reloading` flag the character sets. **Gun identity:** `gun_id()` (the `GunConfig` id, `&""` for a non-gun) and `round_power()`
    (the penetration power of its rounds, 1 for a non-gun), which the character reads for its `reload` event. A `Magazine` (an `Item` subclass, types in `MagazineConfig`, each tied to one `gun` id,
@@ -244,10 +282,13 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `current_item()` / `current_slot()` / `item_reach()` / `has_item(id)` (the held item, its slot and reach, and whether a slot is carried — what the AI's wording, the debug panel and `requires_item` interactions read), `is_attacking()` (a punch swing is under way), `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
    `is_automatic()`, `item_count(slot := -1)` (a grenade slot's count, 1 for any other item, 0 for none), `throw_stats(slot := -1)` (what a grenade carried in the slot tells its holder, `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot: how the AI reads a grenade's numbers, instead of keeping a copy), `throw_release_offset(slot := -1)` (where a grenade leaves its hand when it throws one standing: the hand of its `throw` stance, as `Vector2(px ahead of the body centre, px to its right)` in its own frame; the AI judges a lob from there, instead of keeping a copy of the stance), `aim_target()` (the swayed aim point a grenade
-   is thrown to, interface 6: where the AI expects its own grenade to come down), `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` (carry only those slots, holding one, with those spare
-   magazines, the gun loaded with that type when it fits, a grenade slot with `grenades[slot]` of them: how Main arms a spawn with its side's loadout);
+   is thrown to, interface 6: where the AI expects its own grenade to come down), `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {}, weapon_style := &"police")` (carry only those slots, holding one, with those spare
+   magazines, the gun loaded with that type when it fits, a grenade slot with `grenades[slot]` of them, every item in that weapon style (`Item.style`): how Main arms a spawn with its side's loadout);
+   how it is drawn (`docs/outfits.md` O15, looks only): `style` (exported; a `CharacterConfig.styles` key: `zenitex` / `trauma` the police units, `merc` / `borg`
+   the defenders' crew; `zenitex` when never given one), `look_seed` (exported: its own variety within the style), `rank` (a police unit's: 0 trooper, 1 sergeant,
+   2 lead) and `set_style(style, seed, rank := 0)` (`LoadoutConfig.apply` calls it);
    what it wears (`docs/outfits.md`): `set_outfit(ids)` (`{ head, body, vest, pants, feet, front_plate, back_plate }`, replacing the whole outfit; `LoadoutConfig.apply`
-   calls it), `outfit() -> Outfit` (what its art reads `look()` and `revision` from) and `outfit_view()` (each garment slot -> its name, "" for none; each plate slot ->
+   calls it), `outfit() -> Outfit` (what its art reads `look(style)` and `revision` from) and `outfit_view()` (each garment slot -> its name, "" for none; each plate slot ->
    `{ type, name, condition }`: what the debug panel and the spectator inspector list), and where a round strikes it: `hit_zone(height)` (`feet` / `legs` / `torso` /
    `head` by height over the posture's coverage; `&""` below 0) and `hit_side(direction)` (`front` / `flank` / `back` against the shoulders' facing), with
    `get_surface_at` (interface 3); an outfit's weight slows `run_speed()` and every pace;
@@ -309,11 +350,12 @@ interfaces it takes part in (by number) and describes how they're implemented.
    - `NavBuilder.build(house, rooms, parent, agent_radius=14.0) -> NavigationRegion2D` — bakes
 	 one `NavigationRegion2D` whose walkable area is the house footprint plus an outdoor ring minus the house's
 	 **static** wall colliders (doorways stay open) **and minus each solid furniture footprint**
-	 (baked in as a hole), so paths route around furniture.
+	 (baked in as a hole: every `RigidBody2D` with a collider, an anchored piece frozen static among them; walk-over decor has
+	 none), so paths route around furniture.
    - `NavBuilder.rebake(region, house, rooms, agent_radius=14.0)` — re-carves the furniture holes in
 	 place at the pieces' **current** positions; `rebake_async(region, house, rooms, agent_radius, done)` does it with the
 	 bake on the NavigationServer's worker thread (what the Navigation domain's own `nav_updater.gd` drives).
-   - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints as world-space
+   - `NavBuilder.furniture_holes(house) -> Array` — the carved furniture footprints (the anchored pieces' included) as world-space
 	 polygons: what the Navigation domain's draw-only `nav_debug.gd` overlay draws and its `nav_updater.gd` watches for a
 	 moved piece, and what Main's `match_spawner.gd` keeps a spawn's clearance from.
    - **Characters at rest are holes too, on a second map.** `NavBuilder.character_holes(root) -> Array` (the footprints of the
@@ -366,7 +408,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
       `throw` (`throw/<kind>`), a `grenade` `bounce` (`grenade/<kind>/<floor>`, the floor from `SoundSurface.at`; a `rest` is silent) and the `explosion`, and of the `stun`
       only a deafening of its `focus` (interface 18); the AI hears where a grenade comes down from its `bounce` / `rest`, and the UI's `StunScreen` reads the human's own `stun` event to freeze the frame of the flash.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
-      muzzle)`, gun, attacker, power }`).
+      muzzle)`, gun, attacker, power }`). Audio voices it and the Lighting domain lights a muzzle flash (as it lights a burst on an
+      `&"explosion"`).
     - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
       foot` (0 left / 1 right)`, speed, running, character` (the walker)`, crouched }`). Audio voices it; the AI hears it
       (`docs/hearing.md` H1: a stranger's steps through walls, out to a range set by `running` / `crouched`).
@@ -408,13 +451,22 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  hand queries and leg sweeps (`character/body/`), a dropped item's glance (`items/dropped_item.gd`), a thrown grenade's flight (`items/thrown_grenade.gd`), the
 	  bullet's `collision_mask` (`projectile/projectile.gd`), the blast's lines (`projectile/explosion.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
 	  checks and pile queries (`scenes/vehicle/`) and the character's clearing check (`keep_clear_of`) read it too.
+    - `LightMasks` (`general/light_masks.gd`, a `class_name` static holder) — the light masks every domain builds its shadows and
+	  light layers on, so who shadows whom is decided in one place (`docs/lighting.md` L6): the occluder bits `WALL` 1, `FURNITURE` 2,
+	  `EMITTER` 4 (a solid piece that gives light: it shadows only the flashes and the sky), `CHARACTER` 8; the shadow masks the
+	  Lighting domain gives its lights (`PIECE_SHADOWS` walls + furniture + characters, `FIXTURE_SHADOWS` walls, `ALL_SHADOWS`); the item
+	  light layers `HOUSE` 1 (Godot's default) and `STREET` 2 (the street, lit only by the street lamps, the flashes and its own sky);
+	  `shadows` (whether occluders are built: off with the Testing domain's `lighting.enabled`) and
+	  `occluder(polygon, bit) -> LightOccluder2D` (null while `shadows` is off; wound and culled so the shape itself stays lit). Read by
+	  Objects (walls, solid pieces, the street floors), Character (the living body) and the Lighting domain (interface 20).
     - `DrawLayers` (`general/draw_layers.gd`, a `class_name` static holder) — the world's draw-order ladder, one rung per kind of thing,
 	  so what lies on the floor, what a vehicle covers and what flies over it keep one order across domains: `FLOOR` −5 (Objects' `Floor`,
 	  via `ObjectArtConfig.floor_z_index`) < `RUG` −4 (rugs and mats, `ObjectArtConfig.rug_z_index`) < `BLOOD` −3 (Physics: splats, a
 	  bleed-out pool, prints and smears, the scorch decals; `BloodConfig.z_index` / `print_z_index`) < `LYING` −2 (a dead body,
 	  `CharacterConfig.ragdoll_z_index`; a spent casing, Projectile; a `DroppedItem` and a grenade at rest, Items) < `UNDER_VEHICLE` −1
 	  (a vehicle's `Chassis`) < `STANDING` 0 (Godot's default: the living, a vehicle's occupants, furniture, walls) < `ABOVE` 1 (a
-	  vehicle's `Roof`, a grenade in flight, the UI's `StackMarkers`) < `EFFECTS` 4 (Physics' `ExplosionFx`). A domain's own z knob is initialised from its rung,
+	  vehicle's `Roof`, a grenade in flight, the UI's `StackMarkers`) < `OVERHEAD` 2 (a piece's `Overhang`, Objects:
+	  `ObjectArtConfig.overhang_z_index`, a streetlight's arm and head; a room's ceiling fixture, Lighting) < `EFFECTS` 4 (Physics' `ExplosionFx`). A domain's own z knob is initialised from its rung,
 	  never a bare number; within a rung the scene tree decides. `docs/vehicles.md` V3 / V6 (a body struck down lies under the vehicle).
 
 12. **Objects / Character / Items / Vehicles → Art** (leaf: the pixel-art engine; each domain owns its painters)
@@ -426,18 +478,22 @@ interfaces it takes part in (by number) and describes how they're implemented.
     - `PixelCanvas` — the surface a painter draws on (`static paint(canvas, base, material, opts)`):
 	  shapes (`rounded`/`ellipse`/`disc`/`bowed`), `fill`, `bevel`, `outline`, `surface`, `grain`,
 	  `speckle`, `glare`, `cast_shadows`, `tones(base)` …; `PixelCanvas.ConvexShape.new(rect, x0, x1, y0, y1)` (a shape from its per-row
-	  and per-column spans) is built from outside by the Vehicles domain's `art/vehicle_art.gd`.
+	  and per-column spans) is built from outside by the Vehicles domain's `art/vehicle_art.gd`. **What gives light** (a screen's
+	  face, a tube, a bulb, an LED) a painter draws inside `canvas.glowing(draw: Callable, area := Rect2i())`, which marks every pixel
+	  the drawing changes as emissive; `PixelArt.emissive(painter, size, color, facing, material, opts) -> Texture2D` returns those
+	  pixels of `render`'s texture for the same inputs (same paint, cached beside it; transparent elsewhere, null when nothing in it
+	  glows), for a caller that draws light sources unshaded.
     - `ArtConfig` (`class_name` static holder) — the shared resolution, light, drop/cast shadow,
 	  turn steps, tone ramp and surface-finish tuning.
     Objects' painters + `ObjectArt` registry, Character's body, head, hand, limb, trunk and vest painters, Items' painters
-    (`items/art/`: the guns held and dropped, the frag and stun grenades and the spoon) and Vehicles' painters (`scenes/vehicle/art/`: car, van, door, wheel, lamp) all render through
+    (`items/art/`: one gun and one grenade painter per weapon style, police, scrap and pipe, drawing the guns held and dropped and the frag and stun grenades, and the spoon) and Vehicles' painters (`scenes/vehicle/art/`: car, van, door, wheel, lamp) all render through
     these; Art imports nothing from other domains.
 
 13. **Testing → every domain** (a second composition root, like `main.gd`)
     `scenes/testing/` builds a test's world and drives it through the interfaces above only:
     WorldGen (1, incl. the catalogue lookups) or an arena / hand-laid room layout from the three
     factories (2, incl. `WallFactory.openings_for`), `NavBuilder`
-    + `nav_updater.gd` (9), the character scenes plus the controller contract (7) — a puppet
+    + `nav_updater.gd` (9), the dusk lighting as Main lights a match (20: `WorldLighting.light` after the nav bake), the character scenes plus the controller contract (7) — a puppet
     `ScriptedController` or `player_controller.gd` on `character/character_base.tscn` (the
     controller-less character), the vehicle scenes (19: `TestSetup.vehicle(id, kind, pos, rotation := 0.0, props := {})` instances
     `res://scenes/vehicle/<kind>.tscn` under the world root after the nav bake (not carved) and waits one physics frame so the new bodies
@@ -490,7 +546,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
     - `SoundSurface.register(rect: Rect2, material: String, pattern: String = "") -> int` /
       `SoundSurface.unregister(id)` — Objects' `Floor` registers its world rect with its `floor_material` and
       the painter's `pattern` in `_ready` and unregisters in `_exit_tree` (the same way it already feeds
-      `BloodSurface`).
+      `BloodSurface`); a floor whose definition sets `sound_surface: false` (the street round a house) registers none.
     - `SoundSurface.at(pos) -> StringName` — what the ground is at a world point (`wood tile stone concrete
       carpet`, or `outdoor` when no floor covers it; the newest floor wins). Read only by the Audio domain's
       `Sound` service, to voice a footfall.
@@ -547,13 +603,38 @@ interfaces it takes part in (by number) and describes how they're implemented.
       `player_controller.gd` calls `try_use_vehicle()` on `Keybinds.USE_VEHICLE` (E). Only the sandbox and the tests place a vehicle:
       Main, World-Gen, the nav map and the AI do not know them.
 
+20. **Main / Testing → Lighting, and the world's lights and shadows** (`scenes/lighting/`; spec `docs/lighting.md`; Lighting is a
+    leaf: it imports only General and reads the world duck-typed)
+    - `WorldLighting.light(root: Node2D, seed_value: int, rooms: Array = []) -> WorldLighting` — lights the built world under `root`:
+      adds one `WorldLighting` node under it, in the group `world_lighting` (`rooms` = `WorldGen.get_rooms`, for the fixtures;
+      `seed_value` seeds the rhythms); null, building nothing, while `LightingConfig.enabled` is off. Main calls it after the nav bake
+      with the house seed; the Testing world the same way, with its setup's seed. Its reads: `lights()` (every piece and fixture
+      PointLight2D), `fixtures()` (`{ room, light }`), `flashes()` (the pooled flash lights) and `budget()` (`{ per_floor, dropped }`,
+      `dropped` = `{ piece, index }` per declared light left without a light). `LightingConfig` (static holder): `enabled`,
+      `ambient_color`, `sky_color` and the rest of the dusk, fixture, flash and budget tuning; the Testing domain's `lighting.enabled`
+      switch sets `LightingConfig.enabled` and General's `LightMasks.shadows`.
+    - **Objects → Lighting: `get_lights() -> Array`** on a light-giving piece (an EnvironmentObject; read duck-typed, like Audio reads a
+      vehicle): one plain dict per light in the piece's frame, `offset` (Vector2), `turn` (rad, the pool's long axis), `colour`,
+      `energy`, `radius` (px, along the long axis), `shape` (`round` / `wide` / `tube`), `rhythm` (`[[mode, weight], ...]`, modes
+      `steady buzz failing blink shimmer pulse`), `room_light` (it lights its room: no fixture there), `street` (it lights the street
+      too) and `glow` (the piece's `Emissive` overlay, dimmed with the light; or null). The Lighting domain parents each light it
+      keeps to the piece, so a shoved piece carries it.
+    - **The shadows and light layers** (on General's `LightMasks`, interface 11): Objects' walls (one occluder per wall run, `WALL`) and
+      solid pieces (their footprint, `FURNITURE` or `EMITTER`) and Character's living body (an oval turned with `facing`, `CHARACTER`,
+      freed on death) build their own `LightOccluder2D` children with `LightMasks.occluder`, like their colliders; Objects' street
+      floors (catalogue `light_layer: "street"`) put their canvas items on `LightMasks.STREET`; Objects' `Emissive` overlays draw
+      unshaded. The Lighting domain reads the floors (`floor_material`, `size`, the `light_mask` of their canvas items) for the per-floor
+      budget, and each frame the characters in the group `characters` (`is_dead`, `radius`, interface 7) for whom stands in a light.
+    - **The flash events:** the `&"shot"` and `&"explosion"` topics (interface 10) light its flash pool.
+
 ### Dependency graph (arrows = "calls / knows"; no cycles)
 
 ```
-main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory ─▶ Objects ─▶ Physics
+main ─▶ WorldGen ─▶ ObjectFactory / WallFactory / FloorFactory / WearFactory ─▶ Objects ─▶ Physics
 main ─▶ NavBuilder ──(parses static colliders)──▶ NavigationServer2D
 main ─▶ Character ◀─ PlayerController ─▶ Keybinds
-main ─▶ LoadoutConfig ─▶ GunConfig / MagazineConfig / OutfitConfig / ItemRegistry (random_gun_slot / loadout_for / spares_for) ─▶ Character.set_loadout / set_outfit
+main ─▶ LoadoutConfig ─▶ GunConfig / MagazineConfig / OutfitConfig / ItemRegistry (random_gun_slot / loadout_for / spares_for) ─▶ Character.set_loadout / set_outfit / set_style
+main ──(the styles' side / weapons)──▶ CharacterConfig.styles
 main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals only, no dependency on Settings)
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects;  Projectile ──(get_surface_at / take_hit)──▶ Character ─▶ Outfit (Items)
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
@@ -583,26 +664,29 @@ Sandbox (Testing) ──(own painter)──▶ PixelArt / PixelCanvas (Art);  Sa
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 TestRunner ─▶ Camera (General: frame(targets), pan_enabled)
+main / TestWorld ──(WorldLighting.light)──▶ WorldLighting (Lighting, a leaf) ──(get_lights(), floors, group `characters`, duck-typed)──▶ the world
+Item (&"shot") / Explosion (&"explosion") ──▶ EventBus ──▶ WorldLighting (flashes)
+Objects (walls, solid pieces, street floors) / Character (the living body) ──(LightMasks.occluder, STREET)──▶ LightMasks (General)
 TestWorld ─▶ vehicle scenes (TestSetup.vehicle)
 TestRunner / TestWorld ─▶ DecisionStub / DecisionServerLauncher / NPC scenes (AI), config-holder statics (behaviour switches)
 TestBrowser ──(Back: scene change)──▶ main
 ```
 
-Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
-`Despawner`, `PhysicsLayers`, `DrawLayers`), which every domain may use (World-Gen's only outward code dep is
-the three factories; Navigation depends only on Godot's `NavigationServer2D`; Art
-only on Godot's `Image`). Tuning is split into fourteen `class_name` static holders: `BallisticsConfig`
+Physics, Navigation, Art, Audio, Lighting and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
+`Despawner`, `PhysicsLayers`, `DrawLayers`, `LightMasks`), which every domain may use (World-Gen's only outward code dep is
+the four factories; Navigation depends only on Godot's `NavigationServer2D`; Art
+only on Godot's `Image`; Lighting reads the world only duck-typed). Tuning is split into fifteen `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact, debris and hit particles, deformation, the explosion's look, the ragdoll solver), `CharacterConfig` (walking
-push + punch + being stunned + hit zones, sides and the outfit's weight + the character's art, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
+push + punch + being stunned + hit zones, sides and the outfit's weight + the character's art and its styles, pose, stances and fall), `BloodConfig` (blood splatter, drips and bleed-out), `ArtConfig` (the shared pixel-art light,
 shadows, tones and finishes), `ObjectArtConfig` (Objects' painter proportions/colors, props,
-floor/wall tiles), `WorldGenConfig` (World-Gen's furnishing fill pass), `MagazineConfig` (Items: magazine
+floor/wall tiles, the run-down look: palette grade, grime, neon share, wear marks, street), `WorldGenConfig` (World-Gen's
+furnishing fill pass, the run-down dressing's placement, the street ring and its street lamps), `MagazineConfig` (Items: magazine
 types, capacities and reload times), `GunConfig` (Items: one row per gun — damage, fire rate, penetration,
-muzzle speed, spread, recoil, magazine, whether it raises at a wall), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, and the blast or flash and bang numbers), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, look, the armour's zones, sides and protection numbers, a plate's durability), `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands, the vehicles' engine, skid and crash numbers), `VehicleConfig` (Vehicles: one row per kind — size, mass, engine, brakes, steering, grip, doors and seats — one `looks` row per kind, and the shared getting-in, driving, harm, crash, camera and look numbers) and `LoadoutConfig` (Items: the setup choices' bounds — spare magazines, grenades — and the default outfit). World-Gen's `LayoutRules` (which rooms may
+muzzle speed, spread, recoil, magazine, whether it raises at a wall, its looks per weapon style), `GrenadeConfig` (Items: one row per grenade kind — fuse, windup, range, flight, the blast or flash and bang numbers, its looks per weapon style), `OutfitConfig` (Items: the garment and plate rows — slot, name, weight, looks per character style, the armour's zones, sides and protection numbers, a plate's durability), `SoundConfig` (Audio: the master switch, category volumes, voice caps and ranges, pitch/volume jitter, sample rate, round-weight bands, the vehicles' engine, skid and crash numbers), `VehicleConfig` (Vehicles: one row per kind — size, mass, engine, brakes, steering, grip, doors and seats — one `looks` row per kind, and the shared getting-in, driving, harm, crash, camera and look numbers), `LightingConfig` (Lighting: the master switch, the dusk, the room fixtures, the flashes, the per-floor budget and the light textures) and `LoadoutConfig` (Items: the setup choices' bounds — spare magazines, grenades — and the default outfit). World-Gen's `LayoutRules` (which rooms may
 hold the front door or an exit, which room types may share a door) is a rules table in the same style, not
-tuning. There is no `Config` autoload. A fifteenth static holder, `PhysicsLayers`
-(General, interface 11), is not tuning but a shared physics-layer id, the same role `Wall.Side`
-plays for doorway sides; a sixteenth, `DrawLayers` (General, interface 11), is the shared draw-order ladder every
-domain's z knob starts from.
+tuning. There is no `Config` autoload. Three more static holders are not tuning but shared ids (General, interface 11):
+`PhysicsLayers` (a physics-layer id, the same role `Wall.Side` plays for doorway sides), `DrawLayers` (the shared draw-order
+ladder every domain's z knob starts from) and `LightMasks` (the occluder bits, shadow masks and light layers).
 
 ## Cross-cutting conventions
 

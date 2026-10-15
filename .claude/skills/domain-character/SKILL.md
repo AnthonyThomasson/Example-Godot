@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, the outfit (hit zones, sides, armour in take_hit, its weight), death, footsteps, walking into furniture, riding a vehicle (the forwards to the Vehicles domain's CharacterVehicleUse and the ride pose) and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, the outfit (hit zones, sides, armour in take_hit, its weight), its style (how it is drawn: set_style, look_seed, rank), its shadow (the living body's light occluder), death, footsteps, walking into furniture, riding a vehicle (the forwards to the Vehicles domain's CharacterVehicleUse and the ride pose) and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -29,7 +29,7 @@ character's fresh `facing`, and the character pulls its controller's intent at t
 ## Death
 
 `_apply_damage(amount, direction)` (shared by `take_hit`, which passes the shot's direction, and
-`take_damage`, the punch path) calls `_die(direction)` at zero health. `_die` leaves layer 1 and
+`take_damage`, the punch path) calls `_die(direction)` at zero health. `_die` leaves layer 1, frees its light occluder (below) and
 moves to `CharacterConfig.ragdoll_z_index` (`DrawLayers.LYING`, −2: beneath the living and a vehicle's chassis and roof, above blood
 pools; `vehicle/fallen_body_under_vehicle`), ends any
 interaction, abandons any vehicle ride (`CharacterVehicleUse.abandon()`: the body falls where it is, the door left as it is), builds `ragdoll` from the rig's joints with the body's momentum (walk + knockback,
@@ -43,6 +43,15 @@ pose and hands stop. How the ragdoll is built and drawn is in `domain-character-
 once fallen (blood drips and pools sample it). When the ragdoll first settles the character calls
 `Physics.bleed_out(get_parent(), self, [get_rid()])`, so a pool spreads out from under the body.
 
+
+## The body's shadow (interface 20, `docs/lighting.md` L6)
+
+A living character casts a shadow: `_ready` builds a `LightOccluder2D` child through General's `LightMasks.occluder` (none while
+`LightMasks.shadows` is off) on `LightMasks.CHARACTER`, an oval `CharacterConfig.shadow_depth` (0.72) radii deep along its +x by
+`shadow_width` (1.05) across, a `shadow_sides`-gon (`_shadow_footprint`). It moves with the body (its parent, never rotated) and
+`_turn_shadow` (after each physics step) turns it to `facing` only when the facing has turned. `_die` frees it: a 2D occluder has no
+height, so a body on the floor would throw a shadow as long as a wall's. The Lighting domain leaves the characters out of the
+shadows of a light one stands in. Test: `tests/lighting/occluders_walls_pieces_characters`.
 
 ## Footsteps (bloody footprints)
 
@@ -114,7 +123,7 @@ The run's legs, arms and shoulders (stride blend, `run` stance, shoulder sway an
 The character carries spare magazines (`_magazines`, `Magazine` items) beside its inventory: they are never in
 `_items`, so no number key or interaction can select them. They come from the exports `spare_magazine_types`
 (`MagazineConfig.types` ids, default two standard magazines for each gun) and `start_rounds` (what the starting gun is loaded with;
-negative = full), which tests and sandboxes set through `actor(..., props)`. `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` re-arms a character after the fact (a match gives an NPC or the scene-placed player its gun this way; `loaded_magazine` picks the type the gun starts loaded with). `reload()` (R, or the AI's reload
+negative = full), which tests and sandboxes set through `actor(..., props)`. `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {}, weapon_style := &"police")` re-arms a character after the fact (a match gives an NPC or the scene-placed player its gun this way; `loaded_magazine` picks the type the gun starts loaded with). `reload()` (R, or the AI's reload
 primitive) starts a timer of the held item's `reload_time()` on it if its `can_reload(self)` says a carried
 magazine would add rounds, and sets the item's `reloading` flag (a gun's support hand eases to the `reload`
 stance while it is up). `_update_reload` runs right after the controller: it cancels the reload when the character
@@ -130,15 +139,24 @@ is still cycling between rounds. `_physics_process` ticks every carried item (`I
 cooldown is in step with the frame that pulls the trigger. A controller re-presses `shoot()` every frame while the trigger is held when
 `is_automatic()` (`player_controller.gd` reads `Keybinds.is_fire_pressed()`; the test puppet has `hold_fire(on)`).
 
-**Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades)`, the carried
+**Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {}, weapon_style := &"police")` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine, grenades, weapon_style)` (every item made in that weapon style, `Item.style`: looks only), the carried
 magazines and the held slot (dropping any reload, re-judging the raise). Main uses it (through `LoadoutConfig.apply`) to arm the player and every NPC with its side's loadout — a chosen gun, or one random gun by default
 (`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
+
+## The style (`docs/outfits.md` O15)
+
+How the character is drawn, looks only: `style` (exported, a `CharacterConfig.styles` key: `zenitex` / `trauma`, the police units, `merc` / `borg`, the
+defenders' crew; `zenitex` by default, the defender NPC scene `merc`), `look_seed` (exported: its own variety within the style) and `rank` (a police
+unit's: 0 trooper, 1 sergeant, 2 lead). `set_style(style, seed, rank := 0)` sets all three (Main through `LoadoutConfig.apply`'s `style`; tests through it
+or the props). Each setter bumps `_look_revision`, which the visuals compare once a frame to re-resolve the look (`domain-character-body`). The
+style rows (`CharacterConfig.styles`: side, police, weapon styles, palettes, bare clothes, skin, hair, gloves, pack, livery marks, chrome, optics,
+implant chances) and `default_style` are this domain's tuning. Tests: `tests/character/style_look_test.gd`, `tests/general/match_styles_test.gd`.
 
 ## The outfit: hit zones, sides, armour, weight (`docs/outfits.md` O1 to O10)
 
 The character owns an `Outfit` (Items, `_outfit`; a new one wears nothing). `set_outfit(ids)` replaces the whole worn set (Main dresses every spawn
-through `LoadoutConfig.apply`; tests through it or `set_outfit`); `outfit()` hands the art the `Outfit` (its `look()` and `revision`, `domain-character-body`),
-`outfit_view()` the UI its `view()`. A character never dressed has no armour, no weight and its own look.
+through `LoadoutConfig.apply`; tests through it or `set_outfit`); `outfit()` hands the art the `Outfit` (its `look(style)` and `revision`, `domain-character-body`),
+`outfit_view()` the UI its `view()`. A character never dressed has no armour, no weight and its style's bare clothes.
 - **Where a round strikes.** `hit_zone(height)`: the bullet's `HitInfo.height` over `posture_coverage(_posture)` against `CharacterConfig.hit_zones`
   (`feet` up to 0.08, `legs` 0.45, `torso` 0.85, `head` above; the same fractions standing and crouched), `&""` for a height below 0 (a blast).
   `hit_side(direction)`: the angle between `-direction` and `pose.torso_angle` (the shoulders), `front` up to `side_front_deg` 60, `back` from
@@ -223,7 +241,7 @@ frame doesn't snap speed. Tests: `tests/character/walk_into_furniture_speed_test
 
 The NPCs are the AI domain's scenes (`ai/npc.tscn`, a generic goal-driven agent driven by `ai/goal_controller.gd`;
 see the `domain-ai` skill; `ai/npc_defender.tscn` and `ai/npc_invader.tscn` inherit it and only override data: faction, goal,
-hostility exports, colour). The player uses `player_controller.gd`. `character/character_base.tscn` is the bare
+hostility exports, and the defender's style `merc`). The player uses `player_controller.gd`. `character/character_base.tscn` is the bare
 character (body, shape, Hands, Visuals) with **no controller**, and the one place that composition is declared: `npc.tscn`
 inherits it and `main.tscn`'s `Player` instances it: a composer adds any `control()` child before it enters the tree
 (`_find_controller()` runs at `_ready`) — the Testing domain adds its puppet `ScriptedController` or
@@ -236,4 +254,4 @@ landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
 `outcome = &"punch"` and the struck `material` (the victim's `get_surface()`, `""` when it has none), for the Audio domain.
 
-**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 11 (`PhysicsLayers.SOLID` for the body's hand, leg and strike queries and the clearing check; `DrawLayers.LYING` for the fallen body), 12 (Character → Art), 18 (`stun_view()`, read off `Sound.focus`), 19 (Character ↔ Vehicle) — signatures in `architecture`.
+**Interfaces:** 3 (hittable), 4 (Character → Physics), 5 (pushable), 6 (Items ↔ Character), 7 (Character ↔ Controller), 8 (Interaction), 10 (EventBus), 11 (`PhysicsLayers.SOLID` for the body's hand, leg and strike queries and the clearing check; `DrawLayers.LYING` for the fallen body; `LightMasks.CHARACTER` for its shadow), 12 (Character → Art), 18 (`stun_view()`, read off `Sound.focus`), 19 (Character ↔ Vehicle), 20 (the body's occluder; `is_dead` / `radius` read by the lighting) — signatures in `architecture`.

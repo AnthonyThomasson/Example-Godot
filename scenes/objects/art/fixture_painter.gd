@@ -3,7 +3,10 @@ extends RefCounted
 ## Top-down pixel-art wall FIXTURE painter (thin wall-mounted pieces; Objects domain, private).
 ## Painted in the canonical frame (room side toward +y). A `mirror`: a framed glass strip with glare
 ## streaks. A `towels` rack: a chrome bar on end brackets with folded towels draped over it.
-## Options (`art_opts`): `kind` ("mirror" | "towels").
+## Run down (decay.gd): grime, and a mirror cracked. Options (`art_opts`): `kind` ("mirror" | "towels"), `neon` (a
+## mirror's frame lit as a neon strip, glowing).
+
+const Decay = preload("res://scenes/objects/art/decay.gd")
 
 const _BAR_HEIGHT := 4  ## Heights for cast shadows.
 const _TOWEL_HEIGHT := 6
@@ -16,6 +19,12 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 	else:
 		_mirror(c, base)
 	c.cast_shadows()
+	Decay.grime(c)
+	if String(opts.get("kind", "mirror")) == "mirror":
+		Decay.crack(c)
+		var neon := Decay.neon(opts)
+		if neon.a > 0.0:
+			Decay.neon_ring(c, 0, neon, 0.8)
 
 
 ## A frame around glass with two glare streaks.

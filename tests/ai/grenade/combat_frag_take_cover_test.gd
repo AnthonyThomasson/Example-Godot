@@ -26,7 +26,7 @@ func describe() -> Dictionary:
 
 func configure(s: TestSetup) -> void:
 	# A hall 100 px wide inside, wall to wall: a couch (coverage 45) and a desk (45) across it leave no line to the hostile and shield a crouched body.
-	s.layout([{ "key": "hall", "type": "entry_hall", "rect": Rect2(0, 0, 900, 112) }], [{ "pos": Vector2(0, 56), "width": 80.0 }])
+	s.layout([{ "key": "hall", "type": "hallway", "rect": Rect2(0, 0, 900, 112) }], [{ "pos": Vector2(0, 56), "width": 80.0 }])
 	s.object(&"sofa", "sofa", Vector2(700, 31))
 	s.object(&"desk", "desk", Vector2(700, 81))
 	s.actor(&"i", &"invader", INVADER_AT, { "facing": Vector2.RIGHT })

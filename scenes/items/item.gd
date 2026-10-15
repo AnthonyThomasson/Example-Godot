@@ -9,12 +9,24 @@ class_name Item extends RefCounted
 ## world_root(), report_shot(), aim_target(), aim_sway(), current_item(), and for reloading best_magazine() /
 ## take_magazine() / stow_magazine()), so Items and the Character are otherwise independent.
 
+const WeaponArt = preload("res://scenes/items/art/weapon_art.gd")
+
 ## Shown in the HUD.
 var display_name := "Item"
 ## Punch reach (px), read by the hands to size the swing.
 var reach := 28.0
 ## True while the character is reloading this item (the character sets and clears it).
 var reloading := false
+## The weapon style it is drawn in, its wielder's (`police` issue for the invaders, `scrap` or `pipe` for a defender): stamped
+## on every item a loadout makes (`ItemRegistry.inventory_for`, from `LoadoutConfig.apply`). An item never given one is `police`.
+## A gun or grenade draws its config row's look for it (`GunConfig.look` / `GrenadeConfig.look`); a dropped gun and a thrown
+## grenade keep it. Looks only: nothing it does depends on it.
+var style: StringName = &"police"
+
+var _art: Array[Texture2D] = []  ## The textures the last frame's draws of the item painted, in order (`drawn_art`).
+var _art_frame := -1             ## The process frame `_art` was painted in.
+var _look_row := {}              ## The look last drawn (a config `looks` row) and its painters' handle, so it is hashed once.
+var _look_id := 0                ## The painters' handle of `_look_row`.
 
 
 ## How `hand` (0 = right as drawn, 1 = left) is held while this item is out: the name of a stance in
@@ -170,6 +182,32 @@ func can_reload(_user) -> bool:
 ## best_magazine / take_magazine / stow_magazine). Default: nothing.
 func finish_reload(_user) -> void:
 	pass
+
+
+## The textures the item's last draw (`draw_weapon` or `draw_dropped`, every call in the frame it was last drawn: a lying item's
+## shadow and art) painted, in order. Pixel art is cached by what it depicts, so the same drawing gives the same textures and a
+## changed look new ones. Empty for an item never drawn or that draws nothing.
+func drawn_art() -> Array:
+	return _art.duplicate()
+
+
+## Record `tex` as painted by this frame's draw of the item (`drawn_art`).
+func _note_drawn(tex: Texture2D) -> void:
+	var frame := Engine.get_process_frames()
+	if frame != _art_frame:
+		_art_frame = frame
+		_art.clear()
+	if not _art.has(tex):
+		_art.append(tex)
+
+
+## The painters' handle of `look` (a gun's or grenade's config `looks` row, weapon_art.gd), registered again only when the row
+## drawn is another one (a new style, or a config row replaced).
+func _look_handle(look: Dictionary) -> int:
+	if not is_same(look, _look_row):
+		_look_row = look
+		_look_id = WeaponArt.register(look)
+	return _look_id
 
 
 ## Draw the item's weapon art onto `canvas` (the character's visuals Node2D). Default: none.

@@ -4,7 +4,9 @@ extends RefCounted
 ## (front toward +y). A `tub`: a glazed rim around a sunken basin of rippled water, a drain and a
 ## mixer tap at one end. A `shower`: a tiled tray with a central drain, a glass screen along the
 ## front and one side, a shower head on its arm and a soap dish. Options (`art_opts`):
-## `style` ("tub" | "shower").
+## `style` ("tub" | "shower"). Run down like a toilet (limescale, rust, a crack).
+
+const ToiletPainter = preload("res://scenes/objects/art/toilet_painter.gd")
 
 const _TRAY_HEIGHT := 1  ## Heights for cast shadows.
 const _RIM_HEIGHT := 5
@@ -18,6 +20,7 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	else:
 		_tub(c, base, material)
 	c.cast_shadows()
+	ToiletPainter.porcelain(c)
 
 
 ## Rim, sunken basin (inverted bevel), water with ripples and glare, drain and tap at the left end.

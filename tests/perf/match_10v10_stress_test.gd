@@ -1,8 +1,8 @@
 extends GameTest
 
-## Performance guard for the largest match the game means to carry: a 10v10 in a generated house, set up the way Main
-## sets one up (the match spawner's placement, every NPC armed from the default random loadout, nav re-baker, blood,
-## debris, sound and team radio all on) with Von scripted so no server is needed. After a warm-up that brings the
+## Performance guard for the largest match the game means to carry: a 10v10 in a generated house (the largest plan,
+## `PLAN`), set up the way Main sets one up (the match spawner's placement, every NPC armed from the default random
+## loadout, nav re-baker, blood, debris, sound and team radio all on) with Von scripted so no server is needed. After a warm-up that brings the
 ## sides into contact, 300 frames are measured to the same standard as the 5v5 match: the average frame fits in one
 ## 60 fps frame, with no spike over two. Twenty NPCs sense, decide, path and fight; the house's walls hide most
 ## hostiles from each, which is what keeps it within reach of the standard where an open arena of twenty is not
@@ -13,6 +13,10 @@ const MatchSpawner := preload("res://scenes/match_spawner.gd")
 const OverlayRegistry := preload("res://scenes/ui/overlays/overlay_registry.gd")
 
 const SEED := 7
+## The house is the largest plan by floor area (garage_home: five rooms, 760k px²), pinned rather than drawn from the
+## seed: the match is measured in a full-size house whatever the catalogue holds, and a plan added or dropped changes
+## no seed's load. A small flat would put both sides in each other's sight from the start, which is a different load.
+const PLAN := "garage_home"
 const PER_SIDE := 10
 const WARMUP_S := 6.0
 const MEASURE_FRAMES := 300
@@ -33,7 +37,7 @@ func describe() -> Dictionary:
 
 
 func configure(s: TestSetup) -> void:
-	s.house(SEED)
+	s.house(SEED, PLAN)
 	s.von_script([{ "pick": "combat" }, { "pick": "engage" }])
 	s.switch(&"ai.callouts", true)
 	s.switch(&"ai.vision", true)

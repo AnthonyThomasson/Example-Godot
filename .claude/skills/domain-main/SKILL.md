@@ -1,6 +1,6 @@
 ---
 name: domain-main
-description: Deep implementation detail for the composition root (scenes/main.gd, scenes/main.tscn, scenes/match_spawner.gd) — the one place that wires every domain: the pre-game setup flow (Start / Watch / Endless / Tests / Settings), awaiting the Von decision server, building one match under a World node (house, nav map and re-baker, NPC placement, loadout arming, match HUD, spectator inspector, debug overlays), endless-run teardown and randomisation, the settings page wiring, and the Main exports. Use when editing main.gd or match_spawner.gd, or working on match start-up, spawn placement rules, loadout arming, the endless run or how the overlays are toggled. Complements the `architecture` skill (interfaces 1, 9, 13, 14).
+description: Deep implementation detail for the composition root (scenes/main.gd, scenes/main.tscn, scenes/match_spawner.gd) — the one place that wires every domain: the pre-game setup flow (Start / Watch / Endless / Tests / Settings), awaiting the Von decision server, building one match under a World node (house, nav map and re-baker, the dusk lighting, NPC placement, loadout arming, match HUD, spectator inspector, debug overlays), endless-run teardown and randomisation, the settings page wiring, and the Main exports. Use when editing main.gd or match_spawner.gd, or working on match start-up, spawn placement rules, loadout arming, the endless run or how the overlays are toggled. Complements the `architecture` skill (interfaces 1, 9, 13, 14, 20).
 ---
 
 # Main — the composition root (`scenes/main.gd`, `main.tscn`, `match_spawner.gd`)
@@ -40,7 +40,10 @@ and answers with `set_rows`.
 Everything one match builds lives under a fresh `World` node (group `match_world`), so `_teardown_world` can free it in place:
 
 1. resolve `house_seed` (0 → random) and show it (`SeedDisplay`); `WorldGen.generate(seed, force_plan, front_entrance, world)`; `WorldGen.get_rooms`;
-2. `NavBuilder.build` the nav map, the `nav_debug.gd` overlay and the `nav_updater.gd` re-baker (interface 9);
+2. `NavBuilder.build` the nav map, the `nav_debug.gd` overlay and the `nav_updater.gd` re-baker (interface 9), then the dusk
+   lighting: `WorldLighting.light(_world, house_seed, rooms)` (interface 20, `docs/lighting.md`: the ambient, the sky, the pieces'
+   lights and the room fixtures, the flashes), under `World` so a teardown frees it; the characters spawned after it cast their own
+   shadows (their occluders) and are followed by it through the group `characters`;
 3. a `match_spawner.gd` instance places the NPCs from one RNG seeded with the house seed (see below);
 4. a human, when there is one, joins its side (`_join_player`: a clear spot for a defender, the scene anchor for an invader) and is reparented
    under `World` (draw order house < player < NPCs), is handed the stack radio (`MatchSpawner.bind_player` attaches a `PlayerStack` with the
@@ -52,7 +55,12 @@ Everything one match builds lives under a fresh `World` node (group `match_world
    magazine and spares, its stun / frag grenade counts and its outfit (`docs/outfits.md` O11). By default invaders carry 1 + 1 grenades and wear a helmet, a shirt,
    a plate carrier with a steel III plate front and back, tactical pants and boots (`invader_loadout`'s default `{ stuns: 1, frags: 1, outfit: { … } }`); defenders
    0 + 0 in plain clothes (`defender_loadout` `{}`, so `LoadoutConfig.default_outfit`: a t-shirt, jeans and shoes). The gun is the chosen one or by default
-   one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement. Tests and sandboxes never come through here and keep the weapon they ask for;
+   one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement. Each is
+   styled as it is armed (`docs/outfits.md` O15), from a second RNG seeded with the house seed XOR `STYLE_SEED_SALT` (so the styles never shift the guns):
+   its first draw is the match's police unit, one of the `CharacterConfig.styles` whose `side` is the invaders' (`zenitex`, `trauma`), worn by every invader,
+   the human invader too, the first of them its lead (`rank` 2) and the second its sergeant (1); each defender, the human defender too, draws one of the
+   defenders' styles (`merc`, `borg`), a look seed of its own and one of its style's `weapons` (`scrap`, `pipe`; an invader's is `police`), all handed to
+   `LoadoutConfig.apply` as its `style` (`{ look, seed, rank, weapon }`). Tests and sandboxes never come through here and keep the weapon they ask for;
 6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit, show_details)`, in spectator mode the camera framing + `SpectatorInspector`
    (`setup(combatants, flags, OverlayToggles.RESERVED_WIDTH)`: the width its outfit panel keeps clear; the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 
@@ -80,4 +88,5 @@ inspector and overlays observe.
   `combatants`; `bind_player(player, rooms)` does the human's equivalent (a `PlayerStack`); the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
 - Test: `tests/general/match_spawn_clear_test.gd` (two defenders in a room with a bed over its centre start clear and apart);
   `match_spawn_origin_test.gd` (a counter against the world origin is not launched by a spawn); `stack_player_wiring_test.gd` (`bind_player` attaches the stack with the house's doorways); `match_setup_test.gd`
-  covers the setup dicts, loadout arming and the endless randomisation.
+  covers the setup dicts, loadout arming and the endless randomisation; `match_styles_test.gd` the crews' styles (one unit per match from the seed, defenders mixed,
+  every item in its wielder's weapon style).

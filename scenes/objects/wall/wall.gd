@@ -4,9 +4,12 @@ extends StaticBody2D
 ## computes the wall centerline segments (with any doorways cut out), builds the static
 ## collision walls, and takes hits (deform + debris). Built by WallFactory from a rect +
 ## openings. Drawing lives in wall_visuals.gd, which reads `wall_segments()` and
-## `wall_thickness` from this node.
+## `wall_thickness` from this node. Each wall run also casts a shadow: a LightOccluder2D over its collider's rect, on the
+## General's `LightMasks.WALL`, built with the colliders (none while `LightMasks.shadows` is off).
 
 enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
+
+const ObjectArt = preload("res://scenes/objects/art/object_art.gd")
 
 @export var size: Vector2 = Vector2(600.0, 600.0)  ## Room extents (centerline of the walls).
 @export var wall_thickness: float = 24.0  ## Half the character's width.
@@ -14,10 +17,10 @@ enum Side { NONE, TOP, BOTTOM, LEFT, RIGHT }
 ## measured along the wall from its start corner (top/bottom walls start at the left,
 ## left/right walls start at the top).
 @export var openings: Array = []
-## Pixel-art cap: the tiling painter id ("" = a flat gray line), its base color (also the debris
-## color) and painter options (see ObjectArtConfig.wall_*). Read by wall_visuals.gd.
+## Pixel-art cap: the tiling painter id ("" = a flat gray line), its base color (its debris takes the colour it is drawn
+## in) and painter options (see ObjectArtConfig.wall_*). Read by wall_visuals.gd.
 @export var art: String = ""
-@export var art_color: Color = Color(0.6, 0.6, 0.6)  ## Cap base color (and debris color).
+@export var art_color: Color = Color(0.6, 0.6, 0.6)  ## Cap base color.
 @export var art_opts: Dictionary = {}  ## Painter options, e.g. { "pattern": "plaster" }.
 
 ## The wall's own ballistic surface rating (Objects owns its surface data, same as
@@ -40,10 +43,10 @@ func _ready() -> void:
 	_build_walls()
 
 
-## The wall's ballistic surface: full cover, hard to shoot through, debris in the wall's color.
+## The wall's ballistic surface: full cover, hard to shoot through, debris in the colour its cap is drawn in.
 func get_surface() -> Dictionary:
 	return { "coverage": coverage, "penetration": penetration,
-		"material": "", "color": art_color }
+		"material": "", "color": ObjectArt.drawn_color(art_color) if art != "" else art_color }
 
 
 ## Deform the nearest wall segment and spray debris. Walls are immovable, so no knockback.
@@ -170,6 +173,11 @@ func _build_walls() -> void:
 		col.position = mid
 		add_child(col)
 		_seg_colliders[i] = [col]  # keyed by wall_segments() index for later rebuilds
+		# Its shadow: the same rect, undented (a dent is too small to show in a shadow).
+		var n := dir.orthogonal() * (t * 0.5)
+		var occ := LightMasks.occluder(PackedVector2Array([start - n, end - n, end + n, start + n]), LightMasks.WALL)
+		if occ != null:
+			add_child(occ)
 
 
 ## Rebuild a damaged wall segment's collider(s) from its deformed polygon, so the wall

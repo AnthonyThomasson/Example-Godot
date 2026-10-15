@@ -5,10 +5,14 @@ extends RefCounted
 ## the odd knot — inside a light-aware bevelled rim with rounded corners, optionally dressed with
 ## props. Options (`art_opts`, defaulting to ObjectArtConfig.table_*): `plank_px`, `rim_px`,
 ## `corner_radius`, `inset` (a recessed centre panel), `runner` (a cloth runner down the long
-## axis), `gaps` (open slats, as on a bench) and `props`. A table is symmetric, so its facing only
-## turns the plank direction with the footprint.
+## axis), `gaps` (open slats, as on a bench), `props` and `neon` (a desk's: its screens and a neon strip set round its edge,
+## glowing). Run down like a chair (scratches, cup rings, burns). A table is symmetric, so its facing only turns the plank
+## direction with the footprint.
 
 const Props = preload("res://scenes/objects/art/props.gd")
+const ChairPainter = preload("res://scenes/objects/art/chair_painter.gd")
+const Decay = preload("res://scenes/objects/art/decay.gd")
+
 
 const _TOP_HEIGHT := 2     ## Tabletop height, for cast shadows.
 const _RUNNER_HEIGHT := 3  ## The runner sits on the top.
@@ -33,8 +37,12 @@ static func paint(c: PixelCanvas, base: Color, _material: String, opts: Dictiona
 			c.clear(PixelCanvas.rounded(Rect2i(0, a, c.w, 1) if c.w >= c.h else Rect2i(a, 0, 1, c.h), 0))
 	if opts.get("runner", ObjectArtConfig.table_runner):
 		_runner(c)
-	Props.draw_all(c, opts.get("props", []), Rect2i(0, 0, c.w, c.h).grow(-3))
+	Props.draw_all(c, opts.get("props", []), Rect2i(0, 0, c.w, c.h).grow(-3), Decay.screen_color(opts))
 	c.cast_shadows()
+	ChairPainter.worn_wood(c)
+	var neon := Decay.neon(opts)
+	if neon.a > 0.0:
+		Decay.neon_ring(c, 1, neon, 0.45)
 
 
 ## Planks along the long side: per-plank tone, grain and knots, seams between planks and

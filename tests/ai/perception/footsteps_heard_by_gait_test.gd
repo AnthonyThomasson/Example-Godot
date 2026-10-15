@@ -39,7 +39,7 @@ func describe() -> Dictionary:
 func configure(s: TestSetup) -> void:
 	s.layout([
 		{ "key": "den", "type": "living_room", "rect": LISTEN_ROOM },
-		{ "key": "hall", "type": "entry_hall", "rect": WALK_ROOM },
+		{ "key": "hall", "type": "hallway", "rect": WALK_ROOM },
 	])
 	s.von_script([{ "pick": "stay" }])
 	s.actor(&"listener", &"defender", LISTENER, { "speed": 0.0, "facing": Vector2.LEFT })
