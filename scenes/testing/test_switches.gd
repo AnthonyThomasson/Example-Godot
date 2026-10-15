@@ -3,7 +3,8 @@ extends RefCounted
 ## Testing domain: the ONE table of named behaviour switches a test turns on or off with
 ## `TestSetup.switch(name, on)`. Each row maps a name onto knobs that already exist, as data:
 ##   actor:  { child, props } — set each of `props` to `on` on that child of every actor that has it
-##           (child "" = the character itself), before the actor enters the tree;
+##           (child "" = the character itself), before the actor enters the tree; `controller: true` in place
+##           of `child` targets the actor's controller child (the one with `control`, interface 7);
 ##   world:  { node, props }  — set each of `props` to `on` on that node of the built world;
 ##   static: [[Script, prop], …] — set each static var to `on`, restored after the test; a row
 ##           `[Script, prop, off_value]` is for a non-bool knob: on keeps its tuning, off sets off_value.
@@ -12,43 +13,43 @@ extends RefCounted
 static var ROWS := {
 	&"ai.vision": {
 		"description": "NPCs see (off = they only learn of others by hearing, being hit or callouts).",
-		"actor": { "child": "GoalController", "props": ["vision_enabled"] },
+		"actor": { "controller": true, "props": ["vision_enabled"] },
 	},
 	&"ai.callouts": {
 		"description": "NPCs send and hear team radio callouts.",
-		"actor": { "child": "GoalController", "props": ["send_callouts", "hear_callouts"] },
+		"actor": { "controller": true, "props": ["send_callouts", "hear_callouts"] },
 	},
 	&"ai.entry": {
 		"description": "Invaders enter rooms tactically: stack, slice the pie, cross, take the corners.",
-		"actor": { "child": "GoalController", "props": ["entry_enabled"] },
+		"actor": { "controller": true, "props": ["entry_enabled"] },
 	},
 	&"ai.entry_guard": {
 		"description": "Any walk into a room that is not cleared goes in by tactical entry (needs ai.entry).",
-		"actor": { "child": "GoalController", "props": ["entry_guard"] },
+		"actor": { "controller": true, "props": ["entry_guard"] },
 	},
 	&"ai.pursuit": {
 		"description": "NPCs chase hostiles they have seen.",
-		"actor": { "child": "GoalController", "props": ["pursue_hostiles"] },
+		"actor": { "controller": true, "props": ["pursue_hostiles"] },
 	},
 	&"ai.territory": {
 		"description": "NPCs stay inside the house (the defender preset's confinement).",
-		"actor": { "child": "GoalController", "props": ["defend_territory"] },
+		"actor": { "controller": true, "props": ["defend_territory"] },
 	},
 	&"ai.hostile_on_sight": {
 		"description": "NPCs treat any non-ally they see as hostile.",
-		"actor": { "child": "GoalController", "props": ["hostile_on_sight"] },
+		"actor": { "controller": true, "props": ["hostile_on_sight"] },
 	},
 	&"ai.hostile_on_trespass": {
 		"description": "NPCs treat anyone inside their territory (the house) as hostile.",
-		"actor": { "child": "GoalController", "props": ["hostile_on_trespass"] },
+		"actor": { "controller": true, "props": ["hostile_on_trespass"] },
 	},
 	&"ai.hostile_on_attack": {
 		"description": "NPCs turn hostile toward whoever attacks them.",
-		"actor": { "child": "GoalController", "props": ["hostile_on_attack"] },
+		"actor": { "controller": true, "props": ["hostile_on_attack"] },
 	},
 	&"ai.posture": {
 		"description": "NPCs crouch while fighting in place (off = they always stand).",
-		"actor": { "child": "GoalController", "props": ["posture_enabled"] },
+		"actor": { "controller": true, "props": ["posture_enabled"] },
 	},
 	&"nav.rebake": {
 		"description": "The navmesh is re-carved as furniture is shoved around.",

@@ -232,7 +232,11 @@ func _spawn_actor(a: Dictionary, switches: Dictionary) -> Node:
 		var row: Dictionary = TestSwitches.row(switch_name).get("actor", {})
 		if row.is_empty():
 			continue
-		var target: Node = character if row["child"] == "" else character.get_node_or_null(row["child"])
+		var target: Node
+		if row.get("controller", false):
+			target = TestContext.controller_of(character)
+		else:
+			target = character if row["child"] == "" else character.get_node_or_null(row["child"])
 		if target != null:
 			for prop in row["props"]:
 				target.set(prop, switches[switch_name])

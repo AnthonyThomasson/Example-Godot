@@ -48,7 +48,7 @@ func run(t: TestContext) -> void:
 	var misplaced: Array = []
 	var seen := 0
 	for npc in spawner.combatants:
-		var brain: Node = npc.get_node("GoalController")
+		var brain: Node = TestContext.controller_of(npc)
 		for zone: Dictionary in brain.debug_zones():
 			if not ROOM_CATEGORIES.has(zone["category"]):
 				continue

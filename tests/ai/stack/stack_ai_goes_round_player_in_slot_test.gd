@@ -55,7 +55,7 @@ func run(t: TestContext) -> void:
 	var ai: Node2D = m["npcs"][0]
 	var me: Node2D = m["human"]
 	var stack: Node = m["stack"]
-	var brain: Node = ai.get_node("GoalController")
+	var brain: Node = TestContext.controller_of(ai)
 	ai.set("speed", 0.0)  # Held until the human stands in its slot (the premise).
 	if not t.require(stack != null, "the human has a stack radio (MatchSpawner.bind_player)"):
 		return

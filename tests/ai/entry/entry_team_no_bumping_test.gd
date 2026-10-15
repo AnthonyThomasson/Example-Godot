@@ -41,7 +41,7 @@ func run(t: TestContext) -> void:
 		LoadoutConfig.apply(c, { "stuns": 1, "frags": 1 }, loadout_rng)
 	var team: Array = spawner.combatants
 	var seen: Dictionary = await Bump.watch(t, team, WATCH_S)
-	var acts := ", ".join(team.map(func(c): return "%s %s" % [c.name, c.get_node("GoalController").current_act()]))
+	var acts := ", ".join(team.map(func(c): return "%s %s" % [c.name, TestContext.controller_of(c).current_act()]))
 	var stacked := _largest_stack(t, team)
 	if not t.require(stacked.size() >= 3, "three or more invaders claimed the same doorway (%s; %s)" % [str(stacked), acts]):
 		return

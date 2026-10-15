@@ -102,7 +102,13 @@ func controller(id: StringName, method := &"control") -> Node:
 	var a := actor(id)
 	if a == null:
 		return null
-	for child in a.get_children():
+	return controller_of(a, method)
+
+
+## The child of `character` that has `method` (default `control`: its controller, interface 7), or null. For
+## characters that are not test actors (a match's NPCs spawned in `run`).
+static func controller_of(character: Node, method := &"control") -> Node:
+	for child in character.get_children():
 		if child.has_method(method):
 			return child
 	return null

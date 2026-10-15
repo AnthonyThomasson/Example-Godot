@@ -46,7 +46,7 @@ static func watch(t: TestContext, defenders: Array, seconds: float) -> Dictionar
 		for npc in defenders:
 			if not is_instance_valid(npc) or npc.get("is_dead"):
 				continue
-			var brain: Node = npc.get_node("GoalController")
+			var brain: Node = TestContext.controller_of(npc)
 			var trail: Array = history.get(npc.name, [])
 			if trail.is_empty() or elapsed - trail[-1]["t"] >= 0.5:
 				var st: Dictionary = brain.debug_state()
