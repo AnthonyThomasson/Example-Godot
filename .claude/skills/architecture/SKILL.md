@@ -110,7 +110,12 @@ interfaces it takes part in (by number) and describes how they're implemented.
    contract below, deals its damage through `take_damage(amount)` (the character's plain damage entry, no HitInfo;
    tests wound a character with it too) and does **not** deform, and reads `get_surface()` only for the struck
    `material` it posts. `Explosion` reaches the characters by the one probe of interface 7 (`current_item()`), reads their `is_dead`, `facing`, `get_surface()`, and calls
-   `take_stun` / `take_damage` / `blast_push` / `take_hit` on them, and `apply_impulse` on a pushable (capped by `get_mass()`): the sanctioned surface. An object also carries `object_name` (its display name), which the AI's wording reads.
+   `take_stun` / `take_damage` / `blast_push` / `take_hit` on them, and `apply_impulse` on a pushable (capped by `get_mass()`): the sanctioned surface. Its
+   cover rule (G7, `docs/grenades.md`) is published as two read-only line queries the AI's perception asks of a grenade, so the AI keeps no copy:
+   `Explosion.shields(space, burst, p, height, exclude, cover_reach := INF) -> bool` (whether a wall, or a piece of furniture whose `coverage` is
+   above `height`, stands between a burst and a body `height` tall at `p`; with a finite `cover_reach`, a stun's flash, a piece only when `p` is
+   within that many px of it) and `Explosion.first_stop(space, a, b, height, exclude) -> Dictionary` (the first wall or piece on the line that
+   stops it for that height, as its ray hit, or `{}`). An object also carries `object_name` (its display name), which the AI's wording reads.
 
 4. **Objects/Character/Vehicles → Physics** (objects, the character and a vehicle compose physics; Physics is a leaf domain)
    - `Knockback` (Node child): RigidBody2D adapter — configures its parent body and owns
@@ -524,6 +529,7 @@ Physics debris / hit particles / blood / explosion fx, Projectile casings ─▶
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
 PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"callout": the human's claim)──▶ allied AIControllers;  StackMarkers (UI) ──(view())──▶ PlayerStack
+AI perception ──(Explosion.shields / first_stop: the blast's cover rule)──▶ Explosion (Projectile)
 ThrownGrenade (Items) ──(Explosion.frag / .stun)──▶ Explosion (Projectile) ──(take_hit / blast_push / take_stun, ProjectileSpawner fragments, Physics.spawn_explosion)──▶ Objects / Character / Physics
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
