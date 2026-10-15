@@ -236,6 +236,12 @@ class WrapperTests(unittest.TestCase):
         self.assertEqual(self.run_wrapper("clean", "--no-lint", lint="dirty")[0], 0)
         self.assertEqual(self.run_wrapper("listing_clean", "--list", lint="dirty")[0], 0)
 
+    def test_play_is_refused_with_the_command_that_launches_the_runner(self):
+        code, out = self.run_wrapper("clean", "--play", "some", "sandbox")
+        self.assertEqual(code, 2)
+        self.assertIn("test_runner.tscn -- --play <words>", out)
+        self.assertNotIn("passed,", out)
+
     def test_one_failing_shard_fails_the_whole_run(self):
         self.assertEqual(self.run_wrapper("shard1_error", "--jobs=2")[0], 1)
         self.assertEqual(self.run_wrapper("clean", "--jobs=2")[0], 0)

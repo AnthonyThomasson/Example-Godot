@@ -7,8 +7,9 @@
 #   tools/editor.sh /path/worktree        a different worktree (named after its directory)
 #   tools/editor.sh NAME                  override the name (any argument that is not a directory)
 #
-# If an editor is already open on that worktree nothing is started: its pid, port and log are
-# printed instead (the port is read from the running editor's GODOT_CMD_PORT).
+# If an editor is already open on that worktree no editor is started: its pid, port and log are
+# printed instead (the port is read from the running editor's GODOT_CMD_PORT). With --autorun and no
+# game running on that port, the game window is opened on its own (same name and port) instead.
 # The name travels as GAME_TICKET (the editor's game child inherits it; Main shows it atop the
 # setup menu). The command server listens on GODOT_CMD_PORT, so worktrees don't collide:
 #   python3 tools/gcmd.py --port <printed port> 'scene().name'
@@ -39,6 +40,13 @@ if [[ -n "$running" ]]; then
   recorded_port="$(ps eww -p "$running" 2>/dev/null | tr ' ' '\n' | sed -n 's/^GODOT_CMD_PORT=//p' | head -1)"
   recorded_port="${recorded_port:-default (not started by this script)}"
   echo "editor already running | pid $running | name $ticket | command port $recorded_port | log $log"
+  # --autorun with no game window open (nothing listening on the editor's command port): open the game on its own, with
+  # the editor's name and port, since Play cannot be pressed in an editor that is already up.
+  if [[ -n "$autorun" && "$recorded_port" =~ ^[0-9]+$ ]] && ! lsof -nP -iTCP:"$recorded_port" -sTCP:LISTEN > /dev/null 2>&1; then
+    game_log="${TMPDIR:-/tmp}/game_${ticket//[^A-Za-z0-9._-]/_}.log"
+    GAME_TICKET="$ticket" GODOT_CMD_PORT="$recorded_port" nohup "$GODOT" --path "$path" > "$game_log" 2>&1 &
+    echo "game window opened | pid $! | command port $recorded_port | log $game_log"
+  fi
   exit 0
 fi
 

@@ -48,8 +48,10 @@
 #   --strict-exit   also fail on Godot's own end-of-process leak report (reported as a NOTE by default)
 #   --no-lint       skip the GDScript lint that runs first (tools/lint.sh, ~5 s: unused variables, integer
 #                   division, shadowed names ... the warnings of the editor's Debugger > Errors tab). Any warning
-#                   fails the run before a single test starts. Not run for --list, --self-test or --play, nor when
+#                   fails the run before a single test starts. Not run for --list or --self-test, nor when
 #                   the sources are unchanged since the last clean lint (fingerprint kept in $TMPDIR).
+# Not here: --play <words> (play one test or sandbox in the runner) is the runner's own flag; this wrapper only runs
+# batches, so it refuses --play and prints the command that launches the runner.
 # Every run ends with a `Slowest:` line (wall-clock ms per test).
 # A failed test prints its final actor state and a `bundle:` path to a JSON with its event log,
 # state and traces. Each invocation gets its own engine log, report and bundles in a fresh temp dir
@@ -87,6 +89,10 @@ args=()
 for a in "$@"; do
   case "$a" in
     --shots) HEADLESS=; args+=("$a") ;;
+    --play)
+      echo "--play is the test runner's own flag; this wrapper only runs batches (and they never see sandboxes). Launch the runner:" >&2
+      echo "  \"\$GODOT\" --path . res://scenes/testing/test_runner.tscn -- --play <words>" >&2
+      exit 2 ;;
     --strict-exit) STRICT=--strict-exit ;;
     --jobs=*) JOBS="${a#--jobs=}" ;;
     --changed) CHANGED=1 ;;
@@ -126,7 +132,7 @@ jobs_for() {
   fi
   for x in "$@"; do
     case "$x" in
-      --*) case "$x" in --id=*|--domain=*|--failed=*|--shots|--list|--self-test|--play|--repeat=*) echo 1; return ;; esac ;;
+      --*) case "$x" in --id=*|--domain=*|--failed=*|--shots|--list|--self-test|--repeat=*) echo 1; return ;; esac ;;
       *) echo 1; return ;;  # a filter word
     esac
   done
@@ -198,7 +204,7 @@ run() {
   jobs=$(jobs_for "$@" ${args[@]+"${args[@]}"})
   [[ $jobs -gt 1 ]] && sharded=1
   for x in "$@" ${args[@]+"${args[@]}"}; do
-    case "$x" in --list|--self-test|--play|--shard=*) sharded=0 ;; esac
+    case "$x" in --list|--self-test|--shard=*) sharded=0 ;; esac
     case "$x" in --list|--self-test) keep=0 ;; esac
     case "$x" in --list) listing=1 ;; esac
   done
@@ -208,7 +214,7 @@ run() {
     local code=0
     godot_run "$out" "$@" ${args[@]+"${args[@]}"} || code=$?
     [[ $keep -eq 1 ]] && save_reports "$out"
-    [[ " $* ${args[*]-} " == *" --play "* ]] || scan_log "$out" $listing || code=1
+    scan_log "$out" $listing || code=1
     return $code
   fi
 
@@ -262,7 +268,7 @@ affected() {
 
 # The lint comes first: it takes seconds, and a script the analyzer complains about is not worth a test run.
 for x in ${args[@]+"${args[@]}"}; do
-  case "$x" in --list|--self-test|--play) LINT=0 ;; esac
+  case "$x" in --list|--self-test) LINT=0 ;; esac
 done
 # The same sources lint the same: the fingerprint of the last clean lint (HEAD plus every uncommitted change,
 # the way tools/stop_hook_checks.sh fingerprints) is kept in $LINT_OK, and a run on an identical tree skips the

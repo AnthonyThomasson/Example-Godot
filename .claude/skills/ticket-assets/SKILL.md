@@ -34,12 +34,55 @@ Built by a `showroom` worker; you run the feedback rounds.
 - **Exception:** what cannot be shown that way (e.g. an animation in the real character rig) goes in its domain behind
   a temporary, named variant switch (`static var`) the showroom flips (`set_static` in `configure`). The plan's risks
   name it.
-- **Check:** load check and lint pass (`godot-run`).
+- **One set at a time:** many exhibits are not laid out in one big hall. The showroom is a staging room with on-screen
+  previous / next buttons and a label naming the set shown: a press removes the current set and spawns the next (today's
+  version, then each variant). Only one set exists at a time, so it stays light and readable.
+- **Check:** load check and lint pass (`godot-run`), and each sandbox runs headless without engine errors or warnings,
+  through every set (the cycle below). No screenshot tours: the user looks at the showroom in the game window
+  (`show-me`), not at screenshots.
+
+### Setting up the staging room
+
+A showroom is deleted before its audit, so this is the shape to build each time (file names are suggestions):
+
+- **The sandbox stays thin.** `configure` lays the floor, the `player` actor, a camera on it and a few real props for scale.
+  `run` adds the world nodes and returns. The `GameTest` object, and every lambda or signal bound to it, is freed once
+  `run()` returns. Anything live (buttons, pads, timers, puppets) is a node under `t.world`, never a method of the test.
+- **A stage node owns the sets** (`set_stage.gd`). The sets are a `const` table in picker order. A set resolves to a
+  *cast*: `{ row: [{ look, outfit, caption }], walker: {…} }`, so a new kind of set is a new cast function, not a new
+  layout. The stage adds everything it spawns beside itself (`get_parent().add_child`) and keeps a list of it. On a
+  pick it `remove_child`s then `queue_free`s each node, so the next set's bodies never share the physics space with the
+  last set's.
+- **The picker** (`set_picker.gd`) is a `CanvasLayer` panel at the bottom with Previous / Next (`focus_mode` none, so
+  Space and Enter never press them) and a label of `n / N   title` plus one line. It emits `picked(index)`, and the stage
+  stages that set.
+- **Bodies are real characters** (`character_base.tscn` + a `ScriptedController`), with props and the variant set
+  before they join the tree and the position set before `add_child`. The variant goes in through a per-body switch on
+  the domain node (a temporary `showroom_*` property, e.g. on the body's visuals) when a `static` would restyle every
+  body at once. A row is 110 px apart:
+  a character's legs sweep for anything within 86 px every physics step.
+- **Motion is a driver node** (`pose_driver.gd`) that steers the puppets: a turntable in 8 held steps (turning all the
+  time repaints a body every frame), and a walker on a loop. Captions are `floor_label.gd` nodes under each body.
+- **The player tries variants on** by stepping onto floor pads (`look_pads.gd`), which set the same per-body switch.
+- **Headless cycle:** a user arg `--showroom-cycle=<s>` presses Next every `s` sim seconds through every set and back
+  to the first, then quits. `--play` is the runner's own flag, so launch the runner through Godot (`tools/run_tests.sh`
+  only does batch runs, and those never see sandboxes), then scan the log:
+  `"$GODOT" --headless --path . --fixed-fps 60 --log-file "$out/godot.log" res://scenes/testing/test_runner.tscn -- --play <words> --showroom-cycle=1`,
+  then `python3 tools/scan_godot_log.py "$out/godot.log" --from=0`.
+- **After a round of picks, add team sets** after the variant sets. Each shows the picks as a match would field them:
+  that side's match kit (Main's loadouts: the invaders' `invader_loadout` outfit, a defender's
+  `LoadoutConfig.outfit_of({})`), a few bodies plus a walker, and team-wide rules shown as the user stated them (e.g. a
+  side that wears one picked look per match gets one set per look; a side that mixes picks per body gets a crew seeded
+  per body, with fixed seeds so it is the same on every visit). This is how the user judges the picks together before
+  the plan.
+- **Environment showrooms** stage one house at a time through `WorldGen.generate(seed, plan, ...)` with fixed seeds (never
+  World-Gen's internals), Previous / Next through floorplans and a second row of style buttons re-staging the same house.
 
 ## Feedback rounds
 
-Open it in the `show-me` editor (Tests → SANDBOXES, by its `describe()` name; or the runner's `--play <words>`,
-`test-debug`). Ask per exhibit: pick A/B/C, steer one, or new variants. The `showroom` worker revises; repeat until
+Before each round, run `show-me` so the game window is open: an editor already up without a game running gets the game
+window opened on its own; never ask the user to press Play. Then it opens from Tests → SANDBOXES, by its `describe()`
+name (or the runner's `--play <words>`, `test-debug`). Ask per exhibit: pick A/B/C, steer one, or new variants. The `showroom` worker revises; repeat until
 each exhibit has a pick. All before the plan is accepted.
 
 ## Plan

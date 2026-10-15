@@ -12,7 +12,7 @@ and controller contract, EventBus and character signals) and never reaches into 
 ## Running tests
 
 - **Lint first:** every `tools/run_tests.sh` run starts with `tools/lint.sh` (about 5 s; skipped for `--list`,
-  `--self-test`, `--play`, with `--no-lint`, and when the sources are the ones the last clean lint saw: the wrapper
+  `--self-test`, with `--no-lint`, and when the sources are the ones the last clean lint saw: the wrapper
   keeps a fingerprint of HEAD plus every uncommitted change in `$TMPDIR`, so a rerun of an unchanged tree does not
   lint again, while any edit, new file or commit does). It loads every project script with the engine's debugger on, the only
   way a headless run reports GDScript analyzer warnings (unused variable or parameter, integer division, a name that
@@ -53,7 +53,7 @@ and controller contract, EventBus and character signals) and never reaches into 
   `--shard=I/N`, merges their output into one combined total, one `Slowest:` list and one `--failed` report.
   `auto` = cores, at most 6 (the stress tests stay under half their budgets at 6 jobs on a 12-core machine). **Without `--jobs`, a run of the whole suite uses `auto` and any selection (filter
   words, `--id`, `--domain`, `--failed`, `--repeat`) one process**, since a process costs ~2 s to start; an explicit
-  `--jobs` never starts more processes than the `--id` list has ids. Not used with `--list`/`--self-test`/`--play`/`--shots`
+  `--jobs` never starts more processes than the `--id` list has ids. Not used with `--list`/`--self-test`/`--shots`
   (the `_a`/`_b` restore pairs need one process in id order). **Shards are balanced by measured cost:** the wrapper
   keeps each test's wall-clock ms (the mean of the previous and the latest measurement) in
   `$TMPDIR/example_godot_costs_<checkout hash>.json`, rewritten only after all shards have finished, and passes it to
@@ -103,7 +103,8 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **In game:** the setup window's **Tests** button opens `test_browser.tscn`. Search, pick, then Play,
   double-click or Enter. The runner plays it with the result banner, keeps the world running, and
   offers Rerun and Back/Escape (Back changes scene to `main.tscn`, the setup window). The in-game overlay toggle bar works on the test's NPCs.
-  `-- --play <filter>` on the command line opens the first matching test straight in the runner.
+  `-- --play <filter>` on the command line opens the first matching test straight in the runner (launch
+  `test_runner.tscn` through Godot: `tools/run_tests.sh` only runs batches and refuses `--play` with that command).
   The browser's **Run all** button, and the ▶ button on each domain row (which passes `--domain=<name>`),
   spawn a separate headless run of the whole suite or just that domain, Von tests included
   (`--include-von`; they skip if no server comes up) (its own

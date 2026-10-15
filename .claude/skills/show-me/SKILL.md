@@ -15,7 +15,9 @@ Safe to rerun: it reuses an editor already open on the worktree. Do not run test
    tools/editor.sh --autorun
    ```
 
-2. `editor already running` (with pid, port, log): report it and go to step 4; Play is not pressed again. Otherwise it
+2. `editor already running` (with pid, port, log): report it and go to step 4. If no game was running on its port, the
+   script also opened the game window on its own (`game window opened`, with its pid and log): check that log for
+   `[cmd] listening` and any `SCRIPT ERROR` as below. A game already running is left as it is. Otherwise it
    prints the pid, command-server port and log path; after ~10 s check the log (`$TMPDIR/editor_<name>.log`) for
    `[cmd] listening on 127.0.0.1:<port>` and any `SCRIPT ERROR`.
 3. Report the name, port and pid in a line or two, whether it was already running, and any log errors. Leave it open.
