@@ -264,7 +264,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `hit_landed(body, damage, hand)` (hand 0/1 = melee punch, hand 2 = leg kick, hand −1 = shot),
    `died` (with `is_dead` / `health` to read; a dead body
    falls as a ragdoll, leaves layer 1 and draws beneath the living). Observers (debug HUD, match HUD, camera) attach by
-   exported node path and read only the public API/signals; the controller also exposes
+   exported node path and read only the public API/signals; the AI controller joins the group `npc_controllers` in its `_ready`, and
+   the HUDs find an NPC's controller as its child in that group (the UI's `hud_probe.gd`; a player's controller is never one). The AI controller also exposes
    `current_act()` (its live decision path as ids, e.g. `combat/t_12/flank/side_left`) and
    `debug_status()` (the same path as labels, every level: `COMBAT - Intruder - FLANK - their left
    side (kitchen)`), `debug_state() -> Dictionary` (the deep snapshot the dev command server's `ai` verb dumps), `debug_zones() -> Array`
