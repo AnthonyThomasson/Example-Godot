@@ -135,9 +135,9 @@ const CharacterPush = preload("res://scenes/character/character_push.gd")
 ## character forwards `try_use_vehicle()`, `vehicle()`, `is_in_vehicle()` and lets it drive the ride each frame.
 const CharacterVehicleUse = preload("res://scenes/vehicle/character_vehicle_use.gd")
 
-@onready var _shape: CollisionShape2D = $CollisionShape2D
-@onready var _hands := $Hands
-@onready var _controller := _find_controller()
+@onready var _shape: CollisionShape2D = $CollisionShape2D  ## The body's collision circle (its shape built in _ready()).
+@onready var _hands := $Hands  ## The Hands child (character_hands.gd): hand geometry, the punch.
+@onready var _controller := _find_controller()  ## The controller child it pulls intent from each frame; null for none.
 var _interaction: Node  ## The CharacterInteraction child, built in _ready().
 var _vehicle_use: Node  ## The CharacterVehicleUse child, built in _ready().
 ## The bodies just left (an interaction's object, a vehicle) whose collision exception waits for the body to clear them.

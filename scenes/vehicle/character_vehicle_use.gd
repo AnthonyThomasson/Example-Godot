@@ -11,7 +11,7 @@ extends Node
 
 var _ride: RefCounted  ## The ride under way (VehicleBoarding), from the E press to the last step out; null on foot.
 
-@onready var _character: Node2D = get_parent()
+@onready var _character: Node2D = get_parent()  ## The character that composes it (character.gd).
 
 
 ## E: seated, get out (braking or waiting for the vehicle to slow first); on foot, board by the door whose handle is
