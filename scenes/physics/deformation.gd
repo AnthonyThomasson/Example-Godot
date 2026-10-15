@@ -1,7 +1,7 @@
 class_name Deformation
 
-## Stateless damage-deformation geometry + rendering, shared by furniture, walls and
-## characters (their visuals and, for furniture/walls, collider rebuilds), so the drawn
+## Stateless damage-deformation geometry + rendering, shared by furniture, walls, characters
+## and vehicles (their visuals and, for furniture/walls, collider rebuilds), so the drawn
 ## silhouette and any collider come from the same deformed polygon. The caller owns the
 ## impact list. Tuning lives in PhysicsConfig.deform_* (and, for a character, CharacterConfig).
 ##
