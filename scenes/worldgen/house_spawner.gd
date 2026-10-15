@@ -46,7 +46,7 @@ static func spawn(plan_key: String, front_entrance_world: Vector2, rng: RandomNu
 	for room in rooms:
 		var rect: Rect2 = room["rect"]
 		var room_name := (room["key"] as String).capitalize()
-		WallFactory.spawn(rect, wall_thickness, _openings_for(rect, openings), room_name, house, GeneralCatalog.WALL)
+		WallFactory.spawn(rect, wall_thickness, WallFactory.openings_for(rect, openings), room_name, house, GeneralCatalog.WALL)
 
 		var furniture := Node2D.new()
 		furniture.name = room_name + " Furniture"
@@ -84,7 +84,7 @@ static func _openings_world(rooms: Array, openings: Array, origin: Vector2) -> A
 static func room_keys_on(rooms: Array, opening: Dictionary) -> Array:
 	var keys: Array = []
 	for room in rooms:
-		if not _openings_for(room["rect"], [opening]).is_empty():
+		if not WallFactory.openings_for(room["rect"], [opening]).is_empty():
 			keys.append(room["key"])
 	return keys
 
@@ -101,7 +101,7 @@ static func _validate(rooms: Array, openings: Array, plan_key: String) -> void:
 
 	for opening in openings:
 		var touching := rooms.filter(func(room: Dictionary) -> bool:
-			return not _openings_for(room["rect"], [opening]).is_empty()).size()
+			return not WallFactory.openings_for(room["rect"], [opening]).is_empty()).size()
 		if opening.get("front", false) or opening.get("exit", false):
 			if touching != 1:
 				push_warning("House %s: %s at %s is not on exactly one room wall" % [plan_key, "front entrance" if opening.get("front", false) else "exit", opening["pos"]])
@@ -123,11 +123,6 @@ static func _mirror_x(rooms: Array, openings: Array) -> void:
 	for opening in openings:
 		var p: Vector2 = opening["pos"]
 		opening["pos"] = Vector2(width - p.x, p.y)
-
-
-## Openings (Wall.Side format) for every doorway lying on one of `rect`'s walls.
-static func _openings_for(rect: Rect2, openings: Array) -> Array:
-	return WallFactory.openings_for(rect, openings)
 
 
 ## A box straddling each doorway opening that furniture must stay out of.
