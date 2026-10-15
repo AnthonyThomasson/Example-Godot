@@ -11,8 +11,8 @@ class_name SoundBank
 ##   material  what was struck: wood metal glass ceramic stone plastic fabric foliage electronics flesh,
 ##             `wall` (the empty material walls report) and `default` for anything else.
 ##   outcome   what the bullet did: `blocked` (embedded), `penetrate` (went through), `ricochet`; a fist is `punch`.
-##   band      the projectile's weight, from its penetration power (SoundConfig.light/heavy_power): `light`
-##             (SMG), `medium` (pistol), `heavy` (rifle).
+##   band      the projectile's weight, from its penetration power (`SoundConfig.light_power_max` /
+##             `heavy_power_min`): `light` (SMG), `medium` (pistol), `heavy` (rifle).
 ##   surface   the floor underfoot (SoundSurface): wood tile stone concrete carpet outdoor.
 ##   gait      `walk` or `run`.
 ##   stage     a reload's `out` (the magazine released and drawn) or `in` (seated, then the action racked).
