@@ -122,7 +122,7 @@ of events of that topic, not of everything remembered (a familiar NPC holds a pe
 furniture piece). `seq` keeps the promised order: newest first for readers and `fresh()`, oldest expirable first for volume eviction.
 `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every reader takes the clock
 once. `tests/ai/perception/memory_matches_reference_test.gd` runs random writes through the memory and a plain ordered log and compares every reader. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
-`cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead`.
+`cleared_room` / `hostile` / `under_fire` / `engaged` / `heard_gunfire` / `heard_callout` / `checked_lead` / `flashed`.
 
 ## Tactics (`agent_tactics.gd`)
 
@@ -131,7 +131,7 @@ The flank behaviour these queries should deliver, and the tests that assert it, 
 
 Whether the NPC is hidden from a hostile where it stands is worked out once per snapshot (`ctx.covered_from`), not per candidate
 spot. Pure queries over known contacts, the physics space (via the vision rays) and the nav map
-(`NavigationServer2D` closest point + path). A target's flanks are measured in its own frame (its
+(`NavBuilder.snap` / `route` / `path_length`, interface 9). A target's flanks are measured in its own frame (its
 last-seen facing, else the side facing this NPC): left / right / rear candidates at `flank_distance`,
 sampled across `flank_arc`, snapped to the navmesh, preferring a clear shot. Each spot is annotated
 with clear shot, cover within a step (`cover_min`), route length + exposure (share of route samples
