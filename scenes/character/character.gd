@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-## A generic top-down character. It owns the body, movement, aim-based "facing", the item
+## Character domain: a generic top-down character. It owns the body, movement, aim-based "facing", the item
 ## inventory, and the knockback it takes from shoves. It reads its intent from a pluggable
 ## controller child (any node with a `control(character, delta)` method): the controller
 ## writes `move_input` / `aim_point` and calls `melee/shoot/select_slot`. Drawing
