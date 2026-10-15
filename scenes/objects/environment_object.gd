@@ -1,9 +1,9 @@
 extends RigidBody2D
 
 ## An Objects-domain world object (furniture, decor). Owns its surface data (shape, size,
-## color, cover/penetration ratings, material, mass) and composes two Physics components —
-## a Knockback child (RigidBody2D adapter, how take_hit shoves it) and a Deformable child (damage
-## dents/chunks). The engine integrates its motion, collisions and pivoting. It
+## color, cover/penetration ratings, material, mass) and composes three Physics components —
+## a Knockback child (RigidBody2D adapter, how take_hit shoves it), a Deformable child (damage
+## dents/chunks) and, on a solid piece, a BloodSmear child (drags blood out of a puddle). The engine integrates its motion, collisions and pivoting. It
 ## exposes the two contracts the rest of the game talks to it through, and nothing else:
 ##   • get_surface() / take_hit(HitInfo)  — the "hittable" contract (Projectile, melee)
 ##   • apply_impulse(Vector2, at) / get_mass() — the "pushable" contract (blasts, a character's push, legs, punch, kick)
