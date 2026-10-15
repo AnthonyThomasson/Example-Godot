@@ -172,6 +172,8 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 ## character it drives.
 func bind(character: Node) -> void:
 	_loco.bind(character)
+	_coverage.bind(character)
+	_watch.bind(character)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
@@ -801,7 +803,7 @@ func _apply_watch(character, delta: float) -> void:
 		return
 	if _resting():
 		_gaze = "doors"
-		_watch.idle_gaze(character, delta)
+		_watch.idle_gaze(delta)
 
 
 ## Whether the running primitive leaves the NPC standing with nowhere in particular to look: a hold, a reload, a move that has
@@ -903,13 +905,13 @@ func _apply_move(character, delta: float) -> void:
 			_arrived = _loco.reached(_point)
 		if _arrived:
 			if _look_around:
-				_coverage.begin(character)
+				_coverage.begin()
 			else:
 				_resolved = true
 	if not _arrived:
 		_loco.move_to(_point)
 	elif _look_around:
-		if _coverage.step(character, delta):  # Look around until the room is covered by sight.
+		if _coverage.step(delta):  # Look around until the room is covered by sight.
 			_look_around = false
 			_resolved = true
 			var covered: String = _loco.room_key_at(character.global_position)
@@ -936,7 +938,7 @@ func _aim_move(character) -> void:
 		&"point":
 			character.aim_point = _point
 			return
-	var ahead: Vector2 = _watch.travel_point(character)
+	var ahead: Vector2 = _watch.travel_point()
 	if ahead != Vector2.INF:
 		character.aim_point = ahead
 	elif character.move_input != Vector2.ZERO:

@@ -952,7 +952,7 @@ func _tick_corner(character, team: Array, delta: float) -> void:
 		_finish(character, team)
 	elif _dwell >= corner_dwell:
 		_set_phase(character, "clear")
-		_coverage.begin(character)
+		_coverage.begin()
 
 
 ## Cover the room by sight; when done, and the rest of the stack is in too (or has had `ready_timeout` to come), radio
@@ -962,7 +962,7 @@ func _tick_clear(character, team: Array, delta: float) -> void:
 		_finish(character, team)
 		return
 	if not _covered:
-		_covered = _coverage.step(character, delta)
+		_covered = _coverage.step(delta)
 		return
 	character.move_input = Vector2.ZERO
 	_look_toward(character, _across_from(character.global_position), delta)

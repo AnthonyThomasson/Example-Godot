@@ -37,12 +37,18 @@ var _room := ""                   ## The room whose doorways are being watched.
 var _doors: Array = []            ## That room's doorway points worth watching, in a turn around the room.
 var _door := 0                    ## Which of them is being looked at.
 var _dwell := 0.0                 ## Seconds left looking at it.
+var _character: Node              ## The NPC's body, handed in once by `bind`.
 
 
 ## Capture the locomotion and the perception. Called once by `Behavior.setup()`.
 func setup(loco: Node, perception: Node) -> void:
 	_loco = loco
 	_perception = perception
+
+
+## Hand in the NPC's body. Called once by `Behavior.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## The contact that takes the NPC's eyes from `hostiles` (the known hostile contacts, hostile first and nearest first): the
@@ -72,12 +78,12 @@ func threat(hostiles: Array, engaged_id: int) -> Dictionary:
 ## a clear line to. Along a straight walk that is well ahead; at a doorway it is through the door as soon as it can see
 ## through, and the wall beside it never (the immediate waypoint hugs the jamb, and facing it looks at the jamb).
 ## Vector2.INF with no walk or no clear point (the caller then looks where it steers).
-func travel_point(character) -> Vector2:
+func travel_point() -> Vector2:
 	var walk: Dictionary = _loco.path_ahead()
 	if walk.is_empty():
 		return Vector2.INF
 	var path: PackedVector2Array = walk["path"]
-	var from: Vector2 = character.global_position
+	var from: Vector2 = _character.global_position
 	var best := Vector2.INF
 	var prev := from
 	var walked := 0.0
@@ -100,17 +106,17 @@ func travel_point(character) -> Vector2:
 ## Resting with nothing to look at: turn to each doorway of the room in turn, `door_dwell` s apiece, easing between them. Does
 ## nothing outdoors or in a room with no doorway in line (the gaze it has stays). A fresh NPC that was never given an aim looks
 ## where its body points, not at the world's origin.
-func idle_gaze(character, delta: float) -> void:
-	var here: Vector2 = character.global_position
-	if character.aim_point == Vector2.ZERO:
-		character.aim_point = here + (character.facing as Vector2) * 100.0
+func idle_gaze(delta: float) -> void:
+	var here: Vector2 = _character.global_position
+	if _character.aim_point == Vector2.ZERO:
+		_character.aim_point = here + (_character.facing as Vector2) * 100.0
 	var room: String = _loco.room_key_at(here)
 	if room != _room or _dwell <= 0.0:
-		_pick_door(character, room)
+		_pick_door(room)
 	_dwell -= delta
 	if _doors.is_empty():
 		return
-	ease_gaze(character, _doors[_door], look_rate, delta)
+	ease_gaze(_character, _doors[_door], look_rate, delta)
 
 
 ## Forget the doorway being watched (a new order is taken): the next resting NPC starts again from the nearest.
@@ -122,12 +128,12 @@ func reset() -> void:
 
 ## Choose the next doorway to watch. On entering a room (or the first time) the nearest in line; afterwards the next one
 ## round the NPC, so it sweeps all of them.
-func _pick_door(character, room: String) -> void:
-	var here: Vector2 = character.global_position
+func _pick_door(room: String) -> void:
+	var here: Vector2 = _character.global_position
 	var fresh := room != _room or _doors.is_empty()
 	if fresh:
 		_room = room
-		_doors = _doors_of(character, room)
+		_doors = _doors_of(room)
 		_door = _nearest(_doors, here)
 	elif not _doors.is_empty():
 		_door = (_door + 1) % _doors.size()
@@ -136,8 +142,8 @@ func _pick_door(character, room: String) -> void:
 
 ## The room's doorways worth watching from where the NPC stands, ordered by the angle they lie at round it: those with a clear
 ## line to them and not right under its feet.
-func _doors_of(character, room: String) -> Array:
-	var here: Vector2 = character.global_position
+func _doors_of(room: String) -> Array:
+	var here: Vector2 = _character.global_position
 	var points: Array = []
 	if room == "":
 		return points

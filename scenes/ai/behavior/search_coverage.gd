@@ -23,12 +23,18 @@ const Watch := preload("res://scenes/ai/behavior/watch.gd")
 
 var _loco: Node                   ## The Locomotion child (pathing, rooms, navmesh test).
 var _perception: Node             ## The perception sub-domain (what is in sight).
+var _character: Node              ## The NPC's body, handed in once by `bind`.
 
 
 ## Capture the locomotion and the perception. Called once by `Behavior.setup()`.
 func setup(loco: Node, perception: Node) -> void:
 	_loco = loco
 	_perception = perception
+
+
+## Hand in the NPC's body. Called once by `Behavior.bind()`.
+func bind(character: Node) -> void:
+	_character = character
 
 
 ## Forget the room being covered (a new leaf is adopted); points are sampled again on the next arrival.
@@ -42,30 +48,30 @@ func reset() -> void:
 ## Start covering the room on arrival: lock the room, sample it into points to be seen, and begin the time budget.
 ## The room key may be "" (an explore point in no room); then the sample is empty and `step()` finishes at once
 ## (a single look), which is the graceful fallback.
-func begin(character) -> void:
-	room = _loco.room_key_at(character.global_position)
+func begin() -> void:
+	room = _loco.room_key_at(_character.global_position)
 	points = sample_room(room)
 	unseen = points.duplicate()
-	target = character.global_position
+	target = _character.global_position
 	budget = budget_max
 
 
 ## One tick of coverage: drop every sample point now in sight, then — if the room isn't covered yet and the budget holds —
 ## turn the gaze toward the nearest unseen point and, when it is far or its line is blocked (behind furniture), walk
 ## toward it so a new vantage reveals it. True once `target_fraction` of the points are seen or the budget runs out.
-func step(character, delta: float) -> bool:
+func step(delta: float) -> bool:
 	for p in _perception.visible_points(unseen):
 		unseen.erase(p)
 	budget -= delta
 	if unseen.size() <= floori(points.size() * (1.0 - target_fraction)) or budget <= 0.0:
 		return true
-	var self_pos: Vector2 = character.global_position
+	var self_pos: Vector2 = _character.global_position
 	target = _nearest(self_pos, unseen)
-	Watch.ease_gaze(character, target, look_rate, delta)
+	Watch.ease_gaze(_character, target, look_rate, delta)
 	if self_pos.distance_to(target) > approach or not _perception.has_line_to(null, target):
 		_loco.move_to(_loco.reachable(target))  # Relocate to see a far / occluded part of the room.
 	else:
-		character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.
+		_character.move_input = Vector2.ZERO  # Close with a clear line: stand and turn, the cone will catch it.
 	return false
 
 
