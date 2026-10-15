@@ -23,6 +23,7 @@ const META_RESULTS := "test_results"
 ## the queued headed run the browser hands the runner.
 const META_CHECKED := "test_checked"
 const META_QUEUE := "test_queue"
+## The word pattern `matches` splits a test's text with (compiled on first use).
 static var _WORD: RegEx = null
 ## Whether `discover()` also returns harness self-tests (`internal: true`); the runner's `--self-test`.
 static var show_internal := false

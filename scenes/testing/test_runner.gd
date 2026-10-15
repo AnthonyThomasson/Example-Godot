@@ -42,9 +42,12 @@ const REALTIME_FPS := 60
 ## Seconds a queued run holds each verdict before the next test starts (the HUD's Next skips it).
 const QUEUE_PAUSE := 2.0
 
+## The camera that frames each test's actors.
 @onready var _camera: Camera2D = $MainCamera
 
+## The engine log tail whose errors and warnings fail the open test.
 var _watch := LogWatch.new()
+## Whether this is a headless batch run (`--run-tests`) rather than the interactive runner.
 var _batch := false
 ## Where the report and failure bundles go; `--out=<dir>` moves them off the shared `user://` paths so
 ## concurrent runs (and a running game) never overwrite each other.
@@ -80,6 +83,7 @@ var _stray_logs: Array = []
 ## Interactive only: the result banner and the overlay toggle bar.
 var _hud: CanvasLayer = null
 var _toggles: CanvasLayer = null
+## Interactive only: the performance overlay (the toggle bar's Performance flag).
 var _perf: CanvasLayer = null
 ## Whether the open test has a human-driven player (Space is then its INTERACT, not pause).
 var _has_player := false

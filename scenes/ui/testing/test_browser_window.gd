@@ -12,7 +12,9 @@ extends CanvasLayer
 ## tick or clear the tests the search currently shows. "Run N checked" emits `run_queue_requested` with
 ## the ticked tests' paths for a headed, one-by-one run (the host persists the ticks via `checked_changed`).
 
+## Play the selected test or sandbox (its script path) in the runner.
 signal play_requested(path: String)
+## Back to the setup window.
 signal back_requested
 ## Run the tests of `domain` — every test when it is "" (the host spawns the run and reports back
 ## through `set_run_status` / `set_results`).
@@ -29,19 +31,26 @@ const STATUS_MARKS := { "PASS": "✓", "FAIL": "✗", "TIMEOUT": "⏱", "SKIPPED
 ## Side of the ▶ run button's icon on a domain row, in pixels.
 const RUN_ICON_SIZE := 22
 
+## The ▶ run button's icon, drawn once.
 static var _icon_cache: Texture2D = null
 
+## The test descriptors the list shows.
 var _tests: Array = []
 ## Hand-played sandboxes: their own section below the tests, never part of a run.
 var _sandboxes: Array = []
+## The host's search test: `(descriptor, text) -> bool`.
 var _matcher: Callable
+## The last result per test, `{ id: status }`.
 var _results: Dictionary = {}
+## The search box, the test list and the details pane.
 var _search: LineEdit
 var _tree: Tree
 var _details: RichTextLabel
+## The Play and Run all buttons, and the line under them that reports a run.
 var _play: Button
 var _run_all: Button
 var _run_status: Label
+## How many tests the search shows, of all ("shown / total").
 var _count: Label
 ## The current list's group rows: a domain row per domain (keyed by its name, each carrying a ▶ button) and, under
 ## it, a row per sub-folder of tests the domain has (keyed "<domain>/<category>", no button).
@@ -51,7 +60,9 @@ var _checked: Dictionary = {}
 ## The tick-able tests the search shows: id → its TreeItem, and group key (domain, or "<domain>/<category>") → [ids].
 var _test_items: Dictionary = {}
 var _shown_by_domain: Dictionary = {}
+## How many tests and sandboxes the search shows (`_count`'s first number).
 var _shown_count := 0
+## The header's "Check shown" button and the "Run N checked" button.
 var _check_shown: Button
 var _run_checked: Button
 ## A run is going: Run all and every domain's ▶ are disabled.

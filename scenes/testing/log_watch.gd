@@ -20,6 +20,7 @@ const GLOBAL_ALLOWED := [
 
 ## Set to watch a log other than the project's (a run started with `--log-file`).
 var path_override := ""
+## The log file being tailed, and the byte offset read up to.
 var _path := ""
 var _offset := 0
 ## A trailing line not yet terminated by a newline (kept until the rest arrives).

@@ -36,17 +36,23 @@ var shots: Array = []
 var status := ""
 ## Why it was skipped / timed out.
 var reason := ""
+## Whether the test has ended (`finish`: a verdict, a failed `require`, a skip); a wait then parks for good.
 var is_finished := false
 
+## The world's placed actors, objects and vehicles by id (what `actor`, `object` and `vehicle` read).
 var _actors: Dictionary = {}
 var _objects: Dictionary = {}
 var _vehicles: Dictionary = {}
+## The tree whose physics frames the waits count.
 var _tree: SceneTree
 ## Outstanding expected log lines: `{ pattern, count }`.
 var _expected_logs: Array = []
+## Patterns of log lines the test lets pass (its `allowed_logs`).
 var _allowed_logs: Array = []
+## Whether a logged engine error / warning fails the test (its `fail_on_errors` / `fail_on_warnings`).
 var _fail_on_errors := true
 var _fail_on_warnings := true
+## Whether `conclude` has already run its one-time checks (expected logs, no assertions).
 var _concluded := false
 ## Tagged `gap`: failing is the expected verdict (GAP), passing is the failure.
 var _gap := false

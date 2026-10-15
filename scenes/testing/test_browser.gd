@@ -14,6 +14,7 @@ const RUNNER_SCENE := "res://scenes/testing/test_runner.tscn"
 const MAIN_SCENE := "res://scenes/main.tscn"
 const META_FILTER := "test_filter"
 
+## The UI's browser window this scene hosts.
 var _window: CanvasLayer
 ## The headless run's process id (-1 when none), its output dir and start time (msec).
 var _pid := -1

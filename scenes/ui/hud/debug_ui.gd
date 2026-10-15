@@ -8,7 +8,7 @@ const OutfitLines := preload("res://scenes/ui/hud/outfit_lines.gd")
 
 ## The character to observe.
 @export var character_path: NodePath = ^"../Player"
-var _character: Node
+var _character: Node                 ## The observed character (from `character_path`).
 var _label: Label                    ## Bottom-right stats panel.
 var _hit_display_label: Label        ## Top-left last-hit banner.
 var _outfit_label: Label             ## Bottom-left outfit list (one line per slot).

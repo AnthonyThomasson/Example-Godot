@@ -21,13 +21,13 @@ const STATUS_COLORS := {
 	"GAP": Color(0.85, 0.7, 0.4),  # tagged `gap`: failed as expected (a behaviour the code does not show yet)
 }
 
-var _title: Label
-var _status: Label
-var _details: RichTextLabel
-var _rerun: Button
-var _queue_line: Label
-var _next: Button
-var _pause: Button
+var _title: Label             ## The test's name.
+var _status: Label            ## The verdict (or RUNNING), in its status colour.
+var _details: RichTextLabel   ## Each check with ✓/✗ and any logged errors.
+var _rerun: Button            ## Rerun the same test.
+var _queue_line: Label        ## A queued run's progress line (hidden outside a queue).
+var _next: Button             ## Skip a queued run's pause and start the next test.
+var _pause: Button            ## Pause / Resume the world.
 
 
 func _ready() -> void:

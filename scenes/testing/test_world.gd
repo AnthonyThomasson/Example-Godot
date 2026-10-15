@@ -23,17 +23,19 @@ const ACTOR_SCENES := {
 	&"invader": "res://scenes/ai/npc_invader.tscn",
 }
 
-## The house or arena root, its rooms, and the placed actors/objects by id.
+## The house or arena root and its rooms.
 var house: Node2D
 var rooms: Array = []
 ## Its doorways (`WorldGen.get_openings`), injected into every NPC beside `rooms`.
 var openings: Array = []
+## The placed actors, objects and vehicles by id.
 var actors: Dictionary = {}
 var objects: Dictionary = {}
 var vehicles: Dictionary = {}
 
 ## Original values of overridden statics: `[script, prop, value]`.
 var _saved_statics: Array = []
+## The overlay toggles (`show_<x>` -> on), given to every actor as it spawns and changed by `set_overlay`.
 var _overlay_flags: Dictionary = {}
 ## The baked navigation region (see `_await_nav_sync`).
 var _nav_region: NavigationRegion2D = null
