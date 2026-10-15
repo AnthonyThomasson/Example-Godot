@@ -846,6 +846,18 @@ func throw_stats(slot := -1) -> Dictionary:
 	return item.throw_stats() if item else {}
 
 
+## Where a grenade leaves this character's hand when it throws one standing: the hand the item in `slot` (the held one by default) is
+## thrown with (its `weapon_hand()`; the right hand, 0, for an item that is not thrown or an empty slot), in the `throw` stance
+## (`CharacterConfig.stances`), as an offset from the body centre in the character's own frame: `x` px ahead of it (negative: behind),
+## `y` px to its right. The AI judges a lob from there (docs/grenades.md G17) instead of keeping a copy of the stance.
+func throw_release_offset(slot := -1) -> Vector2:
+	var item := _item_in(slot)
+	var hand := item.weapon_hand() if item != null and item.is_throwable() else 0
+	var stance: Dictionary = CharacterConfig.stances[&"throw"]
+	# Hand 0 rests to the character's right, hand 1 to its left (character_hands.gd).
+	return Vector2(float(stance["forward"]), float(stance["lateral"]) * (1.0 if hand == 0 else -1.0))
+
+
 ## True while a punch swing is in progress.
 func is_attacking() -> bool:
 	return _hands.is_attacking()

@@ -30,14 +30,15 @@ var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
 var _character: Node      ## The NPC's body, handed in once by `bind`.
 
 
-## Capture the collaborators the author reads: the event memory, the combat geometry, the doorway geometry and the grenade geometry.
+## Capture the collaborators the author reads: the event memory, the combat geometry, the doorway geometry, the grenade geometry and
+## why a room is suspect.
 ## Called once by the perception in its setup(), after it has built them. The config fields are set directly by
 ## the perception's apply_config() (like the other modules), so there is no separate configure step.
-func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: RefCounted) -> void:
+func setup(memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: RefCounted, suspicion: RefCounted) -> void:
 	_memory = memory
 	_tactics = tactics
 	_sections.setup(vocab, memory, tactics)
-	_options.setup(vocab, memory, tactics, entry, throw)
+	_options.setup(vocab, memory, tactics, entry, throw, suspicion)
 
 
 ## Hand in the NPC's body, for the author and its three parts. Called once by `AgentPerception.bind()`.
@@ -57,6 +58,7 @@ func bind(character: Node) -> void:
 func build(rooms: Array, goal: String, activity: String, known: Array, callouts: Array, knowledge: Dictionary) -> Dictionary:
 	vocab.rooms = rooms
 	_options.know = knowledge
+	_options.begin()
 	var self_pos: Vector2 = _character.global_position
 	var hostiles: Array = known.filter(func(c): return c["hostile"])
 	var allies: Array = known.filter(func(c): return c["ally"] and not c["hostile"])
@@ -92,10 +94,9 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 			"melee": _options.melee_group(self_pos, t),
 			"grenade_throws": _options.grenade_group(ctx, t, a),
 		}
-		var throws: Array = per_target[t["id"]]["grenade_throws"]["options"].filter(
-			func(o): return not o["tags"]["ally_in_blast"] and not o["tags"]["no_safe_spot"]).map(func(o): return o["id"])
+		var throws := _usable(per_target[t["id"]]["grenade_throws"])
 		per_sections[t["id"]] = {
-			"exposure": _sections.exposure_text(ctx, t, a, throws),
+			"exposure": _sections.exposure_text(ctx, t, a, throws, per_target[t["id"]]["grenade_throws"].get("held_room", "")),
 			"flanks": _sections.flanks_text(t, a),
 			"allies": _sections.allies_text(ctx, t, a),
 		}
@@ -108,6 +109,8 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 	var stun_stack: bool = carried.has(&"stun") or callouts.any(func(c): return int(c.get("stuns", 0)) > 0)
 	# With a stun to throw, gunfire or a hostile in a room a doorway of ENTER leads into is the entry's to weigh (quiet or with a bang).
 	var leads := _options.lead_group(ctx, hostiles, entered if stun_stack else {})
+	# Shot at by someone unseen from a room it is outside of: a grenade where the shots came from (the unbound COMBAT level).
+	var shots_throws := _options.shots_grenade_group(ctx, hostiles)
 	var dmg: float = _character.damage_taken()
 	# Rounds in the gun it fights with (-1 without one): the AI shoots, reloads and plans around it.
 	var gun: int = _character.gun_slot()
@@ -123,7 +126,8 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"leads": not leads["options"].is_empty(),
 		"lead_outside": not SnapshotVocab.room_at(self_pos, rooms).is_empty() \
 			and leads["options"].any(func(o): return not o["tags"]["inside"]),
-		"grenade_ready": per_target.values().any(func(g): return not g["grenade_throws"]["options"].is_empty()),
+		"grenade_ready": not shots_throws["options"].is_empty() \
+			or per_target.values().any(func(g): return not g["grenade_throws"]["options"].is_empty()),
 		"stack_has_stun": stun_stack,
 		"hurt": dmg >= vocab.hurt_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),
@@ -136,7 +140,7 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"current": ("Current activity: %s." % activity) if activity != "" else "",
 		"odds": _sections.odds_text(hostiles, allies, ctx["callouts"], not leads["options"].is_empty()),
 		"contacts": _sections.contacts_text(self_pos, known),
-		"exposure": per_sections[primary["id"]]["exposure"] if not primary.is_empty() else _sections.unseen_fire_text(),
+		"exposure": per_sections[primary["id"]]["exposure"] if not primary.is_empty() else _sections.unseen_fire_text(_usable(shots_throws), shots_throws.get("held_room", "")),
 		"allies": per_sections[primary["id"]]["allies"] if not primary.is_empty() else _sections.allies_text(ctx, {}, {}),
 		"flanks": per_sections[primary["id"]]["flanks"] if not primary.is_empty() else "",
 		"awareness": _sections.awareness_text(self_pos, not hostiles.is_empty()),
@@ -149,6 +153,7 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"retreat_positions": _options.retreat_group(ctx, hostiles, known_rooms, dmg),
 		"leads": leads,
 		"shooter": _options.shooter_group(ctx, hostiles),
+		"grenade_throws": shots_throws,
 		"entries": entries,
 		"search_rooms": _options.search_group(ctx, known_rooms, rooms, entered),
 		"explore": _options.explore_group(ctx, rooms, entered),
@@ -179,6 +184,12 @@ func _analyze(ctx: Dictionary, t: Dictionary) -> Dictionary:
 		"flanks": _tactics.flank_sides(ctx, t, front),
 		"advance": _tactics.advance_positions(ctx, t),
 	}
+
+
+## The kinds (`frag` / `stun`) of the throws in grenade group `group` the GRENADE tactic would offer: those not tagged `ally_in_blast` or
+## `no_safe_spot`.
+static func _usable(group: Dictionary) -> Array:
+	return group["options"].filter(func(o): return not o["tags"]["ally_in_blast"] and not o["tags"]["no_safe_spot"]).map(func(o): return o["id"])
 
 
 ## The goal text with `{gun}` replaced by what the NPC calls its gun ("shoot them with your {gun}" reads

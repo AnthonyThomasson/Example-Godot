@@ -10,7 +10,7 @@ extends Node
 ## is the BUILD pass — run at the start of each decision, it gathers what the agent knows (contacts,
 ## callouts, learned house knowledge) and hands it to the SNAPSHOT AUTHOR (agent_snapshot.gd), which
 ## turns it into the SNAPSHOT the decision planner walks (facts / sections / option groups). The NPC
-## knows only what it has perceived — sight, nearby hits, gunfire within earshot, and its allies' radio
+## knows only what it has perceived — sight, nearby hits, gunfire and footsteps within earshot, and its allies' radio
 ## callouts — and that knowledge decays as the memory does.
 ##
 ## This is the PERCEPTION sub-domain's public face: it OWNS the sight sense (agent_vision.gd), the
@@ -30,6 +30,7 @@ const AgentTactics := preload("res://scenes/ai/perception/agent_tactics.gd")
 const AgentEntry := preload("res://scenes/ai/perception/agent_entry.gd")
 const AgentThrow := preload("res://scenes/ai/perception/agent_throw.gd")
 const AgentGrenades := preload("res://scenes/ai/perception/agent_grenades.gd")
+const AgentSuspicion := preload("res://scenes/ai/perception/agent_suspicion.gd")
 ## The BUILD half: turns what the NPC knows + the combat geometry into the decision snapshot Von walks.
 const AgentSnapshot := preload("res://scenes/ai/perception/agent_snapshot.gd")
 const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
@@ -47,6 +48,8 @@ const FLASH_SHARE := 0.8
 ## sight and the sighting written from it are renewed this often, offset per NPC and target so a squad does not test on the
 ## same frame. What the NPC holds of a character it sees is at most this many frames old.
 const SIGHT_EVERY_FRAMES := 3
+## The longest (ms, wall clock) a decision waits for the avoid map its routes are measured on (`routes_ready`).
+const WARM_CAP_MS := 3000
 
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
 var contact_memory_ttl: float = 4.0
@@ -76,6 +79,9 @@ var search_memory_ttl: float = 60.0    ## GoalController.search_memory_ttl
 # Combat awareness (how hits and gunfire are remembered — see process_hit()).
 var hit_awareness_radius: float = 160.0 ## GoalController.hit_awareness_radius
 var hearing_radius: float = 900.0      ## GoalController.hearing_radius
+var hear_walk: float = 250.0           ## How far (px) a walking step is heard, through walls (docs/hearing.md H1).
+var hear_run: float = 450.0            ## How far (px) a running step is heard.
+var hear_crouch: float = 100.0         ## How far (px) a crouched step is heard.
 var under_fire_time: float = 3.0       ## GoalController.under_fire_time
 var engage_dwell: float = 3.0          ## GoalController.engage_dwell
 # Context: how knowledge is worded and bounded for Von.
@@ -114,10 +120,16 @@ var entry_pie_radius: float = 100.0    ## GoalController.entry_pie_radius
 var entry_pie_steps: int = 5           ## GoalController.entry_pie_steps
 var entry_corner_inset: float = 40.0   ## GoalController.entry_corner_inset
 var entry_short_room: float = 150.0   ## A room with a side under this (px) is too small for the team (agent_entry.gd `short_room`).
+var entry_guard: bool = true           ## Whether walks keep out of doorway views and secure the ones they cross (the controller's `entry_guard`).
+var door_view_depth: float = 450.0     ## How far (px) out of a doorway its view reaches (agent_entry.gd `door_view_depth`).
+var door_avoid_ratio: float = 2.0      ## A walk round the doorway views is taken when no longer than this many times the plain route...
+var door_avoid_slack: float = 300.0    ## ... plus this many px.
+var entry_pass_clear_time: float = 60.0 ## Seconds a cleared room counts as safe to walk past.
 # Grenades (live ones known by sight, hearing and callouts, and the danger zone; see agent_grenades.gd).
 var grenades_enabled: bool = true      ## Whether the NPC reacts to live grenades at all.
 var hear_grenade: float = 300.0        ## How far (px) a grenade coming down is heard.
 var evade_margin: float = 120.0        ## How far past a frag's blast radius its danger zone reaches (px).
+var throw_spot_walk: float = 250.0     ## Longest walk (px of route) to a throw spot (agent_tactics.gd `throw_spot`).
 
 var _character: Node             ## The NPC's body, handed in once by bind().
 var _vision: RefCounted          ## The sight sense (FOV/range/LoS); see agent_vision.gd.
@@ -125,9 +137,12 @@ var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
 var _memory: RefCounted          ## The event memory; see agent_memory.gd.
 var _tactics: RefCounted         ## The combat geometry; see agent_tactics.gd.
 var _entry: RefCounted           ## The doorway geometry and the team's claims; see agent_entry.gd.
+var _warming_since := -1         ## When (`Time.get_ticks_msec`) the decision began waiting for the avoid map; -1: not waiting.
 var _throw: RefCounted           ## The grenade geometry (danger zone, escape spot, lob); see agent_throw.gd.
 var _grenades: RefCounted        ## The live grenades known and the plan to get clear of them; see agent_grenades.gd.
 var _snapshot: RefCounted        ## The BUILD half: writes the decision snapshot; see agent_snapshot.gd.
+var _suspicion: RefCounted       ## Why a room is suspect (G18); see agent_suspicion.gd.
+var _rooms: Array = []           ## The house's rooms, as handed to the latest observe().
 var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the first observe() call.
 var _post_set := false           ## Whether _post has been captured yet.
 var _interactables: Array = []   ## Cached world objects that advertise interactions (static furniture).
@@ -140,7 +155,8 @@ var _visible_before := {}        ## The same one tick earlier (what a character 
 var _looked := {}                ## Instance ids of characters in the view cone that have had a sight test since they entered it.
 var _tracks := {}                ## Per-character movement track: id → { pos, vel, t } (last seen).
 var _blind := false              ## The NPC was flash-blinded on the latest observe() tick: it sees nothing new.
-## The latest grenade burst (`{ kind, position, frame }`, the physics frame it was taken note of in), or {}: a bang entry waits for its stun's.
+## The latest grenade burst (`{ kind, position, frame, team }`: the physics frame it was taken note of in, and whether the NPC or an ally
+## threw it), or {}: a bang entry waits for its stun's, and an entry goes in on its own team's burst in the room (E17).
 var last_burst := {}
 
 
@@ -156,12 +172,16 @@ func setup() -> void:
 	_tactics.vision = _vision
 	_entry = AgentEntry.new()
 	_entry.vision = _vision
+	_entry.pass_clear = is_pass_clear
 	_throw = AgentThrow.new()
 	_throw.vision = _vision
 	_grenades = AgentGrenades.new()
 	_grenades.setup(_throw)
+	_suspicion = AgentSuspicion.new()
+	_suspicion.memory = _memory
+	_suspicion.entry = _entry
 	_snapshot = AgentSnapshot.new()
-	_snapshot.setup(_memory, _tactics, _entry, _throw)
+	_snapshot.setup(_memory, _tactics, _entry, _throw, _suspicion)
 
 
 ## Push the current config fields into the owned modules. Idempotent and state-free (it only sets
@@ -189,15 +209,22 @@ func apply_config() -> void:
 	_tactics.route_clearance = route_clearance
 	_tactics.watch_arc = watch_arc
 	_tactics.fire_spot_distances = fire_spot_distances
+	_tactics.throw_spot_walk = throw_spot_walk
 	_entry.stack_spacing = entry_stack_spacing
 	_entry.wall_standoff = entry_wall_standoff
 	_entry.pie_radius = entry_pie_radius
 	_entry.pie_steps = entry_pie_steps
 	_entry.corner_inset = entry_corner_inset
 	_entry.short_room = entry_short_room
+	_entry.door_view_depth = door_view_depth
+	_entry.door_avoid_ratio = door_avoid_ratio
+	_entry.door_avoid_slack = door_avoid_slack
+	_entry.avoid_views = entry_enabled and entry_guard
 	_throw.evade_margin = evade_margin
 	_grenades.enabled = grenades_enabled
 	_grenades.hear_grenade = hear_grenade
+	_suspicion.still_speed = still_speed
+	_suspicion.extrapolate_cap = extrapolate_cap
 	_snapshot.vocab.shoot_range = shoot_range
 	_snapshot.vocab.punch_range = punch_range
 	_snapshot.vocab.recency_bands = recency_bands
@@ -234,7 +261,8 @@ func bind(character: Node) -> void:
 ## `hearing_radius` is gunfire heard (`heard_gunfire`) — an investigation lead — but ONLY from a shooter
 ## the NPC doesn't already know is hostile: gunfire from a character it is fighting (or any other known
 ## hostile) is no mystery, already covered by COMBAT or that contact's last-seen lead, so it is not a lead
-## to chase. The NPC's own hits are ignored. Returns true when it was a relevant attack, so the controller
+## to chase. The NPC's own hits are ignored, and so is an ally's round striking near it (a teammate's fire is not
+## fire at it; one that hits it still is). Returns true when it was a relevant attack, so the controller
 ## can kick off a fight.
 func process_hit(data: Dictionary) -> bool:
 	var attacker = data.get("attacker")
@@ -244,6 +272,9 @@ func process_hit(data: Dictionary) -> bool:
 	var pos: Vector2 = data.get("position", self_pos)
 	var from: Vector2 = -(data.get("direction", Vector2.RIGHT) as Vector2)
 	var hit_me: bool = data.get("victim") == _character
+	var by_ally: bool = attacker is Node and is_instance_valid(attacker) and _hostility.is_ally(attacker.get("faction") if attacker.get("faction") != null else &"")
+	if not hit_me and by_ally and self_pos.distance_to(pos) <= hit_awareness_radius:
+		return false  # A teammate's round striking close by: it knows who fired.
 	if not hit_me and self_pos.distance_to(pos) > hit_awareness_radius:
 		var known_shooter: bool = attacker is Node and is_instance_valid(attacker) \
 			and _hostility.is_hostile(attacker.get_instance_id(), _memory)
@@ -253,9 +284,65 @@ func process_hit(data: Dictionary) -> bool:
 		return false
 	_memory.remember(&"under_fire", { "from": from, "hit": hit_me }, under_fire_time, "latest")
 	_memory.remember(&"engaged", {}, engage_dwell, "latest")
+	if not by_ally:
+		_note_shot_from(pos, from)
 	if attacker is Node and is_instance_valid(attacker):
 		_hostility.on_attacked(attacker, _memory)
 	return true
+
+
+## Remember where a shot at the NPC came from (`shot_from`, docs/grenades.md G18): the line back from where it landed (`at`), along
+## `from`, to the first wall it meets (`hearing_radius` at most). A shot that came in through a doorway runs back into the room behind
+## it, so that room is where the shooter is. Kept `lead_memory_ttl`, long after being under fire is over (`under_fire_time`), keyed by
+## where the line ends so shots from two places are two memories.
+func _note_shot_from(at: Vector2, from: Vector2) -> void:
+	var dir := from.normalized()
+	if dir == Vector2.ZERO:
+		return
+	var far := at + dir * hearing_radius
+	var hit: Dictionary = _vision.wall_hit(_character.get_world_2d().direct_space_state, at, far)
+	var end: Vector2 = (hit["position"] as Vector2) - dir * 4.0 if not hit.is_empty() else far
+	var cell := "%d,%d" % [floori(end.x / 200.0), floori(end.y / 200.0)]
+	_memory.remember(&"shot_from", { "at": at, "pos": end, "from": from }, lead_memory_ttl, cell)
+
+
+## Hear one `&"footfall"` (interface 10, `{ position, character, running, crouched }`) through walls: the step of a character not of
+## the NPC's own faction (its faction is how it knows its own team's steps) within earshot for its gait, `hear_run` running,
+## `hear_crouch` crouched, else `hear_walk`, is remembered as `heard_footsteps` (`{ pos }`, keyed per walker, so the latest step
+## stands for it; `lead_memory_ttl`): an investigation lead and a reason to suspect the room it came from (docs/hearing.md H1). A
+## character it sees right now is no news. The controller drops every footfall while the NPC is deaf (G15).
+func process_footfall(data: Dictionary) -> void:
+	var walker = data.get("character")
+	if walker == _character or not walker is Node or not is_instance_valid(walker):
+		return
+	var pos: Vector2 = data.get("position", Vector2.INF)
+	var reach := hear_walk
+	if data.get("crouched", false):
+		reach = hear_crouch
+	elif data.get("running", false):
+		reach = hear_run
+	if _character.global_position.distance_to(pos) > reach:
+		return
+	var f = walker.get("faction")
+	if _hostility.is_ally(f if f != null else &"") or _visible_now.has(walker.get_instance_id()):
+		return
+	_memory.remember(&"heard_footsteps", { "pos": pos }, lead_memory_ttl, str(walker.get_instance_id()))
+
+
+## The farthest any footfall is heard (px), so the controller can drop the rest before queuing them.
+func footfall_reach() -> float:
+	return maxf(hear_walk, maxf(hear_run, hear_crouch))
+
+
+## Where the NPC last knew hostile `target_id` to be (its last sighting), else, with nobody known, where the shots at it came from
+## (`shot_from`); `Vector2.INF` when it knows neither. What a combat callout radios as `target_pos` (interface 10).
+func target_pos(target_id: int) -> Vector2:
+	if target_id != 0:
+		for seen in _memory.recall_all(&"saw_character"):
+			if seen["id"] == target_id:
+				return seen["pos"]
+	var shot: Dictionary = _memory.recall(&"shot_from")
+	return shot.get("pos", Vector2.INF)
 
 
 ## Fold one ally radio `&"callout"` (interface 10) into memory: what an ally says it is doing — its
@@ -293,7 +380,9 @@ func process_grenade(data: Dictionary, deaf: bool) -> void:
 ## stun the NPC or an ally threw also blinds the hostiles it knew in its flash (`flashed`).
 func process_explosion(data: Dictionary) -> void:
 	_grenades.burst(data.get("position", Vector2.INF), data.get("kind", &""))
-	last_burst = { "kind": data.get("kind", &""), "position": data.get("position", Vector2.INF), "frame": Engine.get_physics_frames() }
+	var by = data.get("attacker")
+	var team: bool = by == _character or (by is Node and is_instance_valid(by) and _hostility.is_ally(by.get("faction") if by.get("faction") != null else &""))
+	last_burst = { "kind": data.get("kind", &""), "position": data.get("position", Vector2.INF), "frame": Engine.get_physics_frames(), "team": team }
 	if data.get("kind") == &"stun":
 		_note_flash(data)
 
@@ -355,8 +444,26 @@ func memory_size() -> int:
 	return _memory.size()
 
 
+## Whether room `key` is one the shots at the NPC came from: the line back from a shot at it (`shot_from`, kept `lead_memory_ttl`) runs
+## through it. The behaviour's entry guard reads it (`docs/tactical-entry.md` E9: under fire, a walk into the room the shots came from
+## still goes by entry).
+func shots_from_room(key: String) -> bool:
+	for shot in _memory.recall_all(&"shot_from"):
+		if AgentSuspicion.shot_rooms(_rooms, shot).has(key):
+			return true
+	return false
+
+
+## Why the NPC suspects a hostile is waiting in room `key` (`docs/grenades.md` G18): its reasons, `AgentSuspicion.ORDER`'s ids (gunfire or
+## footsteps heard there, shot at from it, an ally's fight in it, a hostile lost in it, by its doorway or heading in), empty when none.
+## What a quiet entry reads to turn into a bang when a new one comes up (`docs/tactical-entry.md` E17).
+func room_suspicion(key: String) -> Array:
+	return _suspicion.rooms_suspected(_rooms, lost_hostiles(), _callouts()).get(key, [])
+
+
 ## Debug read: what the NPC has heard and been told, for the hearing/contacts overlays — gunfire heard
-## (`pos`, `age`), the live under-fire event (`from` direction, `hit`, seconds `left`), ally callouts
+## (`pos`, `age`), footsteps heard (`footsteps`: `pos`, `age`), where shots at it came from (`shot_from`: `pos` the end of the
+## line back, `at` where the shot landed, `age`), the live under-fire event (`from` direction, `hit`, seconds `left`), ally callouts
 ## heard (`pos`, `point`, `label`, `name`, `age`), checked leads, the
 ## hostiles it has lost track of, and the hearing/awareness radii. A pure read of memory; never writes it.
 func debug_memory() -> Dictionary:
@@ -364,6 +471,12 @@ func debug_memory() -> Dictionary:
 	var gunfire: Array = []
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		gunfire.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "age": rec["age"] })
+	var footsteps: Array = []
+	for rec in _memory.recall_aged(&"heard_footsteps"):
+		footsteps.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "age": rec["age"] })
+	var shot_from: Array = []
+	for rec in _memory.recall_aged(&"shot_from"):
+		shot_from.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "at": rec["data"].get("at", Vector2.ZERO), "age": rec["age"] })
 	var under := {}
 	var checked: Array = []
 	for e in _memory.fresh():
@@ -385,6 +498,8 @@ func debug_memory() -> Dictionary:
 		lost.append({ "pos": c["pos"], "vel": c.get("vel", Vector2.ZERO), "age": c["age"], "name": c["name"] })
 	return {
 		"gunfire": gunfire,
+		"footsteps": footsteps,
+		"shot_from": shot_from,
 		"under_fire": under,
 		"callouts": callouts,
 		"checked_leads": checked,
@@ -436,6 +551,7 @@ func observe(rooms: Array) -> void:
 	_throw.learn_body()
 	_seed_house(rooms)
 	_entry.set_house(openings, rooms)
+	_rooms = rooms
 
 	var self_pos: Vector2 = _character.global_position
 	var facing: Vector2 = _character.facing
@@ -809,10 +925,45 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, max_dist: float) -
 	return _entry.threshold_ahead(path, from_idx, _character.global_position, is_cleared, max_dist)
 
 
-## The first doorway the walk `path` passes without entering, into a room that is not cleared, as `{ opening, into, dist }`, or {}
-## (see agent_entry.gd `passing_ahead`): a doorway to be secured before the NPC is abreast of it (E15).
+## The first doorway view the walk `path` goes into without entering the room behind it, as `{ opening, into, dist }`, or {} (see
+## agent_entry.gd `passing_ahead`): a doorway to be secured before the NPC crosses its view (E15, E18).
 func passing_ahead(path: PackedVector2Array, from_idx: int, max_dist: float) -> Dictionary:
-	return _entry.passing_ahead(path, from_idx, _character.global_position, is_cleared, max_dist)
+	var world: World2D = _character.get_world_2d()
+	return _entry.passing_ahead(path, from_idx, _character.global_position, max_dist, world.navigation_map, world.direct_space_state)
+
+
+## Whether room `key` counts as safe to walk past: cleared within `entry_pass_clear_time` (a room cleared longer ago is cleared for
+## the entry, `is_cleared`, but a doorway into it is not safe to walk past again).
+func is_pass_clear(key: String) -> bool:
+	return _memory.age_of(&"cleared_room", "key", key) <= entry_pass_clear_time
+
+
+## Whether the routes a snapshot measures can be the ones the NPC will walk (see agent_entry.gd `warm`): the avoid map for the doorway
+## views from the room it stands in is baked. Asking starts the bake. After `WARM_CAP_MS` of waiting it is true anyway, so a decision
+## never waits for good.
+func routes_ready() -> bool:
+	var world: World2D = _character.get_world_2d()
+	if _entry.warm(_character.global_position, world.navigation_map, world.direct_space_state):
+		_warming_since = -1
+		return true
+	var now := Time.get_ticks_msec()
+	if _warming_since < 0:
+		_warming_since = now
+	return now - _warming_since > WARM_CAP_MS
+
+
+## The doorway views the NPC's walks keep out of from where it stands, each `{ id, into, poly }` (see agent_entry.gd `avoided`): what the
+## entry plan overlay draws.
+func avoided_views() -> Array:
+	var world: World2D = _character.get_world_2d()
+	return _entry.views_from(_character.global_position, world.navigation_map, world.direct_space_state) if _entry.avoid_views else []
+
+
+## The route the NPC walks from where it stands to `to` (see agent_entry.gd `walk_route`): the plain one, or the one that keeps out of
+## the views of the doorways into rooms not clear for passing when there is one within the cap.
+func walk_route(to: Vector2, exempt := "") -> Dictionary:
+	var world: World2D = _character.get_world_2d()
+	return _entry.walk_route(_character.global_position, to, world.navigation_map, world.direct_space_state, exempt)
 
 
 ## The doorways out of the cleared room `into` that lead on into a room that is not cleared, other than `opening_id` (the
@@ -841,13 +992,31 @@ func entry_free_slot(team: Array, self_id: int, current := 0) -> int:
 
 
 ## The side of a doorway (`geometry` from `entry_geometry`) the team stacks on (see agent_entry.gd `stack_side`).
-func entry_stack_side(geometry: Dictionary, team: Array, self_pos: Vector2) -> int:
+func entry_team_side(geometry: Dictionary, team: Array, self_pos: Vector2) -> int:
 	return AgentEntry.stack_side(geometry, team, self_pos)
 
 
-## Where stack slot `slot` stands on side `side` of a doorway (see agent_entry.gd `slot_point`).
-func entry_slot_point(geometry: Dictionary, side: int, slot: int) -> Vector2:
-	return AgentEntry.slot_point(geometry, side, slot)
+## The side of a doorway the NPC stacks on from where it stands: the team's, unless its way there crosses the doorway's view, then its
+## own (a split stack, see agent_entry.gd `stack_side_from`).
+func entry_stack_side(geometry: Dictionary, team: Array) -> int:
+	var world: World2D = _character.get_world_2d()
+	return _entry.stack_side_from(geometry, team, _character.global_position, world.navigation_map, world.direct_space_state)
+
+
+## The members of a stack (claims with `id`, `slot`, `side`, the NPC's own among them) in the order they cross (see agent_entry.gd
+## `crossing_order`).
+func entry_crossing_order(members: Array) -> Array:
+	return AgentEntry.crossing_order(members)
+
+
+## The place in its side's file of the member holding slot `slot` on side `side` (see agent_entry.gd `place`).
+func entry_place(team: Array, side: int, slot: int) -> int:
+	return AgentEntry.place(team, side, slot)
+
+
+## Where the `nth` place in the file on side `side` of a doorway stands (see agent_entry.gd `slot_point`).
+func entry_slot_point(geometry: Dictionary, side: int, nth: int) -> Vector2:
+	return AgentEntry.slot_point(geometry, side, nth)
 
 
 ## Candidate standing points on a ring around the NPC, classified for peek-and-cover against the
@@ -884,19 +1053,31 @@ func grenade_announcements() -> Array:
 	return _grenades.announcements()
 
 
-## Whether a grenade of `kind` can be lobbed from `from` to `to`: within its throw range and over everything between, low furniture included.
-func can_lob(from: Vector2, to: Vector2, kind: StringName) -> bool:
-	return _throw.can_lob(_character.get_world_2d().direct_space_state, from, to, _throw.range_of(kind), _character_rids())
+## Whether a thrower standing at `at` can lob a grenade of `kind` onto `to`: within its throw range, and the lob from its hand is clear
+## of everything between, low furniture included (agent_throw.gd `can_lob`). `walked`: the thrower walks to `at` first, so the lob must be
+## clear wherever that walk may end (`throw_clear_on_arrival`).
+func can_lob(at: Vector2, to: Vector2, kind: StringName, walked := false) -> bool:
+	var space: PhysicsDirectSpaceState2D = _character.get_world_2d().direct_space_state
+	var rids: Array = _character_rids()
+	if not walked:
+		return _throw.can_lob(space, at, to, _throw.range_of(kind), rids)
+	return at.distance_to(to) <= _throw.range_of(kind) and _throw.throw_clear_on_arrival(space, at, to, rids)
 
 
-## Whether nothing stops a lob from `from` to `to` (any distance: the range is `grenade_range`'s).
-func lob_clear(from: Vector2, to: Vector2) -> bool:
-	return _throw.lob_clear(_character.get_world_2d().direct_space_state, from, to, _character_rids())
+## Whether the lob a thrower standing at `at` throws onto `to` flies clear, from its hand (any distance: the range is `grenade_range`'s).
+func throw_clear(at: Vector2, to: Vector2) -> bool:
+	return _throw.throw_clear(_character.get_world_2d().direct_space_state, at, to, _character_rids())
 
 
 ## How far (px) a grenade of `kind` first comes down (what the NPC learned of it off the grenades it carries).
 func grenade_range(kind: StringName) -> float:
 	return _throw.range_of(kind)
+
+
+## How far (px) from its spot a thrower stands to let a grenade of `kind` go: its range less a few px, so one that drifted a step past it
+## closes in first (agent_throw.gd `reach_of`).
+func grenade_reach(kind: StringName) -> float:
+	return _throw.reach_of(kind)
 
 
 ## Seconds from release to the burst of a grenade of `kind` (what the NPC learned of it off the grenades it carries).

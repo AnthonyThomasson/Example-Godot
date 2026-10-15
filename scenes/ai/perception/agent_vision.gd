@@ -148,3 +148,16 @@ func raycast(space, from: Vector2, to: Vector2, exclude: Array) -> Dictionary:
 	_query.to = to
 	_query.exclude = exclude
 	return space.intersect_ray(_query)
+
+
+## The first WALL along `from`→`to` (a static body: furniture, which is a rigid body, and characters are looked through), or {} when
+## the line reaches `to`. What bounds a doorway's view (`AgentEntry.door_view`).
+func wall_hit(space, from: Vector2, to: Vector2) -> Dictionary:
+	var ex: Array = []
+	while true:
+		var hit := raycast(space, from, to, ex)
+		if hit.is_empty() or hit.get("collider") is StaticBody2D:
+			return hit
+		ex = ex.duplicate()
+		ex.append(hit.get("rid"))
+	return {}  # unreachable; satisfies the parser

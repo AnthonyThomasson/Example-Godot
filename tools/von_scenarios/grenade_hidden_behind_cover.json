@@ -1,0 +1,17 @@
+{
+  "name": "tactic: a defender crouched behind a sofa in a room you are outside of, line blocked, after an ambush was chosen -> GRENADE (G17)",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are crouching. You are unhurt.\nYour pistol is loaded. You carry a frag grenade.\nCurrent activity: COMBAT - h - ENGAGE - ambush behind the sofa (moving into position, for 0s).\nKnown hostiles: 1 (1 in sight). Allies near you: none.\nYou are behind cover from h (the sofa): your line to them is blocked. You can throw a frag grenade onto their spot. They are aiming at you.\nh — HOSTILE (seen) — in sight — in pistol range, west of you, in the kitchen — standing still — aiming at you — crouched low — holding a Unarmed.\nFlanks on h (you are on their front): their left side — route passes h, clear shot, in the open, short hidden route; their right side — route passes h, clear shot, cover, medium hidden route; behind them — route passes h, clear shot, cover, medium hidden route.\nDecided so far: COMBAT → h.",
+  "question": "How should you fight h? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+  "options": {
+    "advance": "h looks badly wounded, is unarmed, or is moving away from you (they are in pistol range, standing still, holding a Unarmed)",
+    "engage": "You have a clear shot at h, and you are not badly wounded (once they show, from an ambush behind cover) (your current plan)",
+    "grenade": "Your line to h is blocked and you can throw a grenade onto their spot (h is hidden behind the sofa, within throwing range)",
+    "retreat": "You are badly wounded and being hit (best: behind the sofa close by, out of their sight; you are unhurt)"
+  },
+  "expect": [
+    "grenade"
+  ],
+  "ablate": [
+    "You can throw a frag grenade onto their spot. "
+  ]
+}

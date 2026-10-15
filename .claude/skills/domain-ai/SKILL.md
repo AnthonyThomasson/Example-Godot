@@ -25,9 +25,11 @@ them — building them once, then re-pushing the config each decision so a tunab
 (a behaviour test, the dev command server) takes effect without a rebuild, and on its first `control(character, delta)` hands the NPC's
 body to perception and behaviour once (`bind(character)`, which each passes on to its modules), so no sub-domain function takes the
 character — and it runs the
-**SENSE → THINK → ACT** loop plus the decide cadence, salient-event detection, interrupting a decision
-walk the situation has overtaken, and the EventBus intake (`&"hit"`, allies' `&"callout"`s, `&"grenade"` landings and
-`&"explosion"`s, queued and handed to perception on the next tick) and its own callouts.
+**SENSE → THINK → ACT** loop plus the decide cadence, salient-event detection (a change of belief about hostiles, the behaviour's `salient_key`; the order just
+adopted is not one: `_on_decided` re-takes the key after `set_leaf`, since the order sets or clears the engaged contact the key carries, issue #51 R12, test
+`ai/decision/adopt_target_no_redecide`), interrupting a decision
+walk the situation has overtaken, and the EventBus intake (`&"hit"`, `&"footfall"`s within earshot, allies' `&"callout"`s, `&"grenade"` landings and
+`&"explosion"`s, queued and handed to perception on the next tick) and its own callouts (a combat one carries `target_pos`, where its hostile is).
 
 | Sub-domain | Folder | Skill | Owns (role) |
 |---|---|---|---|
@@ -39,14 +41,17 @@ walk the situation has overtaken, and the EventBus intake (`&"hit"`, allies' `&"
 **The human's stack (`ai/team/player_stack.gd`).** Not a fifth sub-domain: one small module, the human's side of the entry radio
 (`docs/tactical-entry.md` E16). A child of the human's character (Main attaches it through `MatchSpawner.bind_player`), it listens to the
 `&"callout"` bus like an NPC and, when an allied team is stacking at a doorway the human is near (`reserve_range` 300 px of walking), radios the
-human's own claim for the first free slot: the same entry fields, with the human as `speaker`, repeated every 2 s. It reads the human's step
+human's own claim for the first free slot, on the team's side or, when its way there would cross the doorway's view, on its own (a split stack,
+E19): the same entry fields, with the human as `speaker`, repeated every 2 s. It reads the human's step
 from where it stands (`claim` / `ready` / `going_in` / `in`) and withdraws on leaving, dying, nobody left stacking, or `go_timeout` after the AI
-ahead is through. It reuses perception's `AgentEntry` statics (`claims`, `free_slot`, `stack_side`, `slot_point`) and geometry, and `AgentGrenades.is_call`
-(a grenade call is not a stack claim), and never moves the character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
+ahead in the crossing order is through. It reuses perception's `AgentEntry` (the statics `claims`, `free_slot`, `stack_side`, `crossing_order`, `place`,
+`slot_point`, and `geometry` / `stack_side_from`) and `AgentGrenades.is_call` (a grenade call is not a stack claim), and never moves the
+character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
-when free (or forced) and the frame has a snapshot to spare (`DecisionBudget`: `per_frame` snapshots a physics frame, one by
+when free (or forced), its routes can be measured as it will walk them (`AgentPerception.routes_ready`: the avoid map of the doorway views from the room it
+stands in is baked, a few frames at most, `docs/tactical-entry.md` E18) and the frame has a snapshot to spare (`DecisionBudget`: `per_frame` snapshots a physics frame, one by
 default, so NPCs deciding together spread over frames), asks **Perception** for a snapshot and starts a **Decision** walk
 over it;
 adopts the returned leaf into **Behaviour** (and radios it to allies); then has **Behaviour** `apply()`
@@ -56,20 +61,21 @@ the running primitive.
 that is how the HUDs tell an NPC's controller among a character's children (the UI's `hud_probe.gd`). `debug_status()` is the decision path as labels plus the running
 primitive's progress. `debug_state() -> Dictionary` is the deep snapshot: every level of the last walk (the state and question
 Von saw, the options, its probabilities and pick), the facts, the contacts, the running primitive and pathing (`loco`: the walk's
-`way` plain / round / held, `held_for`, `giving_way`), and `decisions` (walks started) with `decision_reason` (why the latest started:
+`way` plain / round / held / doors, `held_for`, `giving_way`), and `decisions` (walks started) with `decision_reason` (why the latest started:
 the force reason, e.g. "task resolved", "way blocked", "attacked", or "cadence"); the dev command
 server's `ai` verb dumps it and `tools/von_probe.py` replays captured levels against Von. `debug_zones() -> Array` flattens the
 last snapshot's option groups to world points, each with its `label`, `desc` (for an inspector to explain a clicked point) and
-`tags`, tagged by zone kind (fire / flank / advance / retreat / lead / search / entry / room / interaction, plus `waypoint` for
-the non-room go-to points: post / entrance / approach). `debug_room_zones() -> Array` gives each room `{ rect, type, status }`
+`tags`, tagged by zone kind (fire / flank / advance / retreat / lead / search / entry / room / interaction / grenade (where a throw
+weighed would burst, with `from`, the throw spot or the NPC's own spot), plus `waypoint` for the non-room go-to points: post / entrance / approach). `debug_room_zones() -> Array` gives each room `{ rect, type, status }`
 by how the NPC regards it (current / searched / unsearched / unknown). Both feed the tactics overlay (`domain-ai-debug`).
 
 ## Grenades (`docs/grenades.md`)
 
-Two decisions Von makes and two reflexes outside it. **GRENADE** (G17) is a COMBAT tactic: offered against a hostile hidden from the NPC's line of fire, in throw range with a clear lob,
-when no known ally would be in the blast and the NPC could get safe from it itself; it runs the `throw` primitive (select, aim, throw, radio `frag_out` / `bang_out`, gun back in hand, wait out the fuse, or the evade plan if it is in the
+Two decisions Von makes and two reflexes outside it. **GRENADE** (G17) is a COMBAT tactic: offered against a hostile hidden from the NPC's line of fire or in a room the NPC is outside of (barricaded), or, shot at by someone unseen from a room it is outside of, where the shots came from, in throw range with a clear lob from where it stands or from a
+throw spot a short walk away (`agent_tactics.gd` `throw_spot`, issue #51 R13 / R15), when no known ally would be in the blast and the NPC could get safe
+from it itself (judged from where it throws); it runs the `throw` primitive (walk to the throw spot, select, aim, throw, radio `frag_out` / `bang_out`, gun back in hand, wait out the fuse, or the evade plan if it is in the
 burst's zone). **STUN ENTRY** (G18) is a SEARCH tactic beside ENTER, offered while the NPC or its stack carries a stun: the same doorways, with a stun thrown into the room from beside the door before the point crosses (the `bang` phase of
-`entry.gd`, `docs/tactical-entry.md` E17). `perception/snapshot` words both (`domain-ai-snapshot`), the tree has the nodes (`domain-ai-decision`), `combat.gd` throws (`domain-ai-combat`), `entry.gd` runs the bang (`domain-ai-entry`); the numbers it
+`entry.gd`, `docs/tactical-entry.md` E17); Von takes it for a suspect room (gunfire or footsteps heard there, shots from it, an ally's fight in it, a hostile lost in it, by its doorway or heading in). `perception/snapshot` words both (`domain-ai-snapshot`), the tree has the nodes (`domain-ai-decision`), `combat.gd` throws (`domain-ai-combat`), `entry.gd` runs the bang (`domain-ai-entry`); the numbers it
 knows of a grenade not yet thrown (throw range, radii, fuses, the flash's cover reach) it reads off the grenades it carries (`Character.throw_stats(slot)`, interface 6/7; no copy in exports).
 
 Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_process_events`), and the exports **Grenades** group (`grenades_enabled`, `hear_grenade` 300 px, `evade_margin` 120 px):
@@ -78,7 +84,12 @@ Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_pr
   shields a crouched body, or outside the zone), holds it facing away and re-decides at the burst. No decision starts or is adopted meanwhile. `perception/agent_grenades.gd`,
   `agent_throw.gd`, `behavior.gd` ("The evade reflex"). `debug_grenades()` reads it; the `show_grenades` overlay draws it.
 - **Stunned (G15).** Blind: no new sighting, no new decision (it re-decides the tick sight returns), its contacts kept so it fires blind at the last-known spot of the one it fought (the character's aim
-  sway applies); deaf: the orchestrator drops gunfire, hits elsewhere, callouts and grenade landings it would have heard.
+  sway applies); deaf: the orchestrator drops gunfire, hits elsewhere, footfalls, callouts and grenade landings it would have heard.
+
+## Hearing (`docs/hearing.md`)
+
+The NPC hears the footsteps of characters not of its faction through walls (H1), out to a range by gait: the exports **Hearing** group, `hear_walk` 250 px,
+`hear_run` 450 px, `hear_crouch` 100 px. A heard step is an INVESTIGATE lead and a reason to suspect the room it came from; `debug_memory()["footsteps"]` reads it.
 
 ## The decision tree
 
@@ -86,12 +97,12 @@ Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_pr
 root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
       │                             ├─ RELOAD  → swap in a magazine             (reload)
       │                             ├─ FLANK   → a side, route clear of hostiles (engage)
-      │                             ├─ GRENADE → frag or stun a hostile hidden behind cover (throw)
+      │                             ├─ GRENADE → frag or stun a hostile hidden or barricaded in a room, or the shots' room (throw)
       │                             ├─ ADVANCE → halfway / close / rush         (move)
       │                             ├─ MELEE   → punch, only when point-blank   (melee)
       │                             ├─ RETREAT → a hidden / farther spot        (move)
       │                             └─ LOCATE  → toward an unseen shooter       (move)
-      ├─ INVESTIGATE ─┬─ a lead (last seen, heading, gunfire, ally's call)      (move)  [always asked of Von]
+      ├─ INVESTIGATE ─┬─ a lead (last seen, heading, gunfire, footsteps, ally's call) (move)  [always asked of Von]
       │               └─ STAY → hold, when a lead is outside the house          (hold)
       ├─ SEARCH ─┬─ ENTER → a doorway into a room left to search              (entry)
       │          ├─ STUN ENTRY → the same with a stun thrown in first (a stun in the stack) (entry{bang})
@@ -114,7 +125,8 @@ Spawned by Main (`defender_count` / `invader_count`, default 1 each):
   sight and is offered unexplored areas by direction), a red body. Dropped just outside the house;
   several start spread around the perimeter and coordinate flanks over the callout radio. It enters rooms
   tactically (`entry_enabled`, `docs/tactical-entry.md`): stack beside the door, slice the pie, cross
-  without stopping, take the corners, clear, leave rear security — as a team over the radio, or alone.
+  without stopping, take the corners, clear, leave rear security — as a team over the radio, or alone. A quiet stack that carries a stun
+  listens at the stack before the pie (`entry_listen_time` 3 s, an **Entry** group export: E17, issue #51 R17), so a late reason can turn it into a bang.
 
 Both pursue hostiles (`pursue_hostiles`, default on): IDLE is never offered and a known hostile sends
 every decision straight to COMBAT.

@@ -131,6 +131,11 @@ func debug_state() -> Dictionary:
 	}
 
 
+## The label of tree node `id` ("STUN ENTRY"), or its id when it has none.
+func label_of(id: StringName) -> String:
+	return str(_nodes.get(id, {}).get("label", id))
+
+
 ## A compact per-level timing digest of the last finished walk, for the controller's log line:
 ## "root 112ms, combat auto, flank 96ms".
 func walk_digest() -> String:
@@ -385,17 +390,19 @@ func _group(group_name) -> Dictionary:
 
 ## Fill a node's template: {target} = the bound target's name, {blinded} = what the bound target's option says of its being blinded, {gun} = what the NPC calls its gun ("pistol",
 ## "assault rifle"), {summary} = its summary group's summary (its `summary_inside` within a confined subtree,
-## so it never advertises a filtered-out place).
+## so it never advertises a filtered-out place), {situation} = that group's `situation` (the case it was offered for, in the state's words).
 func _fill(template: String, id: StringName) -> String:
 	var node: Dictionary = _nodes[id]
 	var summary_group = node.get("summary", node.get("options", [&""])[0] if not node.get("options", []).is_empty() else &"")
 	var summary := ""
+	var situation := ""
 	if summary_group != &"":
 		var group := _group(summary_group)
 		var confined: bool = _confine or (inside_only and node.get("confine", false))
 		summary = group.get("summary_inside", group.get("summary", "")) if confined else group.get("summary", "")
+		situation = group.get("situation", "")
 	var text := template.format({ "target": _binding.get("target", "the hostile"), "blinded": _binding.get("blinded", ""),
-		"gun": _snap.get("gun", "gun"), "summary": summary })
+		"gun": _snap.get("gun", "gun"), "summary": summary, "situation": situation })
 	return text.trim_suffix(" — ").trim_suffix(" ()").strip_edges()
 
 

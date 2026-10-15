@@ -22,7 +22,8 @@ func configure(s: TestSetup) -> void:
 	Entry.rules(s, Entry.BACK)
 	Entry.npc(s, &"a", Vector2(930, 90), 0.4, { "entry_ready_timeout": 40.0 })
 	# Held back until the human has its slot: the premise is an AI that stacks behind the human.
-	Entry.npc(s, &"b", Vector2(990, 450), 0.4, { "entry_enabled": false, "max_commit_time": 0.5, "entry_ready_timeout": 40.0 }, { "speed": 0.0 })
+	# It starts north of the door, on the human's side: a one-sided stack (a late AI from the other side splits the stack, E19).
+	Entry.npc(s, &"b", Vector2(980, -70), 0.4, { "entry_enabled": false, "max_commit_time": 0.5, "entry_ready_timeout": 40.0 }, { "speed": 0.0 })
 	Stack.human(s, &"me", Stack.NEAR)
 
 

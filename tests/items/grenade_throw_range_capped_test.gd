@@ -1,6 +1,6 @@
 extends GameTest
 
-## G2: a throw is capped at `max_range` 450 px. Aiming 900 px away the grenade comes down about 450 px out, no further
+## G2: a throw is capped at `max_range` 550 px. Aiming 900 px away the grenade comes down about 550 px out, no further
 ## (a little roll after the landing is allowed).
 
 const Probe := preload("res://tests/_ai/grenade_probe.gd")
@@ -13,7 +13,7 @@ const ROLL := 100.0
 func describe() -> Dictionary:
 	return {
 		"name": "A throw is capped at the throw range",
-		"description": "Aiming 900 px away, the grenade first touches down within 450 px of the thrower (plus a short roll) and comes to rest short of the aim point.",
+		"description": "Aiming 900 px away, the grenade first touches down within 550 px of the thrower (plus a short roll) and comes to rest short of the aim point.",
 		"tags": ["grenade", "throw", "range", "item"],
 		"timeout": 12.0,
 	}
@@ -40,4 +40,4 @@ func run(t: TestContext) -> void:
 		return
 	var at: Vector2 = Probe.booms(t, &"stun")[0]["data"]["position"]
 	t.check(at.distance_to(FROM) <= Probe.MAX_RANGE + ROLL, "it comes to rest within the cap plus a short roll (%.0f px)" % at.distance_to(FROM))
-	t.check(at.distance_to(AIM) > 300.0, "far short of the aim point 900 px out")
+	t.check(at.distance_to(AIM) > 200.0, "far short of the aim point 900 px out")

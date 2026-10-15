@@ -3,7 +3,8 @@ extends Node
 ## AI domain · TEAM — the human's place in an AI stack (`docs/tactical-entry.md` E16). A child of the human's character
 ## (Main attaches it with `attach`, as it hands an NPC its `rooms` and `openings`): it listens to the same `&"callout"`
 ## radio the NPCs use, and when an allied team is stacking at a doorway near the human it reserves the human the first
-## free slot there, the way an NPC claims one: a `callout` with the human as speaker (`opening`, `into`, `slot`, `side`,
+## free slot there, on the team's side of the door or, when its way there would cross the doorway's view, on the side the
+## human stands on (a split stack, E19), the way an NPC claims one: a `callout` with the human as speaker (`opening`, `into`, `slot`, `side`,
 ## `entry_step`), repeated every `HEARTBEAT` s so the claim stays live. The AI's entry code reads it like any teammate's
 ## claim, so the point waits for the human at the ready barrier, a lone AI is no longer solo, and an AI behind the human
 ## crosses after it. Nothing in the entry code knows it is a human.
@@ -54,8 +55,9 @@ var _heard := {}                              ## speaker instance id -> { data, 
 var _opening := ""                            ## The doorway reserved ("" = no reservation).
 var _into := ""                              ## The key of the room the reserved doorway leads into.
 var _geo := {}                                ## The reserved doorway's geometry (`AgentEntry.geometry`).
-var _slot := 0                                ## The human's slot number (1 = the point; 0 = none).
-var _side := 0                                ## The side of the door the team stacks on (1 / -1 along its wall).
+var _slot := 0                                ## The human's slot number (1 = the point; 0 = none): the order it claimed in.
+var _side := 0                                ## The side of the door the human stacks on (1 / -1 along its wall).
+var _team_side := 0                           ## The side the team stacks on, as last weighed (a change is weighed again).
 var _step := ""                               ## The human's latest radio step (claim / ready / going_in / in).
 var _heartbeat := 0.0                         ## Seconds until the latest step is radioed again.
 var _check := 0.0                             ## Seconds until the next walking-distance check.
@@ -89,19 +91,42 @@ func _exit_tree() -> void:
 
 
 ## The reservation as data for the markers (`{}` with none): `opening`, `door`, `slots` (`{ n, point, mine, held }` for
-## slot 1 up to the last taken), `mine` (the human's slot) and `step` (its own radio step).
+## slot 1 up to the last taken, each where it stands in the file on its holder's side of the door: both sides on a split
+## stack, E19; a free one on the human's side), `mine` (the human's slot) and `step` (its own radio step).
 func view() -> Dictionary:
 	if _opening == "" or _geo.is_empty():
 		return {}
-	var held := {}
+	var members := _members(AgentEntry.claims(_opening, _callouts()))
+	var holder := {}
 	var top := _slot
-	for m in AgentEntry.claims(_opening, _callouts()):
-		held[m["slot"]] = true
+	for m in members:
+		if not holder.has(m["slot"]) or m.get("me", false):
+			holder[m["slot"]] = m
 		top = maxi(top, m["slot"])
 	var slots: Array = []
 	for n in range(1, top + 1):
-		slots.append({ "n": n, "point": AgentEntry.slot_point(_geo, _side, n), "mine": n == _slot, "held": held.has(n) or n == _slot })
+		var on: int = int(holder[n]["side"]) if holder.has(n) and int(holder[n]["side"]) != 0 else _side
+		var point := AgentEntry.slot_point(_geo, on, AgentEntry.place(members, on, n))
+		slots.append({ "n": n, "point": point, "mine": n == _slot, "held": holder.has(n) })
 	return { "opening": _opening, "door": _geo["pos"], "slots": slots, "mine": _slot, "step": _step }
+
+
+## The claims on the reserved doorway (`team`) with the human's own added (`me`).
+func _members(team: Array) -> Array:
+	return team + [{ "id": _char.get_instance_id(), "slot": _slot, "side": _side, "step": _step, "me": true }]
+
+
+## Of the claims on the reserved doorway (`team`), those that cross before the human (`before` true) or after it, in the order
+## the stack crosses (agent_entry.gd `crossing_order`: on a split stack the sides take turns, E19).
+func _crossing(team: Array, before: bool) -> Array:
+	var out: Array = []
+	var past := false
+	for m in AgentEntry.crossing_order(_members(team)):
+		if m.get("me", false):
+			past = true
+		elif past != before:
+			out.append(m)
+	return out
 
 
 ## Keep the latest callout of each allied speaker within range (`_heard`).
@@ -193,7 +218,8 @@ func _look_for_team() -> void:
 	_into = best["into"]
 	_geo = best["geo"]
 	_slot = AgentEntry.free_slot(best["team"], _char.get_instance_id(), 0)
-	_side = AgentEntry.stack_side(_geo, best["team"], _char.global_position)
+	_team_side = AgentEntry.stack_side(_geo, best["team"], _char.global_position)
+	_side = _entry.stack_side_from(_geo, best["team"], _char.global_position, map, space)
 	_step = "claim"
 	_ahead_through_at = -1.0
 	_in_at = -1.0
@@ -228,11 +254,16 @@ func _keep_reservation(delta: float, due: bool) -> void:
 		return
 	if _step != "in":
 		var was := _slot
+		var was_side := _side
 		_slot = AgentEntry.free_slot(team, self_id, _slot)   # An AI with a lower instance id that claimed the same slot keeps it.
-		_side = AgentEntry.stack_side(_geo, team, pos)
-		if _slot != was:
+		var team_side := AgentEntry.stack_side(_geo, team, pos)
+		if team_side != _team_side:
+			_team_side = team_side   # The team's side changed (its point is known now): follow it, unless the way there crosses the view.
+			var world := _char.get_world_2d()
+			_side = _entry.stack_side_from(_geo, team, pos, world.navigation_map, world.direct_space_state)
+		if _slot != was or _side != was_side:
 			_post(_step)
-	var ahead := team.filter(func(m): return m["slot"] < _slot)
+	var ahead := _crossing(team, true)
 	var ahead_through: bool = ahead.all(func(m): return THROUGH.has(m["step"]))
 	if ahead_through and _ahead_through_at < 0.0:
 		_ahead_through_at = _clock
@@ -249,7 +280,7 @@ func _keep_reservation(delta: float, due: bool) -> void:
 			_in_at = _clock
 		_post(_step)
 	if _step == "in":
-		var waiting := team.any(func(m): return m["slot"] > _slot and STACKING.has(m["step"]) and m["step"] != "going_in")
+		var waiting := _crossing(team, false).any(func(m): return STACKING.has(m["step"]) and m["step"] != "going_in")
 		var held := _clock - _in_at
 		if held >= IN_HOLD_MAX or (held >= IN_HOLD_MIN and not waiting):
 			_barred[_opening] = true
@@ -273,7 +304,7 @@ func _step_at(pos: Vector2) -> String:
 		return "in"
 	if absf(outward) < FUNNEL_DEPTH and lateral < float(_geo["width"]) * 0.5:
 		return "going_in"
-	var spot := AgentEntry.slot_point(_geo, _side, _slot)
+	var spot := AgentEntry.slot_point(_geo, _side, AgentEntry.place(AgentEntry.claims(_opening, _callouts()), _side, _slot))
 	var d := pos.distance_to(spot)
 	if d <= SLOT_REACH or (_step == "ready" and d <= SLOT_REACH * 2.0):
 		return "ready"
@@ -288,6 +319,7 @@ func _withdraw(how: String) -> void:
 	_geo = {}
 	_slot = 0
 	_side = 0
+	_team_side = 0
 	_step = ""
 	_ahead_through_at = -1.0
 	_in_at = -1.0

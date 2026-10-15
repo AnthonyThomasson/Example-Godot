@@ -22,8 +22,9 @@ const LANDED_NEAR := 80.0
 ## How far (px) from a heard bounce the grenade it came from is looked for, and from an ally's call (a grenade rolls on a little).
 const HEARD_NEAR := 40.0
 const CALLED_NEAR := 150.0
-## A plan is made again when its grenade has moved this far (px), and not more often than every `REPLAN_EVERY` s of game time (counted in
-## physics frames, as the game's clock: the wall clock runs ahead of it in a fast headless run).
+## A plan is made again when its grenade has moved this far (px), or any distance that brings its spot into the grenade's line, and not
+## more often than every `REPLAN_EVERY` s of game time (counted in physics frames, as the game's clock: the wall clock runs ahead of it in
+## a fast headless run).
 const REPLAN_DIST := 48.0
 const REPLAN_EVERY := 0.15
 ## A grenade that came to rest this far (px) from where it was first called is called again, so the allies plan from the real spot.
@@ -218,7 +219,8 @@ func plan(space, map: RID, exclude: Array) -> Dictionary:
 			if not throw.in_zone(space, rec["kind"], rec["radius"], point, self_pos, height, exclude):
 				continue
 			plan_ = _make(space, map, exclude, id, rec, fuse)
-		elif (plan_["point"] as Vector2).distance_to(point) >= REPLAN_DIST and now - int(plan_["at"]) >= ceili(REPLAN_EVERY * Engine.physics_ticks_per_second):
+		elif point != plan_["point"] and now - int(plan_["at"]) >= ceili(REPLAN_EVERY * Engine.physics_ticks_per_second) \
+				and ((plan_["point"] as Vector2).distance_to(point) >= REPLAN_DIST or not _still_safe(space, exclude, rec, plan_, point)):
 			plan_ = _make(space, map, exclude, id, rec, fuse)
 		_plans[id] = plan_
 		if fuse < best_fuse:
@@ -229,6 +231,17 @@ func plan(space, map: RID, exclude: Array) -> Dictionary:
 	var out: Dictionary = best.duplicate()
 	out["fuse_left"] = best_fuse
 	return out
+
+
+## Whether the spot of `plan_` still keeps a body clear of grenade `rec` now that it lies at `point`: outside its zone, or shielded
+## from it (crouched, for a crouching plan). A grenade that rolled on a few px past where its plan was made, by a doorway, can bring
+## the spot into its line; the plan is then made again whatever the distance. A plan with no spot stands until the grenade moves on.
+func _still_safe(space, exclude: Array, rec: Dictionary, plan_: Dictionary, point: Vector2) -> bool:
+	var spot: Vector2 = plan_["spot"]
+	if spot == Vector2.INF:
+		return true
+	var height := throw.crouch_height() if plan_["crouch"] else throw.stand_height()
+	return not throw.in_zone(space, rec["kind"], rec["radius"], point, spot, height, exclude)
 
 
 ## A fresh plan for grenade `id` (record `rec`) from where the NPC stands.

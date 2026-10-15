@@ -9,6 +9,9 @@ class_name ThrownGrenade extends Node2D
 ## The lob is planned once at the throw (`plan`): its flight time and gravity are solved so the grenade comes to REST at
 ## the aim point (the touchdown, a bounce or two and the skid are simulated with the very integrator the node then
 ## runs), except that a throw is capped at the row's `max_range` of first touchdown, and rolls on a little past it.
+## The plan is then flown over the floor it crosses (`_fit`): a grenade touches down short of the aim and skids the rest of
+## the way, so a piece standing between the touchdown and the aim (a sofa in front of where it is aimed) would stop the
+## skid and kick it back toward the thrower; the thrower then lobs it farther, over the piece, to touch down past it.
 ## On the fuse's end it calls the Projectile System's `Explosion.frag` / `Explosion.stun` with its `GrenadeConfig` row.
 
 ## Physics layers it strikes (walls + solid furniture + the living).
@@ -22,8 +25,17 @@ const MIN_CLATTER_SPEED := 30.0
 ## Steps of the planner's search, and the longest it simulates (physics frames).
 const PLAN_STEPS := 22
 const PLAN_FRAMES := 600
+## A lob flown over the floor that comes to rest within this many px of the aim is kept; one that does not (something on the
+## floor stopped it) is lobbed farther, its first touchdown `FIT_STEP` px further out at a time, up to `max_range`.
+const FIT_NEAR := 24.0
+const FIT_STEP := 12.0
 ## Physics step the plan is simulated at (the game's).
 const PLAN_DELTA := 1.0 / 60.0
+## How far (px) a grenade flies before its thrower's own body can stop it: it leaves the throwing hand beside the body, and its first few px
+## pass within a body's width of it (a pixel either way decides whether it grazes the thrower), so the thrower is passed until it is clear.
+const THROWER_CLEAR := 40.0
+## No bodies passed (once the grenade is clear of its thrower).
+const NOBODY: Array[RID] = []
 
 @export var radius: float = 3.0              ## Its size against walls (px).
 @export var spin_friction: float = 14.0      ## Spin deceleration on the floor (rad/s²).
@@ -43,6 +55,8 @@ var _angle := 0.0            ## Which way the art points (rad).
 var _spin := 0.0             ## Spin (rad/s).
 var _resting := false        ## It has come to rest (the `rest` event was posted).
 var _query: PhysicsShapeQueryParameters2D  ## Reused sweep (a circle of `radius`).
+var _thrower_rid: Array[RID] = []  ## The thrower's body, passed for the first `THROWER_CLEAR` px of flight.
+var _flown := 0.0            ## How far (px) it has flown across the floor.
 
 
 ## The height, rise and speed of a grenade over time, stepped by one integrator for the node and for the plan, so the
@@ -88,9 +102,12 @@ static func spawn(grenade: StringName, from: Vector2, to: Vector2, by: Node, par
 	node.item = ItemRegistry.create(int(row.get("slot", -1)), 1)
 	node._row = row.duplicate()
 	node._fuse = float(row.get("fuse", 3.0))
-	var lob := plan(row, from.distance_to(to))
-	node._motion = _motion_for(row, lob)
 	node._direction = (to - from).normalized() if from.distance_to(to) > 0.5 else Vector2.RIGHT
+	if by is CollisionObject2D:
+		node._thrower_rid = [(by as CollisionObject2D).get_rid()]
+	var lob := _fit(row, plan(row, from.distance_to(to)), from, to, node._direction, parent.get_viewport().find_world_2d().direct_space_state,
+		_sweep_query(node.radius), node._thrower_rid)
+	node._motion = _motion_for(row, lob)
 	node._angle = node._direction.angle()
 	node._spin = randf_range(8.0, 14.0) * (1.0 if randf() < 0.5 else -1.0)
 	parent.add_child(node)
@@ -102,7 +119,7 @@ static func spawn(grenade: StringName, from: Vector2, to: Vector2, by: Node, par
 ## time, the launch's vertical speed, the gravity it is flown under, the speed across the floor and how far it first
 ## touches down). A throw aimed past what `max_range` allows first touches down at `max_range` and rolls on from there.
 static func plan(row: Dictionary, distance: float) -> Dictionary:
-	var cap := float(row.get("max_range", 450.0))
+	var cap := float(row.get("max_range", 550.0))
 	var reach := cap
 	if _simulate(row, cap).y > distance:
 		var low := 0.0
@@ -125,6 +142,48 @@ static func _flight(row: Dictionary, reach: float) -> Dictionary:
 	var time := maxf(reach / float(row.get("throw_speed", 500.0)), GrenadeConfig.min_flight_time)
 	var rise := 2.0 * climb * (1.0 + sqrt(1.0 + start / climb)) / time
 	return { "time": time, "rise": rise, "gravity": rise * rise / (2.0 * climb), "speed": reach / time, "reach": reach }
+
+
+## The lob to throw from `from` toward `to` (along `direction`), given `lob`, the one planned in free air: kept when, flown over the
+## floor in `space` (the walls, furniture and bodies the node itself strikes, `_sweep`, the thrower's body in `passed` passed as the node passes it),
+## it comes to rest within `FIT_NEAR` of the aim; else the longer lob, up to `max_range`, that comes to rest nearest it (a piece the skid
+## would have run into is flown over).
+static func _fit(row: Dictionary, lob: Dictionary, from: Vector2, to: Vector2, direction: Vector2, space: PhysicsDirectSpaceState2D,
+		query: PhysicsShapeQueryParameters2D, passed: Array[RID] = []) -> Dictionary:
+	var best := lob
+	var best_off := _rest_in(row, lob, from, direction, space, query, passed).distance_to(to)
+	var reach := float(lob["reach"]) + FIT_STEP
+	var cap := float(row.get("max_range", 550.0))
+	while best_off > FIT_NEAR and reach <= cap:
+		var longer := _flight(row, reach)
+		var off := _rest_in(row, longer, from, direction, space, query, passed).distance_to(to)
+		if off < best_off:
+			best = longer
+			best_off = off
+		reach += FIT_STEP
+	return best
+
+
+## Where a grenade of `row` thrown on `lob` from `from` along `direction` comes to rest over the floor in `space`: the node's own
+## motion (`Motion.step`, `_sweep`, the thrower's body in `passed` passed for the first `THROWER_CLEAR` px), stepped at the game's physics rate.
+static func _rest_in(row: Dictionary, lob: Dictionary, from: Vector2, direction: Vector2, space: PhysicsDirectSpaceState2D,
+		query: PhysicsShapeQueryParameters2D, passed: Array[RID] = []) -> Vector2:
+	var motion := _motion_for(row, lob)
+	var at := from
+	var dir := direction
+	var flown := 0.0
+	for _frame in PLAN_FRAMES:
+		motion.step(PLAN_DELTA)
+		var step := motion.speed * PLAN_DELTA
+		var moved := _sweep(space, query, at, dir, dir * step, motion.height, passed if flown < THROWER_CLEAR else NOBODY)
+		flown += step
+		at = moved["at"]
+		dir = moved["direction"]
+		if moved["struck"]:
+			motion.speed *= motion.restitution
+		if motion.rolling and motion.speed <= REST_SPEED:
+			break
+	return at
 
 
 ## A `Motion` for a grenade of `row` thrown on `lob`.
@@ -159,12 +218,18 @@ static func _simulate(row: Dictionary, reach: float) -> Vector2:
 func _ready() -> void:
 	add_to_group(&"live_grenades")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	var circle := CircleShape2D.new()
-	circle.radius = radius
-	_query = PhysicsShapeQueryParameters2D.new()
-	_query.shape = circle
-	_query.collision_mask = SOLID_MASK
+	_query = _sweep_query(radius)
 	_update_layer()
+
+
+## The sweep a grenade of `size` px radius is moved with: a circle on the layers it strikes.
+static func _sweep_query(size: float) -> PhysicsShapeQueryParameters2D:
+	var circle := CircleShape2D.new()
+	circle.radius = size
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = circle
+	query.collision_mask = SOLID_MASK
+	return query
 
 
 func _physics_process(delta: float) -> void:
@@ -216,38 +281,53 @@ func _update_layer() -> void:
 func _slide(motion: Vector2) -> void:
 	if motion.length_squared() < 0.000001:
 		return
-	var space := get_world_2d().direct_space_state
-	var struck := _first_strike(space, motion)
-	if struck.is_empty():
-		global_position += motion
+	var moved := _sweep(get_world_2d().direct_space_state, _query, global_position, _direction, motion, _motion.height,
+		_thrower_rid if _flown < THROWER_CLEAR else NOBODY)
+	_flown += motion.length()
+	global_position = moved["at"]
+	if not moved["struck"]:
 		return
-	global_position += motion * float(struck["safe"])
-	var normal: Vector2 = struck["normal"]
-	_direction = _direction.bounce(normal).normalized()
-	global_position += normal * 0.5
+	_direction = moved["direction"]
 	if _motion.speed > MIN_CLATTER_SPEED:
 		_post(&"bounce")
 	_motion.speed *= _motion.restitution
 	_spin *= -0.5
 
 
-## What first stops a sweep of `motion`, as `{ safe, normal }` (how far along it is clear, and the surface's normal), or {}
-## when nothing does. A piece whose `coverage` is below the grenade's height is flown over: it is skipped.
-func _first_strike(space: PhysicsDirectSpaceState2D, motion: Vector2) -> Dictionary:
-	var skipped: Array[RID] = []
+## One step of `motion` across the floor from `at` heading along `direction`, `height` px up, swept with `query`: `{ at, direction,
+## struck }`, where it ends, which way it then heads and whether it struck something (it stops at the thing and bounces off it,
+## the other way); the bodies in `passed` (the thrower, just after the release) do not stop it. Shared by the node and the plan
+## (`_rest_in`), so the plan flies the node's own course.
+static func _sweep(space: PhysicsDirectSpaceState2D, query: PhysicsShapeQueryParameters2D, at: Vector2, direction: Vector2,
+		motion: Vector2, height: float, passed: Array[RID] = []) -> Dictionary:
+	if motion.length_squared() < 0.000001:
+		return { "at": at, "direction": direction, "struck": false }
+	var struck := _first_strike(space, query, at, motion, height, passed)
+	if struck.is_empty():
+		return { "at": at + motion, "direction": direction, "struck": false }
+	var normal: Vector2 = struck["normal"]
+	return { "at": at + motion * float(struck["safe"]) + normal * 0.5, "direction": direction.bounce(normal).normalized(), "struck": true }
+
+
+## What first stops a sweep of `motion` from `at`, `height` px up, as `{ safe, normal }` (how far along it is clear, and the surface's
+## normal), or {} when nothing does. A piece whose `coverage` is below the grenade's height is flown over: it is skipped; so are the
+## bodies in `passed`.
+static func _first_strike(space: PhysicsDirectSpaceState2D, query: PhysicsShapeQueryParameters2D, at: Vector2, motion: Vector2,
+		height: float, passed: Array[RID] = []) -> Dictionary:
+	var skipped: Array[RID] = passed.duplicate()
 	for _attempt in 6:
-		_query.exclude = skipped
-		_query.transform = Transform2D(0.0, global_position)
-		_query.motion = motion
-		var res := space.cast_motion(_query)
+		query.exclude = skipped
+		query.transform = Transform2D(0.0, at)
+		query.motion = motion
+		var res := space.cast_motion(query)
 		if res[0] >= 1.0:
 			return {}
-		_query.transform = Transform2D(0.0, global_position + motion * res[1])
-		_query.motion = Vector2.ZERO
-		var info := space.get_rest_info(_query)
+		query.transform = Transform2D(0.0, at + motion * res[1])
+		query.motion = Vector2.ZERO
+		var info := space.get_rest_info(query)
 		if info.is_empty():
 			return { "safe": res[0], "normal": -motion.normalized() }
-		if _coverage_of(info["collider_id"]) <= _motion.height:
+		if _coverage_of(info["collider_id"]) <= height:
 			skipped.append(info["rid"])
 			continue
 		return { "safe": res[0], "normal": info["normal"] }
@@ -255,7 +335,7 @@ func _first_strike(space: PhysicsDirectSpaceState2D, motion: Vector2) -> Diction
 
 
 ## The height of what object `id` is (its surface's `coverage`; a collider with none always stops a grenade).
-func _coverage_of(id: int) -> float:
+static func _coverage_of(id: int) -> float:
 	var collider: Object = instance_from_id(id)
 	if collider != null and collider.has_method("get_surface"):
 		return float(collider.get_surface().get("coverage", UNKNOWN_COVERAGE))

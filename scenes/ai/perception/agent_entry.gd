@@ -7,6 +7,9 @@ extends RefCounted
 ## (unseen from just outside the threshold) or soft. Plus the team's claims on an opening, read off allies'
 ## radio callouts (the same claim pattern as a flank side, `agent_tactics.side_holder`).
 ##
+## It also lays out each doorway's VIEW (`door_view`: the area outside it that someone inside the room sees through it) and, from the
+## views of the doorways into rooms not clear for passing, the walk that keeps out of them (`walk_route`, `docs/tactical-entry.md` E18).
+##
 ## Pure geometry over the house's openings (Main's `WorldGen.get_openings`, injected), its rooms, the nav map
 ## (slots and pie points are snapped onto it) and sight rays (via the vision sense). The walls never move, so
 ## an opening's geometry is built once, the first time it is asked for on a baked map, and kept. No policy: it
@@ -14,6 +17,7 @@ extends RefCounted
 
 ## How far (px) outside the threshold the "entry point" is that a corner is judged hard or soft from.
 const SnapshotVocab := preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
+const AgentVision := preload("res://scenes/ai/perception/agent_vision.gd")
 const ENTRY_POINT_DEPTH := 24.0
 ## Slots worked out per side: a fuller team queues in the last one.
 const MAX_SLOTS := 6
@@ -23,20 +27,35 @@ const SHORT_ROOM_CAPACITY := 2
 const THRESHOLD_EXTEND := 30.0
 ## How far (px) past the doorway's width a step may cross the wall plane and still count as through it.
 const THRESHOLD_SLACK := 8.0
-## How far (px) out from a doorway's wall a walk may pass it and still count as passing it: a corridor's width, not a room's.
-const PASS_DEPTH := 150.0
+## How far (px) off the wall plane a doorway view's rays start (clear of the wall's thickness), and how many rays one fan casts along
+## each side edge of the view and across its far edge.
+const VIEW_APEX_OUT := 8.0
+const VIEW_SIDE_RAYS := 6
+const VIEW_FAR_RAYS := 10
+## How far (px) the door-avoiding route may end short of the point it was asked for before it counts as not reaching it.
+const AVOID_REACH := 24.0
 
-var vision: RefCounted                ## The perception's sight sense (sight rays over low cover).
+var vision: RefCounted = AgentVision.new()  ## The sight sense (sight rays over low cover): the perception hands in its own.
 var stack_spacing: float = 44.0       ## Distance (px) between neighbouring stack slots: clear of a neighbour's footprint.
 var wall_standoff: float = 28.0       ## Distance (px) of a stack slot off the wall's centreline.
 var pie_radius: float = 100.0         ## Distance (px) from the threshold of the pie arc a point man sweeps from.
 var pie_steps: int = 5                ## Points on the pie arc (angle steps).
 var corner_inset: float = 40.0        ## Inset (px) of a corner point from the room's two walls.
 var short_room: float = 150.0         ## A room with a side under this (px) is too small for the team: two go in (E13).
+var door_view_depth: float = 450.0    ## How far (px) out of a doorway its view reaches, along its edge rays (E18).
+var door_avoid_ratio: float = 2.0     ## A walk round the views is taken when no longer than this many times the plain route...
+var door_avoid_slack: float = 300.0   ## ... plus this many px.
+var avoid_views := true               ## Whether a walk keeps out of doorway views at all (the controller's `entry_guard` and `entry_enabled`).
+var pass_clear: Callable              ## Room key -> whether that room counts as safe to walk past (cleared lately enough).
 
 var _openings: Array = []             ## The house's doorways (`{ pos, width, front, exit, rooms }`), as injected.
 var _rooms: Array = []                ## The house's rooms (`{ key, type, rect }`).
 var _cache := {}                      ## "<opening id>><room key>" -> the geometry of that entry.
+var _views := {}                      ## "<opening id>><room key>@<depth>" -> the view out of that doorway (a polygon).
+var _avoided_frame := -1              ## The physics frame `avoided` last worked out its answer in, and for which room...
+var _avoided_here := ""
+var _avoided_exempt := ""
+var _avoided_set := {}                ## ... and the answer: `{ key, holes, views }`.
 
 
 ## Hand in the house: its doorways and rooms. Forgets the cached geometry when they changed.
@@ -46,6 +65,8 @@ func set_house(openings: Array, rooms: Array) -> void:
 	_openings = openings
 	_rooms = rooms
 	_cache.clear()
+	_views.clear()
+	_avoided_frame = -1
 
 
 ## The stable id of doorway `o` ("door_<x>_<y>", its rounded world position): what the snapshot's options, the
@@ -139,62 +160,237 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 	return {}
 
 
-## The first doorway a walk goes past without entering (E15): the walk crosses its axis (the line out from its centre) within
-## `PASS_DEPTH` px of its wall, outside it, within `max_dist` px of walking. It leads into a room that is not the NPC's own and
-## not cleared, and the walk never crosses its wall plane (that doorway is `threshold_ahead`'s). Only doors between two rooms of
-## the house, from inside it. `{ opening, into, dist }` (`dist` = px of walking until abreast of it), or {}.
-func passing_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2, is_cleared: Callable, max_dist: float) -> Dictionary:
+## The first doorway view a walk goes into without entering the rooms it belongs to (E15 / E18): the walk comes from outside one of the
+## `avoided` views into it, within `max_dist` px of walking. Not the view of a doorway of a room the walk goes into (by any of its doors:
+## that is an entry, `threshold_ahead`'s, and it clears the room and covers its doorways), nor of the room the NPC stands in.
+## `{ opening, into, dist }` (`dist` = px of walking until it is in the view), or {}. The view of any doorway counts, outside the house
+## and at its exterior doors too.
+func passing_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2, max_dist: float, map: RID, space) -> Dictionary:
 	var pts: Array = [from_pos]
 	for i in range(maxi(from_idx, 0), path.size()):
 		pts.append(path[i])
 	if pts.size() < 2:
 		return {}
-	var here := str(SnapshotVocab.room_at(from_pos, _rooms).get("key", ""))
-	if here == "":
-		return {}
-	var candidates: Array = []
-	for o in _openings:
-		var joins: Array = o.get("rooms", [])
-		if joins.size() != 2:
+	var best := {}
+	for v in _crossed_views(pts, avoided(_room_key_at(from_pos), map, space)["views"], max_dist):
+		if best.is_empty() or v["dist"] < best["dist"]:
+			best = { "opening": v["id"], "into": v["into"], "dist": v["dist"] }
+	return best
+
+
+## The `views` the walk `pts` comes into from outside within `max_dist` px of walking, each with its `dist`; not those of a doorway of
+## a room the walk goes into.
+func _crossed_views(pts: Array, views: Array, max_dist: float) -> Array:
+	var entered := _entered_rooms(pts)
+	var out: Array = []
+	for v in views:
+		if (v["joins"] as Array).any(func(k): return entered.has(k)):
 			continue
-		for key in joins:
-			var into := str(key)
-			if into == here or is_cleared.call(into):
+		var d := _entering_distance(pts, v["poly"], max_dist)
+		if d < INF:
+			out.append({ "id": v["id"], "into": v["into"], "poly": v["poly"], "dist": d })
+	return out
+
+
+## The route from `from` to `to` as the NPC walks it (E18), on the world navigation map `map`: the plain route, unless it goes into
+## the view of a doorway into a room not clear for passing (`avoided`) and a route that keeps out of every such view reaches `to` within
+## `door_avoid_ratio` x the plain length + `door_avoid_slack`: that one, on the avoid map. `{ map, path, len, plain_len, doors, pending,
+## views }`: `map` the map the route is on, `doors` whether it is the door-avoiding one, `pending` that the plain route goes into a view and
+## the avoid map is still being baked (the NPC walks the plain route meanwhile and asks again), `views` the views the plain route goes into.
+## `exempt` is a doorway whose view is left alone: the one the walk is for (the approach to its stack).
+func walk_route(from: Vector2, to: Vector2, map: RID, space, exempt := "") -> Dictionary:
+	var plain := NavBuilder.route(map, from, to)
+	var plain_len := NavBuilder.path_length(plain)
+	var out := { "map": map, "path": plain, "len": plain_len, "plain_len": plain_len, "doors": false, "pending": false, "views": [] }
+	if not avoid_views or not NavBuilder.ready(map):
+		return out
+	var avoid_set := avoided(_room_key_at(from), map, space, exempt)
+	var crossed := _crossed_views([from] + Array(plain), avoid_set["views"], INF)
+	out["views"] = crossed
+	if crossed.is_empty():
+		return out
+	var region := NavBuilder.planning_region(map)
+	var avoid := NavBuilder.avoid_map(region, avoid_set["key"], avoid_set["holes"])
+	if not avoid.is_valid() or not NavBuilder.ready(avoid):
+		out["pending"] = true
+		return out
+	var path := NavBuilder.route(avoid, from, to)
+	if path[path.size() - 1].distance_to(NavBuilder.snap(map, to)) > AVOID_REACH:
+		return out  # No way round: the walk goes the plain way and the guard secures what it crosses.
+	var length := NavBuilder.path_length(path)
+	if length > door_avoid_ratio * plain_len + door_avoid_slack:
+		return out
+	out.merge({ "map": avoid, "path": path, "len": length, "doors": true }, true)
+	return out
+
+
+## Whether the routes weighed from point `from` can be measured as they would be walked (E18): the avoid map for the doorway views
+## from the room it is in exists. Asks for it, which starts its bake on the worker thread, so it is under way before a decision is. True when there
+## is nothing to avoid (no views, no planning region, door avoidance off) and once the map answers.
+func warm(from: Vector2, map: RID, space) -> bool:
+	if not avoid_views or not NavBuilder.ready(map):
+		return true
+	var avoid_set := avoided(_room_key_at(from), map, space)
+	var region := NavBuilder.planning_region(map)
+	if avoid_set["views"].is_empty() or region == null:
+		return true
+	return NavBuilder.ready(NavBuilder.avoid_map(region, avoid_set["key"], avoid_set["holes"]))
+
+
+## The views a walk from point `from` keeps out of, each `{ id, into, poly }` (see `avoided`).
+func views_from(from: Vector2, map: RID, space) -> Array:
+	return avoided(_room_key_at(from), map, space)["views"]
+
+
+## The doorway views a walk from room `here_key` ("" = outside) keeps out of: the view out of every doorway into a room that is not
+## clear for passing (`pass_clear`), other than the room the NPC stands in. `{ key, holes, views }`: `key` names the set (for
+## `NavBuilder.avoid_map`), `holes` the polygons, `views` each `{ id, into, poly, joins }` (`joins`: the keys of the rooms the doorway joins). Empty until the map is baked. The views of doorway
+## `exempt` (the doorway a walk is for) are left out.
+func avoided(here_key: String, map: RID, space, exempt := "") -> Dictionary:
+	var frame := Engine.get_physics_frames()
+	if frame == _avoided_frame and here_key == _avoided_here and exempt == _avoided_exempt:
+		return _avoided_set
+	var keys: Array = []
+	var holes: Array = []
+	var views: Array = []
+	for o in _openings:
+		for k in o.get("rooms", []):
+			var into := str(k)
+			if into == here_key or opening_id(o) == exempt or (pass_clear.is_valid() and pass_clear.call(into)):
 				continue
-			var room := _room_rect(into)
-			if room.size == Vector2.ZERO:
+			var poly := door_view(opening_id(o), into, map, space)
+			if poly.is_empty():
 				continue
-			var pos: Vector2 = o["pos"]
-			var inward := _inward(room, pos)
-			if _walk_enters(pts, pos, inward, float(o.get("width", 80.0))):
+			keys.append("%s>%s" % [opening_id(o), into])
+			holes.append(poly)
+			views.append({ "id": opening_id(o), "into": into, "poly": poly, "joins": (o.get("rooms", []) as Array).map(func(j): return str(j)) })
+	_avoided_set = { "key": "%d:%s" % [int(door_view_depth), ",".join(keys)], "holes": holes, "views": views }
+	_avoided_frame = frame
+	_avoided_here = here_key
+	_avoided_exempt = exempt
+	return _avoided_set
+
+
+## The view out of doorway `id` seen from inside room `into` through it, as a polygon in world space (empty when either is unknown or
+## the map is not baked): the area bounded by the rays from the room's two far corners through the opposite jambs, `door_view_depth` px
+## long, and stopped at walls, and, for a doorway between two rooms, cut at the edge of the room in front of it. It is laid out once per doorway (walls do not move) from three points in the gap, the middle and each
+## jamb, so what one of them sees past a wall's end counts.
+func door_view(id: String, into: String, map: RID, space) -> PackedVector2Array:
+	var key := "%s>%s@%d" % [id, into, int(door_view_depth)]
+	if _views.has(key):
+		return _views[key]
+	var opening := {}
+	for o in _openings:
+		if opening_id(o) == id:
+			opening = o
+	var room := SnapshotVocab.room_by_key(_rooms, into)
+	if opening.is_empty() or room.is_empty() or space == null or vision == null or not NavBuilder.ready(map):
+		return PackedVector2Array()
+	# A view lies in the room (or the open) in front of the doorway: it does not run on through the next doorway into another room.
+	var in_front := Rect2()
+	for k in opening.get("rooms", []):
+		if str(k) != into:
+			in_front = _room_rect(str(k))
+	var view := _build_view(opening, room["rect"], space)
+	if in_front.size != Vector2.ZERO:
+		var front_ring := PackedVector2Array([in_front.position, Vector2(in_front.end.x, in_front.position.y), in_front.end, Vector2(in_front.position.x, in_front.end.y)])
+		var cut: Array = Geometry2D.intersect_polygons(view, front_ring)
+		if not cut.is_empty():
+			cut.sort_custom(func(a, b): return absf(_area(a)) > absf(_area(b)))
+			view = cut[0]
+	_views[key] = view
+	return view
+
+
+## The area of polygon `ring` (positive or negative by its winding).
+func _area(ring: PackedVector2Array) -> float:
+	var total := 0.0
+	for i in ring.size():
+		total += ring[i].cross(ring[(i + 1) % ring.size()])
+	return total * 0.5
+
+
+## The view of `opening` into the room `rect`: see `door_view`.
+func _build_view(opening: Dictionary, rect: Rect2, space) -> PackedVector2Array:
+	var pos: Vector2 = opening["pos"]
+	var half := float(opening.get("width", 80.0)) * 0.5
+	var out := -_inward(rect, pos)
+	var along := out.orthogonal()
+	var corners := [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]
+	corners.sort_custom(func(a, b): return (a - pos).dot(out) < (b - pos).dot(out))
+	var far_a: Vector2 = corners[0]
+	var far_b: Vector2 = corners[1]
+	# Each jamb is seen past by the far corner on the other side of the door's axis.
+	var for_a: Vector2 = far_a if (far_a - pos).dot(along) > (far_b - pos).dot(along) else far_b
+	var for_b: Vector2 = far_b if for_a == far_a else far_a
+	var jamb_a := pos - along * half
+	var jamb_b := pos + along * half
+	var end_a := jamb_a + (jamb_a - for_a).normalized() * door_view_depth
+	var end_b := jamb_b + (jamb_b - for_b).normalized() * door_view_depth
+	# The view's outline from jamb to jamb the long way round, sampled for the rays.
+	var boundary: Array = []
+	for i in range(1, VIEW_SIDE_RAYS + 1):
+		boundary.append(jamb_a.lerp(end_a, float(i) / VIEW_SIDE_RAYS))
+	for i in range(1, VIEW_FAR_RAYS):
+		boundary.append(end_a.lerp(end_b, float(i) / VIEW_FAR_RAYS))
+	for i in range(VIEW_SIDE_RAYS, 0, -1):
+		boundary.append(jamb_b.lerp(end_b, float(i) / VIEW_SIDE_RAYS))
+	var merged: Array = []
+	for apex in [pos, jamb_a + along * 2.0, jamb_b - along * 2.0]:
+		var eye: Vector2 = apex + out * VIEW_APEX_OUT
+		var ring := PackedVector2Array([jamb_a])
+		for target in boundary:
+			var hit: Dictionary = vision.wall_hit(space, eye, target)
+			ring.append(hit["position"] if not hit.is_empty() else target)
+		ring.append(jamb_b)
+		if merged.is_empty():
+			merged = [ring]
+			continue
+		var fused := Geometry2D.merge_polygons(merged[0], ring)
+		var outer: Array = fused.filter(func(poly: PackedVector2Array) -> bool: return not Geometry2D.is_polygon_clockwise(poly))
+		if outer.size() == 1:
+			merged = [outer[0]]
+	return merged[0]
+
+
+## The room key at world point `p` ("" = outside every room).
+func _room_key_at(p: Vector2) -> String:
+	return str(SnapshotVocab.room_at(p, _rooms).get("key", ""))
+
+
+## The keys of the rooms the walk `pts` goes into, by any of their doorways.
+func _entered_rooms(pts: Array) -> Dictionary:
+	var entered := {}
+	for o in _openings:
+		for k in o.get("rooms", []):
+			var key := str(k)
+			if entered.has(key):
 				continue
-			candidates.append({ "opening": opening_id(o), "into": into, "pos": pos, "out": -inward })
-	var walked := 0.0
-	for i in range(1, pts.size()):
-		var a: Vector2 = pts[i - 1]
-		var b: Vector2 = pts[i]
-		var best := {}
-		for c in candidates:
-			var pos: Vector2 = c["pos"]
-			var out: Vector2 = c["out"]
-			var along := out.orthogonal()
-			var la := (a - pos).dot(along)
-			var lb := (b - pos).dot(along)
-			if la * lb >= 0.0:
-				continue  # Not a step across the doorway's axis.
-			var q := a + (b - a) * (la / (la - lb))
-			var depth := (q - pos).dot(out)
-			if depth <= 0.0 or depth > PASS_DEPTH:
-				continue
-			var d := walked + a.distance_to(q)
-			if best.is_empty() or d < best["dist"]:
-				best = { "opening": c["opening"], "into": c["into"], "dist": d }
-		if not best.is_empty():
-			return best if best["dist"] <= max_dist else {}
-		walked += a.distance_to(b)
-		if walked > max_dist:
-			break
-	return {}
+			var room := _room_rect(key)
+			if room.size != Vector2.ZERO and _walk_enters(pts, o["pos"], _inward(room, o["pos"]), float(o.get("width", 80.0))):
+				entered[key] = true
+	return entered
+
+
+## The px of walking along the polyline `pts` until it comes into `poly` from outside it, or INF when it does not within `max_dist`. A
+## walk that starts in the polygon has not come into it: its first stretch inside is not counted.
+func _entering_distance(pts: Array, poly: PackedVector2Array, max_dist: float) -> float:
+	var line := PackedVector2Array(pts)
+	var inside: Array = Geometry2D.intersect_polyline_with_polygon(line, poly)
+	var best := INF
+	for piece in inside:
+		var first: Vector2 = piece[0]
+		if first.distance_to(pts[0]) < 0.5:
+			continue
+		var walked := 0.0
+		for i in range(1, pts.size()):
+			var a: Vector2 = pts[i - 1]
+			var b: Vector2 = pts[i]
+			if first.distance_to(Geometry2D.get_closest_point_to_segment(first, a, b)) < 0.5:
+				best = minf(best, walked + a.distance_to(first))
+				break
+			walked += a.distance_to(b)
+	return best if best <= max_dist else INF
 
 
 ## Whether the walk `pts` crosses the wall plane of a doorway at `pos` (into the room that lies along `inward`) within its width:
@@ -330,7 +526,7 @@ static func claims(id: String, callouts: Array) -> Array:
 			continue
 		out.append({ "id": c["id"], "name": c.get("name", ""), "slot": int(c.get("slot", 0)), "side": int(c.get("side", 0)),
 			"step": step, "covering": str(c.get("covering", "")), "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0),
-			"bang": bool(c.get("bang", true)), "stuns": int(c.get("stuns", 0)) })
+			"bang": bool(c.get("bang", true)), "bang_off": bool(c.get("bang_off", false)), "stuns": int(c.get("stuns", 0)) })
 	out.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
 	return out
 
@@ -350,19 +546,86 @@ static func free_slot(team: Array, self_id: int, current := 0) -> int:
 	return slot
 
 
-## The side of the door (1 / -1 along its wall, see `geometry`) the team stacks on: the side with more wall to stack
-## against; when both have the same, the side the point (the slot 1 claim in `team`) stacks on, else the side
-## `self_pos` is on. Every member works it out the same way, so the stack forms on one side.
+## The side of the door (1 / -1 along its wall, see `geometry`) the team stacks on: the side the point (the slot 1 claim
+## in `team`) stacks on; with no point yet, the side with more wall to stack against; when both have the same, the side
+## `self_pos` is on. Every member works it out the same way, so the stack forms on one side unless a member cannot get
+## there (`stack_side_from`, E19).
 static func stack_side(g: Dictionary, team: Array, self_pos: Vector2) -> int:
-	if int(g["side"]) != 0:
-		return int(g["side"])
 	for m in team:
 		if m["slot"] == 1 and m["side"] != 0:
 			return m["side"]
-	return 1 if (self_pos - (g["pos"] as Vector2)).dot(g["along"]) >= 0.0 else -1
+	if int(g["side"]) != 0:
+		return int(g["side"])
+	return side_of(g, self_pos)
 
 
-## Where stack slot `slot` (1 = nearest the door) stands on side `side`.
-static func slot_point(g: Dictionary, side: int, slot: int) -> Vector2:
+## The side of the door (1 / -1 along its wall) point `p` is on.
+static func side_of(g: Dictionary, p: Vector2) -> int:
+	return 1 if (p - (g["pos"] as Vector2)).dot(g["along"]) >= 0.0 else -1
+
+
+## The side a member standing at `from` stacks on (E19): the team's side (`stack_side`), unless its way there crosses the
+## doorway's view (`cuts_view`): then its own side, and the stack is split across the door.
+func stack_side_from(g: Dictionary, team: Array, from: Vector2, map: RID, space) -> int:
+	var team_side := stack_side(g, team, from)
+	var own := side_of(g, from)
+	if own == team_side or not cuts_view(g, from, slot_point(g, team_side, 1), map, space):
+		return team_side
+	return own
+
+
+## Whether the walk from `from` to `to` crosses the view of doorway `g` (E19): it starts outside the view (`door_view`) and its
+## plain route crosses the door's axis inside it, in front of the door. A walk that starts in the view, or goes round it, does not.
+func cuts_view(g: Dictionary, from: Vector2, to: Vector2, map: RID, space) -> bool:
+	var view := door_view(g["id"], g["into"], map, space)
+	if view.is_empty() or Geometry2D.is_point_in_polygon(from, view):
+		return false
+	var pos: Vector2 = g["pos"]
+	var out: Vector2 = g["out"]
+	var axis := PackedVector2Array([pos + out * VIEW_APEX_OUT, pos + out * door_view_depth])
+	var route: Array = [from] + Array(NavBuilder.route(map, from, to))
+	for piece: PackedVector2Array in Geometry2D.intersect_polyline_with_polygon(axis, view):
+		for i in range(1, route.size()):
+			for j in range(1, piece.size()):
+				if Geometry2D.segment_intersects_segment(route[i - 1], route[i], piece[j - 1], piece[j]) != null:
+					return true
+	return false
+
+
+## The members of a stack (`members`: claims with `id`, `slot` and `side`, this member's own among them) in the order they
+## cross (E6, E19): by slot on a one-sided stack; on a split one the point (the lowest slot), then the front man of the other
+## side, then the sides take turns, each side's file in slot order (one that runs out leaves the rest to the other).
+static func crossing_order(members: Array) -> Array:
+	var sorted := members.duplicate()
+	sorted.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
+	if sorted.is_empty():
+		return sorted
+	var lead_side := int(sorted[0]["side"])
+	var lead: Array = sorted.filter(func(m): return int(m["side"]) == lead_side or int(m["side"]) == 0)
+	var other: Array = sorted.filter(func(m): return int(m["side"]) != lead_side and int(m["side"]) != 0)
+	if other.is_empty():
+		return sorted
+	var out: Array = []
+	for i in maxi(lead.size(), other.size()):
+		if i < lead.size():
+			out.append(lead[i])
+		if i < other.size():
+			out.append(other[i])
+	return out
+
+
+## The place (1 = nearest the door) in its side's file of the member holding stack slot `slot` on side `side`: the slots are
+## numbered across both sides in the order they were claimed, so a split stack (E19) leaves out the claims on the other side
+## ahead of it (`team`, the claims, this member's own left out or not). On a one-sided stack the place is the slot.
+static func place(team: Array, side: int, slot: int) -> int:
+	var across := 0
+	for m in team:
+		if int(m["side"]) != side and int(m["side"]) != 0 and int(m["slot"]) < slot:
+			across += 1
+	return maxi(slot - across, 1)
+
+
+## Where the `nth` place (1 = nearest the door, see `place`) in the file on side `side` stands.
+static func slot_point(g: Dictionary, side: int, nth: int) -> Vector2:
 	var row: Array = g["slots"][side]
-	return row[clampi(slot - 1, 0, row.size() - 1)]
+	return row[clampi(nth - 1, 0, row.size() - 1)]

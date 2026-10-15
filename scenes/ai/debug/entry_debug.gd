@@ -1,10 +1,11 @@
 extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain, debug: this NPC's plan for the doorway it is entering (`docs/tactical-entry.md`). The doorway and its
-## fatal funnel, the stack slots (the team's side numbered, its own slot ringed), the approach waypoints, the pie arc
+## fatal funnel, the stack slots (each side the stack holds numbered, its own slot ringed), the approach waypoints, the pie arc
 ## (steps done / to go) and the room points still unseen from outside, the room's corners (red hard / green soft,
 ## filled once the pie saw them) and the corner it enters to, its gaze, and once the room is clear the doorways on it
-## covers (the one it holds bright) or the rear it holds; rooms it regards as cleared are outlined. A badge under the
+## covers (the one it holds bright) or the rear it holds; rooms it regards as cleared are outlined; the views of the doorways its walks keep
+## out of (E18) are shaded red. A badge under the
 ## NPC gives the doorway, role, phase and progress, with timer arcs for the ready wait, the follow gap and the hold.
 ## Reads the controller's `debug_entry_view()` only.
 
@@ -22,6 +23,7 @@ const SOFT := Color(0.4, 0.95, 0.5)
 const GAZE := Color(1.0, 1.0, 1.0)
 const COVER := Color(1.0, 0.6, 0.2)
 const CLEARED := Color(0.3, 0.9, 1.0)
+const VIEW := Color(1.0, 0.35, 0.3)
 ## How deep (px) the funnel is drawn either side of the wall plane (the tests' `FUNNEL_DEPTH`).
 const FUNNEL_DEPTH := 40.0
 ## Half the angle (rad) of the wedge drawn toward the room beyond a covered doorway.
@@ -42,6 +44,8 @@ func _paint() -> void:
 	var view: Dictionary = _controller.debug_entry_view()
 	if view.is_empty():
 		return
+	for v in view["guard"]["views"]:
+		_door_view(v, bool(view["guard"]["round_views"]))
 	for rect in view["guard"]["cleared_rooms"]:
 		_cleared_room(rect)
 	var e: Dictionary = view["entry"]
@@ -55,6 +59,18 @@ func _paint() -> void:
 	_covering(e)
 	_gaze(e)
 	_badge(e)
+
+
+## The view of a doorway the NPC's walks keep out of (E18): a faint red polygon with the doorway's id, bold while the walk goes round the views.
+func _door_view(v: Dictionary, round_views: bool) -> void:
+	var poly := PackedVector2Array()
+	for p in (v["poly"] as PackedVector2Array):
+		poly.append(to_local(p))
+	if poly.size() < 3:
+		return
+	draw_colored_polygon(poly, Color(VIEW, 0.2 if round_views else 0.08))
+	draw_polyline(PackedVector2Array(Array(poly) + [poly[0]]), Color(VIEW, 0.7 if round_views else 0.35), 1.5)
+	_label(v["poly"][0], "view %s" % v["id"], Color(VIEW, 0.7), Vector2(4, -4))
 
 
 ## A cleared room: a cyan outline tagged "cleared".
@@ -82,18 +98,21 @@ func _doorway(e: Dictionary) -> void:
 	_label(pos - along * float(e["side"]) * (half + 26.0), "%s › %s" % [e["opening"], e["into"]], DOOR, Vector2(-40, 6))
 
 
-## The stack slots in use (and the next one free) on the team's side, numbered; a lone entrant's first slots on the far
-## side, which it slices from too, faint; this NPC's slot ringed twice.
+## The stack slots in use (and the next one free) in the file on each side the stack holds (both, when it is split: E19),
+## numbered from the door out; a lone entrant's first slots on the far side, which it slices from too, faint; this NPC's
+## slot ringed twice.
 func _stack(e: Dictionary) -> void:
 	var slots: Dictionary = e["slots"]
 	var side: int = e["side"]
-	var used: int = e["slot"]
+	var used := { side: int(e.get("place", e["slot"])) }
 	for m in e["team"]:
-		used = maxi(used, int(m["slot"]))
-	var row: Array = slots.get(side, [])
-	for i in mini(used + 1, row.size()):
-		draw_circle(to_local(row[i]), 4.0, Color(SLOT, 0.8))
-		_label(row[i], str(i + 1), SLOT, Vector2(-4, -8))
+		var s := int(m["side"]) if int(m["side"]) != 0 else side
+		used[s] = maxi(int(used.get(s, 0)), int(m.get("place", m["slot"])))
+	for s in used:
+		var row: Array = slots.get(s, [])
+		for i in mini(int(used[s]) + 1, row.size()):
+			draw_circle(to_local(row[i]), 4.0, Color(SLOT, 0.8))
+			_label(row[i], str(i + 1), SLOT, Vector2(-4, -8))
 	if e["role"] == "solo":
 		var far: Array = slots.get(-side, [])
 		for i in mini(2, far.size()):

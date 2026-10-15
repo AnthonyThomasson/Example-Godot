@@ -1,9 +1,9 @@
 extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain, debug: the team and the entry guard, as this NPC knows them (`docs/tactical-entry.md` E2, E6, E8, E9).
-## While it enters: each ally's claim on the doorway off the radio (from where it last radioed to its stack slot,
-## tagged with its slot and step, and the doorway on it covers once the room is clear), the order the stack crosses
-## in, and who the point is still waiting for. Whatever it does: the entry guard's view of the walk — the next
+## While it enters: each ally's claim on the doorway off the radio (from where it last radioed to its stack slot, on
+## its own side of the door when the stack is split (E19), tagged with its slot and step, and the doorway on it covers
+## once the room is clear), the order the stack crosses in, and who the point is still waiting for. Whatever it does: the entry guard's view of the walk — the next
 ## doorway into an uncleared room on it and how far (cyan once within the guard's range, where the walk will be paused
 ## for an entry), a running detour with the order it paused, and the doorways the guard is leaving alone for a while.
 ## Reads the controller's `debug_entry_view()` only.
@@ -35,8 +35,9 @@ func _paint() -> void:
 	_guard(view["guard"], not e.is_empty())
 
 
-## Each ally's claim: a line from where it radioed to its slot, `slot N · step` (the slots are the order the stack
-## crosses in), the doorway on it covers; and who the point is still waiting for.
+## Each ally's claim: a line from where it radioed to its place in its side's file, `slot N · step` (the slots are the
+## order the stack claimed the doorway in), the doorway on it covers; the order the stack crosses in; and who the point
+## is still waiting for.
 func _team(e: Dictionary) -> void:
 	var slots: Dictionary = e["slots"]
 	var doors := {}
@@ -48,8 +49,9 @@ func _team(e: Dictionary) -> void:
 		var at: Vector2 = m["pos"]
 		var side: int = m["side"] if int(m["side"]) != 0 else int(e["side"])
 		var row: Array = slots.get(side, slots.get(int(e["side"]), []))
-		if not row.is_empty() and int(m["slot"]) >= 1:
-			var slot_at: Vector2 = row[clampi(int(m["slot"]) - 1, 0, row.size() - 1)]
+		var place := int(m.get("place", m["slot"]))
+		if not row.is_empty() and place >= 1:
+			var slot_at: Vector2 = row[clampi(place - 1, 0, row.size() - 1)]
 			_line(at, slot_at, Color(col, 0.4), 1.0)
 		_ring(at, 12.0, col, 2.0)
 		_label(at, "%s · slot %d · %s" % [m["name"], m["slot"], step.replace("_", " ")], col, Vector2(14, -14))
@@ -57,6 +59,9 @@ func _team(e: Dictionary) -> void:
 		if covers != "" and doors.has(covers):
 			_arrow(at, doors[covers], Color(col, 0.7), 1.5)
 	var me := _character.global_position
+	var order: Array = e.get("order", [])
+	if order.size() > 1:
+		_label(me, "crossing: " + " › ".join(order), ALLY, Vector2(-60, -64))
 	var waiting: Array = e["waiting_for"]
 	if not waiting.is_empty() and e["phase"] in ["stack", "pie"]:
 		var text := "waiting for: " + ", ".join(waiting)

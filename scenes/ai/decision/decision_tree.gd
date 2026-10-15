@@ -17,9 +17,11 @@ extends RefCounted
 ##               measured, not guessed: tools/von_probe.py checks it against clear-cut scenarios.
 ##               Template fields: {target} (the bound target's name), {blinded} (the bound target's "X is
 ##               blinded by a flash and cannot see you, or " when it is, else nothing), {gun} (what the NPC calls its
-##               gun: "pistol", "assault rifle") and {summary} (the summary of
+##               gun: "pistol", "assault rifle"), {summary} (the summary of
 ##               the node's `summary` option group, else its first `options` group — specifics
-##               written by perception, kept in parentheses after the situation).
+##               written by perception, kept in parentheses after the situation) and {situation} (that
+##               group's `situation`: for a node offered in more than one case, the case at hand in the
+##               state's own phrase, e.g. GRENADE's "Your line to X is blocked").
 ##   question  — the instruction Von answers when choosing AMONG this node's children/options. It names
 ##               the trade-off, since Von scores options against it. Same template fields as desc.
 ##   context   — which perception state sections Von sees at this level (the goal is always shown).
@@ -90,8 +92,8 @@ const NODES := {
 	},
 	&"grenade": {
 		"label": "GRENADE",
-		"desc": "Your line to {target} is blocked and you can throw a grenade onto their spot ({summary})",
-		"requires": [&"target", &"grenade_ready"],
+		"desc": "{situation} and you can throw a grenade onto their spot ({summary})",
+		"requires": [&"grenade_ready"],
 		"question": "Which grenade should you throw at {target}? A frag to kill them behind their cover, a stun to blind and deafen them so you can close in.",
 		"context": [&"current", &"loadout", &"exposure", &"contacts", &"allies", &"awareness"],
 		"options": [&"grenade_throws"],
@@ -193,7 +195,7 @@ const NODES := {
 	},
 	&"stun_entry": {
 		"label": "STUN ENTRY",
-		"desc": "A doorway leads into a room where gunfire was heard or a hostile was seen going in ({summary})",
+		"desc": "A doorway leads into a room where a hostile was heard, seen, radioed or shooting from ({summary})",
 		"requires": [&"stack_has_stun"],
 		"question": "Which doorway should you go through? Prefer the shortest route.",
 		"context": [&"situation", &"current", &"awareness"],

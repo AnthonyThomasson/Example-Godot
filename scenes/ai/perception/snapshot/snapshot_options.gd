@@ -9,23 +9,47 @@ extends RefCounted
 const SnapshotVocab = preload("res://scenes/ai/perception/snapshot/snapshot_vocab.gd")
 const AgentEntry = preload("res://scenes/ai/perception/agent_entry.gd")
 const AgentThrow = preload("res://scenes/ai/perception/agent_throw.gd")
+const AgentSuspicion = preload("res://scenes/ai/perception/agent_suspicion.gd")
+## Where along the stretch of the line back from a shot that lies in the room the shots came from a grenade is aimed, in order of
+## preference (shares of the stretch, from where the line comes into the room): its middle first, then either side of it.
+const SHOT_AIM_SHARES := [0.5, 0.35, 0.65, 0.2, 0.8]
+
+## How a doorway's option says why its room is suspect (docs/grenades.md G18), one phrase per `AgentSuspicion` reason, measured with
+## tools/von_probe.py (tools/von_scenarios/stun_entry_*.json).
+const SUSPECT_PHRASES := {
+	AgentSuspicion.GUNFIRE: "gunfire heard there",
+	AgentSuspicion.FOOTSTEPS: "footsteps heard there",
+	AgentSuspicion.SHOT_FROM: "shots at you came from there",
+	AgentSuspicion.ALLY_FIGHT: "an ally radioed a fight there",
+	AgentSuspicion.SEEN_IN: "a hostile seen going in",
+	AgentSuspicion.LOST_BY_DOOR: "a hostile lost by its doorway",
+	AgentSuspicion.HEADING_IN: "a hostile seen heading in",
+}
 
 var know := {}            ## The knowledge the perception hands in for this decision (see `AgentSnapshot.build()`).
+var _throw_spots := {}    ## Throw spots worked out for this decision, by burst spot, reach and room kept out of (`_throw_option`; cleared by `begin`).
 var _v: SnapshotVocab  ## The shared vocabulary and tuning; see snapshot_vocab.gd.
 var _memory: RefCounted   ## The agent's event memory (read-only here); see agent_memory.gd.
 var _tactics: RefCounted  ## The combat geometry; see agent_tactics.gd.
 var _character: Node      ## The NPC's body, handed in once by `bind`.
 var _entry: RefCounted    ## The doorway geometry; see agent_entry.gd.
 var _throw: AgentThrow    ## The grenade geometry (the lob, the danger zone, the escape); see agent_throw.gd.
+var _suspicion: AgentSuspicion  ## Why a room is suspect; see agent_suspicion.gd.
 
 
 ## Capture the collaborators the groups read. Called once by `AgentSnapshot.setup()`.
-func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: AgentThrow) -> void:
+func setup(vocab: SnapshotVocab, memory: RefCounted, tactics: RefCounted, entry: RefCounted, throw: AgentThrow, suspicion: AgentSuspicion) -> void:
 	_v = vocab
 	_memory = memory
 	_tactics = tactics
 	_entry = entry
 	_throw = throw
+	_suspicion = suspicion
+
+
+## Start a decision's option groups: forget what the last one worked out (`know` is set by the caller).
+func begin() -> void:
+	_throw_spots.clear()
 
 
 ## Hand in the NPC's body. Called once by `AgentSnapshot.bind()`.
@@ -159,40 +183,183 @@ func flank_group(t: Dictionary, a: Dictionary, rooms: Array) -> Dictionary:
 	}
 
 
-## Throwing a grenade at hostile `t`, one option per kind carried (a frag first), offered only against a hostile that is hidden
-## from the NPC's line of fire (a bullet would be stopped: low furniture, a corner) at a last-known spot within throw range with a
-## clear lob over what lies between (docs/grenades.md G17). Each option carries the tags the tactic's `drop_tags` drop it by:
-## `ally_in_blast` (a known ally, seen or on the radio, would be inside the grenade's danger zone at that spot) and `no_safe_spot`
-## (the NPC itself would be, and has no way to get safe before the fuse is out: nowhere to crouch behind cover that shields it,
-## no spot out of the burst's line within reach in time). Empty with no grenade, a clear shot, no lob or no known spot.
+## Throwing a grenade at hostile `t`, one option per kind carried (a frag first), offered against a hostile that is hidden from the
+## NPC's line of fire (a bullet would be stopped: low furniture, a corner), or whose last-known spot is in a room the NPC is outside of
+## (a defender barricaded in a room: even with a line of fire it is grenaded, not only shot at, docs/grenades.md G17), at a spot within
+## throw range with a clear lob over what lies between: from where the NPC stands, else from a throw spot a short walk away
+## (`_throw_option`). Each option carries the tags the tactic's `drop_tags` drop it by: `ally_in_blast` (a known ally, seen or on the radio,
+## would be inside the grenade's danger zone at that spot) and `no_safe_spot` (the NPC itself would be, from where it throws, and has no way
+## to get safe before the fuse is out: nowhere to crouch behind cover that shields it, no spot out of the burst's line within reach in time).
+## Empty with no grenade, a clear shot at a hostile in the NPC's own room (or outside with it), no lob from anywhere near or no known spot.
 func grenade_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 	var kinds: Array = know.get("carried_grenades", [])
 	var spot: Vector2 = t["pos"]
+	var held := _held_room(ctx, spot)
+	var hidden: bool = not a["line"]["clear"]
+	if kinds.is_empty() or (not hidden and held.is_empty()):
+		return { "summary": "", "options": [] }
+	var cover: String = a["line"]["blocker"]
+	var room := "" if held.is_empty() else _v.room_name(held["type"])
+	var options: Array = []
+	for kind: StringName in kinds:
+		var what := "frag" if kind == &"frag" else "stun"
+		var option := _throw_option(ctx, kind, spot, t["id"], Rect2() if held.is_empty() else held["rect"], true)
+		if option.is_empty():
+			continue
+		option["id"] = what
+		option["label"] = ("%s %s behind their cover" % [what, t["name"]]) if hidden else ("%s %s in the %s" % [what, t["name"], room])
+		option["desc"] = (("%s grenade onto where %s is hidden, behind the %s" % [what, t["name"], cover]) if hidden \
+			else ("%s grenade into the %s, onto where %s holds it" % [what, room, t["name"]])) + _throw_from_text(ctx, option)
+		options.append(option)
+	if options.is_empty():
+		return { "summary": "", "options": [] }
+	var reach := _throw_reach_text(options)
+	if hidden:
+		return { "summary": "%s is hidden behind the %s, %s" % [t["name"], cover, reach], "options": options,
+			"situation": "Your line to %s is blocked" % t["name"] }
+	return { "summary": "%s holds the %s, a room you are outside of, %s" % [t["name"], room, reach], "options": options,
+		"situation": "%s holds a room you are outside of" % t["name"], "held_room": room }
+
+
+## Throwing a grenade where the shots at the NPC came from (docs/grenades.md G17): shot at by someone it cannot see from a
+## room it is outside of (the line back from a shot, `shot_from`, runs into that room), one option per kind carried, onto the stretch of
+## that line inside the room (`_shots_aim`: from where it stands, else from a throw spot). The same tags as `grenade_group`. Only while
+## under fire with no hostile known (the unbound COMBAT level, where LOCATE is not offered toward such a room: `shooter_group`); empty otherwise.
+func shots_grenade_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
+	var kinds: Array = know.get("carried_grenades", [])
+	if kinds.is_empty() or not hostiles.is_empty() or not _memory.under_fire():
+		return { "summary": "", "options": [] }
+	var options: Array = []
+	var room := ""
+	for kind: StringName in kinds:
+		var aim := _shots_aim(ctx, kind)
+		if aim.is_empty():
+			continue
+		var option: Dictionary = aim["option"]
+		var what := "frag" if kind == &"frag" else "stun"
+		room = _v.room_name(aim["room"]["type"])
+		option["id"] = what
+		option["label"] = "%s where the shots came from" % what
+		option["desc"] = "%s grenade into the %s, where the shots came from%s" % [what, room, _throw_from_text(ctx, option)]
+		options.append(option)
+	if options.is_empty():
+		return { "summary": "", "options": [] }
+	return { "summary": "the shots came from the %s, a room you are outside of, %s" % [room, _throw_reach_text(options)], "options": options,
+		"situation": "The shots came from a room you are outside of", "held_room": room }
+
+
+## The room hostile-held spot `spot` lies in when the NPC is outside that room (outdoors, or in another room), or {}.
+func _held_room(ctx: Dictionary, spot: Vector2) -> Dictionary:
+	var theirs := SnapshotVocab.room_at(spot, _v.rooms)
+	if theirs.is_empty():
+		return {}
+	var here := SnapshotVocab.room_at(ctx["self_pos"], _v.rooms)
+	return {} if not here.is_empty() and here["key"] == theirs["key"] else theirs
+
+
+## Where to throw a grenade of `kind` at the shots: `{ option, room }`, the throw (`_throw_option`) onto a line back from a shot at the
+## NPC (`AgentSuspicion.shot_line`: from where it leaves the room the shot landed in to the wall behind) inside the first room along it the
+## NPC is outside of, at the point nearest the middle of that stretch (`SHOT_AIM_SHARES`) it can lob onto from where it stands, else from a
+## throw spot; {} when there is none.
+func _shots_aim(ctx: Dictionary, kind: StringName) -> Dictionary:
+	var self_pos: Vector2 = ctx["self_pos"]
+	var here := SnapshotVocab.room_at(self_pos, _v.rooms)
+	for shot: Dictionary in _memory.recall_all(&"shot_from"):
+		var at: Vector2 = shot["at"]
+		var line := AgentSuspicion.shot_line(_v.rooms, shot)
+		var best := {}
+		var nearest := INF
+		for room in _v.rooms:
+			if not here.is_empty() and room["key"] == here["key"]:
+				continue
+			var r: Rect2 = room["rect"]
+			var poly := PackedVector2Array([r.position, Vector2(r.end.x, r.position.y), r.end, Vector2(r.position.x, r.end.y)])
+			for piece: PackedVector2Array in Geometry2D.intersect_polyline_with_polygon(line, poly):
+				var d := at.distance_to(piece[0])
+				if d < nearest:
+					nearest = d
+					best = { "room": room, "from": piece[0], "to": piece[piece.size() - 1] }
+		if best.is_empty():
+			continue
+		for walk: bool in [false, true]:
+			for share: float in SHOT_AIM_SHARES:
+				var spot: Vector2 = (best["from"] as Vector2).lerp(best["to"], share)
+				var option := _throw_option(ctx, kind, spot, 0, best["room"]["rect"], walk)
+				if not option.is_empty():
+					return { "option": option, "room": best["room"] }
+	return {}
+
+
+## One grenade throw of `kind` onto `spot` (at hostile `target_id`, 0 for none), with its params and the tags the GRENADE tactic drops it by,
+## or {} when there is no lob onto it in range from where the NPC stands nor (with `walk`) from a throw spot a short walk away (agent_tactics.gd
+## `throw_spot`; never inside `keep_out`, the room the NPC is outside of that it throws into). `params.from` is where it throws
+## from (where it stands, or the throw spot, with `params.walk`): the danger zone and the way out of it are judged from there. The caller
+## words it (`id`, `label`, `desc`).
+func _throw_option(ctx: Dictionary, kind: StringName, spot: Vector2, target_id: int, keep_out: Rect2, walk: bool) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
 	var space = ctx["space"]
 	var rids: Array = know["character_rids"]
-	if kinds.is_empty() or a["line"]["clear"]:
-		return { "summary": "", "options": [] }
-	var cover: String = a["line"]["blocker"]
-	var options: Array = []
-	for kind: StringName in kinds:
-		if not _throw.can_lob(space, self_pos, spot, _throw.range_of(kind), rids):
-			continue
-		var radius := _throw.radius_of(kind)
-		var cornered := false
-		if _throw.in_zone(space, kind, radius, spot, self_pos, _throw.stand_height(), rids):
-			var way: Dictionary = _throw.escape(space, ctx["map"], kind, radius, spot, self_pos, _throw.fuse_of(kind), _throw.run_speed(), rids)
-			cornered = (way["spot"] as Vector2) == Vector2.INF
-		var what := "frag" if kind == &"frag" else "stun"
-		options.append({
-			"id": what, "label": "%s %s behind their cover" % [what, t["name"]],
-			"desc": "%s grenade onto where %s is hidden, behind the %s" % [what, t["name"], cover],
-			"params": { "point": spot, "kind": kind, "radius": radius, "slot": AgentThrow.SLOTS[kind], "target_id": t["id"] },
-			"tags": { "inside": _v.is_inside(spot), "ally_in_blast": _ally_in_blast(ctx, kind, radius, spot), "no_safe_spot": cornered },
-		})
-	if options.is_empty():
-		return { "summary": "", "options": [] }
-	return { "summary": "%s is hidden behind the %s, within throwing range" % [t["name"], cover], "options": options }
+	var from := self_pos
+	var route := 0.0
+	if not _throw.can_lob(space, self_pos, spot, _throw.range_of(kind), rids):
+		if not walk:
+			return {}
+		var reach := _throw.reach_of(kind)
+		var key := [spot, reach, keep_out]  # A frag and a stun of the same reach share their throw spot.
+		if not _throw_spots.has(key):
+			var lob := func(p: Vector2) -> bool: return _throw.throw_clear_on_arrival(space, p, spot, rids)
+			var walk_to := func(p: Vector2) -> Dictionary: return _throw_walk(ctx, p)
+			_throw_spots[key] = _tactics.throw_spot(ctx, spot, reach, lob, rids, keep_out, walk_to)
+		var way: Dictionary = _throw_spots[key]
+		if way.is_empty():
+			return {}
+		from = way["point"]
+		route = way["route_len"]
+	var radius := _throw.radius_of(kind)
+	var ally := _ally_in_blast(ctx, kind, radius, spot)
+	var cornered := false
+	if _throw.in_zone(space, kind, radius, spot, from, _throw.stand_height(), rids):
+		var out: Dictionary = _throw.escape(space, ctx["map"], kind, radius, spot, from, _throw.fuse_of(kind), _throw.run_speed(), rids)
+		cornered = (out["spot"] as Vector2) == Vector2.INF
+	var params := { "point": spot, "kind": kind, "radius": radius, "slot": AgentThrow.SLOTS[kind], "from": from, "walk": from != self_pos }
+	if target_id != 0:
+		params["target_id"] = target_id
+	return { "params": params, "route_len": route,
+		"tags": { "inside": _v.is_inside(spot), "ally_in_blast": ally, "no_safe_spot": cornered } }
+
+
+## The walk to throw spot `p` as the NPC would walk it (agent_entry.gd `walk_route`: round the doorway views when it would take that, E18), and
+## whether the entry guard would stop it on the way (`detour`): a doorway into a room not cleared that it crosses (E9), or a doorway view it
+## comes into with no way round it (E15). `{ path, len, detour }`. The guard runs only where doorway views are kept out of (`AgentEntry.avoid_views`:
+## tactical entry and the guard on).
+func _throw_walk(ctx: Dictionary, p: Vector2) -> Dictionary:
+	var self_pos: Vector2 = ctx["self_pos"]
+	var way: Dictionary = _entry.walk_route(self_pos, p, ctx["map"], ctx["space"])
+	var detour := false
+	if _entry.avoid_views:
+		var cleared := func(key: String) -> bool: return _memory.age_of(&"cleared_room", "key", key) <= _v.search_memory_ttl
+		detour = not _entry.threshold_ahead(way["path"], 0, self_pos, cleared, INF).is_empty() \
+			or (not way["doors"] and not (way["views"] as Array).is_empty())
+	return { "path": way["path"], "len": way["len"], "detour": detour }
+
+
+## What a throw from a throw spot adds to its option's desc: where the spot is and the walk there (" — from the kitchen to the east, short
+## route"); "" for a throw from where the NPC stands.
+func _throw_from_text(ctx: Dictionary, option: Dictionary) -> String:
+	var params: Dictionary = option["params"]
+	if not params["walk"]:
+		return ""
+	var from: Vector2 = params["from"]
+	return " — from %s to the %s, %s route" % [_v.place(from).trim_prefix("in "), _v.compass(from - (ctx["self_pos"] as Vector2)),
+		_v.route_band(option["route_len"])]
+
+
+## How a grenade group's summary says the throw is in reach: "within throwing range" when one of `options` is thrown from where the NPC
+## stands, "within throwing range from a spot nearby" when each needs a walk to a throw spot.
+func _throw_reach_text(options: Array) -> String:
+	if options.any(func(o): return not o["params"]["walk"]):
+		return "within throwing range"
+	return "within throwing range from a spot nearby"
 
 
 ## Whether a known ally (seen, or one that radioed where it was) is inside the danger zone of a grenade of `kind` and `radius`
@@ -301,14 +468,15 @@ func retreat_group(ctx: Dictionary, hostiles: Array, known_rooms: Array, dmg: fl
 	}
 
 
-## What to investigate: lost hostiles (where last seen, and where they were heading), gunfire heard,
-## where unseen shots came from, and allies' radio calls for support — freshest first. A hostile last seen, or gunfire heard, in a room
-## a doorway of ENTER leads into (`entered`, see `entry_rooms`; the snapshot hands it over only while a stun can be thrown) is not a lead:
-## that room is entered, and the entry says why ("gunfire heard there", "a hostile seen going in", docs/grenades.md G18).
+## What to investigate: lost hostiles (where last seen, and where they were heading), gunfire and footsteps heard,
+## where unseen shots came from, and allies' radio calls for support — freshest first. What makes a room suspect (`AgentSuspicion`: a
+## hostile last seen in it, by its doorway or heading in, gunfire or footsteps heard in it, shots from it, an ally's fight in it) is
+## not a lead when the room is one a doorway of ENTER leads into (`entered`, see `entry_rooms`; the snapshot hands it over only while
+## a stun can be thrown): that room is entered, and the entry says why (docs/grenades.md G18).
 func lead_group(ctx: Dictionary, hostiles: Array, entered := {}) -> Dictionary:
 	var self_pos: Vector2 = ctx["self_pos"]
 	var leads: Array = []
-	for c in know["lost"].filter(func(c): return not _entered_at(entered, c["pos"])):
+	for c in know["lost"].filter(func(c): return not _entered_any(entered, _suspicion.lost_rooms(_v.rooms, c).keys())):
 		var moving: bool = (c["vel"] as Vector2).length() >= _v.still_speed
 		leads.append({ "age": c["age"], "id": "lead_seen_%d" % c["id"], "label": "where you last saw %s" % c["name"],
 			"desc": "where you last saw %s, %s — %s — %s route%s" % [c["name"], _v.where(c), _v.recency(c["age"]),
@@ -329,13 +497,26 @@ func lead_group(ctx: Dictionary, hostiles: Array, entered := {}) -> Dictionary:
 			"desc": "gunfire heard to the %s, %s — %s — %s route" % [_v.compass(pos - self_pos), _v.place(pos),
 				_v.recency(rec["age"]), _v.route_band(_route_len(ctx, pos))],
 			"point": NavBuilder.snap(ctx["map"], pos) })
-	if _memory.under_fire() and hostiles.is_empty():
+	for rec in _memory.recall_aged(&"heard_footsteps"):
+		var pos: Vector2 = rec["data"]["pos"]
+		if _entered_at(entered, pos):
+			continue
+		leads.append({ "age": rec["age"], "id": "lead_footsteps_%d_%d" % [floori(pos.x / 200.0), floori(pos.y / 200.0)],
+			"label": "footsteps to the %s" % _v.compass(pos - self_pos),
+			"desc": "footsteps heard to the %s, %s — %s — %s route" % [_v.compass(pos - self_pos), _v.place(pos),
+				_v.recency(rec["age"]), _v.route_band(_route_len(ctx, pos))],
+			"point": NavBuilder.snap(ctx["map"], pos) })
+	var shot: Dictionary = _memory.recall(&"shot_from")
+	if _memory.under_fire() and hostiles.is_empty() and not (not shot.is_empty() and _entered_any(entered, AgentSuspicion.shot_rooms(_v.rooms, shot))):
 		var from: Vector2 = _memory.under_fire_from()
 		var origin: Vector2 = _shot_origin(ctx)
-		leads.append({ "age": 0.0, "id": "lead_shooter", "label": "where the shots came from",
-			"desc": "where the shots at you came from — the %s, just now" % _v.compass(from), "point": origin })
+		# The point toward the shots is measured from where the NPC stands, so reaching it never spends it: one the walk to which
+		# ends where it stands (shots from beyond the walkable ground) is not a lead, as for LOCATE (`AgentTactics.where_it_stands`).
+		if not _tactics.where_it_stands(ctx, origin):
+			leads.append({ "age": 0.0, "id": "lead_shooter", "label": "where the shots came from",
+				"desc": "where the shots at you came from — the %s, just now" % _v.compass(from), "point": origin })
 	for c in ctx["callouts"]:
-		if not str(c.get("path", "")).begins_with("combat"):
+		if not str(c.get("path", "")).begins_with("combat") or _entered_at(entered, c.get("target_pos", Vector2.INF)):
 			continue
 		var at: Vector2 = c.get("position", self_pos)
 		var status: String = c.get("status", "")
@@ -358,21 +539,45 @@ func lead_group(ctx: Dictionary, hostiles: Array, entered := {}) -> Dictionary:
 
 ## Whether world point `p` lies in a room of `entered` (the rooms a doorway of ENTER leads into).
 func _entered_at(entered: Dictionary, p: Vector2) -> bool:
-	return not entered.is_empty() and entered.has(str(SnapshotVocab.room_at(p, _v.rooms).get("key", "")))
+	return not entered.is_empty() and entered.has(_room_key_at(p))
+
+
+## Whether any of room keys `keys` is in `entered`.
+func _entered_any(entered: Dictionary, keys: Array) -> bool:
+	return not entered.is_empty() and keys.any(func(k): return entered.has(k))
+
+
+## The key of the room world point `p` lies in, or "".
+func _room_key_at(p: Vector2) -> String:
+	return AgentSuspicion.room_key_at(_v.rooms, p)
 
 
 ## Under fire from someone the NPC cannot see: the one way to find them — toward where the shots came
-## from. Empty unless under fire with no hostile known.
+## from. Empty unless under fire with no hostile known, and empty for shots from a room the NPC is outside of (the line back from the
+## newest shot, `shot_from`, runs into a room it is not in: a barricaded shooter), which it does not walk into: GRENADE
+## at the shots' origin (`shots_grenade_group`) or RETREAT instead. Empty too when the walk there ends where the NPC stands (within
+## `AgentTactics.STRIDE`: the shots came from beyond the walkable ground, and the navmesh pulls the point back to it).
 func shooter_group(ctx: Dictionary, hostiles: Array) -> Dictionary:
-	if not _memory.under_fire() or not hostiles.is_empty():
+	if not _memory.under_fire() or not hostiles.is_empty() or _shots_from_a_room(ctx):
 		return { "summary": "", "options": [] }
 	var from: Vector2 = _memory.under_fire_from()
 	var origin: Vector2 = _shot_origin(ctx)
+	if _tactics.where_it_stands(ctx, origin):
+		return { "summary": "", "options": [] }  # The shots came from beyond the walkable ground: the walk toward them ends where it stands.
 	var dir := _v.compass(from)
 	return { "summary": "the shots came from the %s" % dir, "options": [{
 		"id": "toward_shots", "label": "toward the shots",
 		"desc": "move toward where the shots came from — the %s%s — %s route" % [dir, _v.room_suffix(origin), _v.route_band(_route_len(ctx, origin))],
 		"params": { "point": origin }, "tags": { "inside": _v.is_inside(origin) } }] }
+
+
+## Whether the line back from the newest shot at the NPC (`shot_from`) runs into a room the NPC is not in.
+func _shots_from_a_room(ctx: Dictionary) -> bool:
+	var shot: Dictionary = _memory.recall(&"shot_from")
+	if shot.is_empty():
+		return false
+	var here := _room_key_at(ctx["self_pos"])
+	return AgentSuspicion.shot_rooms(_v.rooms, shot).any(func(key): return key != here)
 
 
 ## Which known room to search next: not-recently-searched first, then nearest; plus the entrance or
@@ -424,13 +629,14 @@ func search_group(ctx: Dictionary, known_rooms: Array, rooms: Array, entered := 
 ## The doorways the NPC could enter a room by, for a tactical entry (ENTER): from outside the outer doors, from a room
 ## its doors into the next, each into a room it has not seen (named by direction only) or not searched lately. A
 ## doorway's place is the NPC's stack slot beside it (the lowest the radio leaves free, on the side the team stacks
-## on), out of the doorway's line of sight; the behaviour runs the entry from there. Nearest first, capped.
+## on, or its own when the way there crosses the doorway's view), out of the doorway's line of sight; the behaviour runs the entry from there. Nearest first, capped.
 func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 	if not know.get("entry_enabled", false):
 		return { "summary": "", "options": [] }
 	var self_pos: Vector2 = ctx["self_pos"]
 	var here := SnapshotVocab.room_at(self_pos, rooms)
 	var known: Dictionary = know["known_room_keys"]
+	var why: Dictionary = _suspicion.rooms_suspected(rooms, know["lost"], ctx["callouts"])
 	var picks: Array = []
 	for e in _entry.entries_from(str(here.get("key", ""))):
 		var into: String = e["into"]
@@ -444,10 +650,10 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 			continue
 		var team := AgentEntry.claims(e["id"], ctx["callouts"])
 		var slot := AgentEntry.free_slot(team, ctx["self_id"])
-		var side := AgentEntry.stack_side(g, team, self_pos)
-		var point := AgentEntry.slot_point(g, side, slot)
+		var side: int = _entry.stack_side_from(g, team, self_pos, ctx["map"], ctx["space"])
+		var point := AgentEntry.slot_point(g, side, AgentEntry.place(team, side, slot))
 		picks.append({ "e": e, "status": status, "point": point, "slot": slot, "len": _route_len(ctx, point),
-			"suspect": _suspected_in(rooms, into) })
+			"suspect": why.get(into, []).map(func(w): return SUSPECT_PHRASES[w]) })
 	picks.sort_custom(func(x, y):
 		if x["suspect"].is_empty() != y["suspect"].is_empty():
 			return not x["suspect"].is_empty()  # A room a hostile is suspected in first.
@@ -463,18 +669,6 @@ func entry_group(ctx: Dictionary, rooms: Array) -> Dictionary:
 			"params": { "opening": e["id"], "into": e["into"], "point": p["point"], "slot": p["slot"] },
 			"tags": { "inside": not here.is_empty() } })
 	return { "summary": options[0]["desc"] if not options.is_empty() else "", "options": options }
-
-
-## What the NPC has to suspect a hostile is waiting in room `into` (the facts a bang entry rests on, docs/grenades.md G18): "gunfire
-## heard there" (gunfire it heard came from inside the room) and "a hostile seen going in" (one it lost sight of was last seen in it).
-func _suspected_in(rooms: Array, into: String) -> Array:
-	var rect: Rect2 = SnapshotVocab.room_by_key(rooms, into).get("rect", Rect2())
-	var out: Array = []
-	if _memory.recall_all(&"heard_gunfire").any(func(data): return rect.has_point(data["pos"])):
-		out.append("gunfire heard there")
-	if know["lost"].any(func(c): return rect.has_point(c["pos"])):
-		out.append("a hostile seen going in")
-	return out
 
 
 ## The keys of the rooms the doorways of an `entry_group` lead into: those are entered by ENTER, not walked into.
@@ -631,9 +825,10 @@ func _shot_origin(ctx: Dictionary, snap_to_navmesh := true) -> Vector2:
 	return NavBuilder.snap(ctx["map"], p) if snap_to_navmesh else p
 
 
-## The navigated route length (px) from the NPC to `p`.
+## The length (px) of the route the NPC will walk from where it stands to `p`: the one that keeps out of the doorway views when it would
+## take it (`AgentEntry.walk_route`, E18), else the plain one.
 func _route_len(ctx: Dictionary, p: Vector2) -> float:
-	return NavBuilder.path_length(NavBuilder.route(ctx["map"], ctx["self_pos"], p))
+	return float(_entry.walk_route(ctx["self_pos"], p, ctx["map"], ctx["space"])["len"])
 
 
 ## The ally (perceived near the target, or calling it on the radio) already fighting hostile `t`.

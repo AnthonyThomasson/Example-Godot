@@ -1,0 +1,16 @@
+{
+ "name": "tactic: shot at by someone unseen from a room you cannot lob into from where you stand, with a throw spot a short walk away -> GRENADE at the shots' origin above RETREAT (G17, issue #51 R15)",
+ "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are unhurt.\nYour pistol is loaded. You carry a stun grenade.\nSomeone you cannot see is shooting at you. Allies near you: none.\nYou are being shot at by someone you cannot see, from the south-west; you are exposed to their fire. The shots came from the kitchen, a room you are outside of. You can throw a stun grenade where the shots came from.\nNobody else is in sight or known.\nYou are under fire: shots are landing near you, from the south-west!\nDecided so far: COMBAT.",
+ "question": "How should you fight the hostile? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+ "options": {
+  "grenade": "The shots came from a room you are outside of and you can throw a grenade onto their spot (the shots came from the kitchen, a room you are outside of, within throwing range from a spot nearby)",
+  "retreat": "You are badly wounded and being hit (best: behind the wall close by, out of their sight; you are unhurt)"
+ },
+ "expect": [
+  "grenade"
+ ],
+ "ablate": [
+  "from a spot nearby",
+  "The shots came from the kitchen, a room you are outside of. "
+ ]
+}

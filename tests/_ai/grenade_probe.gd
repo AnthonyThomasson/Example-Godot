@@ -12,7 +12,7 @@ const STUN := 7
 const FRAG := 8
 const PISTOL := 3
 ## The throw range cap (G2, `max_range`), the blast radius (G7) and the stun's flash / bang radii (G11, G12).
-const MAX_RANGE := 450.0
+const MAX_RANGE := 550.0
 const BLAST_RADIUS := 250.0
 const KILL_RADIUS := 120.0
 const BLAST_DAMAGE := 60.0
@@ -210,13 +210,18 @@ static func grenades(brain: Node) -> Dictionary:
 	return brain.call("debug_grenades") if brain.has_method("debug_grenades") else {}
 
 
+## The rids of every character (the `characters` group, interface 7), for a ray that looks past bodies.
+static func character_rids(t: TestContext) -> Array:
+	var rids: Array = []
+	for c: Node in t.world.get_tree().get_nodes_in_group(&"characters"):
+		rids.append((c as CollisionObject2D).get_rid())
+	return rids
+
+
 ## True when nothing solid (a wall or a tall piece, not a character) lies on the straight line from `a` to `b`.
 static func line_clear(t: TestContext, a: Vector2, b: Vector2) -> bool:
 	var query := PhysicsRayQueryParameters2D.create(a, b, PhysicsLayers.SOLID)
-	var bodies: Array = []
-	for c in t.world.find_children("*", "CharacterBody2D", true, false):
-		bodies.append((c as CharacterBody2D).get_rid())
-	query.exclude = bodies
+	query.exclude = character_rids(t)
 	return t.world.get_world_2d().direct_space_state.intersect_ray(query).is_empty()
 
 
@@ -252,9 +257,7 @@ static func acts(t: TestContext, who: StringName) -> String:
 ## `coverage` is above the character's own (its posture's: crouched 35, standing 60), on the straight line from the blast to its body.
 static func shielded(t: TestContext, burst: Vector2, c: Node2D) -> bool:
 	var height := float(c.get_surface().get("coverage", 60.0))
-	var exclude: Array = []
-	for body in t.world.find_children("*", "CharacterBody2D", true, false):
-		exclude.append((body as CharacterBody2D).get_rid())
+	var exclude := character_rids(t)
 	var space := t.world.get_world_2d().direct_space_state
 	for i in 8:
 		var query := PhysicsRayQueryParameters2D.create(burst, c.global_position, PhysicsLayers.SOLID)

@@ -5,7 +5,7 @@ extends RefCounted
 ## posts a `footfall` event on the EventBus (the Audio domain makes the step). A foot lands when its lift
 ## (max(-cos(phase), 0), see character_rig.gd) returns to the floor, i.e. cos(phase) rises through zero, at the forward
 ## end of its stride. Stepped by character.gd after the pose each physics frame; one rig solve per footfall, none
-## otherwise.
+## otherwise. The event says whose step it is (`character`) and its gait (`running`, `crouched`), which the AI hears by.
 
 const CharacterRig = preload("res://scenes/character/body/character_rig.gd")
 
@@ -42,5 +42,7 @@ func _report(character, footprints: BloodFootprints, foot: int) -> void:
 	var inner := 1.0 if foot == 0 else -1.0
 	var speed: float = character.get_real_velocity().length()
 	footprints.step(foot, at, dir, length, width, inner, speed)
-	# The footfall itself, for whoever listens (the Audio domain picks the sound from the floor it lands on).
-	EventBus.post(&"footfall", { "position": at, "foot": foot, "speed": speed, "running": character.is_running() })
+	# The footfall itself, for whoever listens (the Audio domain picks the sound from the floor it lands on; the AI hears whose it is
+	# and how it was walked: running carries far, a crouched step hardly at all).
+	EventBus.post(&"footfall", { "position": at, "foot": foot, "speed": speed, "running": character.is_running(),
+		"character": character, "crouched": character.posture() == &"crouch" })

@@ -1,11 +1,13 @@
 extends GameTest
 
 ## G17, the `throw` primitive: the lob is checked again when the order is adopted (the NPC decided on a snapshot of a moment ago). One that is blocked by then is
-## given up before the grenade is taken in hand: nothing is thrown, nothing is radioed, the NPC keeps its grenade and re-decides. One mechanism, scripted Von that
+## given up before the grenade is taken in hand: nothing is thrown before the NPC has re-decided, and Von is asked again. One mechanism, scripted Von that
 ## answers slowly (30 physics frames a level): the invader has a clear lob onto a hostile hidden behind a desk when GRENADE is offered; a wardrobe (coverage 95,
-## over a lob's clearance) is put on the line while its question is in flight.
+## over a lob's clearance) is put on the line while its question is in flight. The re-decision may offer GRENADE again through a throw spot round the
+## wardrobe (issue #51 R13): a throw that follows leaves from at least 40 px from where the invader stood when it gave the first one up, with a clear lob.
 
 const Probe := preload("res://tests/_ai/grenade_probe.gd")
+const Spot := preload("res://tests/_ai/throw_spot_probe.gd")
 const START := Vector2(100, 150)
 const HOSTILE := Vector2(520, 150)
 const ASIDE := Vector2(250, 40)
@@ -15,7 +17,7 @@ const ON_THE_LINE := Vector2(250, 150)
 func describe() -> Dictionary:
 	return {
 		"name": "A throw whose lob got blocked is given up and the NPC re-decides",
-		"description": "A wardrobe is put across the invader's lob while its GRENADE decision is in flight: no grenade is thrown or radioed, the invader still carries it and Von is asked again.",
+		"description": "A wardrobe is put across the invader's lob while its GRENADE decision is in flight: the throw is given up, nothing is thrown before the re-decision is adopted, Von is asked again, and any later throw leaves from a throw spot with a clear lob.",
 		"tags": ["ai", "grenade", "combat", "scripted"],
 		"timeout": 30.0,
 	}
@@ -50,10 +52,20 @@ func run(t: TestContext) -> void:
 		return
 	t.check(not Probe.line_clear(t, inv.global_position, HOSTILE), "set-up: a wardrobe stands across the lob now")
 	var asked := t.von_requests().size()
-	if not t.require(await t.until(func(): return not str(brain.current_act()).contains("grenade"), 4.0), "the throw was given up (acting: %s)" % Probe.acts(t, &"i")):
+	var decisions := int(brain.debug_state().get("decisions", 0))  # Walks started up to the GRENADE order.
+	# Given up: the throw primitive ends (the order's path stays until the next adoption, which may be GRENADE again).
+	if not t.require(await t.until(func(): return str(brain.debug_state().get("primitive", "")) != "throw", 4.0), "the throw was given up (acting: %s)" % Probe.acts(t, &"i")):
 		return
-	await t.seconds(1.0)
-	t.check(not t.happened(&"throw"), "no grenade was thrown")
-	t.check(Probe.callouts(t, &"frag_out").is_empty(), "and none radioed")
-	t.expect_eq(Probe.count(inv, Probe.FRAG), 1, "the invader still carries its frag")
+	var dropped_at: Vector2 = inv.global_position
+	# The re-decision: a walk started after the GRENADE order, and over (adopted).
+	var redecided := await t.until(func():
+		var st: Dictionary = brain.debug_state()
+		return int(st.get("decisions", 0)) > decisions and not st.get("decision", {}).get("pending", false), 4.0)
+	t.check(redecided, "the invader re-decided (acting: %s)" % Probe.acts(t, &"i"))
+	t.check(not t.happened(&"throw"), "no grenade was thrown before the re-decision was adopted")
 	t.check(t.von_requests().size() > asked, "and Von was asked again")
+	await t.seconds(3.0)
+	for e in t.events_of(&"throw", func(d): return d.get("attacker") == inv):
+		var at: Vector2 = e["position"]
+		t.check(at.distance_to(dropped_at) >= 40.0, "a later throw leaves from a throw spot, not where it gave the first one up (%s, it stood at %s)" % [str(at.round()), str(dropped_at.round())])
+		t.check(Spot.lob_clear(t, at, HOSTILE), "with a clear lob onto the hostile's spot")

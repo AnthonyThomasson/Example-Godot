@@ -65,7 +65,7 @@ The in-game observers: each reads only the Character public API / signals (incl.
 
 - `stack_markers.gd` — the **stack markers** (`StackMarkers` Node2D, world space, built by `main.gd` under `World` for a human match). Draws the
   slots of the doorway the human's `PlayerStack` has reserved a place at (`docs/tactical-entry.md` E16): a numbered ring on the floor for each
-  slot, the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
+  slot where it stands (both sides of the door on a split stack, E19; numbered in the order they were claimed), the human's own bright and filled, the ones an AI holds dimmer, a free one faint; nothing without a reservation. A decoupled observer:
   `watch(stack)` then it polls the stack's `view()` and redraws on change; it draws at `DrawLayers.ABOVE` (interface 11), over the standing world, so a
   character on a slot never hides its ring; `drawn()` is what is shown (what the test reads,
   `tests/ui/stack_markers_draw_test.gd`).

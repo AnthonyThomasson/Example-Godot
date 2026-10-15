@@ -19,6 +19,14 @@ const SIDES := { "left": -90.0, "right": 90.0, "rear": 180.0 }
 const SNAP_TOLERANCE := 48.0
 ## Points sampled along a route to judge whether the target can see it.
 const ROUTE_SAMPLES := 8
+## A place a walk ends within this (px of walking) of where the NPC stands is where it stands: the walk is over the moment it begins
+## (a stride, twice the walk's own arrival distance), and the unchanged situation would offer it again. No retreat nor walk toward the
+## shots (LOCATE, the "where the shots came from" lead: `where_it_stands`) goes to one.
+const STRIDE := 32.0
+## A place closer than this (px) to a character the NPC knows of is taken (a body's footprint): a walk there is held short of the body.
+const TAKEN := 32.0
+## How far (px) from an ally lies the spot beside it that the NPC falls back to: a body clear of it (the stack's spacing).
+const BESIDE_ALLY := 44.0
 
 var vision: RefCounted               ## The perception's sight sense; owner of the ray queries.
 var cover_min: float = 40.0          ## Surface coverage at or above which a blocking object is cover.
@@ -32,6 +40,7 @@ var still_speed: float = 20.0        ## Speed (px/s) under which a contact count
 var route_clearance: float = 120.0   ## A route coming this close (px) to a known hostile passes it.
 var watch_arc: float = 90.0          ## Full cone (degrees) around a hostile's front in which it is looking.
 var fire_spot_distances: Array[float] = [200.0, 350.0] ## Distances (px) from a target at which firing spots are sampled.
+var throw_spot_walk: float = 250.0  ## Longest walk (px of route) to a throw spot (`throw_spot`).
 
 
 # --- Ray + nav primitives --------------------------------------------------------------------
@@ -355,6 +364,82 @@ func fire_positions(ctx: Dictionary, target: Dictionary) -> Dictionary:
 	return out
 
 
+## Rings (px from the NPC, and shares of the throw reach from the burst spot) and directions the throw spots are sampled on, and the most
+## candidates routed per call.
+const THROW_RINGS := [48.0, 96.0, 144.0, 192.0, 240.0]
+const THROW_REACH_SHARES := [0.95, 0.8]
+const THROW_DIRECTIONS := 16
+const THROW_ROUTES := 10
+
+
+## Where to throw a grenade onto `spot` from when it cannot be thrown from where the NPC stands (out of range, or no clear lob: docs/grenades.md
+## G17): a point on the navmesh within `reach` of `spot` from which `lob` holds (a `Callable(from: Vector2) -> bool`: the lob
+## from there is clear), a walk of at most `throw_spot_walk` along a route that passes no known hostile, and not inside the rect `keep_out`
+## (the room the hostile holds, which the NPC is outside of; an empty rect for none). `route` (a `Callable(to: Vector2) -> Dictionary`,
+## `{ path, len, detour }`) is the walk there as the NPC would walk it and whether it would be stopped on the way to go into or secure a
+## doorway (the entry guard, E9 / E15 / E18); without it the plain route, no detour. Chosen as the fire spots are, and so that the walk needs no
+## detour: one that needs none first, then out of the line from `spot` (low furniture between: hidden from whoever is there), then with cover
+## close by against it (a doorway's jamb, a piece), then the shortest walk. `{ point, route_len, hidden, cover, detour }`, or {} when there is none.
+func throw_spot(ctx: Dictionary, spot: Vector2, reach: float, lob: Callable, ex: Array, keep_out := Rect2(), route := Callable()) -> Dictionary:
+	var self_pos: Vector2 = ctx["self_pos"]
+	var raw: Array = []
+	for radius: float in THROW_RINGS:
+		if radius > throw_spot_walk:
+			break
+		for i in THROW_DIRECTIONS:
+			raw.append(self_pos + Vector2.RIGHT.rotated(TAU * i / THROW_DIRECTIONS) * radius)
+	for share: float in THROW_REACH_SHARES:
+		for i in THROW_DIRECTIONS:
+			raw.append(spot + Vector2.RIGHT.rotated(TAU * i / THROW_DIRECTIONS) * reach * share)
+	# Cheap facts first (range, the walk's straight-line floor, the navmesh, the lob), then the line and cover; routes last, for the best few.
+	var found: Array = []
+	for r: Vector2 in raw:
+		if self_pos.distance_to(r) > throw_spot_walk or r.distance_to(spot) > reach + SNAP_TOLERANCE:
+			continue  # Past the walk, or past the reach even once snapped: not worth a navmesh query.
+		var p := NavBuilder.snap(ctx["map"], r)
+		if p.distance_to(r) > SNAP_TOLERANCE or p.distance_to(spot) > reach or self_pos.distance_to(p) < STRIDE:
+			continue
+		if keep_out.has_area() and keep_out.has_point(p):
+			continue
+		if found.any(func(c): return (c["point"] as Vector2).distance_to(p) < 12.0) or not lob.call(p):
+			continue
+		var hidden := blocked(ctx["space"], spot, p, ex)
+		found.append({ "point": p, "hidden": hidden, "cover": "" if hidden else cover_near(ctx["space"], p, spot, ex) })
+	found.sort_custom(func(a, b):
+		var ra := _throw_rank(a)
+		var rb := _throw_rank(b)
+		if ra != rb:
+			return ra < rb
+		return self_pos.distance_squared_to(a["point"]) < self_pos.distance_squared_to(b["point"]))
+	var walkable: Array = []
+	for c: Dictionary in found.slice(0, THROW_ROUTES):
+		var way: Dictionary = route.call(c["point"]) if route.is_valid() else {}
+		if way.is_empty():
+			var plain := NavBuilder.route(ctx["map"], self_pos, c["point"])
+			way = { "path": plain, "len": NavBuilder.path_length(plain), "detour": false }
+		var path: PackedVector2Array = way["path"]
+		var length: float = way["len"]
+		if length > throw_spot_walk or path.is_empty() or path[path.size() - 1].distance_to(c["point"]) > 12.0:
+			continue
+		if route_crosses(path, ctx["hostiles"]) != "":
+			continue
+		walkable.append(c.merged({ "route_len": length, "detour": bool(way.get("detour", false)) }))
+	if walkable.is_empty():
+		return {}
+	walkable.sort_custom(func(a, b):
+		if a["detour"] != b["detour"]:
+			return not a["detour"]
+		if _throw_rank(a) != _throw_rank(b):
+			return _throw_rank(a) < _throw_rank(b)
+		return a["route_len"] < b["route_len"])
+	return walkable[0]
+
+
+## How a throw spot ranks (lower first): hidden from the burst spot, then covered against it, then in the open.
+static func _throw_rank(c: Dictionary) -> int:
+	return 0 if c["hidden"] else (1 if c["cover"] != "" else 2)
+
+
 ## `p` annotated as a place to fight `target` from (with its route's exposure to the target), or null
 ## when the route there passes a known hostile or a hostile would catch the NPC in the open on the way
 ## or once there.
@@ -389,8 +474,11 @@ func advance_positions(ctx: Dictionary, target: Dictionary) -> Array:
 
 
 ## Places to fall back to from `threats` (world points): known room centres, cover spots nearby, and
-## a spot beside each nearby ally — each annotated with whether it is hidden from every threat, farther
-## from the nearest threat than here, cover, route and the ally it lies toward.
+## a spot beside each nearby ally — each annotated with whether it is hidden from every threat, cover, route
+## and the ally it lies toward. Each is the point on the navmesh a walk there ends at, judged there. A retreat
+## takes the NPC out of sight of every threat when it stands in sight of one, else farther (by a `STRIDE`) from
+## the nearest; one taken by a character it knows of (`TAKEN`) or where it already stands (`STRIDE`) is no
+## place to fall back to.
 func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	var self_pos: Vector2 = ctx["self_pos"]
 	var here_gap := _nearest_gap(self_pos, threats)
@@ -398,6 +486,7 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	var ex: Array = ctx["exclude"].duplicate()
 	for h in ctx["hostiles"]:
 		ex += body_rid(h)
+	var here_hidden := threats.all(func(t): return blocked(ctx["space"], t, self_pos, ex))
 	var candidates: Array = []
 	for room in rooms:
 		var rect: Rect2 = room["rect"]
@@ -407,30 +496,61 @@ func retreat_positions(ctx: Dictionary, threats: Array, rooms: Array) -> Array:
 	if not threats.is_empty():
 		var nearest: Vector2 = threats[0]
 		for p in combat_spots(ctx["space"], self_pos, nearest, ex, combat_ring_radius * 2.0, combat_ring_count)["cover"]:
-			candidates.append({ "point": p, "room": "" })
-	for a in ctx["allies"]:
-		candidates.append({ "point": NavBuilder.snap(ctx["map"], a["pos"]), "room": "", "ally": a["name"] })
+			candidates.append({ "point": NavBuilder.snap(ctx["map"], p), "room": "" })  # A ring point off the navmesh is walked to its edge.
+		for a in ctx["allies"]:
+			var spot := _beside(ctx, a["pos"], nearest)
+			if spot != Vector2.INF:
+				candidates.append({ "point": spot, "room": "", "ally": a["name"] })
+	var bodies: Array = (ctx["allies"] + ctx["hostiles"]).map(func(c): return c["pos"])
 	var out: Array = []
 	for c in candidates:
 		var p: Vector2 = c["point"]
+		if bodies.any(func(b): return p.distance_to(b) < TAKEN):
+			continue  # Taken: the walk would be held short of the body on it.
 		var hidden := true
 		for t in threats:
 			if not blocked(ctx["space"], t, p, ex):
 				hidden = false
 				break
-		var gap := _nearest_gap(p, threats)
-		if not hidden and gap <= here_gap:
-			continue  # Neither out of sight nor farther away: not a retreat.
+		var farther := _nearest_gap(p, threats) >= here_gap + STRIDE
+		if not farther and (not hidden or here_hidden):
+			continue  # Neither out of sight (from in it) nor farther away: not a retreat.
 		var path := NavBuilder.route(ctx["map"], self_pos, p)
+		var route_len := NavBuilder.path_length(path)
+		if route_len < STRIDE:
+			continue  # Where it stands: the walk would be over before it began.
 		var cover := ""
 		if not threats.is_empty():
 			cover = cover_near(ctx["space"], p, threats[0], ex)
 		c["hidden"] = hidden
 		c["cover"] = cover
-		c["route_len"] = NavBuilder.path_length(path)
+		c["route_len"] = route_len
 		c["route_exposed"] = not threats.is_empty() and route_exposed(ctx["space"], path, threats[0], ex)
 		out.append(c)
 	return out
+
+
+## Whether a walk from where the NPC stands to `p` is over the moment it begins: the point on the navmesh it ends at is within a `STRIDE`
+## of walking (cheap straight-line test first).
+func where_it_stands(ctx: Dictionary, p: Vector2) -> bool:
+	var self_pos: Vector2 = ctx["self_pos"]
+	var q := NavBuilder.snap(ctx["map"], p)
+	return self_pos.distance_to(q) < STRIDE and NavBuilder.path_length(NavBuilder.route(ctx["map"], self_pos, q)) < STRIDE
+
+
+## The spot beside the ally at `ally` that the NPC falls back to: `BESIDE_ALLY` px behind it from `threat` (the ally between the NPC
+## and the threat), else to one side of it; open floor (the navmesh does not pull it) with no wall between it and the ally. INF when
+## there is none.
+func _beside(ctx: Dictionary, ally: Vector2, threat: Vector2) -> Vector2:
+	var away := (ally - threat).normalized()
+	if away == Vector2.ZERO:
+		away = Vector2.RIGHT
+	for turn in [0.0, PI * 0.5, -PI * 0.5]:
+		var p: Vector2 = ally + away.rotated(turn) * BESIDE_ALLY
+		var q := NavBuilder.snap(ctx["map"], p)
+		if q.distance_to(p) <= 3.0 and not blocked(ctx["space"], ally, q, ctx["exclude"]):
+			return q
+	return Vector2.INF
 
 
 ## The facts about standing at `p` to fight `target`: clear shot, cover, route length, exposure.

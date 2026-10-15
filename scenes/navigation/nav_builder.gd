@@ -40,6 +40,16 @@ static var _steering_regions: Dictionary = {}
 ## A map synchronizes on a worker thread, a frame or more after a region joins it; until the region answers a query,
 ## `ready` is false (see there). An entry leaves when its region answers, or when the region leaves the tree.
 static var _awaiting: Dictionary = {}
+## The planning region `build` put on each world map (planning map RID -> region), for `planning_region`.
+static var _planning_regions: Dictionary = {}
+## The avoid maps made for each world navigation map (planning map RID -> key -> entry), see `avoid_map`. An entry is
+## `{ map: RID, region: NavigationRegion2D, version: int, baking: bool, asked_ms: int }`.
+static var _avoid_maps: Dictionary = {}
+## Name of an avoid region, and the meta on the planning region that keeps its bake's source geometry (see `_remember_source`).
+const AVOID_NAME := "NavAvoid"
+const SOURCE_META := "nav_source"
+## An avoid map nobody has asked for in this many ms (wall clock) is freed by the next ask for another set (`avoid_map`).
+static var avoid_idle_ms: int = 20000
 ## Baked polygons smaller than this (px^2) are slivers and are dropped (see `_drop_slivers`).
 const MIN_POLYGON_AREA := 0.5
 ## Segment count approximating a circular furniture footprint as an obstruction polygon.
@@ -56,15 +66,20 @@ const BOUNDS_EPSILON := 0.5
 ## returned region is the PLANNING one, on the world's own navigation map; its child (`steering_region`)
 ## is baked with the living characters at rest too and sits on the steering map.
 static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float = 14.0) -> NavigationRegion2D:
-	var nav_poly := _bake_polygon(house, rooms, agent_radius)
-	if nav_poly == null:
+	var job := _source_for(house, rooms, agent_radius)
+	if job.is_empty():
 		return null
+	var nav_poly := _bake_job(job, house.position)
 	var region := NavigationRegion2D.new()
 	region.name = "NavRegion"
 	region.position = house.position
 	region.navigation_polygon = nav_poly
+	_remember_source(region, job)
 	parent.add_child(region)
 	if region.is_inside_tree():
+		var planning_map := region.get_navigation_map()
+		_planning_regions[planning_map] = region
+		region.tree_exited.connect(func() -> void: _planning_regions.erase(planning_map), CONNECT_ONE_SHOT)
 		_add_steering_region(region, house, rooms, agent_radius, nav_poly)
 		var probe: Vector2 = (rooms[0]["rect"] as Rect2).get_center()
 		_await_region(region.get_world_2d().navigation_map, region, probe)
@@ -79,9 +94,11 @@ static func build(house: Node2D, rooms: Array, parent: Node, agent_radius: float
 ## region keeps its world offset; reassigning `navigation_polygon` re-registers the mesh with the
 ## NavigationServer2D. Call it only when furniture has actually moved — see `nav_updater.gd`.
 static func rebake(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float = 14.0) -> void:
-	var nav_poly := _bake_polygon(house, rooms, agent_radius)
-	if nav_poly != null:
-		region.navigation_polygon = nav_poly
+	var job := _source_for(house, rooms, agent_radius)
+	if job.is_empty():
+		return
+	region.navigation_polygon = _bake_job(job, house.position)
+	_remember_source(region, job)
 
 
 ## Re-bake the steering region under `region` (the planning one `build` returned) with the furniture
@@ -149,13 +166,20 @@ static func _on_steering_region_exited(planning_map: RID) -> void:
 static func _steering_map_for(planning_map: RID) -> RID:
 	if _steering_maps.has(planning_map):
 		return _steering_maps[planning_map]
+	var map := _new_map()
+	_steering_maps[planning_map] = map
+	return map
+
+
+## A new active map with the project's 2D navigation defaults (what the world's own map is made with: a freshly made map has the
+## 3D ones, and the server refuses a navmesh baked with another cell size).
+static func _new_map() -> RID:
 	var map := NavigationServer2D.map_create()
 	NavigationServer2D.map_set_cell_size(map, float(ProjectSettings.get_setting("navigation/2d/default_cell_size", 1.0)))
 	NavigationServer2D.map_set_edge_connection_margin(map, float(ProjectSettings.get_setting("navigation/2d/default_edge_connection_margin", 1.0)))
 	NavigationServer2D.map_set_link_connection_radius(map, float(ProjectSettings.get_setting("navigation/2d/default_link_connection_radius", 4.0)))
 	NavigationServer2D.map_set_use_edge_connections(map, bool(ProjectSettings.get_setting("navigation/2d/use_edge_connections", true)))
 	NavigationServer2D.map_set_active(map, true)
-	_steering_maps[planning_map] = map
 	return map
 
 
@@ -173,6 +197,7 @@ static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array
 		return
 	var nav_poly: NavigationPolygon = job["poly"]
 	var origin := house.position
+	_remember_source(region, job)
 	NavigationServer2D.bake_from_source_geometry_data_async(nav_poly, job["source"], func() -> void:
 		_weld_vertices(nav_poly, origin)
 		_drop_slivers(nav_poly)
@@ -192,9 +217,14 @@ static func _bake_polygon(house: Node2D, rooms: Array, agent_radius: float, char
 	var job := _source_for(house, rooms, agent_radius, characters)
 	if job.is_empty():
 		return null
+	return _bake_job(job, house.position)
+
+
+## Bake a gathered job (`_source_for`) at once, welded and without slivers; `origin` is the region's offset.
+static func _bake_job(job: Dictionary, origin: Vector2) -> NavigationPolygon:
 	var nav_poly: NavigationPolygon = job["poly"]
 	NavigationServer2D.bake_from_source_geometry_data(nav_poly, job["source"])
-	_weld_vertices(nav_poly, house.position)
+	_weld_vertices(nav_poly, origin)
 	_drop_slivers(nav_poly)
 	return nav_poly
 
@@ -213,10 +243,7 @@ static func _source_for(house: Node2D, rooms: Array, agent_radius: float, charac
 	# silently misaligns the walls and seals the doorways.
 	var local_bounds := Rect2(bounds.position - house.position, bounds.size)
 
-	var nav_poly := NavigationPolygon.new()
-	nav_poly.parsed_geometry_type = NavigationPolygon.PARSED_GEOMETRY_STATIC_COLLIDERS
-	nav_poly.source_geometry_mode = NavigationPolygon.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
-	nav_poly.agent_radius = agent_radius + WALL_MARGIN
+	var nav_poly := _new_polygon(agent_radius)
 
 	var source := NavigationMeshSourceGeometryData2D.new()
 	# Obstructions: the house's static colliders (walls). RigidBody2D furniture is not static, so it
@@ -230,6 +257,15 @@ static func _source_for(house: Node2D, rooms: Array, agent_radius: float, charac
 	# after the footprint (both are outlines on the same source) and before the bake carves them in.
 	_add_furniture_holes(source, house, characters)
 	return { "poly": nav_poly, "source": source }
+
+
+## An empty polygon to bake into, with the bake's agent radius (plus the wall margin).
+static func _new_polygon(agent_radius: float) -> NavigationPolygon:
+	var nav_poly := NavigationPolygon.new()
+	nav_poly.parsed_geometry_type = NavigationPolygon.PARSED_GEOMETRY_STATIC_COLLIDERS
+	nav_poly.source_geometry_mode = NavigationPolygon.SOURCE_GEOMETRY_ROOT_NODE_CHILDREN
+	nav_poly.agent_radius = agent_radius + WALL_MARGIN
+	return nav_poly
 
 
 ## Merge the baked vertices that share a 1 px cell of the map (in world space: `origin` is the region's offset), the
@@ -526,6 +562,109 @@ static func _rect_outline(rect: Rect2) -> PackedVector2Array:
 		rect.position + rect.size,
 		rect.position + Vector2(0, rect.size.y),
 	])
+
+
+# --- Avoid maps ------------------------------------------------------------------------------------
+
+## The planning region `build` put on world map `planning_map`, or null when none stands there (or it has left the tree).
+static func planning_region(planning_map: RID) -> NavigationRegion2D:
+	var region := _planning_regions.get(planning_map) as NavigationRegion2D
+	if region == null or not is_instance_valid(region) or not region.is_inside_tree():
+		return null
+	return region
+
+
+## A map of its own that holds the planning bake (the furniture) and the extra `holes` too, each a closed WORLD-space polygon:
+## where the AI plans a walk that keeps out of some stretch of floor (a doorway's view). Made for `region`, the planning region
+## `build` returned, and named by `key` (the same holes, the same key): the first ask makes the map and bakes it on the
+## NavigationServer's worker thread, so a frame never pays for it, and `ready` tells when it answers queries, as for any map;
+## the map is kept for the key and re-baked (the old mesh answers meanwhile) when the planning bake has been redone since. One nobody
+## has asked for in `avoid_idle_ms` (20 s) is freed by the next ask for another key on the same planning map, and every one is freed
+## with its region (its world). Invalid when the region has no bake to start from.
+static func avoid_map(region: NavigationRegion2D, key: String, holes: Array) -> RID:
+	if region == null or not region.has_meta(SOURCE_META):
+		return RID()
+	var planning_map := region.get_navigation_map()
+	var entries: Dictionary = _avoid_maps.get(planning_map, {})
+	_avoid_maps[planning_map] = entries
+	var now := Time.get_ticks_msec()
+	for k in entries.keys():
+		var old: Dictionary = entries[k]
+		if k != key and now - int(old["asked_ms"]) > avoid_idle_ms and is_instance_valid(old["region"]):
+			(old["region"] as Node).queue_free()  # Its tree exit frees the map.
+	var stored: Dictionary = region.get_meta(SOURCE_META)
+	if entries.has(key):
+		var kept: Dictionary = entries[key]
+		kept["asked_ms"] = now
+		if not bool(kept["baking"]) and int(kept["version"]) != int(stored["version"]):
+			_bake_avoid(region, kept, holes)
+		return kept["map"]
+	var map := _new_map()
+	var avoid_region := NavigationRegion2D.new()
+	avoid_region.name = AVOID_NAME
+	avoid_region.set_navigation_map(map)
+	var entry := { "map": map, "region": avoid_region, "version": -1, "baking": false, "asked_ms": now }
+	entries[key] = entry
+	region.add_child(avoid_region)
+	_await_region(map, avoid_region, region.global_position)
+	avoid_region.tree_exited.connect(_on_avoid_region_exited.bind(planning_map, key, map))
+	_bake_avoid(region, entry, holes)
+	return map
+
+
+## An avoid region left the tree (freed for being idle, or with its world): free its map and forget it.
+static func _on_avoid_region_exited(planning_map: RID, key: String, map: RID) -> void:
+	var entries: Dictionary = _avoid_maps.get(planning_map, {})
+	if entries.has(key) and entries[key]["map"] == map:
+		entries.erase(key)
+	if entries.is_empty():
+		_avoid_maps.erase(planning_map)
+	NavigationServer2D.free_rid(map)
+
+
+## Bake `entry`'s avoid region on the worker thread: the planning source geometry kept by `_remember_source`, with `holes` (world
+## space) added as obstructions, fused and snapped like the furniture's. The polygon is assigned when the bake lands.
+static func _bake_avoid(region: NavigationRegion2D, entry: Dictionary, holes: Array) -> void:
+	var stored: Dictionary = region.get_meta(SOURCE_META)
+	var origin := region.global_position
+	var source := NavigationMeshSourceGeometryData2D.new()
+	source.set_traversable_outlines(stored["traversable"])
+	source.set_obstruction_outlines(stored["obstructions"])
+	var outlines: Array = []
+	for hole in holes:
+		var local := PackedVector2Array()
+		for p in (hole as PackedVector2Array):
+			local.append(p - origin)
+		outlines.append(local)
+	for outline in _on_grid(_union_outlines(outlines)):
+		source.add_obstruction_outline(_simplified(outline))
+	var nav_poly := _new_polygon(float(stored["agent_radius"]))
+	var region_id: int = (entry["region"] as Node).get_instance_id()  # Not the node: a region freed while its bake runs must not be captured.
+	entry["baking"] = true
+	entry["version"] = int(stored["version"])
+	NavigationServer2D.bake_from_source_geometry_data_async(nav_poly, source, func() -> void:
+		_weld_vertices(nav_poly, origin)
+		_drop_slivers(nav_poly)
+		entry["baking"] = false
+		var avoid_region := instance_from_id(region_id) as NavigationRegion2D
+		if avoid_region != null:
+			avoid_region.navigation_polygon = nav_poly)
+
+
+## Keep what the planning bake was made from (its walkable outline, its obstructions and the agent radius) on `region`, with a
+## version that counts the bakes, so an avoid map can be baked from it with more holes and knows when the furniture has moved.
+static func _remember_source(region: NavigationRegion2D, job: Dictionary) -> void:
+	var source: NavigationMeshSourceGeometryData2D = job["source"]
+	var poly: NavigationPolygon = job["poly"]
+	var version := 0
+	if region.has_meta(SOURCE_META):
+		version = int((region.get_meta(SOURCE_META) as Dictionary)["version"]) + 1
+	region.set_meta(SOURCE_META, {
+		"traversable": source.get_traversable_outlines(),
+		"obstructions": source.get_obstruction_outlines(),
+		"agent_radius": poly.agent_radius - WALL_MARGIN,
+		"version": version,
+	})
 
 
 # --- Map queries ---------------------------------------------------------------------------------

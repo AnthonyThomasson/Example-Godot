@@ -77,8 +77,14 @@ search (the doorway to the west — unexplored — short route)") and the questi
 behaviour's `entry` primitive (`domain-ai-entry`), which asks Von nothing on the cadence until the entry is over
 (a forced decision — a hit, a hostile belief change — still starts, and replaces the entry or, with Von down, aborts it).
 
-**GRENADE** (`grenade`, a COMBAT child; `docs/grenades.md` G17): offered while some hostile has a `grenade_throws` option (the NPC carries a grenade, the
-hostile's last-known spot is hidden from its line of fire, in throw range with a clear lob) that is not tagged `ally_in_blast` or `no_safe_spot`; runs the `throw`
+**GRENADE** (`grenade`, a COMBAT child; `docs/grenades.md` G17): offered while the group `grenade_throws` has an option (requires `grenade_ready` only, so the unbound level
+offers it too: under the bound hostile, the NPC carries a grenade and the hostile's last-known spot is hidden from its line of fire or in a room the NPC is outside of, in throw
+range with a clear lob; unbound, with no hostile known, the global group throws where the shots came from, beside RETREAT, LOCATE not being offered toward that room) that is not tagged `ally_in_blast` or `no_safe_spot`; its
+desc is "{situation} and you can throw a grenade onto their spot ({summary})", `{situation}` being the group's case ("Your line to X is blocked" / "X holds a room you are outside of" /
+"The shots came from a room you are outside of"; the planner's `_fill` takes it from the summary group's `situation`). Measured (`tools/von_scenarios/grenade_*.json`): the doorway
+holder GRENADE 0.49 to 0.51 against ENGAGE 0.32 to 0.40 (a desc keeping "Your line ... is blocked" for it: 0.14 against 0.61); the shots' origin GRENADE 0.77 against RETREAT
+0.23 (issue #51 R10). Through a throw spot (R13 / R15, the summary "within throwing range from a spot nearby", `grenade_throw_spot_*.json`) the same ranks hold (0.44 / 0.49 / 0.78;
+dropping the walk's words moves GRENADE by 0.02 at most), and over 40 levels captured in real matches out of range GRENADE ranks first in 18 against 17 worded in place. Runs the `throw`
 primitive (`domain-ai-combat`). Its options are `frag` and `stun` (asked of Von only when it carries both). Measured on the three real-Von scenarios
 (`combat_frag_hidden_hostile`, `combat_frag_take_cover`, `combat_stun_then_advance`) with `tools/von_probe.py`: the desc "Your line to {target} is blocked and you can throw a
 grenade onto their spot ({summary})" together with the sentence the exposure section gains ("You can throw a frag grenade onto their spot.") gives GRENADE
@@ -87,10 +93,13 @@ wording wins on the loaded-gun facts), and a desc that opens with "{target} is h
 "blinded by a flash and cannot see you" (the sentence in the exposure section, the `{blinded}` clause in ADVANCE's desc: "{target} is blinded by a flash and cannot see you, or
 {target} looks badly wounded, ..."; the planner fills `{blinded}` from the bound hostile's option, empty otherwise, so every other desc is unchanged): ADVANCE 0.71 against ENGAGE 0.18 (0.26
 against 0.48 with the state's contact line alone). **STUN ENTRY** (`stun_entry`, a SEARCH child, requires `stack_has_stun`, G18): the same `entries` group and `entry` primitive as
-ENTER with `params { bang: true }`; desc "A doorway leads into a room where gunfire was heard or a hostile was seen going in ({summary})", the summary being the nearest doorway's (a doorway into a room a hostile is
-suspected in is listed first and says "gunfire heard there" / "a hostile seen going in" instead of "unexplored"/"unsearched"): with the gunfire STUN ENTRY 0.42 to 0.44 against ENTER 0.34 to 0.37, quiet ENTER 0.46
-against 0.29 (the original "a hostile may be waiting: gunfire heard there, a hostile seen going in" cannot tell the two: 0.37 to 0.42 against 0.36 to 0.38). At the doorway level the unexplored/unsearched word
-costs the suspect doorway (0.48 against 0.52), "gunfire heard there" in its place gives 0.61 and "into the room where gunfire was heard" 0.66. Re-run the probes after any rewording of either.
+ENTER with `params { bang: true }`; desc "A doorway leads into a room where a hostile was heard, seen, radioed or shooting from ({summary})", the summary being the nearest doorway's (a doorway into a
+suspect room is listed first and says why instead of "unexplored"/"unsearched": "gunfire heard there", "footsteps heard there", "shots at you came from there", "an ally radioed a fight there",
+"a hostile seen going in", "a hostile lost by its doorway", "a hostile seen heading in"). Measured with `tools/von_probe.py` on `tools/von_scenarios/stun_entry_*.json` (the SEARCH level of an
+invader outside): STUN ENTRY first with each reason (0.39 to 0.46 against ENTER 0.33 to 0.37; ablating the phrase hands each back to ENTER, but gunfire heard, which the state's awareness line names too), the quiet ENTER with none (unexplored 0.46 against 0.29,
+unsearched 0.45 against 0.25). A desc naming two reasons, "where gunfire was heard or a hostile was seen going in", ties ENTER on an unrelated phrase (0.39 each); one listing every reason by name gives a plain
+unsearched room the bang (0.41 against 0.36); "a hostile may be waiting" bangs everything. At the doorway level the unexplored/unsearched word costs the suspect doorway (0.48 against 0.52),
+"gunfire heard there" in its place gives 0.61 and "into the room where gunfire was heard" 0.66. Re-run the probes after any rewording of either.
 
 **How a `desc` must read.** Von is a CLASSIFIER — it picks the option whose text best matches the
 state (`criteria` in its API are classification criteria). A branch's desc therefore states the

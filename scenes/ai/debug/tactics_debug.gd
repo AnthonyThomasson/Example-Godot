@@ -27,6 +27,7 @@ const ZONE_COLORS := {
 	&"room": Color(0.4, 0.8, 0.8),       # teal — a known room to go to
 	&"interaction": Color(0.9, 0.9, 0.9),# white — an object to use
 	&"waypoint": Color(0.9, 0.3, 0.8),   # magenta — a non-room go-to (starting post / entrance / approach)
+	&"grenade": Color(0.75, 0.75, 0.3),  # olive — where a grenade would burst (thrown from the NPC's spot or a throw spot)
 }
 ## Outline / tint colour per room status (how the NPC regards each room), from `debug_room_zones()`.
 const ROOM_COLORS := {

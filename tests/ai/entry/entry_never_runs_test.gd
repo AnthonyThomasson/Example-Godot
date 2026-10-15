@@ -7,7 +7,7 @@ extends GameTest
 
 const Entry := preload("res://tests/_ai/entry_probe.gd")
 const Maps := preload("res://tests/_ai/flank_maps.gd")
-const START := Vector2(990, 600)   # far south-east in the garden; the stack forms north of the door
+const START := Vector2(990, 600)   # far south-east in the garden; it stacks south of the door, its own side (E19)
 
 
 func describe() -> Dictionary:

@@ -1,0 +1,18 @@
+{
+ "name": "tactic: a defender holds a doorway you have a clear shot at, from a room you are outside of, with no lob from where you stand and a throw spot a short walk away -> GRENADE (G17, issue #51 R13; the captured R7 level, worded for a throw spot)",
+ "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are crouching. You are unhurt.\nYour pistol is loaded. You carry a frag grenade.\nKnown hostiles: 1 (1 in sight). Allies near you: none.\nYou have a clear shot at h from where you stand. You are exposed to their fire. h holds the kitchen, a room you are outside of. You can throw a frag grenade onto their spot.\nh — HOSTILE (seen) — in sight — close, in pistol range, south-west of you, in the kitchen — standing still — holding a Unarmed.\nFlanks on h (you are on their front): their left side — route passes h, clear shot, in the open, short exposed route; their right side — route passes h, clear shot, cover, medium hidden route; behind them — route passes h, clear shot, in the open, medium hidden route.\nDecided so far: COMBAT → h.",
+ "question": "How should you fight h? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+ "options": {
+  "advance": "h looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, standing still, holding a Unarmed)",
+  "engage": "You have a clear shot at h, and you are not badly wounded (from where you stand)",
+  "grenade": "h holds a room you are outside of and you can throw a grenade onto their spot (h holds the kitchen, a room you are outside of, within throwing range from a spot nearby)",
+  "retreat": "You are badly wounded and being hit (best: behind the wall close by, out of their sight; you are unhurt)"
+ },
+ "expect": [
+  "grenade"
+ ],
+ "ablate": [
+  "from a spot nearby",
+  "h holds the kitchen, a room you are outside of. "
+ ]
+}

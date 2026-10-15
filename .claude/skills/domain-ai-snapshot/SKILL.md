@@ -58,7 +58,7 @@ lives in `agent_snapshot.gd`.
   `loadout` (then "You carry a frag grenade and a stun grenade." for the grenades carried; the gun in bands, never round counts: "Your pistol is loaded." / "…nearly empty." / "…empty.", then
   once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
   empty without a gun; the noun is the gun's display name lower-cased, `gun_noun` ("pistol", "assault rifle", an acronym like "SMG" kept), so a
-  pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire heard only while no hostile is known; noted events).
+  pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire and footsteps heard only while no hostile is known; noted events).
   `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile. The snapshot also carries `gun` (that noun), which the planner
   fills into `{gun}` in the tree's templates. `shoot_range` and the "in pistol range" distance band are deliberately left gun-agnostic (pinned wording).
 - **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
@@ -68,12 +68,18 @@ lives in `agent_snapshot.gd`.
   `flank_sides` (tagged `held` when an ally — seen or radioed — holds it, `crosses` when the route
   there passes a known hostile; described as "route passes X"), `advance_positions` (halfway / close /
   rush), `melee` (one `punch` option, only while the target is point-blank); globally
-  `reload` (one option, only while `can_reload`, so the planner takes it unasked), `retreat_positions`, `shooter`, `leads`
-  (last seen, where they were heading, gunfire heard, unseen shooter, support an ally; each says WHERE it is in the canonical
+  `reload` (one option, only while `can_reload`, so the planner takes it unasked), `retreat_positions`, `shooter` (LOCATE's `toward_shots`, under
+  fire with no hostile known; empty when the line back from the newest shot, `shot_from`, runs into a room the NPC is not in: it does not walk into a
+  barricaded shooter, issue #51 R10, and GRENADE at the shots' origin or RETREAT stand instead), `leads`
+  (last seen, where they were heading, gunfire heard, footsteps heard, unseen shooter, support an ally; each says WHERE it is in the canonical
   `SnapshotVocab.place`/`where` words, "in the kitchen" / "outside the house", and the awareness section says it of heard gunfire too, so the
-  NPC's goal can be weighed against it), `entries` (the doorways
+  NPC's goal can be weighed against it). LOCATE (the walk to where the shots came from) and a RETREAT spot are not offered when their walk
+  would end where the NPC already stands or on a character it knows of (issue #51 R12, `docs/tactical-entry.md` E9): `shooter` is empty, and
+  the `lead_shooter` lead left out, when the point toward the shots is where the NPC stands (`AgentTactics.where_it_stands`: the walk to its
+  navmesh point is under a `STRIDE`, 32 px; shots from beyond the walkable ground), and the retreat spots are screened in `agent_tactics.gd`
+  (`domain-ai-perception`, Tactics). Other leads lie at fixed points and reaching one spends it (`check_lead`). `entries` (the doorways
   ENTER offers, `entry_enabled` only: out of the NPC's area into a room unseen — named by direction — or unsearched,
-  nearest first; the place is the NPC's free stack slot on the team's side, `params` carry `opening`, `into`, `slot`,
+  nearest first; the place is the NPC's free stack slot on the side it would stack on (the team's, or its own when the way there crosses the doorway's view, E19), `params` carry `opening`, `into`, `slot`,
   `side`; the summary is the nearest one's desc), `search_rooms` (+ front entrance / approach the house while outside;
   with entries, the rooms they lead into and the entrance are left to ENTER), `explore` (unknown rooms by direction
   only, minus those an entry leads into),
@@ -100,13 +106,37 @@ compare numbers, and an encoder reads "no cover" as "cover". So:
 5. **Only perceived facts** — facing, aim and wounds only while visible; unknown rooms by direction.
 A seen character's `reloading` flag (read via `is_reloading()` only while visible) joins its contact line ("…, reloading").
 **Grenades** (`docs/grenades.md`): per target the group `grenade_throws` (`grenade_group`): one option `frag` / `stun` per kind carried, only against a hostile whose last-known spot is hidden from the NPC's line of fire
-(`line.clear` false), within that kind's throw range (`AgentThrow.range_of`, off the grenade carried) with a clear lob (`AgentThrow.can_lob`), judged per kind; `params` `point` (the spot), `kind`, `radius`, `slot`, `target_id`; `tags` `ally_in_blast` (a known ally, seen or on the radio, in the
-grenade's danger zone at the spot: `AgentThrow.in_zone`), `no_safe_spot` (the NPC itself is in the zone standing and `AgentThrow.escape` finds no spot or cover within the fuse) which the tree's `grenade` node drops by, and `inside`.
+(`line.clear` false: "frag X behind their cover", group `situation` "Your line to X is blocked") or lies in a room the NPC is outside of (`_held_room`, issue #51 R7: "frag X in the kitchen",
+`situation` "X holds a room you are outside of", `held_room` the room, and the exposure section adds "X holds the kitchen, a room you are outside of." before the throw sentence), within that kind's throw range (`AgentThrow.range_of`, off the grenade carried) with a clear lob from the thrower's hand (`AgentThrow.can_lob`), judged per kind, from where the NPC stands or else
+from a **throw spot** a short walk away (`_throw_option(ctx, kind, spot, target_id, keep_out, walk)` asks `AgentTactics.throw_spot` within `AgentThrow.reach_of`, never inside `keep_out`, the room the
+hostile holds, with `_throw_walk` as its route: the walked route (`AgentEntry.walk_route`, E18) and `detour`, whether the entry guard would stop it, a threshold into an uncleared room or a
+doorway view with no way round, so a spot whose walk needs none is preferred; issue #51 R13); `params` `point` (the spot), `kind`, `radius`, `slot`, `target_id`, `from` (where it throws from: the throw spot, or where it stands) and `walk` (`from` is a throw
+spot); the option keeps `route_len` (the walk), its desc adds " — from the hallway to the east, short route" (`_throw_from_text`) and the group's summary says "within throwing range from a spot
+nearby" when every option needs the walk, "within throwing range" otherwise (`_throw_reach_text`; measured: the walk's words change nothing, `docs/grenades.md` G17); `tags` `ally_in_blast` (a known ally, seen or on the radio, in the
+grenade's danger zone at the spot: `AgentThrow.in_zone`), `no_safe_spot` (the NPC itself is in the zone standing **at `from`** and `AgentThrow.escape` from there finds no spot or cover within the fuse) which the tree's `grenade` node drops by, and `inside` (`_throw_option`, shared).
+`debug_zones()` (`ZoneList`) lists every throw weighed, dropped ones too, as zones of category `grenade` with `from`. A throw spot is worked out once per decision for a burst spot,
+reach and room kept out of (`_throw_spots`, cleared by `SnapshotOptions.begin()`, which `build()` calls): a frag and a stun of the same reach share it.
+Globally, `grenade_throws` is also `shots_grenade_group` (R10): with no hostile known and under fire, a throw per kind onto the stretch, inside the first room along it the NPC is
+outside of, of a `shot_from` line (`AgentSuspicion.shot_line`: from where it leaves the room the shot landed in; `_shots_aim`: the point nearest its middle, `SHOT_AIM_SHARES`, it can lob onto from where it stands, else, issue #51 R15, from a throw spot outside that room), `situation` "The shots came from a room you
+are outside of"; the unseen-fire exposure then adds "The shots came from the kitchen, a room you are outside of. You can throw a stun grenade where the shots came from." The fact
+`grenade_ready` holds for either. A group's `situation` fills the tree's `{situation}` (`domain-ai-decision`).
 The exposure section says "You can throw a frag grenade onto their spot." for the options not dropped, and "X is blinded by a flash and cannot see you." for a hostile it caught in a stun's flash (`blind` on the contact, from
 `AgentPerception.process_explosion`); the contact line, the `hostiles` option and the ADVANCE summary say "blinded by a flash", a blinded hostile has no `aim_text`, and the `hostiles` bind carries `blinded` (the clause
-the ADVANCE desc's `{blinded}` is filled with). The `entries` options say what makes a room suspect instead of "unexplored"/"unsearched": "gunfire heard there" (a `heard_gunfire` position inside the room), "a hostile seen going in"
-(a lost hostile last seen in it), listed first. With a stun in the stack (`stack_has_stun`) a gunfire or lost-hostile lead inside a room an entry doorway leads into is no longer a `leads` option (INVESTIGATE would move there and the entry
-guard would turn it into a quiet entry: the bang is the entry's to weigh). Without one the leads are as before.
+the ADVANCE desc's `{blinded}` is filled with). The `entries` options say what makes a room suspect instead of "unexplored"/"unsearched" (the perception's `AgentSuspicion.rooms_suspected`, room key ->
+reason ids, worded by `SnapshotOptions.SUSPECT_PHRASES`, each fact its own phrase, in this order, docs/grenades.md G18; the entry reads the same reasons through `AgentPerception.room_suspicion`
+to make any entry into a suspect room a bang one, E17): "gunfire heard there" (a `heard_gunfire` position inside the room), "footsteps heard there" (`heard_footsteps`, docs/hearing.md H1),
+"shots at you came from there" (the `shot_from` line runs through the room), "an ally radioed a fight there" (a combat callout's `target_pos` in it), "a hostile seen going in" (a lost hostile last seen in it),
+"a hostile lost by its doorway" (lost outside it within `AgentSuspicion.LOST_NEAR_DOOR` 150 px of one of its doorways) and "a hostile seen heading in" (lost moving, where it was heading inside it); such a doorway is listed first.
+With a stun in the stack (`stack_has_stun`) none of those facts about a room an entry doorway leads into is a `leads` option: the lost hostile's last-seen and heading leads, gunfire and footsteps there, the
+unseen-shooter lead whose `shot_from` line runs into it, an ally's support call whose `target_pos` is in it (the way into that room is an entry, ENTER / STUN ENTRY, whose option says why, and any entry into a suspect room is a bang
+one, E17). Without one the leads are as before. The `leads` group also offers **footsteps heard** (`lead_footsteps_<cell>`: "footsteps heard to the west, in the kitchen — just now — short route"),
+and the awareness section says "Footsteps heard to the west, in the kitchen, just now." beside gunfire, while no hostile is known.
+
+**Route bands are the route walked (E18).** Every "short / medium / long route" in an option (`SnapshotOptions._route_len`) is the length of the route the NPC
+will walk from where it stands, `AgentEntry.walk_route(...)["len"]`: the one that keeps out of the doorway views when it would take it (within
+`door_avoid_ratio` x the plain route + `door_avoid_slack`), else the plain one. The controller starts no decision before the avoid map of the room the NPC
+stands in is baked (`AgentPerception.routes_ready`). Test: `tests/ai/entry/entry_route_band_as_walked_test.gd`. The combat spots' `route_len` (`agent_tactics.gd`)
+stay on the plain route.
 
 **Posture** words appear only when someone is not standing, so a standing body's text is byte-identical (the `tools/von_scenarios` fixtures pin it): the
 NPC's own in its situation line (" You are crouching.") and a *visible* contact's in its contact line ("crouched low"; a last-seen posture may be stale, so it is never shown for a remembered one). Test: `tests/ai/posture/posture_in_von_state_test.gd`.

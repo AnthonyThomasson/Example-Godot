@@ -310,6 +310,15 @@ finding, not as the doctrine gap. Their maps: the box room (`Maps.box_room`, `En
 - A defender meant to be unseen from outside has to be behind the jamb from every spot the entrant visits (stack,
   arc, the walk there), e.g. tucked against the door's wall well along from it.
 
+**Doorway views (E18, tag `door_view`).** `tests/_ai/door_view_probe.gd` (`const View := preload(...)`) holds the test's own copy of a doorway's view (`polygon`, `in_view`: the
+spec numbers `DEPTH` 450, `AVOID_RATIO` 2.0, `AVOID_SLACK` 300, `PASS_CLEAR_TIME` 60 are consts there, so a test checks the plan and not the code) and the reads on a `watch` sample
+set (`first_in_view`, `time_in_view`, `longest_pause_in_view`, `axis_crossed_at`, `crossing_span`, `time_covering`), plus `wait_wall` (the memory ages on the wall clock, which a headless run outpaces: it paces
+the sim to real time). The tests: `entry_route_round_door_view_outside` / `_inside`, `entry_secure_exterior_door_then_cross`, `entry_pass_far_out_secured` (real Von, gunfire heard as the premise),
+`entry_cleared_room_pass_expires` (scripted, about 65 s of wall time) and `entry_route_band_as_walked` (scripted, the snapshot's wording); `navigation/avoid_map_carves_the_views` tests the map.
+`entry_split_stack_criss_cross` (E19, real Von) uses the view to check a split stack: two invaders at the back door from north and south, neither walking across the view.
+An invader that starts south of the back door outside its view (e.g. (990, 450)) and joins a stack on the north splits it (E19); a test that
+wants a one-sided stack starts its late joiner on the stack's side (the E16 tests start `b` at (980, -70)).
+
 ## Stack tests (tag `stack`)
 
 `tests/ai/stack/stack_*_test.gd` pin down the human's place in an AI stack (E16 in `docs/tactical-entry.md`), on the Terrace house and the back
@@ -325,7 +334,9 @@ until the human has its slot. `stack_player_slot_von` runs the whole thing with 
 
 `tests/_ai/bump_probe.gd` (`const Bump := preload(...)`) measures "walks into" off public state only: `watch(t, who, duration, stop)` records
 every frame a character steers (`move_input`) within 60° of another it touches (centres under 31 px) as a bump, with whether the other was at
-rest and how far it was shoved; `of_kind`, `collisions` (a head-on pair's two bumps as one collision), `describe`, `tally`, `totals`. The
+rest and how far it was shoved; `of_kind`, `collisions` (a head-on pair's two bumps as one collision), `describe`, `tally`, `totals`;
+`pressed_watch(walker, other)` is a clock of the walker standing pressed against the other (still, centres under `PRESSED_GAP` 45 px: what `keep_off`
+leaves of a walk into a body, short of a bump), called once a frame, against `PRESSED_MAX` (0.5 s). The
 mechanism tests are `tests/ai/movement/npc_*` (scripted Von, a puppet teammate standing still), the scenario `tests/ai/entry/entry_team_no_bumping`
 (real Von, four invaders placed by `MatchSpawner`). A test that a held walk re-plans reads `debug_state()["decisions"]` / `["decision_reason"]`
 ("way blocked"): an auto-picked level asks Von nothing (`tests/ai/entry/entry_held_walk_replans` for an entry's walk).
@@ -347,6 +358,8 @@ Scripted ones (`investigate_outside_lead_offers_stay`, `investigate_lone_lead_is
 (`requires_von`, `--include-von --require-von`) check what a real Von decides: the defender stays in, still investigates gunfire inside,
 and an invader still investigates the same gunfire outside. After rewording any of what Von reads about leads, run them with
 `tools/von_probe.py` (its `investigate_outside_lead_*` scenarios).
+Footsteps (`docs/hearing.md` H1, tag `hearing`): `ai/perception/footsteps_heard_by_gait` (scripted: puppets walk, run and crouch lanes at set distances behind a
+wall from a held defender, read off `debug_memory()["footsteps"]` and the `footfall` events' `character` / `crouched`) and `ai/investigate/footsteps_lead` (real Von).
 
 `defenders_stay_in_house_quiet` (scripted) and `defenders_stay_in_house_quiet_von` (real Von, invaders outside as at the start of a match)
 watch every defender of a generated house (`tests/_ai/house_probe.gd`: `spawn`, `watch`, whose failure message carries each
@@ -424,12 +437,20 @@ with `--include-von --require-von`. They are spread by domain (`tests/items/gren
 `tests/general/camera_shakes_on_explosion`; `tests/ui/stun_screen_whiteout`) with the AI ones in `tests/ai/grenade/`, all through
 `tests/_ai/grenade_probe.gd` (`const Probe := preload(...)`): `arm(character, stuns, frags)` (a test world keeps the default inventory, so each test
 arms the thrower the way Main does, at the start of `run`), `throw_at`, `live`, `raw` / `booms` / `stuns` (bus events with their sim time), the numbers of the spec
-(`MAX_RANGE`, `FLASH_RADIUS`, `expected_blind`, ...) so a test checks the doc and not the code, and the AI reads (`offered`, `acts`, `callouts`). The scenario tests
+(`MAX_RANGE`, `FLASH_RADIUS`, `expected_blind`, ...) so a test checks the doc and not the code, the AI reads (`offered`, `acts`, `callouts`), and `character_rids` (the rids of the `characters` group: what its rays and `throw_spot_probe.gd`'s look
+past). The scenario tests
 in `tests/ai/grenade/` run the whole AI pipeline with the real Von server and `require` the premise first (that the AI took the GRENADE / STUN ENTRY path), so a
 different Von choice reads as a set-up finding. A hall of 100 px or less with a sofa in it is **sealed in the navmesh** (the lane left is under an agent body wide) and
 a route to the far side then runs outside the house: give a scenario hall at least 140 px when the NPC has to walk past a piece of furniture.
-The mechanisms the scenarios cannot reach are scripted-Von tests: `grenade_range_drift`, `throw_dropped_when_lob_blocked` and `throw_committed_in_windup` use `von_script(rules, 30)`
-(slow answers) to change the world while a question is in flight (a character moved with `global_position`, a piece of furniture shoved onto the lob: it must be `freeze`d first and
+The suspect-room STUN ENTRY tests (`stun_entry_*`, G18) share `tests/_ai/suspect_probe.gd` (`const Suspect := preload(...)`: `world` the bare Terrace house
+and a stack of two in the back garden, `arm`, `watch`, `first_search`, `check_stun_entry`: the stack's first SEARCH / INVESTIGATE decision must be STUN ENTRY by the back door
+and a `bang` radioed); each adds the one thing that makes the kitchen suspect at the start of `run`. The wording they rest on is measured by `tools/von_scenarios/stun_entry_*.json`.
+The throw-spot tests (`grenade_throw_spot_*`, `grenade_walks_to_throw_spot`, `grenade_shots_origin_throw_spot`, G17's throw spots) share
+`tests/_ai/throw_spot_probe.gd` (`const Spot := preload(...)`: `throws` (the `grenade` zones of `debug_zones()`), `from_of`, its own `lob_clear` (one ray, nothing above 50 on the
+line), `hand_lob_clear` (that lob from the thrower's hand, `Character.throw_release_offset`, along a band 8 px either side), `THROW_RANGE` (550), `walk` (a `NavBuilder.route` reach and length), `any_lob_along`, and `note` / `describe`, which follow each decision walk with where the NPC stood when it began). A throw's
+`throw` event is at the hand, about 16 px from the thrower's centre. The mechanisms the scenarios cannot reach are scripted-Von tests: `grenade_range_drift`, `throw_dropped_when_lob_blocked` and `throw_committed_in_windup` use `von_script(rules, 30)`
+(slow answers) to change the world while a question is in flight; `evade_replans_when_spot_in_line` rolls a grenade on by moving it once it is at rest (a resting
+`ThrownGrenade` stays where it is put) and posting the `grenade` rest event it would post, which a turned-away NPC hears (a character moved with `global_position`, a piece of furniture shoved onto the lob: it must be `freeze`d first and
 the teleport made a frame later, or the physics step puts a free body back), and the four `bang_fallback_*` tests run a stack of two at the Terrace house's back door through
 `tests/_ai/bang_probe.gd` (`const Bang := preload(...)`: `rules` SEARCH > STUN ENTRY > that doorway, `stack`, `arm`, `radio_mate` for a teammate that is a puppet radioing its part of
 the stack, `note_acts` / `took`).

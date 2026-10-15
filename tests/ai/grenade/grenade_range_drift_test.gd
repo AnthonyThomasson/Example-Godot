@@ -1,21 +1,21 @@
 extends GameTest
 
-## G17: the GRENADE tactic is offered against a spot within throw range (450 px) of where the NPC stood when the snapshot was made. The NPC moves on
+## G17: the GRENADE tactic is offered against a spot within throw range (550 px) of where the NPC stood when the snapshot was made. The NPC moves on
 ## while Von answers, so by the time the order is adopted it can stand a few px past the range. It must not give the throw up there and re-decide (the
 ## tactic then flaps in and out of the offer near the range); the thrower closes the last few px on the spot and throws. One mechanism, scripted Von
-## that answers slowly (30 physics frames a level): the invader starts 440 px from a hostile hidden behind a desk and is moved 20 px back, to 460 px,
+## that answers slowly (30 physics frames a level): the invader starts 540 px from a hostile hidden behind a desk and is moved 20 px back, to 560 px,
 ## while its first question is in flight. GRENADE is asked about and carried out once, and the grenade leaves the hand within range.
 
 const Probe := preload("res://tests/_ai/grenade_probe.gd")
 const START := Vector2(80, 150)
 const DRIFTED := Vector2(60, 150)
-const HOSTILE := Vector2(520, 150)
+const HOSTILE := Vector2(620, 150)
 
 
 func describe() -> Dictionary:
 	return {
 		"name": "A thrower that drifted out of range closes in and throws",
-		"description": "The invader is 440 px from a hidden hostile when GRENADE is offered and 460 px when the order is adopted: it closes the last few px and throws, with GRENADE picked once.",
+		"description": "The invader is 540 px from a hidden hostile when GRENADE is offered and 560 px when the order is adopted: it closes the last few px and throws, with GRENADE picked once.",
 		"tags": ["ai", "grenade", "combat", "scripted"],
 		"timeout": 30.0,
 	}

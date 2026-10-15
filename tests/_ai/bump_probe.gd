@@ -28,6 +28,12 @@ const STEERING := 0.1
 const MERGE_GAP := 0.5
 ## How many bumps `describe` spells out.
 const DESCRIBE_MAX := 12
+## Standing pressed against a body: still (slower than `PRESSED_SPEED` px/s) with its centre closer than `PRESSED_GAP` px to
+## the other's, which neither a walk round it (passing, moving) nor a walk held short of it (`STOP_GAP` 56 px off) does; a test
+## allows a stand of at most `PRESSED_MAX` s (a step that `keep_off` cut for a frame or two).
+const PRESSED_GAP := 45.0
+const PRESSED_SPEED := 10.0
+const PRESSED_MAX := 0.5
 
 
 ## Watch `who` (actor ids, or the character nodes themselves, named by their node name) for up to `duration` s, or
@@ -80,6 +86,20 @@ static func watch(t: TestContext, who: Array, duration: float, stop := Callable(
 			break
 		await t.frames(1)
 	return { "bumps": bumps, "closest": nearest }
+
+
+## A clock of `walker` standing pressed against `other` (see `PRESSED_GAP`): call the returned Callable once a physics frame;
+## each call samples that frame and returns the longest stand so far (s).
+static func pressed_watch(walker: Node2D, other: Node2D) -> Callable:
+	var clock := [0.0, 0.0]  # the stand under way, the longest (an Array: a lambda captures floats by value)
+	return func() -> float:
+		var still: bool = walker.get_real_velocity().length() < PRESSED_SPEED
+		if still and walker.global_position.distance_to(other.global_position) < PRESSED_GAP:
+			clock[0] += 1.0 / Engine.physics_ticks_per_second
+			clock[1] = maxf(clock[1], clock[0])
+		else:
+			clock[0] = 0.0
+		return clock[1]
 
 
 ## What a character's NPC brain is doing, in a few words: its entry phase when it is entering, else its decision path.

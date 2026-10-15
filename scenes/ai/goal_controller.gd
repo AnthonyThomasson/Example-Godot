@@ -24,7 +24,7 @@ extends Node
 ##
 ## This file keeps only the ORCHESTRATION: the control loop, the decide cadence, forcing a re-decision
 ## on a salient event or a finished task (interrupting a walk in flight when the situation now calls for
-## a different starting point — e.g. under fire → straight to combat), the EventBus intake (hits and
+## a different starting point — e.g. under fire → straight to combat), the EventBus intake (hits, footfalls and
 ## allies' radio callouts) and posting this NPC's own callouts. The behaviour is pure DATA — `goal` plus
 ## the generic primitives and decision config exported below; a house defender and a house invader are
 ## the same code with different data.
@@ -189,6 +189,9 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_enabled: bool = false
 ## Seconds the point waits at the door, once in its slot, for the rest of the stack before going in without them.
 @export var entry_ready_timeout: float = 6.0
+## Seconds a quiet entry whose stack carries a stun holds at the stack, once the point is in its slot, before the point slices the pie: time
+## for a late reason to suspect the room to come up and turn it into a bang one (E17). A hostile in view or coming under fire ends it early.
+@export var entry_listen_time: float = 3.0
 ## Seconds a follower leaves after the member ahead of it is through, so the stack crosses one at a time.
 @export var entry_follow_gap: float = 0.3
 ## Distance (px) between neighbouring stack slots along the wall: clear of a neighbour's footprint (the 34 px hole a body at
@@ -228,6 +231,22 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 ## Seconds a doorway the NPC secured as it passed (E15: a doorway on its walk in a corridor, not crossed) is left alone before
 ## the guard may secure it again.
 @export var entry_secure_time: float = 30.0
+## How far (px) out of a doorway its view reaches, along the rays from the room's far corners through the opposite jambs (stopped at
+## walls): a walk keeps out of the view of every doorway into a room not clear for passing (E18).
+@export var door_view_depth: float = 450.0
+## A walk round those views is taken when it is no longer than this many times the plain route...
+@export var door_avoid_ratio: float = 2.0
+## ... plus this many px. Longer, or none: the walk goes the plain way, and the guard secures each doorway view it crosses (E15).
+@export var door_avoid_slack: float = 300.0
+## Seconds a cleared room counts as safe to walk past (its doorways' views are then left alone); after it they are avoided or secured again.
+@export var entry_pass_clear_time: float = 60.0
+
+@export_group("Hearing")
+## How far (px) the footsteps of a character not of the NPC's own faction are heard, through walls, by gait (`docs/hearing.md` H1):
+## walking, running and crouched. A heard step is an investigation lead and a reason to suspect the room it came from.
+@export var hear_walk: float = 250.0
+@export var hear_run: float = 450.0
+@export var hear_crouch: float = 100.0
 
 @export_group("Grenades")
 ## React to live grenades (`docs/grenades.md` G16): an NPC that sees one, hears it land or is told of it, and is in its danger zone, radios
@@ -238,6 +257,9 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var hear_grenade: float = 300.0
 ## How far (px) past a frag's blast radius its danger zone reaches: the NPC runs to be clear of that, not only of the blast.
 @export var evade_margin: float = 120.0
+## Longest walk (px of route) to a throw spot: a grenade out of range or with no clear lob from where the NPC stands is thrown from a spot
+## at most this far away that is in range with a clear lob (docs/grenades.md G17), else not offered.
+@export var throw_spot_walk: float = 250.0
 
 @export_group("Watch")
 ## How far (px) down its path a walking NPC looks: through the doorway it is lining up, not at the wall beside it.
@@ -385,6 +407,9 @@ func _apply_config() -> void:
 	_perception.search_memory_ttl = search_memory_ttl
 	_perception.hit_awareness_radius = hit_awareness_radius
 	_perception.hearing_radius = hearing_radius
+	_perception.hear_walk = hear_walk
+	_perception.hear_run = hear_run
+	_perception.hear_crouch = hear_crouch
 	_perception.under_fire_time = under_fire_time
 	_perception.engage_dwell = engage_dwell
 	_perception.shoot_range = shoot_range
@@ -419,9 +444,15 @@ func _apply_config() -> void:
 	_perception.entry_pie_steps = entry_pie_steps
 	_perception.entry_corner_inset = entry_corner_inset
 	_perception.entry_short_room = entry_short_room
+	_perception.entry_guard = entry_guard
+	_perception.door_view_depth = door_view_depth
+	_perception.door_avoid_ratio = door_avoid_ratio
+	_perception.door_avoid_slack = door_avoid_slack
+	_perception.entry_pass_clear_time = entry_pass_clear_time
 	_perception.grenades_enabled = grenades_enabled
 	_perception.hear_grenade = hear_grenade
 	_perception.evade_margin = evade_margin
+	_perception.throw_spot_walk = throw_spot_walk
 	_perception.apply_config()
 	# The pursuit/territory primitives become planner config: pursuit disables IDLE and starts a walk at
 	# COMBAT once a hostile is known; territory confines combat options inside the house.
@@ -463,6 +494,7 @@ func _apply_config() -> void:
 	_behavior.run_min_distance = run_min_distance
 	_behavior.run_start_fraction = run_start_fraction
 	_behavior.entry_ready_timeout = entry_ready_timeout
+	_behavior.entry_listen_time = entry_listen_time
 	_behavior.entry_follow_gap = entry_follow_gap
 	_behavior.entry_pie_dwell = entry_pie_dwell
 	_behavior.entry_corner_dwell = entry_corner_dwell
@@ -481,10 +513,14 @@ func _apply_config() -> void:
 
 
 ## Buffer a world event for processing on the next control() tick (the signal can fire before the
-## controller knows which character it drives): hits (combat awareness, gunfire heard), allies'
-## radio callouts, and a grenade coming down or going off.
+## controller knows which character it drives): hits (combat awareness, gunfire heard), footfalls (footsteps
+## heard; one out of earshot of every gait is dropped here, as they come many a second), allies' radio
+## callouts, and a grenade coming down or going off.
 func _on_event(topic: StringName, data: Dictionary) -> void:
 	if topic == &"hit" or topic == &"callout" or topic == &"grenade" or topic == &"explosion":
+		_event_queue.append([topic, data])
+	elif topic == &"footfall" and _character != null \
+			and _character.global_position.distance_to(data.get("position", Vector2.INF)) <= _perception.footfall_reach():
 		_event_queue.append([topic, data])
 
 
@@ -713,12 +749,30 @@ func control(character, delta: float) -> void:
 		_start_decision()
 	# ACT.
 	_behavior.apply(delta)
+	if _behavior.take_entry_turned():
+		_on_entry_turned()
 	for step in _behavior.take_entry_calls():
 		if send_callouts:
 			_post_entry_call(step)
 	for throw in _behavior.take_throw_calls():
 		if send_callouts:
 			_post_throw_call(throw)
+
+
+## The running ENTER became a bang one, its room suspect (`docs/tactical-entry.md` E17: at its start, or on a late reason): the order is
+## re-adopted as the STUN ENTRY it now is (`search/stun_entry/<door>`, its label from the tree), so what the NPC is doing reads as it is.
+## An entry the guard runs under another order (a walk's detour) keeps that order's name.
+func _on_entry_turned() -> void:
+	var order: Dictionary = _behavior.order()
+	var path: Array = order["path"]
+	if path.size() < 2 or str(path[0]) != "search" or str(path[1]) != "enter":
+		return
+	var labels: Array = order["labels"]
+	path[1] = &"stun_entry"
+	if labels.size() >= 2:
+		labels[1] = _planner.label_of(&"stun_entry")
+	_behavior.adopt_bang(path, labels)
+	GameLog.say("%s (suspect room) %s" % [_npc_name(), " - ".join(labels)])
 
 
 ## Raise the force-decide flag and remember why, for the brain debug overlay.
@@ -737,6 +791,8 @@ func _should_decide() -> bool:
 		return false  # A blinded NPC starts no new decision (G15), one running from a grenade none until the burst (G16).
 	if not _force and not _behavior.wants_decision(_decide_timer <= 0.0):
 		return false
+	if not _force and not _perception.routes_ready():
+		return false  # The routes it would weigh are still being measured (the avoid map is baking): a few frames. A forced decision does not wait.
 	return Budget.claim()
 
 
@@ -774,7 +830,7 @@ func _start_decision() -> void:
 func _process_events() -> void:
 	if _event_queue.is_empty():
 		return
-	var deaf: bool = _character.is_deaf()  # A deafened NPC hears no gunfire, no hit elsewhere and no radio call (G15).
+	var deaf: bool = _character.is_deaf()  # A deafened NPC hears no gunfire, no footsteps, no hit elsewhere and no radio call (G15).
 	for ev in _event_queue:
 		match ev[0]:
 			&"hit":
@@ -785,6 +841,9 @@ func _process_events() -> void:
 			&"callout":
 				if hear_callouts and not deaf:
 					_perception.process_callout(ev[1])
+			&"footfall":
+				if not deaf:
+					_perception.process_footfall(ev[1])
 			&"grenade":
 				_perception.process_grenade(ev[1], deaf)
 			&"explosion":
@@ -828,6 +887,10 @@ func _on_decided(leaf: Dictionary) -> void:
 	if _behavior.evading():
 		return  # Overtaken by a grenade while Von was answering; the burst ends in a new decision.
 	_behavior.set_leaf(leaf)
+	# The order just adopted sets (or clears) the engaged contact, which the salient key carries: that is not a change of belief about
+	# hostiles, and the decision just made already weighed what the NPC knows. Re-take the key so it does not start another.
+	if _salient_init:
+		_salient_key = _behavior.salient_key()
 	GameLog.say("%s (Von) %s  [%s]" % [_npc_name(), " - ".join(leaf["labels"]), _planner.walk_digest()])
 	if send_callouts and _character != null and not leaf["path"].is_empty() \
 			and str(leaf["path"][0]) in ["combat", "investigate"]:
@@ -835,13 +898,14 @@ func _on_decided(leaf: Dictionary) -> void:
 
 
 ## Broadcast this NPC's decision as an `&"callout"` EventBus event (interface 10): who is speaking and
-## where, its state, the decision path, its target and destination. Allies within range hear it.
+## where, its state, the decision path, its target and destination, and with a combat decision `target_pos`
+## (where the hostile is as it knows it). Allies within range hear it.
 func _post_callout(leaf: Dictionary) -> void:
 	var params: Dictionary = leaf["params"]
 	var status := _status(leaf["primitive"] == &"reload")
 	_last_callout = { "position": _character.global_position, "point": params.get("point", _character.global_position),
 		"label": " - ".join(leaf["labels"]), "at": Time.get_ticks_msec() }
-	EventBus.post(&"callout", {
+	var radio := {
 		"speaker": _character,
 		"faction": _character.faction,
 		"position": _character.global_position,
@@ -850,7 +914,11 @@ func _post_callout(leaf: Dictionary) -> void:
 		"label": " - ".join(leaf["labels"]),
 		"target_id": params.get("target_id", 0),
 		"point": params.get("point", _character.global_position),
-	})
+	}
+	if str(leaf["path"][0]) == "combat":
+		# Where the hostile is, as the speaker knows it: an ally weighing the room it is in hears it (docs/grenades.md G18).
+		radio["target_pos"] = _perception.target_pos(params.get("target_id", 0))
+	EventBus.post(&"callout", radio)
 
 
 ## Radio a live grenade the NPC has seen or heard come down (`{ point, kind }`) as an `&"grenade"` callout: the spot it landed
@@ -893,7 +961,7 @@ func _post_throw_call(throw: Dictionary) -> void:
 ## Radio one step of a tactical entry (`{ step, opening, slot, side, cleared_room? }` from the behaviour) as an
 ## `&"callout"`: the usual fields plus `opening`, `into` (the room it leads into), `slot`, `side` and `entry_step` (claim / ready / going_in / in /
 ## clear / cover / rear / done / abort), `cleared_room` with a clear and `covering` (the doorway on it watches) with a
-## cover. It is how the stack claims slots, waits for the team and
+## cover, and the bang entry's `bang` (its mode), `bang_off` (it gave the bang up) and `stuns`. It is how the stack claims slots, waits for the team and
 ## crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
 func _post_entry_call(step: Dictionary) -> void:
 	var status := _status(false)
@@ -917,6 +985,7 @@ func _post_entry_call(step: Dictionary) -> void:
 		"side": step["side"],
 		"entry_step": step["step"],
 		"bang": step.get("bang", false),
+		"bang_off": step.get("bang_off", false),
 		"stuns": step.get("stuns", 0),
 		"cleared_room": step.get("cleared_room", ""),
 		"covering": step.get("covering", ""),

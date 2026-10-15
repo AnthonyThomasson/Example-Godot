@@ -243,7 +243,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
    damage, for injury sensing), `posture()`, `is_running()` / `stamina_fraction()`, `run_speed()` / `walk_speed()` (px/s standing, running / walking, slower while stunned or weighed down by the outfit: how an AI works out whether it gets somewhere in time) / `posture_coverage(posture)` (the body's height on the coverage scale in `stand` / `crouch`, what furniture must stand above to shield it), the ammo reads `ammo(slot := -1)` / `ammo_capacity(slot)` / `can_reload(slot)` /
    `spare_magazines()` / `is_reloading()` (the held item for slot -1; -1 rounds = no ammo), `item_name(slot := -1)`, `current_item()` / `current_slot()` / `item_reach()` / `has_item(id)` (the held item, its slot and reach, and whether a slot is carried — what the AI's wording, the debug panel and `requires_item` interactions read), `is_attacking()` (a punch swing is under way), `gun_slot()` (the
    gun it fights with: the held item if it takes ammo, else the lowest such slot, else −1), `weapon_blocked()` / `weapon_raise()` /
-   `is_automatic()`, `item_count(slot := -1)` (a grenade slot's count, 1 for any other item, 0 for none), `throw_stats(slot := -1)` (what a grenade carried in the slot tells its holder, `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot: how the AI reads a grenade's numbers, instead of keeping a copy), `aim_target()` (the swayed aim point a grenade
+   `is_automatic()`, `item_count(slot := -1)` (a grenade slot's count, 1 for any other item, 0 for none), `throw_stats(slot := -1)` (what a grenade carried in the slot tells its holder, `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot: how the AI reads a grenade's numbers, instead of keeping a copy), `throw_release_offset(slot := -1)` (where a grenade leaves its hand when it throws one standing: the hand of its `throw` stance, as `Vector2(px ahead of the body centre, px to its right)` in its own frame; the AI judges a lob from there, instead of keeping a copy of the stance), `aim_target()` (the swayed aim point a grenade
    is thrown to, interface 6: where the AI expects its own grenade to come down), `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"", grenades := {})` (carry only those slots, holding one, with those spare
    magazines, the gun loaded with that type when it fits, a grenade slot with `grenades[slot]` of them: how Main arms a spawn with its side's loadout);
    what it wears (`docs/outfits.md`): `set_outfit(ids)` (`{ head, body, vest, pants, feet, front_plate, back_plate }`, replacing the whole outfit; `LoadoutConfig.apply`
@@ -255,7 +255,11 @@ interfaces it takes part in (by number) and describes how they're implemented.
    while it is posed by the ride (the item put away);
    the stun (a grenade's flash and bang): `take_stun(blind, deaf)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
-   (aim, visible wounds, a reload in progress and the posture are things it perceives). Every character joins the group `characters` in its `_ready`:
+   (aim, visible wounds, a reload in progress and the posture are things it perceives); the exceptions are three reads of an unseen character's `faction`,
+   which stand for knowing who its own team is: the faction of a character whose footstep it hears (the `footfall` event's `character`, interface 10), so its
+   own side's steps are never taken for a stranger's (`docs/hearing.md` H1); of the attacker of a hit on or near it (the `hit` event's `attacker`), so an
+   ally's round striking nearby is not fire at it; and of the thrower of a grenade that bursts (the `explosion` event's `attacker`), so it knows a burst as its
+   own team's (`docs/grenades.md`). Every character joins the group `characters` in its `_ready`:
    that group is how the AI (its perception and tactics), the Projectile System's `Explosion` and a vehicle tell a character in the world, so it
    is part of this interface and is not renamed lightly.
    `player_controller.gd` is the human one and
@@ -325,6 +329,13 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 `route(map, from, to) -> PackedVector2Array` (the navigated waypoints; a straight segment before the bake or with no
 	 path) and `path_length(path) -> float`. The AI's locomotion, tactics geometry, entry geometry, snapshot options and
 	 routes overlay, and the human's `PlayerStack` (how near a doorway it is), all go through these, so the "is the map baked yet" rule lives in one place.
+   - **Avoid maps**, for a walk that keeps out of some stretch of floor (the AI's doorway views, `docs/tactical-entry.md` E18):
+	 `NavBuilder.avoid_map(region, key, holes) -> RID` (`region`: the planning region `build` returned, found from a world map by
+	 `NavBuilder.planning_region(planning_map) -> NavigationRegion2D`; `holes`: world-space polygons; `key` names the set): a map of its
+	 own with the planning bake plus those holes, baked on the NavigationServer's worker thread, cached by `key` (re-baked when the
+	 planning bake has been redone since), freed by the next ask for another set once nobody has asked for it for 20 s, and with its
+	 world, and `ready` as any map. The world's map and the
+	 steering map are untouched. The AI's `Locomotion` walks it and `AgentEntry.walk_route` measures on it.
    `main.gd` calls `build` once after `WorldGen.generate` (and builds the `nav_debug.gd` overlay and the
    `nav_updater.gd` re-baker right after). Any `NavigationAgent2D` then pathfinds
    against the global map automatically — the AI's locomotion sets `target_position` and steers at
@@ -357,15 +368,18 @@ interfaces it takes part in (by number) and describes how they're implemented.
     - `&"shot"`: a gun (Items) posts one per round that leaves the barrel (`{ position` (the
       muzzle)`, gun, attacker, power }`).
     - `&"footfall"`: `CharacterFootsteps` posts one each time a foot lands (`{ position` (the sole)`,
-      foot` (0 left / 1 right)`, speed, running }`).
+      foot` (0 left / 1 right)`, speed, running, character` (the walker)`, crouched }`). Audio voices it; the AI hears it
+      (`docs/hearing.md` H1: a stranger's steps through walls, out to a range set by `running` / `crouched`).
     - `&"reload"`: `Character` posts one when a reload starts (`stage = &"start"`) and one when it finishes
       (`&"done"`, never after a cancelled one): `{ position` (weapon hand)`, gun, stage, power, character }`.
     - `&"sound"`: the Audio domain's `Sound` service posts one for every sound it accepts (`{ kind,
       profile, variant, position, volume_db, pitch }`), which is what tests assert on.
     - `&"callout"`: an AI controller posts one when it adopts a combat or investigation decision —
-      its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`) — and one
-      per step of a tactical entry, which adds `opening`, `into` (the room it leads into), `slot`, `side`, `entry_step` (claim / ready / bang /
-      going_in / in / clear / cover / rear / done / abort), `bang` (this member goes in with a stun thrown first) and `stuns` (how many it carries), `cleared_room` (with a clear) and `covering` (with a cover:
+      its team radio (`{ speaker, faction, position, status, path, label, target_id, point }`, and with a combat decision `target_pos`:
+      the hostile's last-known spot as the speaker knows it, else where the shots at it came from, `Vector2.INF` when it knows neither;
+      an ally reads it as a fight in that room, `docs/grenades.md` G18) — and one
+      per step of a tactical entry, which adds `opening`, `into` (the room it leads into), `slot`, `side` (the side of the door it stacks on: a stack split across the door, E19, has both), `entry_step` (claim / ready / bang /
+      going_in / in / clear / cover / rear / done / abort), `bang` (this member goes in with a stun thrown first), `bang_off` (it gave the bang up: the stack goes in quietly) and `stuns` (how many it carries), `cleared_room` (with a clear) and `covering` (with a cover:
       the doorway on out of the cleared room it watches) (`docs/tactical-entry.md`); a human invader's `PlayerStack`
       (interface 17) posts the same entry steps for the human. A live grenade has its own statuses, which an ally in range reads as "a
       grenade is down there" and not as what the speaker is doing: `status = "grenade"` (an NPC that saw or heard a grenade come down and
@@ -486,7 +500,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 17. **Main → AI team: the human's place in a stack** (`scenes/ai/team/player_stack.gd`; a human invader is one of the stack)
     - `MatchSpawner.bind_player(player, rooms) -> Node` (Main's helper, beside `bind_npc`) attaches a `PlayerStack` child to the human with
       the house's `rooms` and `openings` (`PlayerStack.attach(character, rooms, openings)`); it returns it.
-    - `PlayerStack.view() -> Dictionary` — `{}` with no reservation, else `{ opening, door, slots: [{ n, point, mine, held }], mine, step }`:
+    - `PlayerStack.view() -> Dictionary` — `{}` with no reservation, else `{ opening, door, slots: [{ n, point, mine, held }], mine, step }`
+      (`n` the slot, numbered in claim order; `point` where it stands, on its holder's side of the door: both sides on a split stack, E19):
       the UI's `StackMarkers` (`ui/hud/stack_markers.gd`, `watch(stack)`, built by Main under `World`) draws it on the floor and reads
       nothing else. The stack radios the human's claim as entry `&"callout"`s (interface 10) and reads the allies' off the same bus;
       the AI's entry code treats it as any teammate (E16 in `docs/tactical-entry.md`).
@@ -555,6 +570,7 @@ PlayerStack (human) ◀──(&"callout" entry steps)── EventBus ──(&"ca
 AI perception ──(Explosion.shields / first_stop: the blast's cover rule)──▶ Explosion (Projectile)
 ThrownGrenade (Items) ──(Explosion.frag / .stun)──▶ Explosion (Projectile) ──(take_hit / blast_push / take_stun, ProjectileSpawner fragments, Physics.spawn_explosion)──▶ Objects / Character / Physics
 Item (&"shot") / Projectile (&"hit") / Character (&"hit", &"footfall", &"reload") ──(events)──▶ EventBus ──(posted)──▶ Sound (Audio) ─▶ SoundBank ─▶ SoundSynth
+Character (&"footfall") ──▶ EventBus ──(posted)──▶ AIController (footsteps heard)
 Objects Floor ──(SoundSurface.register)──▶ SoundSurface ◀── Sound   (Audio, a leaf: imports nothing but EventBus)
 main ──(Sound.focus = the human)──▶ Sound   /   Character (&"stun") ──▶ EventBus ──▶ Sound (tinnitus + muffle for the focus), StunScreen (UI)
 Explosion (&"explosion") ──▶ EventBus ──▶ Sound (the burst) / Camera (shake)

@@ -59,6 +59,23 @@ Solid furniture is recognised by engine type alone — a non-frozen `RigidBody2D
 `CollisionShape2D` (walls are `StaticBody2D`; non-solid decor freezes itself) — so Navigation stays a
 leaf that imports nothing.
 
+## Avoid maps (`avoid_map`): the planning bake plus holes someone wants to keep out of
+
+A walk that should keep out of some stretch of floor (the AI's doorway views, `docs/tactical-entry.md` E18) plans on a map that has it
+carved out: `NavBuilder.avoid_map(region, key, holes) -> RID`. `region` is the planning region (`planning_region(planning_map)` finds the
+one `build` put on a world map), `holes` are closed world-space polygons, `key` names the set. The planning bake keeps what it was made
+from on its region (`_remember_source`: the walkable outline, the obstructions and the agent radius, with a version that counts the
+bakes), so the avoid bake is the same geometry with the holes added as obstructions, fused (`_union_outlines`), snapped to the grid and
+simplified like the furniture's, then welded and stripped of slivers. Each key gets a map of its own (`_new_map`, the project's 2D defaults)
+holding one child region `NavAvoid` of the planning region; the bake runs on the NavigationServer's worker thread
+(`bake_from_source_geometry_data_async`), so a frame never pays for it, and the region is awaited like any (`ready(map)` is false until it
+answers queries). Asking again for the key returns the same map and marks it asked; once the planning bake has been redone (furniture
+shoved, `rebake` / `rebake_async`) it is baked again in place, the old mesh answering meanwhile. A map nobody has asked for in
+`avoid_idle_ms` (a static var, 20 s of wall clock) is freed with its region (its `tree_exited` frees the map) by the next ask for another
+key on the same planning map (the sweep runs only inside `avoid_map`: with no further asks an idle map lives on), and every one is freed with its world.
+Invalid when the region has no bake to start from. The world's own map and the steering map are not touched. Test:
+`tests/navigation/avoid_map_carves_the_views_test.gd`.
+
 ## Keeping the holes current (`nav_updater.gd`)
 
 The holes a `build` carves are a snapshot of where the furniture stood at bake time. Furniture is

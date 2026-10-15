@@ -35,7 +35,7 @@ behaviour keeps the NPC's body and hands it to each module's own `bind`, so none
 | `interact` | `object`, `id` | Walk to the object, face it, run the interaction, hold it `interaction_dwell`. | Dwell over (forces a decision), or approach cap. |
 | `reload` | — | Equip the gun (`gun_slot()`), stand still (its eyes where the watch stage puts them) and `Character.reload()`; ends when the reload does (or at once if it can't start). | The reload ending (forces a decision), or `max_commit_time`. |
 | `entry` | `opening`, `into`, `slot`, `side` (from the ENTER option) | A tactical entry through the doorway (`entry.gd`, `domain-ai-entry`): approach and stack, slice the pie, cross, take a corner, clear the room, maybe hold the door. Shoots a threat in sight in every phase (the watch stage). | When the entry is over (room clear, rear watch done, or given up); never on the cadence. The entry guard (below) also runs it, as a detour in the middle of another order. |
-| `throw` | `point` (the spot), `kind` (`frag` / `stun`), `radius`, `slot`, `target_id` | The GRENADE tactic (`docs/grenades.md` G17; `combat.gd` does the throwing, `domain-ai-combat`): take the grenade in hand, turn to the spot (closing the last px if it drifted out of range since the offer), throw (the line is re-checked until the wind-up begins and the throw dropped if it is blocked; from the wind-up on it is committed), radio `frag_out` / `bang_out` as it leaves the hand (`take_throw_calls`), gun back in hand, then stand out the fuse (the watch stage shoots from there). An evade plan (the thrower in its own burst's zone) replaces the order at the release tick; `poll_throw` runs before it so the call is radioed first. Committed (no re-decision) during the wind-up. | When the grenade has gone off (or the throw could not be made, or the fuse plus a second ran out). |
+| `throw` | `point` (the spot), `kind` (`frag` / `stun`), `radius`, `slot`, `target_id`, `from` (where it throws from), `walk` (`from` is a throw spot) | The GRENADE tactic (`docs/grenades.md` G17; `combat.gd` does the throwing, `domain-ai-combat`): with a throw spot (issue #51 R13) walk all the way to it first (gun in hand, the watch stage on any threat; status "walking to the throw spot"; a held walk re-decides like a move; the walk is guarded like an engage's: `_entry_guard`, `_guards` and `_keeps_out_of_views` take the throw's `walk` stage, and `_resume_order` re-begins the throw (`_begin_throw_order`) when a detour's entry hands it back), then take the grenade in hand, turn to the spot (closing the last px if it drifted out of range since the offer), throw (the line is re-checked until the wind-up begins and the throw dropped if it is blocked; from the wind-up on it is committed), radio `frag_out` / `bang_out` as it leaves the hand (`take_throw_calls`), gun back in hand, then stand out the fuse (the watch stage shoots from there). An evade plan (the thrower in its own burst's zone) replaces the order at the release tick; `poll_throw` runs before it so the call is radioed first. Committed (no re-decision) during the wind-up. | When the grenade has gone off (or the throw could not be made, or the fuse plus a second ran out). |
 | `hold` | — | Stand; the watch stage looks at the threat (and shoots it) or turns among the room's doorways. | Decide cadence. |
 
 **Gaze and fire** are a policy too, the **watch stage** (`Behavior._apply_watch`, `watch.gd`; the `domain-ai-watch` skill, spec `docs/gaze-and-fire.md`):
@@ -77,9 +77,10 @@ no-per-weapon-code rule — is `combat.gd`: the **`domain-ai-combat`** skill. `B
 ## The evade reflex (G16) and the blind NPC (G15)
 
 **Evade (`Behavior.set_evade(plan)`, called every tick by the orchestrator with the perception's `evade_plan`; `docs/grenades.md` G16).** Outside Von and over every primitive, like the
-auto-reload: while a live grenade threatens the NPC it is carried out instead of the running order, an entry (committed or not) and an interaction included. The first
+auto-reload, but for the NPC's own throw in its wind-up (`throw_stage` `windup`: the grenade leaves the hand within 0.3 s toward its spot; the evade starts the tick it has, `poll_throw` running first; test `ai/grenade/evade_waits_for_own_windup`): while a live grenade threatens the NPC it is carried out instead of the running order, an entry (committed or not) and an interaction included. The first
 tick of a plan drops the detour, abandons the entry (the stack is told), and replaces the order with `evade` (path `["evade"]`, labels `EVADE - a live frag grenade`);
-no decision is started or adopted while it runs (the controller's `_should_decide` / `_on_decided`, `set_leaf`). `_apply_evade` runs to `plan.spot` (`Locomotion.move_to`, looking where it
+no decision is started or adopted while it runs (the controller's `_should_decide` / `_on_decided`, `set_leaf`). `_apply_evade` runs all the way into `plan.spot` (`Locomotion.move_to`
+within `EVADE_REACH` 6 px: a spot is out of the burst's line with little room to spare, so a stride short of it can be in the line; looking where it
 goes, running when `run_enabled` and stamina allow), then holds it facing away from the grenade, **crouched when the spot is cover** (`plan.crouch`); the watch stage does not run (no
 turning to a threat, no shot). With no spot in time it stays, facing away (a stun then blinds it for the back-turned share only), crouched for a frag. When the plan ends (the burst) `_resolved` forces
 a new decision. Read-outs: `evading()`, `evade_spot()` (the controller's `debug_grenades().escape`), `debug_state()["evade"]`. Tests: `tests/ai/grenade/evade_*`.
@@ -103,10 +104,11 @@ The entry phase machine, its team radio, the entry guard's detours and the entry
 - `salient_key()`, `service_interaction(delta, force)`, `take_resolved()` (with `resolve_reason()`, read just before it:
   "way blocked" when a body seals the only way of the walk and stays, "" for a finished task; the controller forces its decision with it),
   `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(delta)`,
-  `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
+  `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway, throwing the bang, a throw's wind-up: no decision may
   start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view()`,
   `debug_combat()`, `debug_coverage()`, `debug_progress()`, `path_label()`, `throw_plan()` (the throw about to be made,
-  `{ from, to, kind, radius }`, `{}` once the grenade is away: the grenades overlay's `throw`).
+  `{ from, to, kind, radius }`, `{}` once the grenade is away: the grenades overlay's `throw`), `order()` (the running order's `{ path, labels }`),
+  `take_entry_turned()` and `adopt_bang(path, labels)` (an ENTER that turned into a bang one is re-adopted as STUN ENTRY, E17: `domain-ai-entry`).
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.
 - `ongoing()` — the running choice is still in progress (en route, fighting, using an object): only
@@ -137,9 +139,18 @@ a body it has not seen does not exist for the walk, and one out of sight whose l
 now with nobody on it has moved on (`Behavior._walk_bodies`, via `AgentPerception.visible_points`). `ignore_id` leaves out the one a
 `melee` closes on. A body whose track is slower than
 `REST_SPEED` (40 px/s) is at rest, any faster one a walker. Each walk (a new one when the destination moves more than `NEW_WALK` px) is in
-one of three ways, checked once a physics frame (`_check`):
+one of four ways, checked once a physics frame (`_check`):
 - **plain**: the world's own map (furniture only). The first known body at rest the path passes closer than `PASS_CLEARANCE` (32 px, and
   closer than the NPC stands to it now) within `LOOKAHEAD` (400 px), or one standing on the goal, ends it:
+- **doors**: the Navigation domain's avoid map (`NavBuilder.avoid_map`: the planning bake with the doorway views carved out, E18), for a walk
+  `Behavior` marks `avoid_doors` (above). `_update_doors` asks the perception for the route (`walk_route(goal, avoid_exempt)`) each frame until
+  it is decided (plain while the avoid map bakes: `pending`), then every `DOORS_RECHECK` (2 s) while round the views (which keeps the map alive and follows
+  the rooms as their clear lapses): the avoid map when the plain route comes into a view and the route round them is within `door_avoid_ratio` x plain +
+  `door_avoid_slack`, else plain (and `passing_ahead` secures what it crosses). A walk that is not guarded (`avoid_doors` false) drops it. A body at rest on
+  a doors walk's path takes it to the steering map (round) or holds it as on a plain one: the steering map has no views carved, so E15 secures what that
+  crosses; once the way is free it goes back to the avoid map: a held walk at once (`_free_way`), a walk gone round once the avoid map's route to the goal passes
+  no known body at rest all the way, not only the first `LOOKAHEAD` (`_clear_on`, looked at every `RECHECK` s; a body just past the look-ahead would send it
+  round again a few strides on). Tests: `tests/ai/movement/npc_doors_walk_round_body`, `npc_doors_walk_body_on_goal` (scripted).
 - **round**: the Navigation domain's steering map, with every character at rest carved out, when its route reaches the goal and passes
   no known body at rest (`_goes_round`), whatever the detour (out of the room and in by another door included);
 - **held**: no way round (the body seals the only way, or has just stopped and the map, re-baked every 0.75 s, has not carved it yet),
@@ -160,8 +171,9 @@ the walker has gone by (at most `GIVE_MAX` 3 s). Even with the right of way it s
 (50 px), whose track may not show it setting off yet. Last of all, whatever the walk (and the combat back-off), `keep_off` drops the part of a step that heads
 into a known body closer than `KEEP_OFF` (36 px) so the NPC slides past it (the agent cuts a path's corners by up to its 16 px
 `path_desired_distance`); with nothing left of the step it stands. `holding()` is true whenever the walk stands or steps aside for a body (held, giving way, kept off, or at the free spot beside a taken destination): the entry's crossing then does not push on straight. `debug_state()["loco"]` adds `way`, `held_for`, `giving_way`. Cost: per walker per
-frame, the agent's path against the few known bodies near it; a steering route only on a change of way or every `RECHECK` while held; the
-free-spot search only on a re-plan. Tests: `tests/ai/movement/npc_detours_round_body_at_rest`, `npc_waits_at_doorway_held_by_teammate`,
+frame, the agent's path against the few known bodies near it; a steering route only on a change of way or every `RECHECK` while held; an
+avoid-map route every `RECHECK` while a walk that keeps out of the doorway views is round a body, and `walk_route` every `DOORS_RECHECK`
+while it is round the views; the free-spot search only on a re-plan. Tests: `tests/ai/movement/npc_detours_round_body_at_rest`, `npc_waits_at_doorway_held_by_teammate`,
 `npc_dest_taken_stops_nearby`, `npc_routes_only_round_bodies_it_sees`, `npc_walkers_give_way`, `npc_routes_around_character`,
-`npc_own_hole_does_not_slow_it`, and the scenario `tests/ai/entry/entry_team_no_bumping` (real Von; `tests/_ai/bump_probe.gd` measures
-"walks into").
+`npc_own_hole_does_not_slow_it`, `npc_doors_walk_round_body`, `npc_doors_walk_body_on_goal`, and the scenario `tests/ai/entry/entry_team_no_bumping`
+(real Von; `tests/_ai/bump_probe.gd` measures "walks into", and standing pressed against a body, which `keep_off` alone stops short of a bump).

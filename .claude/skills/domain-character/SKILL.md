@@ -51,8 +51,9 @@ the foot is planted while `cos(stride_phase + (0|PI))` is >= 0, so a landing is 
 (only above `MIN_WALK` walk amount; none while an interaction holds the character or once dead). On a landing it
 solves the rig once, reports the sole (middle, toes, `body_foot` x radius long, `body_shoe_widths[0]` wide) to the
 `BloodFootprints` child (Physics), which decides whether it prints, and posts a `&"footfall"` `EventBus` event
-(`{ position` (the sole)`, foot` (0 left / 1 right)`, speed, running }`) which the Audio domain turns into a step on the floor
-under it. Tests: `tests/physics/footprints_trail_test.gd`, `tests/audio/footstep_surface_sound_test.gd`.
+(`{ position` (the sole)`, foot` (0 left / 1 right)`, speed, running, character` (itself)`, crouched` (`posture() == crouch`)` }`) which
+the Audio domain turns into a step on the floor under it and the AI hears by (whose step, and how far it carries by gait, `docs/hearing.md` H1).
+Tests: `tests/physics/footprints_trail_test.gd`, `tests/audio/footstep_surface_sound_test.gd`, `tests/ai/perception/footsteps_heard_by_gait_test.gd`.
 
 A reload posts `&"reload"` on `EventBus` twice: `stage = &"start"` from `reload()` and `&"done"` once the timer ends and the
 magazine is swapped (`_post_reload`; `{ position` (weapon hand)`, gun, stage, power, character }`). A reload cancelled by
@@ -161,7 +162,7 @@ Tests: `tests/character/hit_zone_by_bullet_height_test.gd`, `outfit_weight_slows
 
 ## Grenades and the stun (`docs/grenades.md` G1, G13)
 
-`item_count(slot := -1)` reads a grenade slot's count; `throw_stats(slot := -1)` forwards the item's `throw_stats()` (a grenade's `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot), which the AI throws by. `_empty_spent_slots` (after the items tick) erases a grenade slot whose last grenade is thrown and, if it was held,
+`item_count(slot := -1)` reads a grenade slot's count; `throw_stats(slot := -1)` forwards the item's `throw_stats()` (a grenade's `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, `{}` for any other item or an empty slot), which the AI throws by; `throw_release_offset(slot := -1)` is where that grenade leaves the hand, standing: the `throw` stance's `forward` and `lateral` for the item's `weapon_hand()` (hand 0, the right, for anything else), as `Vector2(ahead, right)` in the character's frame, which the AI judges a lob from (test `tests/ai/grenade/grenade_lob_follows_throw_stance_test.gd`). `_empty_spent_slots` (after the items tick) erases a grenade slot whose last grenade is thrown and, if it was held,
 selects `gun_slot()` (else the fists). `aim_target()` is the aim point swayed by `aim_sway()`; `GunItem.secondary` turns each shot by `aim_sway()` (0 unless stunned).
 `take_stun(blind, deaf)` takes the longer of the old and new timers (blind and deaf each) and posts `&"stun"` (`{ character, position, blind, deaf }`); `stun_level()` (0..1) is the longer remaining timer over
 `CharacterConfig.recover_tail` (the four stun numbers, `stun_speed`, `stun_sway`, `recover_tail` and `stun_drift`, are the body's tuning and live in `CharacterConfig`: the

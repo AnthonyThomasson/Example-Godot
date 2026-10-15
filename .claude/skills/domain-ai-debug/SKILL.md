@@ -54,14 +54,14 @@ The tactical-geometry overlay, in two independent aspects (both draw on the NPC'
 reading the controller's public API; both default off — they are dense).
 
 **Point zones (`show_tactics`)** — the candidate positions the NPC's perception laid out for its last
-decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc, tags }`, one
+decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc, tags }` (a `grenade` zone also `from`), one
 per option in the last snapshot's option groups that carries a world location (its `point` param, or an
 interactable's current position); the spectator inspector reads `label`/`desc` to detail a clicked
 point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()` (drawn while a focus is set, even
 with both toggles off). Each is a translucent disc + outline + a dot at the exact point,
 coloured by `category` (`fire` red, `flank` orange, `advance` yellow, `retreat` blue, `lead` purple,
 `search` green, `entry` cyan (the stack slot beside a doorway ENTER offers), `room` teal, `interaction` white,
-`waypoint` magenta — `ZONE_COLORS`); each category
+`grenade` olive (where a throw it weighed would burst; dropped ones included), `waypoint` magenta — `ZONE_COLORS`); each category
 is labelled once beside its first marker, so the palette reads as an in-world legend. `waypoint` covers
 the non-room go-to options the room/search groups carry (the NPC's starting post, the front entrance,
 approaching the house) — re-tagged out of `room`/`search` so these, which often sit well outside any
@@ -119,15 +119,15 @@ Each is a child of the NPC in `ai/npc.tscn`, found by its `show_<x>` property (r
 | `routes_debug` (`show_routes`) | navigated route to each fire/flank/advance/retreat point (green hidden / red exposed), clear-shot + cover notes, flank `held by` / `route passes` / ally lane, hostile `watch_arc` wedges | `debug_zones()` (entries carry `tags`), `known_contacts_for_display()`; route from the nav map, cached 0.5 s |
 | `stuck_debug` (`show_stuck`) | recent-position trail + a ring that reddens while the NPC is trying to move without progressing | `debug_progress()` |
 | `grenade_overlay` (`show_grenades`) | (docs/grenades.md G19) every live grenade the NPC knows of: a dot with its danger radius ringed round it, `kind fuse_left (source)` and a countdown arc (against the grenade's whole `fuse`, which `debug_grenades()` reports); the safe spot it is running to (green ring, line from the NPC); a planned throw (`throw` set: an arc from the hand to the landing spot, the grenade's danger radius round it) | `debug_grenades()` |
-| `entry_debug` (`show_entry`) | this NPC's tactical entry: the doorway, its out-normal and the fatal funnel; stack slots in use (numbered, its own ringed; a lone entrant's far side faint); approach waypoints; the pie arc (steps done dim / to go bright, the current one ringed), the line through the doorway and the room points still unseen; corners red hard / green soft, filled once its pie saw them, its target corner ringed; its gaze; after the clear the doorways on (line + wedge, the one it covers bright, a solo sweep numbered) or the rear it holds; cleared rooms outlined; a badge (slot, role, phase, pie progress, seen %) with timer arcs for the ready wait, follow gap and hold | `debug_entry_view()` |
-| `entry_team_debug` (`show_entry_team`) | the team off the radio: each ally's claim (from where it radioed to its slot, `slot N · step`, an arrow to the doorway on it covers) and who the point is waiting for; the entry guard: the next doorway into an uncleared room on the walk and how far (cyan within `entry_guard_range`, grey beyond), a running detour (GUARD badge, dashed line to the paused order), doorways it is leaving alone | `debug_entry_view()` |
+| `entry_debug` (`show_entry`) | the doorway views its walks keep out of (E18: a faint red polygon with the doorway's id for each, the ones its walk is round bold), and this NPC's tactical entry: the doorway, its out-normal and the fatal funnel; stack slots in use (numbered per side's file, on both sides of a split stack, its own ringed; a lone entrant's far side faint); approach waypoints; the pie arc (steps done dim / to go bright, the current one ringed), the line through the doorway and the room points still unseen; corners red hard / green soft, filled once its pie saw them, its target corner ringed; its gaze; after the clear the doorways on (line + wedge, the one it covers bright, a solo sweep numbered) or the rear it holds; cleared rooms outlined; a badge (slot, role, phase, pie progress, seen %) with timer arcs for the ready wait, follow gap and hold | `debug_entry_view()` |
+| `entry_team_debug` (`show_entry_team`) | the team off the radio: each ally's claim (from where it radioed to its place on its side, `slot N · step`, an arrow to the doorway on it covers), the crossing order (`crossing: a › b › …`) and who the point is waiting for; the entry guard: the next doorway into an uncleared room on the walk and how far (cyan within `entry_guard_range`, grey beyond), a running detour (GUARD badge, dashed line to the paused order), doorways it is leaving alone | `debug_entry_view()` |
 
 The getters are read-only and added to the controller: `debug_memory()` (perception memory: gunfire,
 under-fire, callouts, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
 state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
 and the last force reason, facts), `debug_progress()` (locomotion's `{ stalled_for, trail }`, kept by `sample()` — observation only, nothing
 reacts to a stall), `debug_sent_callout()`, `debug_grenades()` (perception's known grenades, the behaviour's evade spot and, from the throw primitive, the throw planned until the grenade leaves the hand (`Behavior.throw_plan`): `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: not running to one), throw: {} }`) and `debug_entry_view()` (behaviour `debug_entry_view`: the running entry as
-world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`; the guard's
+world-space data from entry.gd `debug_view` under `entry`, and the entry guard's picture under `guard`, which carries the doorway `views` its walks keep out of (`{ id, into, poly }`; `round_views` while the walk is on the avoid map); the guard's
 look-ahead along the walk is computed only when asked). `debug_zones()` entries also carry the option's `tags`
 (`inside`, `held`, `crosses`/`crosses_name`, `no_shot`, `heading`, `lane`, `hidden`, plus `clear_shot`,
 `route_exposed`, `cover`, `ally_lane`, `held_by` added by the snapshot's

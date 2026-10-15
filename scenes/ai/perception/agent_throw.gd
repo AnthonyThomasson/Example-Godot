@@ -42,12 +42,25 @@ const RING_DIRECTIONS := 12
 ## What a lob clears over the whole way (px, the `coverage` scale): the height a grenade leaves the hand at. A piece of
 ## furniture above it is struck near the thrower; the arc rises over the middle, so this is the safe reading.
 const LOB_CLEARANCE := 50.0
+## Where a grenade leaves a thrower that stands facing its aim: its throwing hand (`Character.throw_release_offset`, learned with the
+## grenades it carries), held off a wall the way the character's own hand is, `HAND_RADIUS` px short of it. A lob is clear only when the
+## band `LOB_MARGIN` px either side of the line from there is clear the whole way (the grenade's own body and the hand's sway): a line from
+## the thrower's centre that grazes a jamb by a pixel, or a line that clears it by less than the grenade's width, is a grenade that strikes it.
+const HAND_RADIUS := 3.0
+const LOB_MARGIN := 8.0
+## How far (px) from a spot it walks to a thrower may end up (the walk's own arrival: `Combat.THROW_SPOT_REACH`, the entry's `SLOT_REACH`): a
+## throw from a spot it walks to is judged from there and from this far off it either way (`throw_clear_on_arrival`).
+const ARRIVAL_SLACK := 6.0
+## How far (px) inside a grenade's range a thrower stands to let it go (`reach_of`): one that drifted a step past it closes in on its spot
+## before it throws, and a throw spot is chosen within it.
+const REACH_SLACK := 15.0
 
 var vision: RefCounted                ## The perception's sight sense; owner of the ray queries.
 var evade_margin: float = 120.0       ## How far past a frag's blast radius its danger zone reaches (px).
 var _stats := {}                      ## Kind -> what the NPC knows of that grenade (`Character.throw_stats`, `ThrownGrenade.throw_stats`); see `learn`.
 var _stand := 100.0                  ## The height of a standing body on the coverage scale (`Character.posture_coverage`); tall until it is learned.
 var _crouch := 100.0                 ## The same for a crouched one.
+var _release := Vector2.ZERO          ## Where a grenade leaves the NPC's hand, in its frame (`Character.throw_release_offset`: x ahead, y to its right); the centre until learned.
 var _character: Node                 ## The NPC's body (`bind`): the grenades it carries, its heights and its pace.
 
 
@@ -79,10 +92,14 @@ func learn(stats: Dictionary) -> void:
 		_stats[stats["kind"]] = stats
 
 
-## Learn the numbers of every grenade the NPC carries (`Character.throw_stats`).
+## Learn the numbers of every grenade the NPC carries (`Character.throw_stats`), and where one leaves its hand
+## (`Character.throw_release_offset`).
 func learn_carried() -> void:
 	for slot: int in SLOTS.values():
-		learn(_character.throw_stats(slot))
+		var stats: Dictionary = _character.throw_stats(slot)
+		learn(stats)
+		if not stats.is_empty():
+			_release = _character.throw_release_offset(slot)
 
 ## Learn the heights of a standing and of a crouched body off the NPC's own (`Character.posture_coverage`), the figures furniture is measured against.
 
@@ -104,6 +121,11 @@ func crouch_height() -> float:
 ## How far (px) a throw of `kind` first comes down; 0 for a kind it has never met.
 func range_of(kind: StringName) -> float:
 	return float(_stats.get(kind, {}).get("max_range", 0.0))
+
+
+## How far (px) from its spot a thrower stands to let a grenade of `kind` go: its range less `REACH_SLACK`.
+func reach_of(kind: StringName) -> float:
+	return maxf(range_of(kind) - REACH_SLACK, 0.0)
 
 
 ## The blast radius of a frag, the flash radius of a stun; 0 for a kind it has never met.
@@ -221,10 +243,45 @@ func run_speed() -> float:
 
 # --- The lob -------------------------------------------------------------------------------------------------
 
-## Whether a grenade can be lobbed from `from` to `to`: within `max_range` and over everything between (`lob_clear`).
-## `exclude` holds the characters' rids.
-func can_lob(space, from: Vector2, to: Vector2, max_range: float, exclude: Array) -> bool:
-	return from.distance_to(to) <= max_range and lob_clear(space, from, to, exclude)
+## Whether a thrower standing at `at` can lob a grenade onto `to`: within `max_range` of it, and the lob from its hand is clear
+## (`throw_clear`). `exclude` holds the characters' rids.
+func can_lob(space, at: Vector2, to: Vector2, max_range: float, exclude: Array) -> bool:
+	return at.distance_to(to) <= max_range and throw_clear(space, at, to, exclude)
+
+
+## Whether the lob a thrower standing at `at` throws onto `to` flies clear, whatever the distance: the band `LOB_MARGIN` px either side of
+## the line from where the grenade leaves its hand (`release_point`) to `to`, its middle and both edges.
+func throw_clear(space, at: Vector2, to: Vector2, exclude: Array) -> bool:
+	var hand := release_point(space, at, to, exclude)
+	var side := (to - hand).normalized().orthogonal() * LOB_MARGIN
+	for lateral: Vector2 in [Vector2.ZERO, side, -side]:
+		if not lob_clear(space, hand + lateral, to + lateral, exclude):
+			return false
+	return true
+
+
+## Whether the lob onto `to` is clear for a thrower that walks to `at`: from `at` and from `ARRIVAL_SLACK` px off it in each of the four
+## directions, where the walk may end (a spot clear only to the pixel is a jamb struck by a thrower that stops a stride's sliver short).
+func throw_clear_on_arrival(space, at: Vector2, to: Vector2, exclude: Array) -> bool:
+	if not throw_clear(space, at, to, exclude):
+		return false
+	for off: Vector2 in [Vector2.RIGHT, Vector2.LEFT, Vector2.DOWN, Vector2.UP]:
+		if not throw_clear(space, at + off * ARRIVAL_SLACK, to, exclude):
+			return false
+	return true
+
+
+## Where a grenade thrown onto `to` leaves a thrower standing at `at`: its throwing hand (the learned release offset, as it faces `to`),
+## or, with a wall or solid piece closer than that, the hand held against it, as the character's own hand is.
+func release_point(space, at: Vector2, to: Vector2, exclude: Array) -> Vector2:
+	var toward := (to - at).normalized()
+	if toward == Vector2.ZERO or _release == Vector2.ZERO:
+		return at
+	var hand := at + toward * _release.x + toward.rotated(PI * 0.5) * _release.y
+	var hit: Dictionary = vision.raycast(space, at, hand, exclude)
+	if hit.is_empty():
+		return hand
+	return (hit["position"] as Vector2) - (hand - at).normalized() * HAND_RADIUS
 
 
 ## Whether nothing stops a lob on the straight line from `from` to `to`, low furniture included (no wall or piece taller than

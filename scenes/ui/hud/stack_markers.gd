@@ -1,9 +1,10 @@
 extends Node2D
 
 ## UI domain: the stack markers. While the human's stack radio (the AI domain's `PlayerStack`) holds a reserved
-## slot, this draws the slots of that doorway on the floor, numbered from the door out: the human's own highlighted, the
-## ones the AI holds dimmer, a free one faint. Nothing is drawn without a reservation. A decoupled observer like the
-## contact markers: it polls the watched node's `view()` (`{ slots: [{ n, point, mine, held }], ... }`) and never writes.
+## slot, this draws the slots of that doorway on the floor where each stands (on both sides of the door when the stack is
+## split), numbered in the order they were claimed: the human's own highlighted, the ones the AI holds dimmer, a free one
+## faint. Nothing is drawn without a reservation. A decoupled observer like the contact markers: it polls the watched
+## node's `view()` (`{ slots: [{ n, point, mine, held }], ... }`) and never writes.
 ##
 ## Added under the match's `World` node (world space), so the positions map straight to the floor. Main builds it and
 ## calls `watch` with the player's stack.

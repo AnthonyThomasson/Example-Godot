@@ -30,14 +30,14 @@ class_name GrenadeConfig
 ##   point_blank, point_blank_damage   the only damage a stun does.
 static var grenades: Dictionary = {
 	&"stun": {
-		"name": "Stun grenade", "slot": 7, "fuse": 1.5, "windup": 0.3, "max_range": 450.0, "throw_speed": 720.0,
+		"name": "Stun grenade", "slot": 7, "fuse": 1.5, "windup": 0.3, "max_range": 550.0, "throw_speed": 720.0,
 		"release_height": 50.0, "arc_height": 82.0, "restitution": 0.35, "friction": 700.0,
 		"flash_radius": 400.0, "flash_full": 100.0, "max_blind": 5.0, "flash_cover_reach": 30.0,
 		"bang_radius": 350.0, "max_deaf": 6.0, "wall_factor": 0.4,
 		"point_blank": 30.0, "point_blank_damage": 5.0,
 	},
 	&"frag": {
-		"name": "Frag grenade", "slot": 8, "fuse": 3.0, "windup": 0.3, "max_range": 450.0, "throw_speed": 720.0,
+		"name": "Frag grenade", "slot": 8, "fuse": 3.0, "windup": 0.3, "max_range": 550.0, "throw_speed": 720.0,
 		"release_height": 50.0, "arc_height": 82.0, "restitution": 0.35, "friction": 700.0,
 		"blast_radius": 250.0, "kill_radius": 120.0, "blast_damage": 60.0, "blast_impulse": 12000.0, "blast_max_speed": 700.0,
 		"fragments": 40, "fragment_damage": 12.0, "fragment_speed": 3600.0, "fragment_range": 500.0,

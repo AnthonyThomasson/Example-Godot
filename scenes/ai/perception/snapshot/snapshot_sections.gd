@@ -92,8 +92,9 @@ func contacts_text(self_pos: Vector2, known: Array) -> String:
 
 ## The line between the NPC and hostile `t`: whether each can shoot the other, what blocks it, and
 ## which other hostiles can see the NPC here. `throws` are the kinds of grenade it can throw onto their spot ("You can throw a frag
-## grenade onto their spot.").
-func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array = []) -> String:
+## grenade onto their spot."), `held` the room they hold that the NPC is outside of, when that is why ("X holds the kitchen, a room you
+## are outside of.", docs/grenades.md G17).
+func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array = [], held := "") -> String:
 	var line: Dictionary = a["line"]
 	var text := ""
 	if line["clear"] and line["in_range"]:
@@ -105,6 +106,8 @@ func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array 
 	else:
 		text = "A %s is between you and %s: your line to them is blocked." % [line["blocker"], t["name"]]
 	if not throws.is_empty():
+		if held != "":
+			text += " %s holds the %s, a room you are outside of." % [t["name"], held]
 		text += " You can throw %s onto their spot." % " or ".join(throws.map(func(k): return "a %s grenade" % k))
 	if t.get("blind", false):
 		text += " %s is blinded by a flash and cannot see you." % t["name"]
@@ -116,11 +119,17 @@ func exposure_text(ctx: Dictionary, t: Dictionary, a: Dictionary, throws: Array 
 	return text
 
 
-## Exposure when under fire from someone the NPC cannot see.
-func unseen_fire_text() -> String:
+## Exposure when under fire from someone the NPC cannot see; with `throws` (the kinds of grenade it can throw where the shots came from,
+## into room `held`, which the NPC is outside of) "The shots came from the kitchen, a room you are outside of. You can throw a stun grenade
+## where the shots came from."
+func unseen_fire_text(throws: Array = [], held := "") -> String:
 	if not _memory.under_fire():
 		return ""
-	return "You are being shot at by someone you cannot see, from the %s; you are exposed to their fire." % _v.compass(_memory.under_fire_from())
+	var text := "You are being shot at by someone you cannot see, from the %s; you are exposed to their fire." % _v.compass(_memory.under_fire_from())
+	if not throws.is_empty():
+		text += " The shots came from the %s, a room you are outside of. You can throw %s where the shots came from." % [held,
+			" or ".join(throws.map(func(k): return "a %s grenade" % k))]
+	return text
 
 
 ## The NPC's allies: where each perceived ally is — and which side of hostile `t` it holds, in `t`'s
@@ -165,7 +174,7 @@ func flanks_text(t: Dictionary, a: Dictionary) -> String:
 	return "Flanks on %s (you are on %s): %s." % [t["name"], SnapshotVocab.SIDE_WORDS[a["own_side"]], "; ".join(parts)]
 
 
-## Being shot at or hit (and from where), and gunfire heard nearby (only while no hostile is known — in a
+## Being shot at or hit (and from where), and gunfire and footsteps heard nearby (only while no hostile is known — in a
 ## fight it is just the fight).
 func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 	var out: Array = []
@@ -176,6 +185,10 @@ func awareness_text(self_pos: Vector2, fighting: bool) -> String:
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		if not fighting and rec["age"] <= _v.recency_bands.y:
 			out.append("Gunfire heard to the %s, %s, %s." % [_v.compass(rec["data"]["pos"] - self_pos), _v.place(rec["data"]["pos"]), _v.recency(rec["age"])])
+			break
+	for rec in _memory.recall_aged(&"heard_footsteps"):
+		if not fighting and rec["age"] <= _v.recency_bands.y:
+			out.append("Footsteps heard to the %s, %s, %s." % [_v.compass(rec["data"]["pos"] - self_pos), _v.place(rec["data"]["pos"]), _v.recency(rec["age"])])
 			break
 	return "\n".join(out)
 

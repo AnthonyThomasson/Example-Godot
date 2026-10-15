@@ -1,0 +1,16 @@
+{
+  "name": "G18 nothing suspected, the room unexplored: the quiet ENTER",
+  "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH.",
+  "question": "Where should you search next? Prefer unsearched rooms and unexplored areas, nearest first.",
+  "options": {
+    "enter": "A doorway leads into a room left to search (the doorway to the south-west — unexplored — short route)",
+    "explore_west": "an unexplored part of the house to the west — medium route",
+    "stun_entry": "A doorway leads into a room where a hostile was heard, seen, radioed or shooting from (the doorway to the south-west — unexplored — short route)"
+  },
+  "expect": [
+    "enter"
+  ],
+  "ablate": [
+    "unexplored"
+  ]
+}
