@@ -21,12 +21,14 @@ object to the character's `keep_clear_of(body)`, which lifts the exception only 
 character's `CLEAR_MARGIN`, so restoring the collision never finds an overlap to eject from; re-entering the object just left calls
 `stop_clearing(body)` first and keeps the exception it still has.
 
-The component reads the character's existing `facing`, `global_position`, `aim_point` and
-`has_item(id)`, and moves it. It discovers objects through the **interactable contract** — every
+The component reads the character's existing `facing`, `global_position`, `aim_point`, `has_item(id)` and `get_rid()` (left out of
+its reach query), moves it, and takes and gives back the collision exception with Godot's own `add_collision_exception_with` and the
+character's `keep_clear_of` / `stop_clearing`. The reach query is a circle of `reach` px `front_offset` ahead along `facing`, on
+`PhysicsLayers.SOLID` (`QUERY_MASK`). It discovers objects through the **interactable contract** — every
 world object implements `get_interactions() -> Array` (plain data dicts: `id`, `label`, optional
 `move_to` / `requires_item`), advertised via the optional `interactions` object field.
 
 A non-player controller uses `interactions_in_reach()` + `interact_with(object, id)` to pick a
 specific object and action instead of the random toggle.
 
-**Interfaces:** 8 (Interaction ↔ Character & Objects) — signatures in `architecture`.
+**Interfaces:** 8 (Interaction ↔ Character & Objects), 11 (`PhysicsLayers.SOLID` for the reach query) — signatures in `architecture`.
