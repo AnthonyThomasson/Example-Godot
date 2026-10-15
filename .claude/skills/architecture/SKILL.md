@@ -5,9 +5,10 @@ description: The architecture map for this Godot project (Forced-Entry) — the 
 
 # Forced-Entry architecture
 
-A small top-down Godot 4.4 demo: a circle you drive with WASD around a procedurally
-furnished house, with two "hands" that aim at the mouse, a punch on **F**, a leg kick, a gun (pistol, SMG or
-assault rifle) that fires on left-click, and object interactions on **Space** (sit, lie, …). The code is
+A small top-down Godot 4.4 demo: a pixel-art character you walk with WASD (run on **Shift**, crouch on **C**) around a
+procedurally furnished house, aiming at the mouse, with a punch on **F**, a kick on **V**, a gun (pistol, SMG or assault rifle)
+that fires on left-click and reloads on **R**, stun and frag grenades thrown on left-click, items picked on **1**–**9**, object
+interactions on **Space** (sit, lie, …) and, in the sandbox, a car or van to get into on **E**. The code is
 organized into **fifteen isolated domains** so each can be changed on its own.
 
 This skill is the **map**: the domains, the sanctioned cross-domain surface (the vital
