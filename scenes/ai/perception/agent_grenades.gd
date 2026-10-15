@@ -112,7 +112,8 @@ func called(character, data: Dictionary) -> void:
 		_note(node, at, &"called", true)
 
 
-## Whether a callout `status` names a live grenade.
+## Whether a callout `status` names a live grenade. Part of the perception's seam to the human's `PlayerStack` (`ai/team/`), beside
+## `AgentEntry`'s: a grenade call is not a stack claim.
 static func is_call(status: Variant) -> bool:
 	return CALL_KINDS.has(StringName(str(status)))
 
