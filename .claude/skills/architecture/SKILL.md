@@ -262,9 +262,9 @@ interfaces it takes part in (by number) and describes how they're implemented.
    a plain-language `goal` plus generic primitives (hostility rules, pursuit, territory) and
    decision-tree config. Main injects only `rooms` and `openings` (and `entry_point`); the AI finds and categorizes
    the characters it perceives by sight. Von walks a data-driven DECISION TREE ranked against the
-   goal — a broad mode (combat / investigate / search / idle), then a tactic (engage / flank / advance /
+   goal — a broad mode (combat / reload_quiet / investigate / search / idle), then a tactic (engage / flank / advance /
    retreat / reload / locate …), then a concrete option (a place, a firing spot, an object) — one `choice`
-   request per level, ending in a behaviour primitive (move / engage / melee / interact / hold / reload / entry) — no
+   request per level, ending in a behaviour primitive (move / engage / melee / interact / hold / reload / entry / throw) — no
    per-goal or per-NPC-type code. `goal_controller.gd` is only the thin orchestrator; the work is split
    across four isolated AI sub-domains (perception / decision / behaviour / debug). See the `domain-ai`
    overview and its `domain-ai-<name>` sub-skills.
