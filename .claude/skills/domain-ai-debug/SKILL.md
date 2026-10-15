@@ -118,7 +118,7 @@ Each is a child of the NPC in `ai/npc.tscn`, found by its `show_<x>` property (r
 | `entry_team_debug` (`show_entry_team`) | the team off the radio: each ally's claim (from where it radioed to its slot, `slot N · step`, an arrow to the doorway on it covers) and who the point is waiting for; the entry guard: the next doorway into an uncleared room on the walk and how far (cyan within `entry_guard_range`, grey beyond), a running detour (GUARD badge, dashed line to the paused order), doorways it is leaving alone | `debug_entry_view()` |
 
 The getters are read-only and added to the controller: `debug_memory()` (perception memory: gunfire,
-under-fire, callouts, engaged window, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
+under-fire, callouts, checked leads, lost hostiles, radii), `debug_combat()` (behaviour
 state as world-space data), `debug_brain()` (planner pending / last-failed / levels, decide + force timers
 and the last force reason, facts), `debug_progress()` (locomotion `sample()` — observation only, nothing
 reacts to a stall), `debug_sent_callout()`, `debug_grenades()` (perception's known grenades, the behaviour's evade spot and, from the throw primitive, the throw planned until the grenade leaves the hand (`Behavior.throw_plan`): `{ known: [{ point, kind, fuse_left, fuse, radius, source }], escape: Vector2 (INF: not running to one), throw: {} }`) and `debug_entry_view()` (behaviour `debug_entry_view`: the running entry as
