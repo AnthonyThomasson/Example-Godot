@@ -1,6 +1,6 @@
 class_name GameTest extends RefCounted
 
-## Testing domain: the base class every game test extends (`tests/<domain>/<name>_test.gd`). A test
+## Testing domain: the base class every game test extends (`tests/<domain>/[<topic>/]<name>_test.gd`). A test
 ## is three steps the runner calls in order:
 ##   describe()          — static facts about the test (name, tags, timeout, needs Von, …),
 ##   configure(setup)    — fill a TestSetup: the world, who/what is in it, which behaviours are on,
