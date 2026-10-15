@@ -59,60 +59,60 @@ var openings: Array = []
 
 # --- Config fields the controller copies from its exports before calling setup(). ---
 # Vision (the sight sense).
-var vision_enabled: bool = true
-var view_distance: float = 2520.0
-var fov_degrees: float = 110.0
-var awareness_radius: float = 48.0
-var see_over_coverage: float = 60.0
+var vision_enabled: bool = true        ## GoalController.vision_enabled
+var view_distance: float = 2520.0      ## GoalController.view_distance
+var fov_degrees: float = 110.0         ## GoalController.fov_degrees
+var awareness_radius: float = 48.0     ## GoalController.awareness_radius
+var see_over_coverage: float = 60.0    ## GoalController.see_over_coverage
 # Hostility (the categorization rules).
-var hostile_on_sight: bool = false
-var hostile_on_trespass: bool = false
-var hostile_on_attack: bool = true
-var hostility_ttl: float = 0.0
+var hostile_on_sight: bool = false     ## GoalController.hostile_on_sight
+var hostile_on_trespass: bool = false  ## GoalController.hostile_on_trespass
+var hostile_on_attack: bool = true     ## GoalController.hostile_on_attack
+var hostility_ttl: float = 0.0         ## GoalController.hostility_ttl
 # Memory (the event log) and how long each kind of knowledge lasts.
-var memory_capacity: int = 128
-var lead_memory_ttl: float = 20.0
-var search_memory_ttl: float = 60.0
+var memory_capacity: int = 128         ## GoalController.memory_capacity
+var lead_memory_ttl: float = 20.0      ## GoalController.lead_memory_ttl
+var search_memory_ttl: float = 60.0    ## GoalController.search_memory_ttl
 # Combat awareness (how hits and gunfire are remembered — see process_hit()).
-var hit_awareness_radius: float = 160.0
-var hearing_radius: float = 900.0
-var under_fire_time: float = 3.0
-var engage_dwell: float = 3.0
+var hit_awareness_radius: float = 160.0 ## GoalController.hit_awareness_radius
+var hearing_radius: float = 900.0      ## GoalController.hearing_radius
+var under_fire_time: float = 3.0       ## GoalController.under_fire_time
+var engage_dwell: float = 3.0          ## GoalController.engage_dwell
 # Context: how knowledge is worded and bounded for Von.
-var shoot_range: float = 500.0
-var punch_range: float = 48.0
-var recency_bands: Vector2 = Vector2(2.0, 8.0)
-var route_buckets: Vector2 = Vector2(400.0, 900.0)
-var aim_cone: float = 20.0
-var still_speed: float = 20.0
-var track_smoothing: float = 0.3
-var extrapolate_cap: float = 3.0
-var investigate_distance: float = 300.0
-var max_options_per_level: int = 4
+var shoot_range: float = 500.0         ## GoalController.shoot_range
+var punch_range: float = 48.0          ## GoalController.punch_range
+var recency_bands: Vector2 = Vector2(2.0, 8.0) ## GoalController.recency_bands
+var route_buckets: Vector2 = Vector2(400.0, 900.0) ## GoalController.route_buckets
+var aim_cone: float = 20.0             ## GoalController.aim_cone
+var still_speed: float = 20.0          ## GoalController.still_speed
+var track_smoothing: float = 0.3       ## GoalController.track_smoothing
+var extrapolate_cap: float = 3.0       ## GoalController.extrapolate_cap
+var investigate_distance: float = 300.0 ## GoalController.investigate_distance
+var max_options_per_level: int = 4     ## GoalController.max_options_per_level
 var hurt_threshold: float = 15.0       ## Accumulated damage at/above which a character reads as hurt.
 var critical_threshold: float = 35.0   ## Accumulated damage at/above which a character reads as badly wounded.
 var low_ammo_fraction: float = 0.34    ## A gun at/below this fraction of its magazine reads as nearly empty.
 var max_contacts_in_state: int = 4     ## Most contacts described in the decision state (hostiles first).
 # Tactics (the combat geometry).
 var cover_min: float = 40.0            ## Surface coverage at/above which a blocking object counts as cover.
-var flank_distance: float = 220.0
-var flank_arc: float = 60.0
-var flank_ally_radius: float = 500.0
-var combat_ring_radius: float = 80.0
-var combat_ring_count: int = 12
-var route_clearance: float = 120.0
-var watch_arc: float = 90.0
-var fire_spot_distances: Array[float] = [200.0, 350.0]
+var flank_distance: float = 220.0      ## GoalController.flank_distance
+var flank_arc: float = 60.0            ## GoalController.flank_arc
+var flank_ally_radius: float = 500.0   ## GoalController.flank_ally_radius
+var combat_ring_radius: float = 80.0   ## GoalController.combat_ring_radius
+var combat_ring_count: int = 12        ## GoalController.combat_ring_count
+var route_clearance: float = 120.0     ## GoalController.route_clearance
+var watch_arc: float = 90.0            ## GoalController.watch_arc
+var fire_spot_distances: Array[float] = [200.0, 350.0] ## GoalController.fire_spot_distances
 # Callouts (allies' radio).
-var callout_range: float = 1500.0
-var callout_ttl: float = 6.0
+var callout_range: float = 1500.0      ## GoalController.callout_range
+var callout_ttl: float = 6.0           ## GoalController.callout_ttl
 # Tactical entry (the doorway geometry; see agent_entry.gd).
 var entry_enabled: bool = false        ## Whether doorways into rooms left to clear are offered (ENTER).
-var entry_stack_spacing: float = 44.0
-var entry_wall_standoff: float = 28.0
-var entry_pie_radius: float = 100.0
-var entry_pie_steps: int = 5
-var entry_corner_inset: float = 40.0
+var entry_stack_spacing: float = 44.0  ## GoalController.entry_stack_spacing
+var entry_wall_standoff: float = 28.0  ## GoalController.entry_wall_standoff
+var entry_pie_radius: float = 100.0    ## GoalController.entry_pie_radius
+var entry_pie_steps: int = 5           ## GoalController.entry_pie_steps
+var entry_corner_inset: float = 40.0   ## GoalController.entry_corner_inset
 var entry_short_room: float = 150.0   ## A room with a side under this (px) is too small for the team (agent_entry.gd `short_room`).
 # Grenades (live ones known by sight, hearing and callouts, and the danger zone; see agent_grenades.gd).
 var grenades_enabled: bool = true      ## Whether the NPC reacts to live grenades at all.

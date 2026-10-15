@@ -12,21 +12,21 @@ const COMPASS := ["east", "south-east", "south", "south-west", "west", "north-we
 const SIDE_WORDS := { "left": "their left side", "right": "their right side", "rear": "behind them", "front": "their front" }
 
 # --- Config fields the perception copies from its own config before each decision. ---
-var shoot_range: float = 500.0
-var punch_range: float = 48.0
-var recency_bands: Vector2 = Vector2(2.0, 8.0)
-var route_buckets: Vector2 = Vector2(400.0, 900.0)
-var aim_cone: float = 20.0
-var still_speed: float = 20.0
-var flank_ally_radius: float = 500.0
-var investigate_distance: float = 300.0
-var extrapolate_cap: float = 3.0
-var max_options_per_level: int = 4
-var hurt_threshold: float = 15.0
-var critical_threshold: float = 35.0
-var low_ammo_fraction: float = 0.34
-var max_contacts_in_state: int = 4
-var search_memory_ttl: float = 60.0
+var shoot_range: float = 500.0         ## GoalController.shoot_range
+var punch_range: float = 48.0          ## GoalController.punch_range
+var recency_bands: Vector2 = Vector2(2.0, 8.0) ## GoalController.recency_bands
+var route_buckets: Vector2 = Vector2(400.0, 900.0) ## GoalController.route_buckets
+var aim_cone: float = 20.0             ## GoalController.aim_cone
+var still_speed: float = 20.0          ## GoalController.still_speed
+var flank_ally_radius: float = 500.0   ## GoalController.flank_ally_radius
+var investigate_distance: float = 300.0 ## GoalController.investigate_distance
+var extrapolate_cap: float = 3.0       ## GoalController.extrapolate_cap
+var max_options_per_level: int = 4     ## GoalController.max_options_per_level
+var hurt_threshold: float = 15.0       ## GoalController.hurt_threshold
+var critical_threshold: float = 35.0   ## GoalController.critical_threshold
+var low_ammo_fraction: float = 0.34    ## GoalController.low_ammo_fraction
+var max_contacts_in_state: int = 4     ## GoalController.max_contacts_in_state
+var search_memory_ttl: float = 60.0    ## GoalController.search_memory_ttl
 
 var rooms: Array = []  ## The house rooms for the decision being built (set at the top of `AgentSnapshot.build()`).
 
