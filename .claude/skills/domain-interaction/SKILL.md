@@ -16,7 +16,10 @@ learns what an interaction *means* — add/retune actions in the catalogue data 
 (`aim_point`), and runs a random one of its valid actions — freezing the character (`is_busy()`).
 For a `move_to` action it snaps the character onto the object and lets the two bodies overlap (a
 temporary `add_collision_exception_with`, so a seat/bed isn't shoved and the character isn't
-ejected), moving it back on exit. **Space** again stops and steps back.
+ejected), moving it back on exit. **Space** again stops and steps back. On exit (deferred out of the physics step) it hands the
+object to the character's `keep_clear_of(body)`, which lifts the exception only once the body has cleared the object by the
+character's `CLEAR_MARGIN`, so restoring the collision never finds an overlap to eject from; re-entering the object just left calls
+`stop_clearing(body)` first and keeps the exception it still has.
 
 The component reads the character's existing `facing`, `global_position`, `aim_point` and
 `has_item(id)`, and moves it. It discovers objects through the **interactable contract** — every
