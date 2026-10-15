@@ -12,6 +12,10 @@ const MAX_TURN_PER_FRAME := 0.25
 const MAX_FOLD_PER_FRAME := 0.1
 ## The most a door's open amount may change in one frame: a 0.35 s eased swing peaks near 0.08.
 const MAX_DOOR_PER_FRAME := 0.15
+## A measured ease (the door from 5 % to 90 % open, the fold from 10 % to 90 %) takes between these shares of the spec's
+## full time (`Probe.DOOR_OPEN_TIME`, `Probe.FOLD_TIME`).
+const EASE_SHARE_MIN := 0.4
+const EASE_SHARE_MAX := 2.0
 
 
 func describe() -> Dictionary:
@@ -112,7 +116,7 @@ func run(t: TestContext) -> void:
 	var open := _first(door, func(x): return x >= 0.9)
 	if opening >= 0 and open >= 0:
 		var took := float(open - opening) / Engine.physics_ticks_per_second
-		t.check(took >= 0.15 and took <= 0.7, "the door takes about 0.35 s to open (%.2f s)" % took)
+		t.check(_about(took, Probe.DOOR_OPEN_TIME), "the door takes about %.2f s to open (%.2f s)" % [Probe.DOOR_OPEN_TIME, took])
 	var door_open_by := _first(door, func(x): return x >= 0.8)
 	t.check(door_open_by >= 0 and fold_starts >= 0 and door_open_by <= fold_starts, "the door is open before the character folds in (open frame %d, fold frame %d)" % [door_open_by, fold_starts])
 	var peak_at := door.find(peak)
@@ -133,13 +137,18 @@ func run(t: TestContext) -> void:
 	var folded := _first(fold, func(x): return x >= 0.9)
 	if fold_starts >= 0 and folded >= 0:
 		var fold_time := float(folded - fold_starts) / Engine.physics_ticks_per_second
-		t.check(fold_time >= 0.2, "the fold takes about 0.5 s (%.2f s)" % fold_time)
+		t.check(_about(fold_time, Probe.FOLD_TIME), "the fold takes about %.2f s (%.2f s)" % [Probe.FOLD_TIME, fold_time])
 
 	# Seated: inside the body, over the chassis and under the roof.
 	var reach_in := car.global_position.distance_to(Probe.edge(car, -Probe.forward(car)))
 	t.check(me.global_position.distance_to(car.global_position) < reach_in, "the character ends inside the car's body")
 	t.check(Probe.draws_above(me, chassis), "the seated character is drawn over the chassis")
 	t.check(Probe.draws_above(roof, me), "and under the roof")
+
+
+## Whether a measured ease of `took` s fits a full time of `full` s.
+func _about(took: float, full: float) -> bool:
+	return took >= full * EASE_SHARE_MIN and took <= full * EASE_SHARE_MAX
 
 
 ## The first index of `values` where `test` holds, or -1.
