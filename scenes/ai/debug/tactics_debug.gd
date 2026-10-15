@@ -52,9 +52,9 @@ func _on() -> bool:
 
 ## Draw the room zones (behind) then the candidate point zones (in front), then the highlighted point.
 func _paint() -> void:
-	if show_room_zones and _controller.has_method("debug_room_zones"):
+	if show_room_zones:
 		_draw_room_zones()
-	if show_tactics and _controller.has_method("debug_zones"):
+	if show_tactics:
 		_draw_point_zones()
 	if _focus != Vector2.INF:
 		_draw_focus()

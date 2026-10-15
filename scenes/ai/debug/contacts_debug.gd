@@ -23,13 +23,11 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	if not _controller.has_method("known_contacts_for_display"):
-		return
-	var mem := _read("debug_memory")
+	var mem: Dictionary = _controller.debug_memory()
 	var ttl: float = mem.get("lead_memory_ttl", 20.0)
 	var live_ttl: float = mem.get("contact_memory_ttl", 4.0)
 	var reasons := {}
-	for c in _read("debug_state").get("contacts", []):
+	for c in _controller.debug_state().get("contacts", []):
 		reasons[c["name"]] = c.get("reason", "")
 	for c in _controller.known_contacts_for_display():
 		var pos: Vector2 = c["pos"]

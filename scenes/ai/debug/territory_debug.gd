@@ -21,7 +21,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var rooms: Array = _controller.debug_room_zones() if _controller.has_method("debug_room_zones") else []
+	var rooms: Array = _controller.debug_room_zones()
 	if rooms.is_empty():
 		return
 	var bounds: Rect2 = rooms[0]["rect"]
@@ -30,7 +30,7 @@ func _paint() -> void:
 		draw_rect(Rect2(to_local(r["rect"].position), r["rect"].size), Color(INSIDE, 0.06), true)
 	draw_rect(Rect2(to_local(bounds.position), bounds.size), Color(INSIDE, 0.5), false, 2.0)
 	_label(bounds.position, "house", INSIDE, Vector2(4, -6))
-	var c := _read("debug_combat")
+	var c: Dictionary = _controller.debug_combat()
 	var holding: bool = c.get("hold_ground", false)
 	var me := _character.global_position
 	var me_inside := rooms.any(func(r): return (r["rect"] as Rect2).has_point(me))
@@ -44,9 +44,8 @@ func _paint() -> void:
 		if holding:
 			_line(me, tp, Color(HOLD, 0.5), 1.0)
 	# Zones outside the house: what a territorial NPC would drop from its combat options.
-	if _controller.has_method("debug_zones"):
-		for z in _controller.debug_zones():
-			if not z.get("tags", {}).get("inside", true):
-				var p: Vector2 = z["point"]
-				_line(p + Vector2(-6, -6), p + Vector2(6, 6), OUTSIDE, 2.0)
-				_line(p + Vector2(-6, 6), p + Vector2(6, -6), OUTSIDE, 2.0)
+	for z in _controller.debug_zones():
+		if not z.get("tags", {}).get("inside", true):
+			var p: Vector2 = z["point"]
+			_line(p + Vector2(-6, -6), p + Vector2(6, 6), OUTSIDE, 2.0)
+			_line(p + Vector2(-6, 6), p + Vector2(6, -6), OUTSIDE, 2.0)

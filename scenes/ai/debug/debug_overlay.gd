@@ -45,13 +45,6 @@ func _paint() -> void:
 	pass
 
 
-## The controller's `method` result, or an empty Dictionary when it doesn't offer it.
-func _read(method: String) -> Dictionary:
-	if _controller.has_method(method):
-		return _controller.call(method)
-	return {}
-
-
 ## A small text label at world point `world` (drawn in this node's local space).
 func _label(world: Vector2, text: String, color: Color, offset := Vector2(6, -6)) -> void:
 	DebugText.string(self, ThemeDB.fallback_font, to_local(world) + offset, text, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, color)

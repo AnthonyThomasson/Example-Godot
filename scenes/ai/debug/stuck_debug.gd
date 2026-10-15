@@ -22,7 +22,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var p := _read("debug_progress")
+	var p: Dictionary = _controller.debug_progress()
 	if p.is_empty():
 		return
 	var trail: Array = p["trail"]

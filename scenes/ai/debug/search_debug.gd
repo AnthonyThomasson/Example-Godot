@@ -29,8 +29,6 @@ func _on() -> bool:
 ## Draw the sample points (dim = seen, bright = unseen), the current target with a line from the NPC,
 ## and a seen/total count with the budget's seconds left — but only while the NPC is actively covering a room.
 func _paint() -> void:
-	if not _controller.has_method("debug_search_coverage"):
-		return
 	var cov: Dictionary = _controller.debug_search_coverage()
 	if not cov.get("active", false):
 		return

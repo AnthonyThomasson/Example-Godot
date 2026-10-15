@@ -41,12 +41,12 @@ func _paint() -> void:
 		_cache_ms = now
 		_cache_from = me
 	var half_arc := deg_to_rad(float(_controller.get("watch_arc") if _controller.get("watch_arc") != null else 90.0)) * 0.5
-	var contacts: Array = _controller.known_contacts_for_display() if _controller.has_method("known_contacts_for_display") else []
+	var contacts: Array = _controller.known_contacts_for_display()
 	for c in contacts:
 		var facing: Vector2 = c.get("facing", Vector2.ZERO)
 		if c["hostile"] and facing != Vector2.ZERO:
 			_wedge(c["pos"], facing.angle(), half_arc)
-	var zones: Array = _controller.debug_zones() if _controller.has_method("debug_zones") else []
+	var zones: Array = _controller.debug_zones()
 	for z in zones:
 		if not z["category"] in CATEGORIES:
 			continue

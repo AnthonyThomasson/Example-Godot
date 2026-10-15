@@ -23,7 +23,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var c := _read("debug_combat")
+	var c: Dictionary = _controller.debug_combat()
 	if c.is_empty():
 		return
 	var me := _character.global_position
@@ -59,6 +59,6 @@ func _paint() -> void:
 		_line(me, watch, Color(WATCH, 0.5), 1.0)
 		_ring(watch, 10.0, WATCH)
 		_label(watch, "watching", WATCH, Vector2(14, 4))
-	var checked: Array = _read("debug_memory").get("checked_leads", [])
+	var checked: Array = _controller.debug_memory().get("checked_leads", [])
 	if not checked.is_empty():
 		_label(me, "%d leads checked" % checked.size(), Color(1, 1, 1, 0.55), Vector2(-30, 76))

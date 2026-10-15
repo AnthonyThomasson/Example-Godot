@@ -26,7 +26,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var view := _read("debug_entry_view")
+	var view: Dictionary = _controller.debug_entry_view()
 	if view.is_empty():
 		return
 	var e: Dictionary = view["entry"]

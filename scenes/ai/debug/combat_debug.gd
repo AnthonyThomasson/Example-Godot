@@ -24,7 +24,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var c := _read("debug_combat")
+	var c: Dictionary = _controller.debug_combat()
 	if c.is_empty():
 		return
 	var me := _character.global_position

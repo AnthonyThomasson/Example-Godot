@@ -24,7 +24,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var mem := _read("debug_memory")
+	var mem: Dictionary = _controller.debug_memory()
 	if mem.is_empty():
 		return
 	var me := _character.global_position
@@ -51,7 +51,7 @@ func _paint() -> void:
 		draw_circle(to_local(c["point"]), 4.0, CALLOUT_IN)
 		_ring(c["pos"], 12.0, CALLOUT_IN)
 		_label(c["pos"], "%s: %s (%.0fs)" % [c["name"], c["label"], c["age"]], CALLOUT_IN, Vector2(14, 4))
-	var sent := _read("debug_sent_callout")
+	var sent: Dictionary = _controller.debug_sent_callout()
 	if not sent.is_empty() and (Time.get_ticks_msec() - sent["at"]) / 1000.0 <= SENT_SHOW:
 		_line(sent["position"], sent["point"], Color(CALLOUT_OUT, 0.7), 2.0)
 		_ring(sent["point"], 9.0, CALLOUT_OUT, 2.0)

@@ -30,7 +30,7 @@ func _on() -> bool:
 
 ## Draws the overlay from the controller's public debug getters.
 func _paint() -> void:
-	var b := _read("debug_brain")
+	var b: Dictionary = _controller.debug_brain()
 	if b.is_empty():
 		return
 	var y := ORIGIN.y

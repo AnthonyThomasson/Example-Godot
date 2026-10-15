@@ -44,7 +44,7 @@ func _on() -> bool:
 func _paint() -> void:
 	if show_path and _agent != null:
 		_draw_path()
-	if show_actions and _controller.has_method("debug_status"):
+	if show_actions:
 		_draw_label(_controller.debug_status())
 
 

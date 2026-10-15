@@ -69,8 +69,6 @@ func _rebuild_visibility() -> void:
 			_bubble_poly.append(Vector2.from_angle((float(i) / float(BUBBLE_RAYS)) * TAU) * awareness)
 		return
 
-	if not _controller.has_method("debug_sight_end"):
-		return
 	var from_pos: Vector2 = _character.global_position
 
 	# Awareness bubble: 360° ray sweep clipped by LoS — walls reduce the radius in each direction.
