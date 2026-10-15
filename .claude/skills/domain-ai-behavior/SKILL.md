@@ -39,7 +39,8 @@ fields are read live, so only those modules need the push.)
 
 **Gaze and fire** are a policy too, the **watch stage** (`Behavior._apply_watch`, `watch.gd`; the `domain-ai-watch` skill, spec `docs/gaze-and-fire.md`):
 after the primitive steers, a threat in sight (or one seen a moment ago with a clear line) takes the NPC's eyes and gun whatever the primitive
-is (a move, a hold, a reload, an engage still walking, any entry phase; not a melee, an arrived engage or an interaction); no primitive
+is (a move, a hold, a reload, an engage still walking, a throw once the grenade is away, any entry phase but `bang`; not a melee, an
+arrived engage, an interaction, a throw still taking the grenade in hand and throwing it, or an entry's `bang`); no primitive
 or entry phase has its own fire call. With no threat a walker looks down its path (`Watch.travel_point`) and a resting NPC (hold / reload /
 an arrived move) turns among its room's doorways. An arrived move zeroes `move_input`. Tests: `tests/ai/gaze/`,
 `entry_guard_fires_from_outside`, `fire_dry_gun_on_move_reloads`, `engaged_retargets_to_visible`.
