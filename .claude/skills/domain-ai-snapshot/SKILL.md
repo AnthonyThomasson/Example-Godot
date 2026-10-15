@@ -47,8 +47,7 @@ lives in `agent_snapshot.gd`.
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
   rounds), `under_fire`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
   gates the `stay` child of INVESTIGATE), `hurt`, `inside`, `exposed`, and the grenade ones: `has_frag`, `has_stun` (carried, `Character.item_count`), `grenade_ready` (some known hostile has a `grenade_throws` option),
-  `stack_has_stun` (it carries a stun, or a teammate's entry callout says `stuns` > 0: gates STUN ENTRY). A fact is written only while something gates on it
-  (a tree `requires`, an entry rule or a test); the brain overlay shows the ones that hold.
+  `stack_has_stun` (it carries a stun, or a teammate's entry callout says `stuns` > 0: gates STUN ENTRY). The brain overlay shows the ones that hold.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
