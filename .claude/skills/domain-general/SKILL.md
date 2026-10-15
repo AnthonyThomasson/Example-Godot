@@ -109,11 +109,11 @@ delivers to any listener, which filters by `topic`. Emitters and listeners never
 other. Topics in use: `&"hit"`, posted by the Projectile System for each damaging hit and
 by the Character for each landed punch (`{ position, victim, source, direction, damage, attacker }`, plus
 `outcome` / `material` and, for bullets, `speed_factor`, `power`)
-and consumed by the AI for combat awareness, hostility and gunfire heard, and by Audio for impacts;
+and consumed by the AI for combat awareness, hostility and gunfire heard, by Audio for impacts and by the match HUD's combat feed;
 `&"shot"` (a round left a gun), `&"footfall"` (a foot landed) and `&"reload"` (a
 reload started / finished), posted by
-Items and Character and consumed only by Audio; the grenades' `&"throw"`, `&"grenade"` (a bounce or rest), `&"explosion"` (consumed by Audio and the camera shake, and
-by the AI) and `&"stun"` (Audio's tinnitus, the stun screen, the AI); the vehicles' `&"vehicle"` (ignition, doors, crashes, a character struck), `&"engine"` and `&"skid"` (consumed by Audio);
+Items and Character and consumed only by Audio; the grenades' `&"throw"` (consumed by Audio), `&"grenade"` (a bounce or rest, consumed by Audio and the AI), `&"explosion"` (consumed by Audio and the camera shake, and
+by the AI) and `&"stun"` (Audio's tinnitus and the stun screen); the vehicles' `&"vehicle"` (ignition, doors, crashes, a character struck), `&"engine"` and `&"skid"` (consumed by Audio);
 `&"sound"`, which Audio posts for every sound it
 makes (what tests assert on); and `&"callout"`, an AI
 controller's team radio (`{ speaker, faction, position, status, path, label, target_id, point }`),
