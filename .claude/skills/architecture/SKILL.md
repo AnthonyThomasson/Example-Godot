@@ -515,9 +515,11 @@ main ─▶ Settings ─▶ Keybinds   /   main ─▶ SettingsMenu (UI; signals
 Character ─▶ Item ─▶ ProjectileSpawner ──(get_surface / take_hit)──▶ Objects;  Projectile ──(get_surface_at / take_hit)──▶ Character ─▶ Outfit (Items)
 Character ─▶ Interaction ──(get_interactions)──▶ Objects
 Character ─▶ CharacterVehicleUse (Vehicles) ─▶ Vehicle   (the ride and a strike call back only the character API of interface 19, as an Item calls its user's)
+Character ─▶ Deformable / Deformation / BloodWound / BloodFootprints / Ragdoll / HitInfo / Physics.impact_impulse / spawn_debris / bleed_out (Physics)
 Vehicle ─▶ Deformable / Physics.impact_impulse / Physics.spawn_debris (Physics);  Vehicle ─▶ PhysicsLayers (General)
 Objects / Character / Item / Vehicle ──(painters)──▶ PixelArt / PixelCanvas / ArtConfig   (Art, a leaf)
 AIController ─▶ NavigationAgent2D ─▶ NavigationServer2D   (writes Character.move_input; tactics query the nav map)
+AIController ─▶ ItemRegistry slot ids (Items: FISTS_SLOT, STUN_SLOT, FRAG_SLOT)
 Physics debris / hit particles / blood / explosion fx, Projectile casings ─▶ Despawner
 Projectile / Character ──(&"hit" events)──▶ EventBus ──(posted)──▶ AIController / MatchHUD
 AIController ──(&"callout" events)──▶ EventBus ──(posted)──▶ allied AIControllers
@@ -530,11 +532,14 @@ Explosion (&"explosion") ──▶ EventBus ──▶ Sound (the burst) / Camera
 Vehicle (&"vehicle", &"engine", &"skid") ──▶ EventBus ──▶ Sound ──(engine_state / slip / speed, duck-typed)──▶ the vehicle's loops
 Camera ──(target.vehicle().view_zoom_out(), duck-typed)──▶ Vehicle
 UI (DebugUI / MatchHUD / SpectatorInspector) / Camera ──(exported path + signals)──▶ Character  (MatchHUD reads AIController.goal_text; the inspector debug_zones / known_contacts_for_display; DebugUI and the inspector outfit_view)
+DebugUI ─▶ LoadoutConfig.grenade_options (Items)
 main ──(Tests button: scene change)──▶ TestBrowser ─▶ TestRunner ─▶ WorldGen / factories / NavBuilder / Character scenes / EventBus
 Sandbox (Testing) ──(own painter)──▶ PixelArt / PixelCanvas (Art);  Sandbox ──(recipe_for / render)──▶ SoundBank / SoundSynth (Audio) ─▶ its own AudioStreamPlayer2D
 TestBrowser / TestRunner ─▶ UI (TestBrowserWindow / TestResultHUD / OverlayToggles / PerformanceOverlay)
 TestRunner / TestWorld ─▶ NavDebug / NavUpdater (Navigation, overlay + re-bake)
 TestWorld ─▶ vehicle scenes (TestSetup.vehicle)
+TestRunner / TestWorld ─▶ DecisionStub / DecisionServerLauncher / NPC scenes (AI), config-holder statics (behaviour switches)
+TestBrowser ──(Back: scene change)──▶ main
 ```
 
 Physics, Navigation, Art, Audio and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
