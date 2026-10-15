@@ -13,8 +13,8 @@ class_name OutfitConfig
 ##   weight      kg; the outfit's total slows the walk and tires the run (`CharacterConfig.outfit_*`).
 ##   plates      true = it holds a front and a back plate (the plate carrier); a plate is worn only in such a garment.
 ##   look        what the art draws: `kind` (the painter's style name) and `color` (absent = the side's team colour).
-##   armour      absent = no protection (looks and weight only). Else the zones it covers (`zones`, of `ZONES`), the sides
-##               (`sides`, of `SIDES`; absent = all round) and the protection numbers below.
+##   armour      absent = no protection (looks and weight only). Else the zones it covers (`zones`, of `feet legs torso head`), the
+##               sides (`sides`, of `front flank back`; absent = all round) and the protection numbers below.
 ## Protection numbers (an armour row, a plate row):
 ##   stop_power  a round whose power x speed factor is below it is stopped (round power: `GunConfig` `penetration`, pistol
 ##               1.0, SMG 0.8, rifle 2.2; a frag's fragment 0.4).
@@ -31,9 +31,6 @@ const GARMENT_SLOTS: Array[String] = ["head", "body", "vest", "pants", "feet"]
 const PLATE_SLOTS: Array[String] = ["front_plate", "back_plate"]
 ## The side of the torso each plate slot covers.
 const PLATE_SIDE := { "front_plate": &"front", "back_plate": &"back" }
-## Hit zones, feet up, and the sides a round strikes from (Character: zone by bullet height, side by the shot's direction).
-const ZONES: Array[StringName] = [&"feet", &"legs", &"torso", &"head"]
-const SIDES: Array[StringName] = [&"front", &"flank", &"back"]
 
 ## The garment slots that may be left empty (the rest are always worn once an outfit is chosen); the plate slots may always be.
 static var optional_slots: Array[String] = ["head", "vest"]

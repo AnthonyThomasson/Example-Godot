@@ -57,7 +57,7 @@ func condition(slot: String) -> float:
 	return float(_condition.get(slot, 0.0))
 
 
-## The armour a round meets striking hit zone `zone` (`OutfitConfig.ZONES`) from side `side` (`OutfitConfig.SIDES`): `{}` when
+## The armour a round meets striking hit zone `zone` (`feet legs torso head`) from side `side` (`front flank back`): `{}` when
 ## nothing protects it there, else `{ stop_power, penetration, material, color, blunt, reduction, blast, plate }` (`plate` = the
 ## plate slot it is, "" for a garment). A plate on that side lies over the garment's soft panel: its numbers, with its stop power
 ## falling toward the panel's as it wears, never below it.
