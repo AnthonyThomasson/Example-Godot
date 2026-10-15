@@ -248,10 +248,8 @@ func _spawn_actor(a: Dictionary, switches: Dictionary) -> Node:
 			continue
 		for prop in children[child_path]:
 			child.set(prop, children[child_path][prop])
+	OVERLAY_REGISTRY.apply(character, _overlay_flags)
 	for child in character.get_children():
-		for flag in _overlay_flags:
-			if flag in child:
-				child.set(flag, _overlay_flags[flag])
 		# The AI learns the house's rooms and doorways from its composer (main.gd does the same).
 		if child.has_method("control") and "rooms" in child:
 			child.rooms = rooms

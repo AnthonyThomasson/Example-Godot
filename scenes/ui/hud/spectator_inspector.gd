@@ -30,6 +30,7 @@ const OUTFIT_GAP := 10.0
 
 const ContactMarkers := preload("res://scenes/ui/hud/contact_markers.gd")
 const OutfitLines := preload("res://scenes/ui/hud/outfit_lines.gd")
+const OverlayRegistry := preload("res://scenes/ui/overlays/overlay_registry.gd")
 
 var _combatants: Array = []  ## The NPCs to pick from (public nodes), handed in by Main.
 var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from Main).
@@ -79,7 +80,7 @@ func setup(combatants: Array, flags: Dictionary, right_clear: float) -> void:
 func set_flag(flag: String, on: bool) -> void:
 	_flags[flag] = on
 	if _selected != null and is_instance_valid(_selected):
-		_set_overlays(_selected, true)
+		OverlayRegistry.apply(_selected, _flags)
 
 
 ## A label on this layer that never swallows a click meant for an NPC. The caller anchors/positions it.
@@ -186,7 +187,7 @@ func _select(npc: Node) -> void:
 	# Show only the selected NPC's own overlays; hide every other NPC's.
 	for c in _combatants:
 		if is_instance_valid(c):
-			_set_overlays(c, c == npc)
+			OverlayRegistry.apply(c, _flags if c == npc else _flags_off())
 	_refresh_markers()
 	_refresh_outfit()
 
@@ -208,18 +209,12 @@ func _refresh_markers() -> void:
 	_contact_markers.set_contacts(display)
 
 
-## Reveal (`on`) or hide one NPC's debug overlays by duck-typed property name. When revealing, each
-## toggle takes its setup-menu value from `_flags`; when hiding, all go false. Forces a redraw because a
-## paused overlay's own _process may not run.
-func _set_overlays(npc: Node, on: bool) -> void:
-	for child in npc.get_children():
-		var touched := false
-		for flag in _flags:
-			if flag in child:
-				child.set(flag, _flags[flag] if on else false)
-				touched = true
-		if touched and child.has_method("queue_redraw"):
-			child.queue_redraw()
+## Every flag of `_flags` set false: what a hidden NPC's overlays are given.
+func _flags_off() -> Dictionary:
+	var off := {}
+	for flag in _flags:
+		off[flag] = false
+	return off
 
 
 ## Highlight the clicked tactical point on the selected NPC and fill the detail panel with its kind,
