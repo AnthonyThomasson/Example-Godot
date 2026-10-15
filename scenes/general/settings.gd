@@ -1,12 +1,13 @@
 class_name Settings
 
-## General domain: the player's saved settings — the debug switch and the key bindings that differ from
-## the defaults, and the last match-setup choices — kept in one JSON file. A `class_name` holder of `static var`s and static functions, read
+## General domain: the player's saved settings — the debug switch, the key bindings that differ from
+## the defaults, the last match-setup choices and the overlay toggles — kept in one JSON file. A `class_name` holder of `static var`s and static functions, read
 ## as `Settings.<name>`; there is no instance and no autoload.
 ##
 ## Main loads it once at startup (`load_file()`), so the headless test runner, which never loads
 ## `main.tscn`, never reads a developer's real file. The settings page's changes come back through the
-## mutators here (`set_debug`, `rebind`, `reset`, `reset_all`), each of which saves at once.
+## mutators here (`set_debug`, `set_setup`, `set_overlay`, `rebind`, `reset`, `reset_all`), each of which
+## saves at once.
 ## Bindings live in `Keybinds`; this file only persists them and reshapes them for the page.
 
 ## Where the settings are stored. A test points it at a scratch file.
