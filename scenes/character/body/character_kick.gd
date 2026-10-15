@@ -12,15 +12,14 @@ signal kicked(body: Node, damage: float)
 
 enum Phase { IDLE, STRIKE, RECOVER }
 
-## Physics layer a kick meets: walls, solid furniture and living characters (the hands' mask).
-const MASK := PhysicsLayers.SOLID
+## The melee strike a kick lands (shared with the punch).
+const Strike = preload("res://scenes/character/body/body_strike.gd")
 ## The leg that kicks: side 0, the character's right as drawn.
 const LEG := 0
 
 var _phase := Phase.IDLE  ## Where the kick is: not kicking, throwing the foot out, or drawing it back.
 var _time := 0.0           ## Seconds into the current phase.
 var _hit_bodies := {}      ## Bodies already struck this kick (dedup).
-var _shape := CircleShape2D.new()  ## The foot's strike circle (radius set per query).
 
 
 ## Begin a kick with the right leg; false while one is still under way.
@@ -74,29 +73,9 @@ func foot_world(character) -> Vector2:
 	return character.global_position + character.facing * (CharacterConfig.kick_reach * amount())
 
 
-## Shove and damage every body the foot overlaps that this kick has not struck yet.
+## Shove and damage the first body the foot overlaps that this kick has not struck yet (`body_strike.gd`), at the foot,
+## so a piece struck off-centre turns.
 func _strike(character) -> void:
-	_shape.radius = CharacterConfig.kick_radius
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = _shape
-	params.collision_mask = MASK
-	params.exclude = [character.get_rid()]
-	var foot: Vector2 = foot_world(character)
-	params.transform = Transform2D(0.0, foot)
-	for result in character.get_world_2d().direct_space_state.intersect_shape(params, 8):
-		var body: Node = result.collider
-		if body == character or _hit_bodies.has(body):
-			continue
-		_hit_bodies[body] = true
-		var impulse: Vector2 = character.facing * CharacterConfig.kick_impulse
-		var pushed := body.has_method("apply_impulse")
-		if pushed:
-			# At the foot, so a piece struck off-centre turns.
-			body.apply_impulse(impulse, foot - (body as Node2D).global_position)
-		var damage := CharacterConfig.kick_damage
-		GameLog.say("Kick hit %s for %.1f damage, push %.0f (%s)" % [
-			body.name, damage, impulse.length(), "pushable" if pushed else "fixed"])
-		kicked.emit(body, damage)
-		if body.has_method("take_damage"):
-			body.take_damage(damage)
-		return
+	Strike.strike(character, foot_world(character), CharacterConfig.kick_radius,
+			character.facing * CharacterConfig.kick_impulse, CharacterConfig.kick_damage, _hit_bodies, true, kicked.emit,
+			"Kick")

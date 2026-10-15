@@ -37,6 +37,8 @@ var _hand_pos := [Vector2.ZERO, Vector2.ZERO]
 const HAND_MASK := PhysicsLayers.SOLID
 ## The collide-and-slide a hand makes toward where the pose wants it (shared with the legs).
 const Sweep = preload("res://scenes/character/body/body_sweep.gd")
+## The melee strike a punch lands (shared with the kick).
+const Strike = preload("res://scenes/character/body/body_strike.gd")
 
 ## Punch tween durations (s): the fist extends, then retracts. The extend time also
 ## normalizes the swing-speed factor, so a full-speed extend counts as a full-power hit.
@@ -46,7 +48,6 @@ const PUNCH_RETRACT_TIME := 0.11
 var _tempo := 1.0
 
 ## Hit-detection state for the current swing.
-var _fist_shape: CircleShape2D  ## Query shape for punch detection (fist radius).
 var _attack_active := false   ## True for the whole swing (extend + retract); gates hit polling.
 var _active_hand := 0         ## Hand the fist is tracking this swing.
 var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
@@ -55,10 +56,6 @@ var _hit_bodies := {}         ## Bodies already reported this swing (dedup).
 
 
 func _ready() -> void:
-	# Build the fist query shape (punch detection is a shape query at the raw punch position).
-	_fist_shape = CircleShape2D.new()
-	_fist_shape.radius = hand_radius
-
 	# Seed the resolved-hand cache so the first drawn frame isn't at the body center.
 	for hand in [0, 1]:
 		_hand_pos[hand] = _raw_hand_position(hand)
@@ -194,10 +191,6 @@ func _set_punch(value: float, hand: int) -> void:
 ## punch pushes (via the pushable contract) but never deforms; walls have no `apply_impulse`,
 ## so they take damage without moving.
 func _report_hits() -> void:
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = _fist_shape
-	params.collision_mask = HAND_MASK
-	params.exclude = [_character.get_rid()]
 	var end := Vector2.ZERO
 	var item: Item = _character.current_item()
 	if item and _active_hand == item.weapon_hand():
@@ -205,24 +198,12 @@ func _report_hits() -> void:
 		if end.dot(facing) <= 0.0:
 			end = Vector2.ZERO
 	var fist: Vector2 = _character.global_position + _raw_hand_position(_active_hand) + end
-	params.transform = Transform2D(0.0, fist)
 
 	# Range of motion: how fast the fist is swinging this frame (1.0 = full-speed extend).
 	var motion := clampf(absf(_punch_speed[_active_hand]) * PUNCH_EXTEND_TIME * _tempo, 0.0, 1.0)
-	for result in get_world_2d().direct_space_state.intersect_shape(params, 8):
-		var body: Node = result.collider
-		if body == _character or _hit_bodies.has(body):
-			continue
-		_hit_bodies[body] = true
-		var impulse := facing * CharacterConfig.punch_impulse * motion
-		var pushed := body.has_method("apply_impulse")
-		if pushed:
-			# At the fist (or the butt), so a piece struck off-centre turns.
-			body.apply_impulse(impulse, fist - (body as Node2D).global_position)
-		var damage := CharacterConfig.punch_damage * motion
-		GameLog.say("Punch (hand %d) hit %s for %.1f damage, push %.0f (%s, %.0f%% swing)" % [
-			_active_hand, body.name, damage, impulse.length(),
-			"pushable" if pushed else "fixed", motion * 100.0])
-		punched.emit(_active_hand, body, damage)
-		if body.has_method("take_damage"):
-			body.take_damage(damage)
+	var hand := _active_hand
+	# Struck at the fist (or the butt), so a piece struck off-centre turns.
+	Strike.strike(_character, fist, hand_radius, facing * CharacterConfig.punch_impulse * motion,
+			CharacterConfig.punch_damage * motion, _hit_bodies, false,
+			func(body: Node, damage: float) -> void: punched.emit(hand, body, damage),
+			"Punch (hand %d)" % hand, ", %.0f%% swing" % (motion * 100.0))
