@@ -1,4 +1,4 @@
-extends Node2D
+extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain: an optional debug overlay for the NPC's tactical geometry, in two independent aspects. The
 ## point ZONES (`show_tactics`) are every candidate position its perception laid out for the last
@@ -9,14 +9,10 @@ extends Node2D
 ## sibling GoalController's `debug_zones()` / `debug_room_zones()` through its public API, senses nothing
 ## and feeds nothing back (the "draw on its own child Node2D" convention, like vision_debug.gd).
 
-const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
-
 ## Whether to draw the candidate point zones. Off by default — it is the densest overlay.
 @export var show_tactics: bool = false
 ## Whether to draw the room zones (each room tinted by how the NPC regards it). Off by default.
 @export var show_room_zones: bool = false
-## The GoalController to read the zones from (a sibling under the NPC).
-@export var controller_path: NodePath = NodePath("../GoalController")
 
 ## Marker colour per zone category (the categories `debug_zones()` tags each point with). A colour is
 ## drawn once as an in-world label beside its first marker, so the palette reads as a legend.
@@ -43,34 +39,19 @@ const ROOM_COLORS := {
 const ZONE_RADIUS := 15.0
 ## Radius (px) of the solid dot at a zone's exact point.
 const DOT_RADIUS := 3.0
-## Point size of the per-category label.
-const FONT_SIZE := 16
 ## Inset (px) of a room's tag from its top-left corner.
 const ROOM_LABEL_INSET := 6.0
 
-var _controller: Node       ## The GoalController read for the zones.
-var _character: Node2D      ## The NPC body this overlay is a child of.
 var _focus := Vector2.INF   ## A tactical point the inspector asked to highlight, or INF for none.
 
 
-func _ready() -> void:
-	_controller = get_node_or_null(controller_path)
-	_character = get_parent() as Node2D
-	# Keep drawing while the tree is paused, so the spectator inspector can reveal a clicked NPC's zones
-	# during a pause (the usual way to study them). Static while paused — the NPC isn't moving.
-	process_mode = Node.PROCESS_MODE_ALWAYS
+## Whether either toggle is on, or the inspector has a point highlighted (its ring draws with both off).
+func _on() -> bool:
+	return show_tactics or show_room_zones or _focus != Vector2.INF
 
 
-## Redraw every frame so the zones track the NPC's latest decision and room knowledge.
-func _process(_delta: float) -> void:
-	if show_tactics or show_room_zones:
-		queue_redraw()
-
-
-## Draw the room zones (behind) then the candidate point zones (in front).
-func _draw() -> void:
-	if _controller == null or _character == null or _character.get("is_dead") == true:
-		return
+## Draw the room zones (behind) then the candidate point zones (in front), then the highlighted point.
+func _paint() -> void:
 	if show_room_zones and _controller.has_method("debug_room_zones"):
 		_draw_room_zones()
 	if show_tactics and _controller.has_method("debug_zones"):

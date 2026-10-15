@@ -1,4 +1,4 @@
-extends Node2D
+extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain: an optional debug overlay that draws, in the world next to the NPC, what its brain is
 ## doing — a floating ACTION LABEL (the controller's live decision, from `debug_status()`) and its
@@ -7,14 +7,10 @@ extends Node2D
 ## and NavigationAgent2D through their public API, senses nothing and feeds nothing back (follows the
 ## "draw on its own child Node2D" convention, like vision_debug.gd).
 
-const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
-
 ## Whether to draw the floating action label above the NPC.
 @export var show_actions: bool = true
 ## Whether to draw the NPC's current navigation path.
 @export var show_path: bool = true
-## The GoalController to read the action status from (a sibling under the NPC).
-@export var controller_path: NodePath = NodePath("../GoalController")
 ## The NavigationAgent2D to read the current path from (a sibling under the NPC).
 @export var agent_path: NodePath = NodePath("../NavigationAgent2D")
 ## Colour of the action label text.
@@ -25,39 +21,30 @@ const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
 @export var label_offset: float = 28.0
 
 ## Point size of the label font.
-const FONT_SIZE := 11
+const LABEL_FONT_SIZE := 11
 ## Radius (px) of a waypoint dot on the path.
 const WAYPOINT_RADIUS := 2.5
 ## Radius (px) of the ring drawn at the path's final target.
 const TARGET_RADIUS := 6.0
 
-var _controller: Node             ## The GoalController read for the action label.
 var _agent: NavigationAgent2D     ## The nav agent read for the movement path.
-var _character: Node2D            ## The NPC body this overlay is a child of.
 
 
 func _ready() -> void:
-	_controller = get_node_or_null(controller_path)
+	super()
 	_agent = get_node_or_null(agent_path) as NavigationAgent2D
-	_character = get_parent() as Node2D
-	# Keep drawing while the tree is paused, so the spectator inspector can reveal a clicked NPC's label
-	# and path during a Space-pause.
-	process_mode = Node.PROCESS_MODE_ALWAYS
 
 
-## Redraw every frame so the label and path track the NPC's live decision and movement.
-func _process(_delta: float) -> void:
-	if show_actions or show_path:
-		queue_redraw()
+## Whether either toggle is on.
+func _on() -> bool:
+	return show_actions or show_path
 
 
 ## Draw the current path (remaining waypoints + target) and the action label.
-func _draw() -> void:
-	if _character == null or _character.get("is_dead") == true:
-		return
+func _paint() -> void:
 	if show_path and _agent != null:
 		_draw_path()
-	if show_actions and _controller != null and _controller.has_method("debug_status"):
+	if show_actions and _controller.has_method("debug_status"):
 		_draw_label(_controller.debug_status())
 
 
@@ -84,6 +71,6 @@ func _draw_label(text: String) -> void:
 	if text == "":
 		return
 	var font: Font = ThemeDB.fallback_font
-	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE).x
+	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_CENTER, -1, LABEL_FONT_SIZE).x
 	var pos := Vector2(-width / 2.0, label_offset)
-	DebugText.string(self, font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, FONT_SIZE, label_color)
+	DebugText.string(self, font, pos, text, HORIZONTAL_ALIGNMENT_CENTER, -1, LABEL_FONT_SIZE, label_color)

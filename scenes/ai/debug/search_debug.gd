@@ -1,4 +1,4 @@
-extends Node2D
+extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain: an optional debug overlay for how an NPC is searching a room — the line-of-sight COVERAGE
 ## a `look_around` search move performs. It reads the sibling GoalController's `debug_search_coverage()`
@@ -9,13 +9,9 @@ extends Node2D
 ## run out on it. Senses nothing, feeds nothing back (the "draw on its own child Node2D"
 ## convention, like tactics_debug.gd / vision_debug.gd).
 
-const DebugText := preload("res://scenes/ai/debug/debug_text.gd")
-
 ## Whether to draw the coverage overlay. Off by default; in spectator mode the inspector turns it on
 ## only for the selected NPC (like the tactics overlay).
 @export var show_search: bool = false
-## The GoalController to read the coverage from (a sibling under the NPC).
-@export var controller_path: NodePath = NodePath("../GoalController")
 
 const SEEN_COLOR := Color(0.4, 0.8, 0.5, 0.35)   # dim green — a sampled point already seen
 const UNSEEN_COLOR := Color(1.0, 0.85, 0.2)      # bright gold — still to be seen
@@ -23,29 +19,16 @@ const TARGET_COLOR := Color(1.0, 0.4, 0.2)       # red — the point being looke
 const POINT_RADIUS := 2.5
 const UNSEEN_RADIUS := 4.0
 const TARGET_RADIUS := 8.0
-const FONT_SIZE := 16
-
-var _controller: Node   ## The GoalController read for the coverage state.
-var _character: Node2D   ## The NPC body this overlay is a child of.
 
 
-func _ready() -> void:
-	_controller = get_node_or_null(controller_path)
-	_character = get_parent() as Node2D
-	process_mode = Node.PROCESS_MODE_ALWAYS  # Keep drawing while paused, like the other overlays.
-
-
-## Redraw every frame so the shrinking unseen set and the moving target track the live search.
-func _process(_delta: float) -> void:
-	if show_search:
-		queue_redraw()
+## Whether this overlay's toggle is on.
+func _on() -> bool:
+	return show_search
 
 
 ## Draw the sample points (dim = seen, bright = unseen), the current target with a line from the NPC,
 ## and a seen/total count with the budget's seconds left — but only while the NPC is actively covering a room.
-func _draw() -> void:
-	if not show_search or _controller == null or _character == null or _character.get("is_dead") == true:
-		return
+func _paint() -> void:
 	if not _controller.has_method("debug_search_coverage"):
 		return
 	var cov: Dictionary = _controller.debug_search_coverage()

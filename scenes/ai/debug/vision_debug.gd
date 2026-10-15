@@ -1,4 +1,4 @@
-extends Node2D
+extends "res://scenes/ai/debug/debug_overlay.gd"
 
 ## AI domain: an optional debug overlay that draws the NPC's *actual* visible area — the portions
 ## of the forward FOV cone and the 360° near-awareness bubble that have a direct, unobstructed line
@@ -15,38 +15,30 @@ const BUBBLE_RAYS := 48
 
 ## Whether to draw the vision overlay at all.
 @export var show_vision: bool = true
-## The GoalController to read vision tunables from (a sibling under the NPC).
-@export var controller_path: NodePath = NodePath("../GoalController")
 ## Fill colour for the forward view cone's line-of-sight area.
 @export var cone_color: Color = Color(0.3, 0.8, 1.0, 0.12)
 ## Fill colour for the near-awareness bubble's line-of-sight area.
 @export var bubble_color: Color = Color(1.0, 0.9, 0.3, 0.5)
 
-var _controller: Node
-var _character: Node2D
 var _cone_poly: PackedVector2Array = PackedVector2Array()
 var _bubble_poly: PackedVector2Array = PackedVector2Array()
 
 
-func _ready() -> void:
-	_controller = get_node_or_null(controller_path)
-	_character = get_parent() as Node2D
-	# Keep rebuilding/drawing while the tree is paused, so the spectator inspector can reveal a clicked
-	# NPC's vision during a Space-pause (otherwise the visibility polygons wouldn't be built).
-	process_mode = Node.PROCESS_MODE_ALWAYS
-
-
-## Rebuild the visibility polygons every frame so they track the NPC's movement and facing.
-func _process(_delta: float) -> void:
+## Rebuild the visibility polygons every frame so they track the NPC's movement and facing (the base runs
+## PROCESS_MODE_ALWAYS, so they are still built while the spectator inspector holds a Space-pause).
+func _process(delta: float) -> void:
 	if show_vision:
 		_rebuild_visibility()
-		queue_redraw()
+	super(delta)
+
+
+## Whether this overlay's toggle is on.
+func _on() -> bool:
+	return show_vision
 
 
 ## Draw the cached visibility polygons built in _process.
-func _draw() -> void:
-	if not show_vision or _controller == null or _character == null:
-		return
+func _paint() -> void:
 	if _bubble_poly.size() >= 3:
 		draw_polygon(_bubble_poly, [bubble_color])
 	if _cone_poly.size() >= 3:
