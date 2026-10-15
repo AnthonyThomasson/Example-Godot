@@ -6,25 +6,12 @@ extends Node
 ## so the ride overrides that frame's intent) and `abandon()` on death. It finds vehicles through the group `vehicles`
 ## and steps the character's ride (vehicle_boarding.gd), which moves the character through its own walk and its ride API
 ## (`set_ride_pose`, `end_ride`). While the ride lasts the character keeps a collision exception with the vehicle; once
-## it is out, the exception is dropped as soon as the body has cleared the vehicle, so getting out never shoves it.
-
-## Extra gap (px) around the body before the vehicle's collision is restored after a ride.
-const CLEAR_MARGIN := 3.0
+## it is out, it hands the vehicle to the character's `keep_clear_of`, which drops the exception as soon as the body has
+## cleared the vehicle, so getting out never shoves it.
 
 var _ride: RefCounted  ## The ride under way (VehicleBoarding), from the E press to the last step out; null on foot.
-var _clearing: Node2D  ## The vehicle just left, whose collision exception waits for the body to clear it.
 
 @onready var _character: Node2D = get_parent()
-
-
-func _physics_process(_delta: float) -> void:
-	if _clearing == null or _ride != null:
-		return
-	if not is_instance_valid(_clearing):
-		_clearing = null
-	elif not _overlaps(_clearing):
-		_character.remove_collision_exception_with(_clearing)
-		_clearing = null
 
 
 ## E: seated, get out (braking or waiting for the vehicle to slow first); on foot, board by the door whose handle is
@@ -48,8 +35,7 @@ func try_use_vehicle() -> void:
 		var ride: RefCounted = c["vehicle"].board(_character, c["door"])
 		if ride != null:
 			_ride = ride
-			if _clearing == c["vehicle"]:
-				_clearing = null  # Back into the vehicle just left: its exception stays.
+			_character.stop_clearing(c["vehicle"])  # Back into the vehicle just left: its exception stays.
 			return
 
 
@@ -68,8 +54,8 @@ func is_active() -> bool:
 	return _ride != null
 
 
-## Step the ride one physics frame (the character calls it after its controller). Once the character is out, its
-## collision with the vehicle is restored as soon as it has cleared the body.
+## Step the ride one physics frame (the character calls it after its controller). Once the character is out, the
+## vehicle goes to the character's `keep_clear_of`, which restores their collision as soon as it has cleared the body.
 func control(delta: float) -> void:
 	if _ride == null:
 		return
@@ -79,7 +65,7 @@ func control(delta: float) -> void:
 		return
 	_ride.step(delta)
 	if _ride.is_done():
-		_clearing = _ride.vehicle
+		_character.keep_clear_of(_ride.vehicle)
 		_ride = null
 
 
@@ -89,21 +75,6 @@ func abandon() -> void:
 		return
 	if is_instance_valid(_ride.vehicle):
 		_ride.abandon()
-		_clearing = _ride.vehicle
+		_character.keep_clear_of(_ride.vehicle)
 	_ride = null
 	_character.end_ride()
-
-
-## Whether the body (its circle plus a margin) overlaps `left`'s body.
-func _overlaps(left: Node2D) -> bool:
-	var shape := CircleShape2D.new()
-	shape.radius = _character.radius + CLEAR_MARGIN
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = shape
-	params.collision_mask = PhysicsLayers.SOLID
-	params.exclude = [_character.get_rid()]
-	params.transform = Transform2D(0.0, _character.global_position)
-	for result in _character.get_world_2d().direct_space_state.intersect_shape(params, 16):
-		if result["collider"] == left:
-			return true
-	return false

@@ -117,6 +117,8 @@ signal hit_landed(body: Node, damage: float, hand: int)
 
 ## The `hit_landed` hand code of a leg kick (0/1 are the punching hands, -1 a shot).
 const KICK_HAND := 2
+## Extra gap (px) around the body before the collision with a body it left (`keep_clear_of`) is restored.
+const CLEAR_MARGIN := 3.0
 
 ## Interaction component (Interaction domain): finds and runs object interactions. Composed in
 ## code like the other components; the character only forwards `try_interact()` and reads
@@ -138,6 +140,8 @@ const CharacterVehicleUse = preload("res://scenes/vehicle/character_vehicle_use.
 @onready var _controller := _find_controller()
 var _interaction: Node  ## The CharacterInteraction child, built in _ready().
 var _vehicle_use: Node  ## The CharacterVehicleUse child, built in _ready().
+## The bodies just left (an interaction's object, a vehicle) whose collision exception waits for the body to clear them.
+var _clearing: Array = []  # untyped: a body freed while waiting stays in it until the next check
 
 
 func _ready() -> void:
@@ -182,6 +186,12 @@ func _ready() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_physics_step(delta)
+	_restore_cleared()
+
+
+## One physics frame of the body: a dead one's ragdoll, else the controller's intent, the ride or interaction, and the walk.
+func _physics_step(delta: float) -> void:
 	if is_dead:
 		ragdoll.step(delta, get_world_2d().direct_space_state, global_position)
 		if ragdoll.is_settled() and not _bled_out:
@@ -394,6 +404,49 @@ func _ride_frame(delta: float) -> void:
 	_legs.clear()
 	_kick.clear()
 	pose.update(delta, facing, _ride_step, speed, _stances(), _hands.punch_amounts())
+
+
+## Keep the collision exception with `body` (one the character just left: an interaction's object, a vehicle) until the
+## body (its circle plus `CLEAR_MARGIN`) no longer overlaps it, then drop it, so restoring the collision never finds an
+## overlap for the solver to eject either out of. A freed body is forgotten.
+func keep_clear_of(body: Node) -> void:
+	if not _clearing.has(body):
+		_clearing.append(body)
+
+
+## Stop waiting to clear `body` (the character is back on or in it, so its exception stays); true when it was waiting.
+func stop_clearing(body: Node) -> bool:
+	if not _clearing.has(body):
+		return false
+	_clearing.erase(body)
+	return true
+
+
+## Drop the collision exception with each body `keep_clear_of` waits on that the body has cleared (once a physics frame,
+## after the move).
+func _restore_cleared() -> void:
+	for i in range(_clearing.size() - 1, -1, -1):
+		var body = _clearing[i]  # untyped, as the list
+		if not is_instance_valid(body):
+			_clearing.remove_at(i)
+		elif not _overlaps(body):
+			remove_collision_exception_with(body)
+			_clearing.remove_at(i)
+
+
+## Whether the body (its circle plus `CLEAR_MARGIN`) overlaps `body`'s collider on the solid layer.
+func _overlaps(body: Node) -> bool:
+	var circle := CircleShape2D.new()
+	circle.radius = radius + CLEAR_MARGIN
+	var params := PhysicsShapeQueryParameters2D.new()
+	params.shape = circle
+	params.collision_mask = PhysicsLayers.SOLID
+	params.exclude = [get_rid()]
+	params.transform = Transform2D(0.0, global_position)
+	for result in get_world_2d().direct_space_state.intersect_shape(params, 32):
+		if result["collider"] == body:
+			return true
+	return false
 
 
 ## The active interaction's HUD label, or "" when idle.

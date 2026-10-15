@@ -19,27 +19,13 @@ extends Node2D
 
 ## Physics layer the reach query tests (General's `PhysicsLayers.SOLID` — walls + solid furniture).
 const QUERY_MASK := PhysicsLayers.SOLID
-## Extra gap (px) required around the body before an object's collision is re-enabled on exit.
-const CLEAR_MARGIN := 3.0
 
 var _active: Dictionary = {}     ## The active interaction spec, or empty when idle.
 var _active_object: Node = null  ## The object the active interaction belongs to.
 ## Where the character stood when the interaction began; it returns here on exit.
 var _return_position := Vector2.ZERO
-## Object whose collision exception is pending removal once the body has cleared it (see below).
-var _clearing_object: Node = null
 
 @onready var _character := get_parent()  ## Character (CharacterBody2D) — position, aim, inventory.
-
-
-func _physics_process(_delta: float) -> void:
-	# Re-enable collision with a just-left object only once the body has fully separated from it,
-	# so restoring collision never finds an overlap for the solver to eject the object out of.
-	if _clearing_object == null:
-		return
-	if not _overlaps(_clearing_object):
-		_character.remove_collision_exception_with(_clearing_object)
-		_clearing_object = null
 
 
 ## Toggle interaction: end the current one (moving back), or start the best one in range.
@@ -146,9 +132,7 @@ func _begin(spec: Dictionary, object: Node) -> void:
 	_active = spec
 	_active_object = object
 	if spec.get("move_to", false):
-		if _clearing_object == object:
-			_clearing_object = null  # Re-entering the same object: keep its existing exception.
-		else:
+		if not _character.stop_clearing(object):  # Re-entering the object just left keeps its existing exception.
 			_character.add_collision_exception_with(object)
 		_character.global_position = object.global_position
 
@@ -161,27 +145,12 @@ func _end() -> void:
 	call_deferred("_teardown")
 
 
-## Restore the character to its start spot and hand the object off to the clearing check, which
+## Restore the character to its start spot and hand the object off to the character's `keep_clear_of`, which
 ## re-enables collision only once the body has separated from it (so no separation kick). Runs
 ## outside the physics step (deferred from _end), then clears the busy state.
 func _teardown() -> void:
 	_character.global_position = _return_position
 	if _active_object != null and _active.get("move_to", false):
-		_clearing_object = _active_object
+		_character.keep_clear_of(_active_object)
 	_active = {}
 	_active_object = null
-
-
-## Whether the body (its circle plus a clearance margin) currently overlaps `object`'s collider.
-func _overlaps(object: Node) -> bool:
-	var shape := CircleShape2D.new()
-	shape.radius = _character.radius + CLEAR_MARGIN
-	var params := PhysicsShapeQueryParameters2D.new()
-	params.shape = shape
-	params.collision_mask = QUERY_MASK
-	params.exclude = [_character.get_rid()]
-	params.transform = Transform2D(0.0, _character.global_position)
-	for result in get_world_2d().direct_space_state.intersect_shape(params, 32):
-		if result.collider == object:
-			return true
-	return false
