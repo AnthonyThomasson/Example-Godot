@@ -4,7 +4,7 @@ class_name ThrownGrenade extends Node2D
 ## furniture taller than the arc is high there (the same `coverage` scale as everything else) and the characters in its
 ## way, bounces off them with energy loss, skids to a stop and goes off when its fuse runs out. Docs: `docs/grenades.md`
 ## G3, G6 and G10. A world `Node2D` like `DroppedItem`; nobody picks it up or throws it back. While it lives it is in the
-## group `live_grenades` (`kind`, `fuse_left()`, `thrower`) for perception to query.
+## group `live_grenades` (`kind`, `fuse_left()`, `throw_stats()`, `thrower`) for perception to query.
 ##
 ## The lob is planned once at the throw (`plan`): its flight time and gravity are solved so the grenade comes to REST at
 ## the aim point (the touchdown, a bounce or two and the skid are simulated with the very integrator the node then
