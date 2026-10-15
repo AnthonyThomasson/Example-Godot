@@ -141,6 +141,8 @@ var _vehicle_use: Node  ## The CharacterVehicleUse child, built in _ready().
 
 
 func _ready() -> void:
+	# The group every domain finds the world's characters by (interface 7).
+	add_to_group(&"characters")
 	# Top-down: no floor/ceiling, so a moving body it touches is never ridden as a platform.
 	motion_mode = CharacterBody2D.MOTION_MODE_FLOATING
 	# Build the body's collision circle to match `radius`.

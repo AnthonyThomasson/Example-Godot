@@ -146,19 +146,13 @@ static func _dead(body: Object) -> bool:
 	return body.get("is_dead") == true
 
 
-## Every character under `world` (a node with `current_item()`, dead ones included).
+## Every character under `world` (the group `characters`, interface 7; dead ones included), in tree order.
 static func _characters(world: Node) -> Array:
 	var out: Array = []
-	_collect_characters(world, out)
+	for c: Node in world.get_tree().get_nodes_in_group(&"characters"):
+		if world.is_ancestor_of(c):
+			out.append(c)
 	return out
-
-
-## Append to `out` every character under `node`, at any depth.
-static func _collect_characters(node: Node, out: Array) -> void:
-	for child in node.get_children():
-		if child.has_method("current_item"):
-			out.append(child)
-		_collect_characters(child, out)
 
 
 ## The bodies a blast of `radius` at `at` may reach: what its circle overlaps on the solid layer (furniture, the living; walls

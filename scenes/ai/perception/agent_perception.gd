@@ -131,10 +131,6 @@ var _post := Vector2.ZERO        ## The NPC's spawn position, captured on the fi
 var _post_set := false           ## Whether _post has been captured yet.
 var _interactables: Array = []   ## Cached world objects that advertise interactions (static furniture).
 var _scanned := false            ## Whether the one-time interactable scan has run.
-var _characters: Array = []      ## Every node under the world root that is a character (this NPC included), in tree order.
-var _characters_root: Node = null  ## The world root `_characters` was scanned from.
-var _characters_stale := true    ## Whether a character entered or left the tree since the last scan.
-var _watching_tree := false      ## Whether the tree's node_added / node_removed are connected yet.
 var _seeded := false             ## Whether the familiar-NPC house-knowledge seed has run.
 var _learn_next := 0             ## First physics frame the next look for unknown rooms and furniture may run.
 var _learned_frame := -1         ## Physics frame of the latest such look (-1 = none yet).
@@ -730,44 +726,17 @@ func _collect(node: Node) -> void:
 		_collect(child)
 
 
-## Every other character in the world (a node with a current_item method, excluding the NPC itself),
-## found by scanning from the shared world root. Used by observe() to test each for visibility. The scan
-## walks every node under the root, so it is done once and kept: the list is rescanned only after a node
-## that is a character enters or leaves the tree (a spawn, a death that frees, a reparent), which is
-## the only way the answer changes. Tree order is kept, as the scan found them.
+## Every other character in the world (the group `characters`, interface 7) under the shared world root, excluding
+## the NPC itself, in tree order. Used by observe() to test each for visibility.
 func _other_characters(character) -> Array:
 	var root: Node = character.world_root()
 	if root == null:
 		return []
-	if not _watching_tree:
-		_watching_tree = true
-		var tree: SceneTree = character.get_tree()
-		tree.node_added.connect(_on_tree_node_changed)
-		tree.node_removed.connect(_on_tree_node_changed)
-	if _characters_stale or _characters_root != root:
-		_characters.clear()
-		_collect_characters(root, _characters)
-		_characters_root = root
-		_characters_stale = false
 	var out: Array = []
-	for c in _characters:
-		if c != character and is_instance_valid(c):
+	for c: Node in character.get_tree().get_nodes_in_group(&"characters"):
+		if c != character and root.is_ancestor_of(c):
 			out.append(c)
 	return out
-
-
-## A node joined or left the tree: the cached character list is out of date if that node is a character.
-func _on_tree_node_changed(node: Node) -> void:
-	if node.has_method("current_item"):
-		_characters_stale = true
-
-
-## Recursively gather descendants that expose current_item() (characters).
-func _collect_characters(node: Node, out: Array) -> void:
-	for child in node.get_children():
-		if child.has_method("current_item"):
-			out.append(child)
-		_collect_characters(child, out)
 
 
 # --- Combat geometry for the behaviour -------------------------------------------------------
