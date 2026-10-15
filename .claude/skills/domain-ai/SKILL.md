@@ -133,4 +133,5 @@ PERCEIVED: it fights a hostile's last-KNOWN position, loses a contact once its s
 becomes an investigation lead), and (unless `familiar_with_house`) must see rooms/objects before it can
 use them. The detail lives in `domain-ai-perception`, `domain-ai-decision` and `domain-ai-behavior`.
 
-**Interfaces:** 7 (Character ↔ Controller, the observer reads and overlay exports), 9 (AI → Navigation), 10 (EventBus), 11 (`PhysicsLayers`), 13 (`DecisionStub` / `DecisionServerLauncher` for tests), 17 (the human's `PlayerStack`) — signatures in `architecture`.
+**Interfaces:** 3 (`Explosion.shields` / `first_stop`, the blast's cover rule perception asks of a grenade), 6 (`ItemRegistry`'s
+slot ids, `throw_stats()`, `aim_target()`), 7 (Character ↔ Controller, the observer reads and overlay exports), 9 (AI → Navigation), 10 (EventBus), 11 (`PhysicsLayers`), 13 (`DecisionStub` / `DecisionServerLauncher` for tests), 17 (the human's `PlayerStack`) — signatures in `architecture`.
