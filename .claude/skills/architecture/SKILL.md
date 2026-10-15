@@ -177,7 +177,7 @@ interfaces it takes part in (by number) and describes how they're implemented.
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `hand_stance(hand) -> StringName` (how that
    hand is held — the name of a `CharacterConfig.stances` entry: `relaxed`, `guard`, `aim`, `support`;
-   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F), `strike_ahead()` / `strike_turn()` / `strike_swing(amount)` / `strike_end(aim, amount)` (a long gun's punch swings it nearly across the body, butt leading),
+   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F), the melee hooks the character's hands read, `strike_direction(aim, amount)` / `strike_end(aim, amount)` / `strike_forward()` / `strike_short()` / `strike_support_gap()` / `strike_tempo()` (a long gun's punch swings it nearly across the body, butt leading; `GunItem` overrides `strike_ahead()` / `strike_turn()`, from which the direction, end and forward follow, and the short, support gap and tempo),
    `secondary(user) -> bool` (LMB; true = a round left the barrel), `tick(delta)` (the item's own clocks; the character ticks
    every item it carries each physics frame), `is_automatic()` (holding the trigger keeps firing), `weapon_hand()`,
    `muzzle_ahead()` (px past the weapon hand where bullets leave; negative = the character's `CharacterConfig.muzzle_ahead`),
