@@ -50,7 +50,8 @@ over it;
 adopts the returned leaf into **Behaviour** (and radios it to allies); then has **Behaviour** `apply()`
 the running primitive.
 
-**Observer reads** (pure reads, never perturbing the loop): `debug_status()` is the decision path as labels plus the running
+**Observer reads** (pure reads, never perturbing the loop). The controller joins the group `npc_controllers` in its `_ready` (interface 7):
+that is how the HUDs tell an NPC's controller among a character's children (the UI's `hud_probe.gd`). `debug_status()` is the decision path as labels plus the running
 primitive's progress. `debug_state() -> Dictionary` is the deep snapshot: every level of the last walk (the state and question
 Von saw, the options, its probabilities and pick), the facts, the contacts, the running primitive and pathing (`loco`: the walk's
 `way` plain / round / held, `held_for`, `giving_way`), and `decisions` (walks started) with `decision_reason` (why the latest started:

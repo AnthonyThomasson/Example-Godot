@@ -228,7 +228,8 @@ inherits it and `main.tscn`'s `Player` instances it: a composer adds any `contro
 (`_find_controller()` runs at `_ready`) — the Testing domain adds its puppet `ScriptedController` or
 `player_controller.gd`.
 
-Every character has an exported `faction` (`&"player"` by default; the NPC presets set
+Every character joins the group `characters` in its `_ready` (interface 7): it is how the AI's perception and tactics, the Projectile
+System's `Explosion` and a vehicle tell a character in the world. Every character has an exported `faction` (`&"player"` by default; the NPC presets set
 `&"household"` / `&"invader"`), read by AI perception to tell allies from potential hostiles. A
 landed punch (or leg kick, `_on_kicked`, hand code `KICK_HAND`) is surfaced as `hit_landed` **and** posted as a `&"hit"` `EventBus` event with
 `attacker = self` (like a projectile's), so a punch counts as an attack for AI hostility. The event also carries
