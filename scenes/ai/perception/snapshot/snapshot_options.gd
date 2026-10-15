@@ -178,7 +178,6 @@ func grenade_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 		if not _throw.can_lob(space, self_pos, spot, _throw.range_of(kind), rids):
 			continue
 		var radius := _throw.radius_of(kind)
-		var ally := _ally_in_blast(ctx, kind, radius, spot)
 		var cornered := false
 		if _throw.in_zone(space, kind, radius, spot, self_pos, _throw.stand_height(), rids):
 			var way: Dictionary = _throw.escape(space, ctx["map"], kind, radius, spot, self_pos, _throw.fuse_of(kind), _throw.run_speed(ctx["character"]), rids)
@@ -188,26 +187,26 @@ func grenade_group(ctx: Dictionary, t: Dictionary, a: Dictionary) -> Dictionary:
 			"id": what, "label": "%s %s behind their cover" % [what, t["name"]],
 			"desc": "%s grenade onto where %s is hidden, behind the %s" % [what, t["name"], cover],
 			"params": { "point": spot, "kind": kind, "radius": radius, "slot": AgentThrow.SLOTS[kind], "target_id": t["id"] },
-			"tags": { "inside": _v.is_inside(spot), "ally_in_blast": ally != "", "ally_name": ally, "no_safe_spot": cornered },
+			"tags": { "inside": _v.is_inside(spot), "ally_in_blast": _ally_in_blast(ctx, kind, radius, spot), "no_safe_spot": cornered },
 		})
 	if options.is_empty():
 		return { "summary": "", "options": [] }
 	return { "summary": "%s is hidden behind the %s, within throwing range" % [t["name"], cover], "options": options }
 
 
-## The name of a known ally (seen, or one that radioed where it was) inside the danger zone of a grenade of `kind` and `radius` that
-## would burst at `spot`, or "".
-func _ally_in_blast(ctx: Dictionary, kind: StringName, radius: float, spot: Vector2) -> String:
+## Whether a known ally (seen, or one that radioed where it was) is inside the danger zone of a grenade of `kind` and `radius`
+## that would burst at `spot`.
+func _ally_in_blast(ctx: Dictionary, kind: StringName, radius: float, spot: Vector2) -> bool:
 	var found := {}
 	for al in ctx["allies"]:
-		found[al["id"]] = { "name": al["name"], "pos": al["pos"] }
+		found[al["id"]] = al["pos"]
 	for c in ctx["callouts"]:
 		if not found.has(c["id"]):
-			found[c["id"]] = { "name": c["name"], "pos": c.get("position", Vector2.INF) }
-	for ally: Dictionary in found.values():
-		if _throw.in_zone(ctx["space"], kind, radius, spot, ally["pos"], _throw.stand_height(), know["character_rids"]):
-			return ally["name"]
-	return ""
+			found[c["id"]] = c.get("position", Vector2.INF)
+	for pos: Vector2 in found.values():
+		if _throw.in_zone(ctx["space"], kind, radius, spot, pos, _throw.stand_height(), know["character_rids"]):
+			return true
+	return false
 
 
 
