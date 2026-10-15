@@ -1,8 +1,8 @@
 class_name GunConfig
 
 ## Tuning for the guns (Items domain). Static vars, like the other config holders, so a test or tool can
-## change them (tests restore them with `set_static`). One row per gun, by gun id (`GunItem.GUN` /
-## `Magazine.gun`); add a row and a `GunItem` subclass in `ItemRegistry.GUN_CLASSES` to add a gun.
+## change them (tests restore them with `set_static`). One row per gun, by gun id (`GunItem.gun` /
+## `Magazine.gun`); add a row, a `GunItem` subclass and a case in `ItemRegistry._new_gun` to add a gun.
 ##
 ## Row keys:
 ##   name              display name (HUD, and how the AI words it: "Your pistol is loaded").
