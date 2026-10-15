@@ -10,7 +10,7 @@ The in-game observers: each reads only the Character public API / signals (incl.
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
   item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
   `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), a grenades line (`Grenades: 1 stun, 2 frag`, "—" with none, read through `item_count(slot)` for the slots of `LoadoutConfig.grenade_options()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
-  (punch left/right or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Attaches to its character by the
+  (punch left/right, kick or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Attaches to its character by the
   exported `character_path`; listens to `hit_landed` on the character; freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
   Bottom left (26pt, growing up from the bottom edge: free in a player match, where the match HUD hides its combat feed), an `=== OUTFIT ===` block of
   `OutfitLines.of(outfit_view())`, refreshed every frame (`docs/outfits.md` O13). Tested by `tests/ui/debug_panel_outfit_test.gd`.
