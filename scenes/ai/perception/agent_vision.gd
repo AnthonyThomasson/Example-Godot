@@ -12,7 +12,7 @@ extends RefCounted
 ## straight line on the physics query layer. For SIGHT that line is forgiving: a standing agent looks
 ## OVER low furniture (a collider whose `coverage` is at or below `see_over_coverage` — tables, beds,
 ## islands, counters), so only walls and tall furniture (cabinets, wardrobes, fridges) break the line.
-## Set `enabled` to false to make everything visible (omniscient), restoring the pre-vision behaviour.
+## Set `enabled` to false to make everything visible (omniscient), for debugging.
 ##
 ## This "look over low cover" rule is SIGHT-only: `blocked()` / `raycast()` below stay fully physical
 ## (every solid collider counts) because they serve line-of-fire and cover, where a bullet is still
