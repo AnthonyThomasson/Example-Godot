@@ -121,6 +121,27 @@ static var flesh_hole_color: Color = Color(0.25, 0.02, 0.03)
 ## Color of the faint scorch halo around each wound; dark red so it reads as bruising.
 static var flesh_scorch_color: Color = Color(0.35, 0.02, 0.02)
 
+# --- Where a round strikes, and what is worn (docs/outfits.md O2 to O4, O10) ---------------
+# A bullet's height (0..100) over the posture's coverage picks the hit zone: up to each row's fraction, feet up; above the
+# last, the head. The same fractions standing and crouched. A hit with no height (a frag's blast) strikes the whole body.
+
+## `[zone, highest fraction]`, feet up; anything above the last row is the head.
+static var hit_zones: Array = [[&"feet", 0.08], [&"legs", 0.45], [&"torso", 0.85]]
+## The share of a round's damage each zone takes (melee, through `take_damage`, is not zoned).
+static var zone_damage: Dictionary = { &"feet": 0.6, &"legs": 0.6, &"torso": 1.0, &"head": 2.0 }
+## The side a round strikes: the angle (degrees) between the way back to the shooter and the shoulders' facing. Up to
+## `side_front_deg` is the front, from `side_back_deg` the back, the flank between.
+static var side_front_deg: float = 60.0
+static var side_back_deg: float = 120.0  ## From this angle (degrees) on, the round strikes the back.
+## What a body carries at its tuned speed (kg: ordinary clothes); only the outfit's weight above it slows and tires.
+static var outfit_free_weight: float = 2.0
+## Share of the move speed lost per kg worn above `outfit_free_weight` (a full plated kit, 12 kg over: about 8%), floored at
+## `outfit_speed_min`.
+static var outfit_speed_per_kg: float = 0.0067
+static var outfit_speed_min: float = 0.6  ## The least share of the move speed an outfit's weight leaves.
+## Extra share of stamina a run spends per kg worn above `outfit_free_weight` (the plated kit: about 1.3x).
+static var outfit_stamina_per_kg: float = 0.025
+
 # --- Pixel art (the body and hand painters; shared lighting/resolution is ArtConfig) ---
 ## Head radius as a fraction of the body's width.
 static var art_head_size: float = 0.19

@@ -30,5 +30,8 @@ var exit_normal: Vector2 = Vector2.ZERO
 ## Blood the striker carries when it strikes this object, 0..1 (0 = none): a bullet that just passed through a
 ## character and is still within its carry distance. The object shows it as a bloody mark.
 var blood: float = 0.0
+## The height the striker flew at, on the 0..100 coverage scale (a bullet's one height), which tells a body where it was
+## struck; -1 = none (a blast, which strikes the whole body).
+var height: float = -1.0
 ## The node that caused the hit (the projectile, the character, …). May be null.
 var source: Node = null

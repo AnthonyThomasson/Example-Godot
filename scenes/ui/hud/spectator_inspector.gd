@@ -4,13 +4,14 @@ extends CanvasLayer
 ## A LEFT-CLICK on an NPC selects it — revealing ONLY that NPC's debug overlays (the enabled ones) and
 ## hiding every other NPC's; clicking it again, or empty ground, clears the selection. With an NPC
 ## selected, a LEFT-CLICK on one of its tactical points (a zone marker) highlights that point and opens
-## a detail panel with its kind, label and the reasoning text Von read (cover, route, range). No NPC
-## shows any overlay until it is clicked — the debug view is always focused on one NPC at a time.
+## a detail panel with its kind, label and the reasoning text Von read (cover, route, range). While an NPC is
+## selected, a panel at the bottom right lists what it wears (its `outfit_view()`: each garment, each plate with its condition).
+## No NPC shows any overlay until it is clicked — the debug view is always focused on one NPC at a time.
 ##
 ## It runs PROCESS_MODE_ALWAYS so Space and clicks work while the tree is paused (freeze the match, then
 ## inspect). A decoupled observer like the other spectator UI: it reads only published surfaces — the
-## combatants' public `global_position`, the framing camera for the cursor's world point, and each NPC's
-## `debug_zones()` (duck-typed) for the point details — and flips the debug-overlay toggles by the same
+## combatants' public `global_position` and `outfit_view()`, the framing camera for the cursor's world point, and each
+## NPC's `debug_zones()` (duck-typed) for the point details — and flips the debug-overlay toggles by the same
 ## duck-typed property names `main.gd`'s `_configure_debug` uses (`show_actions` / `show_path` /
 ## `show_vision` / `show_tactics` / `show_room_zones`). Main builds it in spectator mode. Player-mode
 ## input is untouched: Space stays the player's INTERACT there (this node exists only in the match).
@@ -24,20 +25,26 @@ const ZONE_PICK_RADIUS := 20.0
 const GOAL_LEFT := 24.0
 const GOAL_WIDTH := 560.0
 const GOAL_BOTTOM := 356.0
+## The outfit panel's gap (px) from the screen width it keeps clear on the right (`setup`'s `right_clear`).
+const OUTFIT_GAP := 10.0
 
 const ContactMarkers := preload("res://scenes/ui/hud/contact_markers.gd")
+const OutfitLines := preload("res://scenes/ui/hud/outfit_lines.gd")
 
 var _combatants: Array = []  ## The NPCs to pick from (public nodes), handed in by Main.
 var _flags: Dictionary = {}  ## Which overlay toggles to enable on the selected NPC (from Main).
 var _selected: Node = null   ## The NPC whose overlays are shown, or null.
 var _selected_ctrl: Node = null ## The selected NPC's controller, cached for live marker refreshes.
 var _detail: Label           ## The clicked tactical point's detail text (hidden when none).
+var _outfit: Label           ## What the selected NPC wears, bottom right (hidden while nothing is selected).
 var _contact_markers: Node2D ## World-space overlay that draws the selected NPC's contact knowledge.
 
 
 ## Keep running while paused and build the hint + detail UI. `flags` is the set of overlay toggles the
-## setup menu enabled (property name -> bool); a selected NPC shows exactly those. Called by Main.
-func setup(combatants: Array, flags: Dictionary) -> void:
+## setup menu enabled (property name -> bool); a selected NPC shows exactly those. `right_clear` is the screen width (px) from
+## the right edge the outfit panel keeps clear: Main hands it the overlay toggle bar's column, which the seed readout sits under.
+## Called by Main.
+func setup(combatants: Array, flags: Dictionary, right_clear: float) -> void:
 	_combatants = combatants
 	_flags = flags
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -53,6 +60,17 @@ func setup(combatants: Array, flags: Dictionary) -> void:
 	_detail.offset_bottom = GOAL_BOTTOM + 8.0 + 240.0
 	_detail.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_detail.visible = false
+	# The selected NPC's outfit sits at the bottom, just left of the toggle bar's column, growing up and to the left.
+	_outfit = _make_label(HORIZONTAL_ALIGNMENT_LEFT, 22)
+	_outfit.anchor_left = 1.0
+	_outfit.anchor_right = 1.0
+	_outfit.anchor_top = 1.0
+	_outfit.anchor_bottom = 1.0
+	_outfit.offset_right = -(right_clear + OUTFIT_GAP)
+	_outfit.offset_bottom = -10.0
+	_outfit.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+	_outfit.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_outfit.visible = false
 	_select(null)  # start with every NPC's overlays hidden — nothing is shown until clicked
 
 
@@ -140,10 +158,22 @@ func _zone_at(world: Vector2) -> Dictionary:
 
 
 ## Refresh the contact markers every frame so the rings track characters as they move (and as the
-## selected NPC's knowledge of them updates). Runs while paused too, where the knowledge holds steady.
+## selected NPC's knowledge of them updates), and its outfit list as its plates wear. Runs while paused too,
+## where the knowledge holds steady.
 func _process(_delta: float) -> void:
 	if _selected != null:
 		_refresh_markers()
+		_refresh_outfit()
+
+
+## Show what the selected NPC wears (its `outfit_view()`), or hide the list when nothing (or no character) is selected.
+func _refresh_outfit() -> void:
+	if _outfit == null:
+		return
+	var shown := _selected != null and is_instance_valid(_selected) and _selected.has_method("outfit_view")
+	_outfit.visible = shown
+	if shown:
+		_outfit.text = "\n".join(["%s — OUTFIT" % _selected.name] + OutfitLines.of(_selected.outfit_view()))
 
 
 ## Select `npc` (null = none): show only the selected NPC's own overlays and cache its controller for
@@ -158,6 +188,7 @@ func _select(npc: Node) -> void:
 		if is_instance_valid(c):
 			_set_overlays(c, c == npc)
 	_refresh_markers()
+	_refresh_outfit()
 
 
 ## Push the selected NPC's current contact knowledge to the world-space marker overlay (empty when

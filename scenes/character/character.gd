@@ -90,6 +90,9 @@ var _stun_phase := Vector2.ZERO
 var _knockback := Vector2.ZERO
 ## Speed multiplier from pushing objects last frame (1.0 = unencumbered).
 var _push_slow := 1.0
+## What the character wears (Items domain; `set_outfit`): its armour, its weight and, for the art, its look. A new one wears
+## nothing (no armour, no weight).
+var _outfit := Outfit.new()
 
 ## Damage dents/chunks recorded when the character is shot; read by the visuals and the
 ## collider rebuild. The character is flesh — a hittable surface like furniture.
@@ -428,6 +431,23 @@ func set_loadout(slots: Array, hold_slot: int, spare_types: Array, loaded_magazi
 	_update_weapon_raise(0.0)
 
 
+## Dress the character in `ids` (`{ head, body, vest, pants, feet, front_plate, back_plate }`, String keys, StringName ids; a
+## missing or empty one = nothing there), replacing everything worn before: its armour, its weight and its look
+## (`docs/outfits.md`). How Main dresses a spawn (through `LoadoutConfig.apply`); a character never dressed wears nothing.
+func set_outfit(ids: Dictionary) -> void:
+	_outfit.set_ids(ids)
+
+
+## What the character wears (the `Outfit` the art reads its `look()` from).
+func outfit() -> Outfit:
+	return _outfit
+
+
+## What it wears, for the UI: each garment slot -> the garment's name ("" for nothing), each plate slot -> `{ type, name, condition }`.
+func outfit_view() -> Dictionary:
+	return _outfit.view()
+
+
 ## Rounds loaded in the item in `slot` (the held one by default), or -1 if it has no ammo.
 func ammo(slot := -1) -> int:
 	var item := _item_in(slot)
@@ -531,16 +551,27 @@ func _update_weapon_raise(delta: float) -> void:
 	_raise = move_toward(_raise, 1.0 if _blocked else 0.0, CharacterConfig.weapon_raise_speed * delta)
 
 
-## Walking speed (slower in a lower posture, and slowed to `CharacterConfig.stun_speed` while stunned), or run speed while
-## running (only possible standing and not stunned).
+## Walking speed (slower in a lower posture, slowed to `CharacterConfig.stun_speed` while stunned and by the outfit's weight), or
+## run speed while running (only possible standing and not stunned).
 func _move_speed() -> float:
 	return _speed_in(_posture, _running)
 
 
-## The speed (px/s) the body covers ground at in posture `which`, running or walking, as it is now (stunned or not).
+## The speed (px/s) the body covers ground at in posture `which`, running or walking, as it is now (stunned or not, and
+## weighed down by what it wears).
 func _speed_in(which: StringName, running: bool) -> float:
 	return speed * float(CharacterConfig.postures[which]["speed"]) * (CharacterConfig.run_speed_mult if running else 1.0) \
-			* lerpf(1.0, CharacterConfig.stun_speed, stun_level())
+			* lerpf(1.0, CharacterConfig.stun_speed, stun_level()) * _weight_speed()
+
+
+## The kg worn above what the body carries at its tuned speed (`CharacterConfig.outfit_free_weight`).
+func _extra_weight() -> float:
+	return maxf(_outfit.weight() - CharacterConfig.outfit_free_weight, 0.0)
+
+
+## The share of its speed the outfit's weight leaves the body (1 = unencumbered).
+func _weight_speed() -> float:
+	return maxf(1.0 - _extra_weight() * CharacterConfig.outfit_speed_per_kg, CharacterConfig.outfit_speed_min)
 
 
 ## The speed (px/s) it would cover ground at running, standing, as it is now (slowed while stunned): how a controller works out whether it
@@ -577,12 +608,13 @@ func _stand_if_busy() -> void:
 		_posture = &"stand"
 
 
-## Settle this frame's running and spend or regain stamina. Running dry latches `_exhausted`,
+## Settle this frame's running and spend or regain stamina (a heavier outfit spends it faster). Running dry latches `_exhausted`,
 ## which holds until stamina refills to `run_resume_fraction`.
 func _update_stamina(wants_run: bool, delta: float) -> void:
 	_running = wants_run and not _exhausted and stamina > 0.0
 	if _running:
-		stamina = maxf(stamina - delta / CharacterConfig.run_stamina_seconds, 0.0)
+		var strain := 1.0 + _extra_weight() * CharacterConfig.outfit_stamina_per_kg
+		stamina = maxf(stamina - delta * strain / CharacterConfig.run_stamina_seconds, 0.0)
 		if stamina <= 0.0:
 			_exhausted = true
 			_running = false
@@ -859,16 +891,79 @@ func get_surface() -> Dictionary:
 	}
 
 
-## Take a hit: shove along the impact (folded into locomotion via the pushable path),
-## record the deformation relative to the shoulders (it dents the drawn body and hands and turns
-## with them), spray blood debris, and start bleeding: a splatter spray now, then drips every few
-## seconds (BloodWound). The striker fills in a HitInfo.
+## The surface a round flying at `height` (0..100) along `direction` meets (the Projectile System asks before it resolves): the
+## body's own (`get_surface()`) where nothing protects it, else the armour over that zone and side (`Outfit.layer`): its
+## `penetration`, `material` and `color`, plus `stop_power` (a round below it is stopped) and `inner_material` (the flesh a round
+## that gets through strikes). A `height` below 0 is the plain surface.
+func get_surface_at(height: float, direction: Vector2) -> Dictionary:
+	var surface := get_surface()
+	if height < 0.0:
+		return surface
+	var armour := _outfit.layer(hit_zone(height), hit_side(direction))
+	if armour.is_empty():
+		return surface
+	surface["inner_material"] = surface["material"]
+	surface.merge({ "penetration": armour["penetration"], "material": armour["material"], "color": armour["color"],
+		"stop_power": armour["stop_power"] }, true)
+	return surface
+
+
+## The hit zone (`&"feet"`, `&"legs"`, `&"torso"`, `&"head"`) a round at `height` (0..100) strikes: its height over the
+## posture's coverage against `CharacterConfig.hit_zones`. `&""` for no height (below 0: a blast, the whole body).
+func hit_zone(height: float) -> StringName:
+	if height < 0.0:
+		return &""
+	var share := height / maxf(posture_coverage(_posture), 0.001)
+	for row: Array in CharacterConfig.hit_zones:
+		if share <= float(row[1]):
+			return row[0]
+	return &"head"
+
+
+## The side (`&"front"`, `&"flank"`, `&"back"`) a blow travelling along `direction` strikes: the angle between the way back
+## along it and the shoulders' facing (`pose.torso_angle`) against `CharacterConfig.side_front_deg` / `side_back_deg`.
+func hit_side(direction: Vector2) -> StringName:
+	if direction.length() < 0.001:
+		return &"front"
+	var off := rad_to_deg(absf(Vector2.from_angle(pose.torso_angle).angle_to(-direction)))
+	if off <= CharacterConfig.side_front_deg:
+		return &"front"
+	return &"back" if off >= CharacterConfig.side_back_deg else &"flank"
+
+
+## Take a hit: shove along the impact (folded into locomotion via the pushable path), then hurt by where it struck (the
+## striker fills in a HitInfo; `docs/outfits.md` O2 to O9). A round's zone (`hit_zone` of its `height`) scales its damage
+## (`CharacterConfig.zone_damage`). Where armour covers that zone and side (`Outfit.layer`), the hit wears its plate, and a round
+## that did not get through it (`penetrated` false: stopped or glanced off) deals only the armour's `blunt` share: no wound, no
+## blood, its debris the armour's; one that got through deals all but the armour's `reduction`. A hit with no height (a frag's
+## blast) strikes the whole body, cut by the torso armour's `blast`. A wound records the deformation relative to the shoulders
+## (it dents the drawn body and hands and turns with them), sprays blood debris and starts the bleeding (BloodWound).
 func take_hit(hit: HitInfo) -> void:
 	apply_impulse(Physics.impact_impulse(hit))
+	var side := hit_side(hit.direction)
+	if hit.height < 0.0:
+		_wound_by(hit, hit.damage * (1.0 - float(_outfit.layer(&"torso", side).get("blast", 0.0))))
+		return
+	var zone := hit_zone(hit.height)
+	var damage := hit.damage * float(CharacterConfig.zone_damage.get(zone, 1.0))
+	var armour := _outfit.layer(zone, side)
+	if armour.is_empty():
+		_wound_by(hit, damage)
+		return
+	_outfit.wear(zone, side, hit.damage)
+	if hit.penetrated:
+		_wound_by(hit, damage * (1.0 - float(armour["reduction"])))
+		return
+	Physics.spawn_debris(get_parent(), hit, get_surface().merged({ "material": armour["material"], "color": armour["color"] }, true))
+	_apply_damage(damage * float(armour["blunt"]), hit.direction)
+
+
+## A hit that wounds: the dent, the blood debris and the bleeding, and `damage` off health.
+func _wound_by(hit: HitInfo, damage: float) -> void:
 	_deformable.record(hit, pose.torso_angle)
 	Physics.spawn_debris(get_parent(), hit, get_surface())
 	_wound.record(hit)
-	_apply_damage(hit.damage, hit.direction)
+	_apply_damage(damage, hit.direction)
 
 
 ## Reduce health by `amount`; called by the punch path (projectile path goes through take_hit).

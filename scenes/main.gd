@@ -30,12 +30,20 @@ extends Node2D
 ## Which side a human player takes when there is one ("defender" / "invader"). The player joins that
 ## side on top of its NPC count, carrying the side's loadout.
 @export var player_side: StringName = &"defender"
-## What the defenders (and a player defending) carry: `{ weapon, magazine, spares, stuns, frags }`, anything
-## missing = the `LoadoutConfig` default (a random gun with its own magazine and spares, no grenades).
+## What the defenders (and a player defending) carry and wear: `{ weapon, magazine, spares, stuns, frags, outfit }`, anything
+## missing = the `LoadoutConfig` default (a random gun with its own magazine and spares, no grenades, and
+## `LoadoutConfig.default_outfit`'s plain clothes: a t-shirt, jeans and shoes).
 @export var defender_loadout: Dictionary = {}
-## What the invaders (and a player invading) carry; same shape as `defender_loadout`. They come with a stun grenade
-## and a frag grenade each.
-@export var invader_loadout: Dictionary = { "stuns": 1, "frags": 1 }
+## What the invaders (and a player invading) carry and wear; same shape as `defender_loadout`. They come with a stun grenade
+## and a frag grenade each, in a helmet, a shirt, a plate carrier with a steel III plate front and back, tactical pants
+## and boots.
+@export var invader_loadout: Dictionary = {
+	"stuns": 1, "frags": 1,
+	"outfit": {
+		"head": &"helmet", "body": &"shirt", "vest": &"plate_carrier", "pants": &"tactical_pants", "feet": &"boots",
+		"front_plate": &"steel_iii", "back_plate": &"steel_iii",
+	},
+}
 ## Endless run: seconds between a match ending and the next one starting.
 @export var endless_delay: float = 5.0
 ## Endless run: seconds before an undecided match is called a draw, so a stalemate can't stall the run
@@ -159,6 +167,7 @@ func _ready() -> void:
 		_setup_menu.open(_with_saved_setup(defaults).merged({
 			"weapons": LoadoutConfig.options(),
 			"grenades": LoadoutConfig.grenade_options(),
+			"outfits": LoadoutConfig.outfit_options(),
 			"ticket": _ticket(),
 		}))
 
@@ -177,7 +186,7 @@ func _ticket() -> String:
 
 
 ## The setup window's `defaults` with what the player chose last time (kept in the settings file) over them, side by
-## side: a choice an older save does not name (the grenade counts) keeps its default.
+## side: a choice an older save does not name (the grenade counts, the outfit) keeps its default.
 func _with_saved_setup(defaults: Dictionary) -> Dictionary:
 	var out := defaults.merged(Settings.setup, true)
 	for side in ["defenders", "invaders"]:
@@ -186,7 +195,7 @@ func _with_saved_setup(defaults: Dictionary) -> Dictionary:
 	return out
 
 
-## A side's setup-window defaults: `{ count, weapon, magazine, spares, stuns, frags }` from its count and loadout.
+## A side's setup-window defaults: `{ count, weapon, magazine, spares, stuns, frags, outfit }` from its count and loadout.
 func _side_defaults(count: int, loadout: Dictionary) -> Dictionary:
 	var out := LoadoutConfig.normalize(loadout).merged({ "count": count })
 	if out["spares"] < 0:
@@ -239,7 +248,7 @@ func _side_value(side: Variant, key: String, fallback: Variant) -> Variant:
 func _side_loadout(side: Variant, fallback: Dictionary) -> Dictionary:
 	var out := fallback.duplicate()
 	if side is Dictionary:
-		for key in ["weapon", "magazine", "spares", "stuns", "frags"]:
+		for key in ["weapon", "magazine", "spares", "stuns", "frags", "outfit"]:
 			if side.has(key):
 				out[key] = side[key]
 	return out
@@ -406,7 +415,7 @@ const LOADOUT_SEED_SALT := 0x4C4F4144
 
 ## Arm the player (when there is one) and every NPC with their side's loadout (`defender_loadout` /
 ## `invader_loadout`): the chosen gun with its magazine and spares, or for "random" one gun drawn per
-## character. Drawn from the house seed, so a pinned seed pins the random guns too. Tests and sandboxes
+## character, and dress each in the side's outfit. Drawn from the house seed, so a pinned seed pins the random guns too. Tests and sandboxes
 ## build their own characters and never come through here, so they keep the weapon they ask for.
 func _arm_characters(characters: Array) -> void:
 	var rng := RandomNumberGenerator.new()
@@ -459,7 +468,7 @@ func _setup_spectator(combatants: Array) -> void:
 	var npc_flags := _overlay_flags.duplicate()
 	for flag in OVERLAY_REGISTRY.GLOBAL:  # global overlays, not per NPC
 		npc_flags.erase(flag)
-	inspector.setup(combatants, npc_flags)
+	inspector.setup(combatants, npc_flags, OVERLAY_TOGGLES.RESERVED_WIDTH)  # its outfit panel keeps clear of the bar's column
 	var debug := get_node_or_null("DebugUI")
 	if debug:
 		debug.queue_free()
@@ -543,7 +552,7 @@ func _process(delta: float) -> void:
 
 
 ## Choose the next endless match's parameters: a new seed, each side's count drawn from 1..its setup
-## count (a side set to 0 stays empty) and a random gun for each side, with the grenades it was set up with.
+## count (a side set to 0 stays empty) and a random gun and outfit for each side, with the grenades it was set up with.
 ## Everything the player picked in the setup window is the upper limit; the rest is luck.
 func _randomize_match() -> void:
 	var rng := RandomNumberGenerator.new()

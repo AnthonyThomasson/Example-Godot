@@ -5,8 +5,11 @@ extends RefCounted
 ## full strip the caller maps onto the trunk's rounded outline (which gives it its shape and outline).
 ## Canonical frame: shoulders toward −y, hips toward +y, across the body along x. The shirt runs down
 ## to the belt and pants cover the hips; the front has a collar and buttons, the back a seam and the
-## optional backpack, the side a seam. Options (`opts`, defaulting to CharacterConfig.art_*): `face`
-## ("front" | "back" | "side"), `pants`, `backpack`, `pack`.
+## optional backpack, the side a seam. A t-shirt (`sleeves` "short") has a round neck and no buttons; a vest is drawn over the
+## shirt (vest_painter.gd). Options (`opts`, defaulting to CharacterConfig.art_*): `face` ("front" | "back" | "side"), `pants`,
+## `backpack`, `pack`, `sleeves` and the vest's (body_painter.gd).
+
+const VestPainter = preload("res://scenes/character/body/vest_painter.gd")
 
 const _PANTS_HEIGHT := 3  ## Heights for cast shadows, floor-up.
 const _SHIRT_HEIGHT := 4
@@ -33,19 +36,25 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 
 	match face:
 		"front":
-			c.line(Vector2i(cx - 3, 1), Vector2i(cx, 4), t.shadow)
-			c.line(Vector2i(cx + 3, 1), Vector2i(cx, 4), t.shadow)
-			for y in range(7, waist - 2, 4):
-				c.px(cx, y, t.dark)
+			if String(opts.get("sleeves", "")) == "short":
+				c.line(Vector2i(cx - 3, 1), Vector2i(cx - 1, 3), t.dark)
+				c.line(Vector2i(cx + 3, 1), Vector2i(cx + 1, 3), t.dark)
+				c.px(cx, 3, t.dark)
+			else:
+				c.line(Vector2i(cx - 3, 1), Vector2i(cx, 4), t.shadow)
+				c.line(Vector2i(cx + 3, 1), Vector2i(cx, 4), t.shadow)
+				for y in range(7, waist - 2, 4):
+					c.px(cx, y, t.dark)
 			c.line(Vector2i(belt_in, waist), Vector2i(c.w - belt_in - 1, waist), pt.outline, _PANTS_HEIGHT)
 			c.px(cx, waist, Color(0.75, 0.7, 0.5), _PANTS_HEIGHT)
 		"back":
 			c.line(Vector2i(cx, 3), Vector2i(cx, waist - 2), t.dark)
 			c.line(Vector2i(belt_in, waist), Vector2i(c.w - belt_in - 1, waist), pt.outline, _PANTS_HEIGHT)
-			if opts.get("backpack", false):
-				_backpack(c, cx, waist, opts.get("pack", CharacterConfig.art_pack_color))
 		_:
 			c.line(Vector2i(cx, 2), Vector2i(cx, waist - 2), t.dark)
+	VestPainter.paint_face(c, face, waist, opts)
+	if face == "back" and opts.get("backpack", false):
+		_backpack(c, cx, waist, opts.get("pack", CharacterConfig.art_pack_color))
 	c.cast_shadows()
 
 

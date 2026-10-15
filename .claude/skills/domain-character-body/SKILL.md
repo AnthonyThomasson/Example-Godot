@@ -1,14 +1,14 @@
 ---
 name: domain-character-body
-description: Deep implementation detail for the Character body sub-domain (scenes/character/body/) — the standing skeleton and its solved joints (CharacterRig), the living motion of head, shoulders, hips and hands (CharacterPose), leg/foot clamping against walls (CharacterLegs), hand geometry, the punch and its hit detection (CharacterHands), the ragdoll fall on death, and all the drawing (CharacterVisuals: standing body, fallen body, shadows, wounds) through the body/head/hand/limb/torso pixel-art painters. Use when editing scenes/character/body/ or working on the walk cycle, run pose, crouch look, how a weapon is held (stances), punch detection, the fallen body, the character's pixel art or redraw key. Complements the `domain-character` overview and the `architecture` skill.
+description: Deep implementation detail for the Character body sub-domain (scenes/character/body/) — the standing skeleton and its solved joints (CharacterRig), the living motion of head, shoulders, hips and hands (CharacterPose), leg/foot clamping against walls (CharacterLegs), hand geometry, the punch and its hit detection (CharacterHands), the ragdoll fall on death, and all the drawing (CharacterVisuals: standing body, fallen body, shadows, wounds) through the body/head/hand/limb/torso/vest pixel-art painters, and the outfit's look (garments, vest, plate wear). Use when editing scenes/character/body/ or working on the walk cycle, run pose, crouch look, how a weapon is held (stances), punch detection, the fallen body, the character's pixel art, how an outfit is drawn or the redraw key. Complements the `domain-character` overview and the `architecture` skill.
 ---
 
 # Character · Body sub-domain (`scenes/character/body/`)
 
 Everything that gives the character a body: `character_rig, character_legs, character_pose, character_ragdoll, character_hands`
-(animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso` painters (draw). `character.gd` (the root body, see
+(animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso / vest` painters (draw). `character.gd` (the root body, see
 `domain-character`) owns state and physics and steps these each frame; nothing here decides what the character *does*. Cross-domain
-edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), and
+edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), the character's `Outfit` (Items: `look()`, `revision`), and
 `CharacterConfig` (this domain's tuning holder, in `character/`). `character_base.tscn` attaches
 `character_hands.gd` and `character_visuals.gd` as the `Hands` / `Visuals` children (the NPC scenes and `main.tscn`'s `Player` inherit or instance it); the rest are `RefCounted` helpers the character owns.
 
@@ -27,11 +27,13 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   `draw_order` records what the last living draw painted (`weapon`, `torso`, `hands`, `head`) for `tests/character/head_over_gun_test.gd`. Once dead it draws the fallen body instead (below).
   **A standing body is repainted only when its drawing changes.** Each frame `_process` solves the rig once
   (shared by the body's and the shadow's draw) and rounds its inputs to a key: every joint and foot, the
-  shoulder / head / fist / weapon angles, the weapon raise (`REDRAW_RAISE_STEP`), the held slot, and the wound count and damage. The key is rounded
+  shoulder / head / fist / weapon angles, the weapon raise (`REDRAW_RAISE_STEP`), the held slot, the wound count and damage, and the resolved look's hash (`_look_key`, the outfit below). The key is rounded
   to `REDRAW_POS_STEP` (0.1 px) and `REDRAW_ANGLE_STEP` (0.02 rad), below a visible pixel at the body's
   size; `queue_redraw()` (body and shadow) runs only when the key changes. A character standing still drifts
   by less than a step most frames (breath, glance), so it repaints about once in 15 frames; a walking one
-  every frame. `redraws` counts the standing body's draws for tests. A new input to the standing draw must
+  every frame. `redraws` counts the standing body's draws for tests, and `drawn_art()` returns the textures the last draw painted (limbs, fists,
+  shoulders or trunk faces, head; not the held item), standing, crouched or fallen: pixel art is cached by what it depicts, so the same drawing gives the
+  same textures (`tests/character/outfit_art_test.gd` reads it). A new input to the standing draw must
   join `_redraw_key_of`, or the body will not repaint when it changes. Test:
   `tests/character/standing_body_repaints_on_change_test.gd`; the idle crowd's frame cost is guarded by
   `tests/perf/crowd_deaths_stress_test.gd`.
@@ -170,11 +172,12 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   shoulder ellipse from above. Each hull grows by `HULL_OVERLAP` so neighbours overlap in area
   (seen edge-on they share only a line, and the union can come apart, flashing the torso as one
   small slice for a frame as the body landed); a union still in pieces falls back to the two slices'
-  convex hull. Test: `tests/character/fallen_trunk_outline_steady_test.gd`. It fills with the shirt, then the art of the side most turned to the
-  camera mapped across it (UVs from that side's projected axes; the art is requested at whole pixels, because the spine's
-  length flexes every frame and an exact size would paint and cache a new texture each frame): the standing `BodyPainter`
-  shoulders on top, or `torso_painter.gd` (a full strip: shirt with collar and buttons down to a
-  belt, pants on the hips; the back with a seam and the backpack; a flank), then a 1 px outline.
+  convex hull. Test: `tests/character/fallen_trunk_outline_steady_test.gd`. It fills with the shirt, then maps the trunk's sides across it
+  (`_trunk_faces` / `_face_art`: UVs from each side's projected axes; the art is requested at whole pixels, because the spine's
+  length flexes every frame and an exact size would paint and cache a new texture each frame): first the most visible of chest, back and flank,
+  `torso_painter.gd` (a full strip that covers the outline: shirt with a collar and buttons, or a t-shirt's round neck, down to a belt, pants on the
+  hips; the vest's face over it; the back with a seam and the backpack; a flank), and over it, when the top is turned up more still (a crouch's
+  bent back, a body upright as it starts to fall), the standing `BodyPainter` shoulders, which cover only the shoulders; then a 1 px outline.
 - Wounds: each recorded impact sits on the trunk's surface around the body where it struck (its
   angle in the shoulders' frame) at a seeded height between waist and chest, drawn with
   `Deformation.draw_marks` only while that patch faces the camera — chest wounds on a body lying on
@@ -192,7 +195,8 @@ over from the last frame (`_stack`): a pair swaps only once their heights differ
   `body_crouch_foot_gap`), stands the feet ahead of the pelvis so the knees lead (`body_crouch_foot_ahead`), staggers the weapon hand's foot back
   (`body_crouch_stagger`) and shortens the stride (`body_crouch_stride`). The rig also answers `torso()` and `face()`, so a body folded past
   `FOLD_DRAW` is drawn by `_draw_lying`: `_draw_fallen(rig, false, weapon)` (a lofted trunk showing its back, the limbs by height), then the weapon and
-  fists on top, with its shadow from `_draw_fallen_shadow`.
+  fists on top, with its shadow from `_draw_fallen_shadow`. A crouched body's 25° pitch turns the top most to the camera, so its trunk is the back's
+  art (seam, backpack, the vest's back panel and plate wear) with the shoulders' over it.
   **Arms:** the shoulders sprite and head are drawn at the rig's `CHEST` / `HEAD` xy (`shoulder_centre()` / `head_centre()` on the visuals), so a
   crouch's forward lean carries them with the sleeves. `posture_hand_ahead()` (`body_crouch_hand_ahead` x `posture_folded()`) is added to every
   hand's stance `forward` (`CharacterHands._raw_hand_position`) and to the wall-raise ray's reach, so the arms keep their reach past the leaning
@@ -230,12 +234,20 @@ Test: `tests/character/run_pose_test.gd`.
 ## Pixel art
 
 The character is top-down pixel art rendered through the Art domain (interface 12):
-- Five private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
-  (`body_color`) with sleeve seams, the dark neck ring and an optional backpack with straps;
+- Six private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
+  (`body_color`) with sleeve seams, a shirt's collar points and button placket or a t-shirt's round neckband (`sleeves`), the dark neck ring,
+  the vest over them and an optional backpack with straps;
   `head_painter.gd` — skin with ears and a nose toward the front under a `hair_style` (`short` /
-  `long` / `buzz` / `beanie` / `cap`) in `hair_color`, on its own canvas (`radius_for(width)`,
+  `long` / `buzz` / `beanie` / `cap` / `helmet`: a shell a pixel wider than the head over the hair and ears, only the nose showing in front, with a
+  rim, a crown seam, side rails and a brow mount) in `hair_color`, on its own canvas (`radius_for(width)`,
   `canvas_for(r)`); `hand_painter.gd` — a fist with knuckles to the front and the thumb on the
-  inner side (`side`); `limb_painter.gd` — the shaded strip of one arm, leg or shoe segment, which
+  inner side (`side`); `vest_painter.gd` — the vest, called by the body painter (`paint_top`, seen from above) and the torso painter
+  (`paint_face`, the trunk's front / back / side): a soft `vest` (a padded panel cut to the shoulders, the shoulder caps bare, a velcro patch; a zip on
+  the face) or a plate `carrier` (front and back panels past the shoulders, straps, three magazine pouches in front, a drag handle on the back, a raised
+  bevelled panel where a plate sits, the cummerbund on the flank); a plate's wear is `WEAR_STEPS` (4) steps of `_MARKS_PER_STEP` (2) marks from one fixed
+  sequence per side (a dark crack, then a scuff torn through to the plate's colour; pale chips on ceramic, grey on steel), so each step adds to the last;
+  `limb_painter.gd` — the shaded strip of one arm, leg or shoe segment (options `cuff`, and `pattern` × `part`: `jeans` stitched outer seams and a faded
+  thigh, `tactical` a cargo pocket, a knee pad and a shin seam, `boots` a laced foot with a toe cap and the shaft's padded rim), which
   the visuals map onto the limb's tapered capsule between two rig joints (the same drawing the
   fallen body uses: `_arm_chain` / `_leg_chain` / `_draw_chain`). Standing, the sleeve and forearm
   of each arm and the leg and shoe on each side draw under or around the shoulders (legs lowest,
@@ -262,7 +274,19 @@ The character is top-down pixel art rendered through the Art domain (interface 1
 - Look exports on `Visuals`: `body_color`, `hand_color` (skin or glove), `skin_color`,
   `hair_color`, `hair_style`, `backpack`, `pack_color`, and `pants_color` / `shoe_color` (the legs and shoes, seen
   where they stride out from under the body). The defender preset wears a navy cap, khaki pants and brown shoes; the invader a dark
-  beanie, gloves, a backpack and dark jeans. Proportions/defaults: `CharacterConfig.art_*`.
+  beanie, gloves, a backpack and dark jeans. Proportions/defaults: `CharacterConfig.art_*`. The exports are the look **where the outfit names
+  nothing**; each (but `hand_color`) has a setter that re-resolves the look.
+- **The outfit's look** (`docs/outfits.md` O12). `_dress()` resolves the look from `character.outfit().look()` over the exports, and builds the painters'
+  option dicts once per change (shoulders, torso per face, head, forearm, each leg's parts). Each part the outfit names overrides its export: the head
+  `kind` (`cap`, `helmet`) the hair style and colour; the body `kind` the sleeves (`short_sleeves`: bare forearms and a round neck; `long_sleeves`: the
+  forearm in shirt fabric with a cuff, a collar and buttons), the shirt in the garment's colour or else `body_color` (the team colour: NPC scenes author
+  it); the vest `kind` (`vest`, `carrier`), its colour and each plate's colour and wear step `ceil((1 − condition) × WEAR_STEPS)`; the pants `kind`
+  (`jeans`, `tactical`) and colour; the feet (`boots`: the shin's lower part, from `BOOT_TOP` 0.62 down to the ankle, becomes the boot's shaft,
+  `BOOT_GROW` 0.06 body radii wider; `shoes`) and colour. **With no outfit** the painters get only their base option keys (no `sleeves`, `vest`, plate or
+  `pattern` key), so a body without an outfit is drawn with its look exports. For every body, dressed or not, the crouched and falling trunk
+  map the most visible of chest, back and flank under the shoulders' art (`_trunk_faces`, above). `_dress` runs only when `Outfit.revision` moves (one int compare a frame) or a look export is set; when the
+  resolved look's hash `_look_key` changes it joins the redraw key and a settled fallen body repaints (`_settled_drawn = false`), also on its first
+  frame back in view after a change made off screen. Gloves are not modelled: `hand_color` stays the export.
 
 Ordering: a parent's `_physics_process` runs before its children's, so the hands see the
 character's fresh `facing`, and the character pulls its controller's intent at the top of its own

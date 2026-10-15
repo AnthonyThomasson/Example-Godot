@@ -14,7 +14,7 @@ bodies. The pieces: `projectile.gd` (the bullet), `character.gd` and `character_
 keeps it for its whole flight, through ricochets and penetrations. It strikes every collider whose coverage
 is above that height and flies over every collider at or below it. A collider of coverage C is therefore
 cleared with chance (100 − C) / 100 (coverage 30 is cleared 70% of the time, coverage 100 never), and the same height
-serves everything along the path.
+serves everything along the path. On a body it also picks the hit zone struck, and so the damage (feet, legs, torso, head: `docs/outfits.md` O2, O3).
 `BallisticsConfig.bullet_height` pins it (0 to 100) for tests; negative is random. `cover_flyover_scale`
 scales how much is flown over (0: nothing is, every shot meets what it reaches).
 Tests: `cover_shared_bullet_height`, `posture_hit_chance`.

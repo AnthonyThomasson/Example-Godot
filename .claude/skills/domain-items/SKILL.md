@@ -1,6 +1,6 @@
 ---
 name: domain-items
-description: Deep implementation detail for the Items domain (scenes/items/) — the things the character holds and the actions they perform (fists, the guns — pistol, SMG, assault rifle —, key, unarmed). Use when editing scenes/items/ or working on item slots, the Item contract, adding a new item or gun, GunConfig (damage, fire rate, penetration, spread, recoil), how a long gun is held and raised against a wall, magazines, an item dropped on death (DroppedItem), or a gun's link into the projectile system. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Items domain (scenes/items/) — the things the character holds and the actions they perform (fists, the guns — pistol, SMG, assault rifle —, key, unarmed). Use when editing scenes/items/ or working on item slots, the Item contract, adding a new item or gun, GunConfig (damage, fire rate, penetration, spread, recoil), how a long gun is held and raised against a wall, magazines, an item dropped on death (DroppedItem), outfits (OutfitConfig garments and armour plates, Outfit: armour layers, plate wear, weight, look), loadouts, or a gun's link into the projectile system. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Items domain
@@ -93,10 +93,47 @@ Write an `Item` subclass in `items/` and add a case in `ItemRegistry.create`. To
 
 `LoadoutConfig` (static holder) is what a match hands a character: `options()` is the plain-data list a UI shows — **Random**
 first, then every gun in `GunConfig.guns` by slot, each with its `MagazineConfig` types (its own `magazine` first) — so a gun
-added to `GunConfig` is offered automatically. `normalize(loadout)` makes a `{ weapon, magazine, spares }` dict valid,
+added to `GunConfig` is offered automatically; `grenade_options()` and `outfit_options()` (below) are the grenade and outfit rows.
+`normalize(loadout)` makes a `{ weapon, magazine, spares, stuns, frags, outfit }` dict valid (the outfit through `outfit_of`, which clears both plates
+unless the vest holds plates),
 `apply(character, loadout, rng)` calls `Character.set_loadout` (bare hands, fists, key and the one gun, loaded with the chosen
-magazine and carrying `spares` of it; `random` draws a gun from `rng`) and returns the gun id, `random(rng)` draws a valid
-loadout. `ItemRegistry.create` / `inventory_for` take an optional loaded-`magazine` override.
+magazine and carrying `spares` of it; `random` draws a gun from `rng`) and `Character.set_outfit` (the whole outfit, replacing what it
+wore) and returns the gun id, `random(rng)` draws a valid loadout, its outfit (`random_outfit(rng)`: each slot any of its choices, None
+included, then made valid by `outfit_of`, so a plate drawn without a carrier is cleared) drawn after the gun, so a seed's gun does not depend on it. `ItemRegistry.create` / `inventory_for` take an optional loaded-`magazine` override.
+
+## Outfits (`outfit_config.gd`, `outfit.gd`; spec `docs/outfits.md` O1 to O11)
+
+What a character wears. `OutfitConfig` (static holder; tests retune it with `set_static`) has the slots — `GARMENT_SLOTS` `head body vest pants feet`
+and `PLATE_SLOTS` `front_plate back_plate`, String keys like a loadout's; `PLATE_SIDE` (the torso side each plate covers), `ZONES` (`feet legs torso head`),
+`SIDES` (`front flank back`), `optional_slots` (head, vest; the plate slots may always be empty) — and two tables of rows by StringName id
+(`&""` = nothing worn):
+
+- `garments`: `name`, `slot`, `weight` (kg), `plates` (true = holds a front and back plate: the plate carrier only), `look` (`kind`, the painter's style name:
+  `cap`, `helmet`, `short_sleeves`, `long_sleeves`, `vest`, `carrier`, `jeans`, `tactical`, `shoes`, `boots`; and `color`, absent for the t-shirt and shirt, which
+  take the team colour) and, for the helmet, the tactical vest and the plate carrier, `armour`: `zones`, optional `sides` (absent = all round) and the
+  protection numbers.
+- `plates` (soft IIIA insert, steel III, ceramic IV): the protection numbers plus `name`, `weight` and `durability`.
+
+The protection numbers: `stop_power` (round-power units: a round whose power × speed factor is below it is stopped), `penetration` (P, what a round that
+gets through loses speed against; P ≥ `BallisticsConfig.penetration_bounce_min` ricochets a glancing one: the steel plate), `material` / `color` (what a
+stopped round strikes: debris, the hit event, the impact sound), `blunt` (share of a stopped round still dealt), `reduction` (share cut from one that gets
+through) and `blast` (share cut from a frag's blast). Helpers: `garment(id)`, `plate(id)`, `slots()`, `may_be_empty(slot)`, `choices(slot)`, `fits(slot, id)`,
+`name_of(slot, id)`.
+
+`Outfit` (`RefCounted`) is one character's worn set; the Character owns one (`Character.set_outfit` / `outfit()`). `Outfit.new(ids)` / `set_ids(ids)` replace
+everything worn (an unfitting id = nothing; a plate is kept only while the vest `holds_plates()`; a plate left in its slot keeps its condition, a new one
+starts at 1). Reads: `ids()`, `worn(slot)`, `condition(slot)` (1 new .. 0 spent). `layer(zone, side)` is the armour a round meets there — `{}`, or the
+strongest covering garment's numbers, or over them the plate on that side: its numbers, its stop power `lerp(panel's, max(plate's, panel's), condition)`,
+`reduction` and `blast` the larger of the two — as `{ stop_power, penetration, material, color, blunt, reduction, blast, plate }`. `wear(zone, side, damage)`
+wears the plate there by `damage / durability` (floored at 0; only plates wear; a hit that changes nothing is skipped). `weight()` is the kg worn.
+`look()` (the art: each garment slot worn -> `{ id, kind, color? }`, each plate -> `{ id, condition, color }`), `view()` (the UI: each garment slot -> its
+name, "" for none; each plate slot -> `{ type, name, condition }`) and `revision` (bumped by `set_ids` and by a `wear` that lowered a condition: the art
+checks it once a frame). `LoadoutConfig.outfit_options()` is the setup window's rows (`[{ slot, label, choices: [{ id, label }] }]`, `OUTFIT_LABELS`, a
+"None" choice first where a slot may be empty; a garment choice whose row `plates` is marked `plates: true`, the plate carrier's, and each plate slot's
+row `plate: true`, so the window can offer the plates only with a vest that holds them, `docs/outfits.md` O11b); `outfit_of(loadout)` makes a loadout's
+`outfit` valid (every slot; a missing, unknown or misplaced id — String ids accepted — takes `default_outfit`'s: a t-shirt, jeans and shoes; both plates
+`&""` unless the vest holds plates). What a layer does to a hit is the Character's `take_hit` (`domain-character`),
+and the stop itself the projectile's (`domain-projectile`).
 
 ## Gun art
 
@@ -141,4 +178,4 @@ Art: `art/stun_grenade_painter.gd`, `frag_grenade_painter.gd` (option `spoon`: t
 Guns are the one place Items reach into the Projectile System
 (`ProjectileSpawner` / `CasingSpawner`). No other item crosses that boundary.
 
-**Interfaces:** 6 (Items ↔ Character), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 12 (Items → Art) — signatures in `architecture`.
+**Interfaces:** 6 (Items ↔ Character, incl. `Outfit` / `OutfitConfig`), 10 (EventBus `&"shot"`, `&"throw"`, `&"grenade"`), 12 (Items → Art) — signatures in `architecture`.

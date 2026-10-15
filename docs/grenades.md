@@ -95,7 +95,7 @@ falling linearly to 0 at 250 px (`60 * (250 - d) / 130` between), measured from 
 **Cover:** a piece of furniture between the blast and a character blocks it too when its `coverage` is above the character's posture height (the
 character's own `get_surface().coverage`: crouched 35, standing 60). So a crouched character behind a couch (45) is shielded and a standing one is
 not; a coffee table (30) shields nobody. Fragments already behave so (they fly at a height, `docs/cover-and-stance.md`). The blast reaches
-characters and objects alike through `take_hit` (so characters bleed; objects deform and shed debris), and each blast hit posts `&"hit"` with
+characters and objects alike through `take_hit` (so characters bleed, a character's torso armour cutting the damage by its `blast` share: `docs/outfits.md` O9; objects deform and shed debris), and each blast hit posts `&"hit"` with
 `outcome = &"blast"`. Pushables in range are shoved away from the blast by `blast_impulse`, falling off with distance: furniture, living
 characters (as knockback) and the ragdolls of the dead. The burst posts `&"explosion"` `{ position, kind, attacker, radius }`.
 Tests: `projectile/frag_blast_by_distance` (80 px dead, about 200 px hurt by the fall-off, 400 px no blast, an object struck),
@@ -105,7 +105,7 @@ Tests: `projectile/frag_blast_by_distance` (80 px dead, about 200 px hurt by the
 **G8. Fragments.** `fragments` **40** real projectiles leave the blast point evenly round the circle (jittered), through
 `ProjectileSpawner`, with low power (`penetration` 0.4, `fragment_damage` 12, fast) and a short reach (`fragment_range` **500 px**: a
 projectile can now be given a maximum range, past which it is spent). So cover, penetration, ricochet, blood, debris and impact sounds
-all work as for bullets, and each hit posts `&"hit"` with the thrower as `attacker`.
+all work as for bullets (a character's armour and hit zones too: `docs/outfits.md` O9), and each hit posts `&"hit"` with the thrower as `attacker`.
 Test: `projectile/frag_fragments_hit`.
 
 **G9. Friendly fire.** Grenades hurt and stun everyone: the thrower and its allies are not spared.
@@ -138,7 +138,7 @@ and then it is as before. `Character.take_stun(blind, deaf, from)` applies it (a
 `stun_level()` (0..1) read it, `stun_view()` gives `{ blind, blind_total, deaf, level }` (seconds left blind and deaf, the blind
 seconds at the burst, the level) to the UI, and a new stun takes the longer of the old and new timers, blind and deaf each. The four numbers live in
 `CharacterConfig` (they tune the body, not the item). A character also tells a controller what it needs to judge a place in time: `posture_coverage(posture)` (the
-height of the body standing and crouched, on the coverage scale) and `run_speed()` (px/s standing and running, slower while stunned), so the AI keeps no copy of either.
+height of the body standing and crouched, on the coverage scale) and `run_speed()` (px/s standing and running, slower while stunned or weighed down by the outfit), so the AI keeps no copy of either.
 Tests: `character/stunned_slow_and_sway`, `character/posture_and_run_reads`.
 
 **G14. The stunned player.** The player's screen goes white at the burst and fades back over the blind time through a frozen afterimage

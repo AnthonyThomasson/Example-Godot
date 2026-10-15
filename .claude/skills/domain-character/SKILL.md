@@ -1,6 +1,6 @@
 ---
 name: domain-character
-description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, death, footsteps, walking into furniture and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Overview and root-body detail for the Character domain (scenes/character/) — the player character (built so other character types can exist): facing, movement, postures and running, the weapon raise against a wall, ammo / reloading and loadout, the outfit (hit zones, sides, armour in take_hit, its weight), death, footsteps, walking into furniture and the player/NPC scene wiring. The body itself (skeleton, pose, legs, hands and punch, ragdoll fall, all drawing and pixel art) is the sub-domain `domain-character-body` (scenes/character/body/). Use when editing character.gd, player_controller.gd, character_footsteps.gd, character_push.gd, character_config.gd or the character scenes. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Character domain
@@ -80,7 +80,7 @@ numbers: `docs/cover-and-stance.md`. (`CharacterConfig.stances` is how a *hand* 
 - **API** (interface 7): `set_posture(p) -> bool` (idempotent, so a controller may write it every frame; refused while dead, in an interaction or
   within `posture_change_time` of the last change), `toggle_crouch()` (C: stand<->crouch); reads `posture()`. The player's key comes from `Keybinds.CROUCH` through `player_controller.gd`; the puppet has `set_posture` / `toggle_crouch`.
 - **Reads for a controller:** `posture_coverage(posture)` (the body's height on the coverage scale in `stand` / `crouch`: what furniture must stand above to shield it) and
-  `run_speed()` (px/s standing and running as it is now, slower while stunned): the AI's grenade geometry judges a spot by them and keeps no copy of the numbers
+  `run_speed()` (px/s standing and running as it is now, slower while stunned or weighed down by the outfit): the AI's grenade geometry judges a spot by them and keeps no copy of the numbers
   (`tests/character/posture_and_run_reads_test.gd`).
 - **Effects:** `_move_speed()` multiplies the posture's `speed` row (1.0 / 0.6); running (`_update_stamina`) needs `_posture == stand`, so a
   refused run costs no stamina; shooting, reloading and `melee()` work in every posture (`leg_kick()` only standing); `get_surface().coverage` is the
@@ -100,7 +100,7 @@ A controller sets `run_input` (the player: `Keybinds.RUN`, Shift; an NPC: its be
 exhausted) and spends or regains `stamina` (a 0..1 bar): a full bar lasts `run_stamina_seconds`, it refills
 at `stamina_regen_per_sec`. Running dry latches `_exhausted` — the character walks, run still held, until
 the bar refills to `run_resume_fraction`. Only a standing character runs (a crouched one's run request is ignored). Running multiplies the walk speed by `run_speed_mult`
-(`_move_speed()`, also used for the death momentum and the push carry cap); `pose.update` still gets the
+(`_move_speed()`, also used for the death momentum and the push carry cap); a heavy outfit spends the bar faster (below); `pose.update` still gets the
 walk `speed`, so the walk amount stays at 1 while the stride cadence rises with the speed. Being busy in
 an interaction counts as not running. `shoot()` does nothing while running (`melee()` still works).
 Reads: `is_running()`, `stamina_fraction()`. Test: `tests/character/run_speed_stamina_test.gd`.
@@ -131,6 +131,32 @@ cooldown is in step with the frame that pulls the trigger. A controller re-press
 **Loadout.** `set_loadout(slots, hold_slot, spare_types, loaded_magazine := &"")` rebuilds the inventory from `ItemRegistry.inventory_for(slots, start_rounds, loaded_magazine)`, the carried
 magazines and the held slot (dropping any reload, re-judging the raise). Main uses it (through `LoadoutConfig.apply`) to arm the player and every NPC with its side's loadout — a chosen gun, or one random gun by default
 (`ItemRegistry.loadout_for` / `spares_for`); tests that do not call it keep `default_inventory()` — every item.
+
+## The outfit: hit zones, sides, armour, weight (`docs/outfits.md` O1 to O10)
+
+The character owns an `Outfit` (Items, `_outfit`; a new one wears nothing). `set_outfit(ids)` replaces the whole worn set (Main dresses every spawn
+through `LoadoutConfig.apply`; tests through it or `set_outfit`); `outfit()` hands the art the `Outfit` (its `look()` and `revision`, `domain-character-body`),
+`outfit_view()` the UI its `view()`. A character never dressed has no armour, no weight and its own look.
+- **Where a round strikes.** `hit_zone(height)`: the bullet's `HitInfo.height` over `posture_coverage(_posture)` against `CharacterConfig.hit_zones`
+  (`feet` up to 0.08, `legs` 0.45, `torso` 0.85, `head` above; the same fractions standing and crouched), `&""` for a height below 0 (a blast).
+  `hit_side(direction)`: the angle between `-direction` and `pose.torso_angle` (the shoulders), `front` up to `side_front_deg` 60, `back` from
+  `side_back_deg` 120, `flank` between.
+- **`get_surface_at(height, direction)`** (interface 3, which the projectile asks first): `get_surface()` where `Outfit.layer(zone, side)` is empty or the
+  height is below 0; over armour, that surface with the layer's `penetration`, `material`, `color`, `stop_power` and `inner_material` (the body's own
+  material, flesh).
+- **`take_hit`.** The shove is always applied. A hit with height below 0 (a frag's blast) is not zoned: its damage less the torso layer's `blast` share for
+  that side wounds (`_wound_by`). Otherwise the damage is scaled by `CharacterConfig.zone_damage` (head 2, torso 1, legs and feet 0.6). No layer there:
+  it wounds for the zoned damage (`_wound_by`). Over a layer it first wears the plate (`Outfit.wear(zone, side, hit.damage)`: the unscaled damage); then a hit that got through
+  (`hit.penetrated`) wounds for `(1 − reduction)` of the zoned damage, and one that did not (stopped or glanced off, `penetrated` false: the projectile
+  guarantees a round that beats `stop_power` penetrates) deals only `blunt` of it through `_apply_damage`, with debris of the armour's material and colour
+  and no `Deformable` record (so `damage_taken()` does not rise), no `BloodWound`. `_wound_by(hit, damage)` is the wounding path: the dent, the blood
+  debris, the bleeding and the damage. Melee (`take_damage`) is not zoned and meets no armour.
+- **Weight.** `_speed_in` multiplies every pace by `_weight_speed()` = `max(1 − extra × outfit_speed_per_kg, outfit_speed_min)` (0.0067, 0.6), `extra` the kg worn above
+  `outfit_free_weight` (2: plain clothes weigh nothing extra), so `_move_speed()` and `run_speed()` slow with it; `_update_stamina` spends the run's stamina
+  `1 + extra × outfit_stamina_per_kg` (0.025) times as fast. The invaders' plated kit (14 kg) is about 8% slower and spends 1.3x.
+Tests: `tests/character/hit_zone_by_bullet_height_test.gd`, `outfit_weight_slows_test.gd`, `outfit_art_test.gd`, and the armour ones in `tests/projectile/`
+(`helmet_stops_pistol_not_rifle`, `soft_vest_stops_pistol_smg_not_rifle`, `plate_covers_front_back_not_flank`, `plate_wears_out`, `armour_stop_feedback`,
+`frag_blast_cut_by_vest`). A test that counts gun damage pins `BallisticsConfig.bullet_height` (a random height picks a zone).
 
 ## Grenades and the stun (`docs/grenades.md` G1, G13)
 

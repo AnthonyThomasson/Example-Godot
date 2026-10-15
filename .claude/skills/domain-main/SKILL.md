@@ -21,10 +21,15 @@ A scripted `restart` (the dev command server) sets the Engine `skip_setup` meta 
 - **Start** — a human joins the chosen side, on top of its NPC count, with the side's loadout and faction;
 - **Watch** — AIs alone (spectator mode);
 - **Endless** — AIs alone; 5 s after each match ends (the MatchHUD's `match_ended`) Main frees its `World` node and builds a fresh match with
-  a new seed, random counts up to the chosen ones and random loadouts; an undecided match is called a draw after `endless_time_limit`;
+  a new seed, random counts up to the chosen ones and random loadouts (`LoadoutConfig.random`: a gun and an outfit per side, the grenade counts it was
+  set up with); an undecided match is called a draw after `endless_time_limit`;
 - **Tests** — changes scene to `testing/test_browser.tscn`; **Settings** — opens the settings page over the window.
 
-Main saves the window's choices (`Settings.set_setup`) on Start, Tests and Escape and feeds them back into the window's defaults.
+The window gets `weapons`, `grenades` and `outfits` (`LoadoutConfig.options()` / `grenade_options()` / `outfit_options()`) and each side's defaults
+from `_side_defaults` (`LoadoutConfig.normalize` of the side's loadout, so `outfit` included); `_side_loadout` copies the window's `weapon`, `magazine`,
+`spares`, `stuns`, `frags` and `outfit` back into the side's loadout.
+Main saves the window's choices (`Settings.set_setup`, the outfit with them) on Start, Tests and Escape and feeds them back into the window's defaults
+(`_with_saved_setup`: a choice an older save does not name, such as the outfit, keeps its default).
 Before `_spawn_world()` it **awaits the AI domain's `DecisionServerLauncher.resolved(live)`**, so no NPC makes its first decision against a
 still-booting Von server; the launcher is a root node of `main.tscn`, probes at scene load and always resolves (a run with no server still
 starts, with NPCs that hold steady). The settings page is wired here (interface 14): Main applies each `SettingsMenu` signal to `Settings`
@@ -43,11 +48,13 @@ Everything one match builds lives under a fresh `World` node (group `match_world
    `_build_stun_screen` then names the human the listener (`Sound.focus = _player`, the Audio autoload's one input from Main: a bang's muffle and tinnitus are
    the human's alone) and adds the `StunScreen` (UI hud) under `World`, `watch`ing the player (`docs/grenades.md` G14). A spectator match has no human, so `Sound.focus`
    stays null; `_teardown_world` clears it;
-5. `_arm_characters`: every character gets its side's loadout through `LoadoutConfig.apply` → `Character.set_loadout` — a chosen gun with its
-   magazine and spares and its stun / frag grenade counts (invaders default to 1 + 1, defenders 0 + 0: `invader_loadout`'s default `{ stuns: 1, frags: 1 }`), or by default
+5. `_arm_characters`: every character gets its side's loadout through `LoadoutConfig.apply` → `Character.set_loadout` and `Character.set_outfit` — a chosen gun with its
+   magazine and spares, its stun / frag grenade counts and its outfit (`docs/outfits.md` O11). By default invaders carry 1 + 1 grenades and wear a helmet, a shirt,
+   a plate carrier with a steel III plate front and back, tactical pants and boots (`invader_loadout`'s default `{ stuns: 1, frags: 1, outfit: { … } }`); defenders
+   0 + 0 in plain clothes (`defender_loadout` `{}`, so `LoadoutConfig.default_outfit`: a t-shirt, jeans and shoes). The gun is the chosen one or by default
    one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement. Tests and sandboxes never come through here and keep the weapon they ask for;
 6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit, show_details)`, in spectator mode the camera framing + `SpectatorInspector`
-   (the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
+   (`setup(combatants, flags, OverlayToggles.RESERVED_WIDTH)`: the width its outfit panel keeps clear; the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 
 Overlay flags live in `_overlay_flags` (one entry per row of `OverlayRegistry`); `_on_overlay_toggled` applies a flip live — the furniture holes to
 the single NavDebug, the performance flag to its overlay, spectator mode via `SpectatorInspector.set_flag`, otherwise to every NPC's overlay

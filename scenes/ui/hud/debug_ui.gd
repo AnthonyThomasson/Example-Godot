@@ -1,14 +1,17 @@
 extends CanvasLayer
 
-## Debug UI showing the held item, attack state and last-hit info. Talks to the character
-## only through its public API + signals (hit_landed / current_item / is_attacking), never
-## its internals — so it stays a UI-domain observer.
+## Debug UI showing the held item, attack state and last-hit info, and (bottom-left) what the character wears, each plate
+## with its condition. Talks to the character only through its public API + signals (hit_landed / current_item /
+## is_attacking / outfit_view), never its internals — so it stays a UI-domain observer.
+
+const OutfitLines := preload("res://scenes/ui/hud/outfit_lines.gd")
 
 ## The character to observe.
 @export var character_path: NodePath = ^"../Player"
 var _character: Node
 var _label: Label                    ## Bottom-right stats panel.
 var _hit_display_label: Label        ## Top-left last-hit banner.
+var _outfit_label: Label             ## Bottom-left outfit list (one line per slot).
 var _last_hit_body: String = "—"     ## Name of the last body hit.
 var _last_hit_hand: int = -1         ## Hand of the last hit (−1 = a shot).
 var _last_hit_time: float = 0.0      ## When the last hit landed (seconds).
@@ -47,6 +50,16 @@ func _ready() -> void:
 	_hit_display_label.text = ""
 	_hit_display_label.add_theme_font_size_override("font_size", 32)
 	_hit_display_label.add_theme_color_override("font_color", Color.YELLOW)
+
+	# What the character wears (bottom-left), growing up from the bottom edge.
+	_outfit_label = Label.new()
+	add_child(_outfit_label)
+	_outfit_label.anchor_top = 1.0
+	_outfit_label.anchor_bottom = 1.0
+	_outfit_label.offset_left = 32.0
+	_outfit_label.offset_bottom = -10.0
+	_outfit_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_outfit_label.add_theme_font_size_override("font_size", 26)
 
 	# One unified hit feed: melee punches (hand 0/1) and shots (hand -1), both with damage.
 	if _character.has_signal("hit_landed"):
@@ -111,6 +124,7 @@ func _process(_delta: float) -> void:
 		debug_lines.append("  (none)")
 
 	_label.text = "\n".join(debug_lines)
+	_outfit_label.text = "\n".join(["=== OUTFIT ==="] + OutfitLines.of(_character.outfit_view()))
 
 	# Update hit display (top-left).
 	if _last_hit_time > 0:

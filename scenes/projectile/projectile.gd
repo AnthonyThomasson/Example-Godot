@@ -119,7 +119,7 @@ func _resolve(result: Dictionary) -> void:
 	# Captured before the ricochet branch reassigns `direction`; the shove follows the shot in.
 	var incoming := direction
 
-	var surface := _surface_for(body)
+	var surface := _surface_for(body, incoming)
 	var coverage: float = surface["coverage"]
 	var penetration: float = surface["penetration"]
 
@@ -144,14 +144,24 @@ func _resolve(result: Dictionary) -> void:
 		return
 
 	var dealt := damage * squareness * speed_factor
-	# 3a. Too slow to punch through (a more penetrating round needs less speed): deal the impact and embed
-	# (zeroed speed frees the bullet).
-	if speed < BallisticsConfig.penetration_min_speed / penetration_power:
+	# 3. Armour (a surface with a `stop_power`, a character's vest or helmet): a round weaker than it is stopped, deals the
+	# impact and embeds; one that beats it is through, penetrates and strikes what lies under it (`inner_material`, flesh).
+	var stop_power := float(surface.get("stop_power", 0.0))
+	if stop_power > 0.0:
+		if penetration_power * speed_factor < stop_power:
+			GameLog.say("Shot stopped by %s's armour for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
+			speed = 0.0
+			_deal(body, _hit_info(result, incoming, speed_factor, dealt, false, _take_blood(surface)), &"blocked", surface)
+			return
+		surface = surface.merged({ "material": surface.get("inner_material", surface.get("material", "")) }, true)
+	# 4a. Too slow to punch through (a more penetrating round needs less speed): deal the impact and embed
+	# (zeroed speed frees the bullet). A round through armour always goes on.
+	elif speed < BallisticsConfig.penetration_min_speed / penetration_power:
 		GameLog.say("Shot blocked by %s for %.0f damage (%.0f%% square)" % [body.name, dealt, squareness * 100.0])
 		speed = 0.0
 		_deal(body, _hit_info(result, incoming, speed_factor, dealt, false, _take_blood(surface)), &"blocked", surface)
 		return
-	# 3b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
+	# 4b. Penetrate: deal damage, bleed speed (more when glancing/hard), deflect slightly.
 	var loss := clampf((penetration / 100.0) * BallisticsConfig.penetrate_loss_scale * (2.0 - squareness)
 		/ penetration_power, 0.0, 1.0)
 	speed *= (1.0 - loss)
@@ -175,9 +185,11 @@ func _flyover_height(coverage: float) -> float:
 	return clampf(100.0 - (100.0 - coverage) * BallisticsConfig.cover_flyover_scale, 0.0, 100.0)
 
 
-## The struck object's surface via get_surface(), or the wall-rating fallback for a collider
-## that exposes none.
-func _surface_for(body: Node) -> Dictionary:
+## The struck object's surface: where the round meets it (`get_surface_at(height, direction)`, a character's armour) when it
+## can say, else via get_surface(), or the wall-rating fallback for a collider that exposes none.
+func _surface_for(body: Node, travel: Vector2) -> Dictionary:
+	if body.has_method("get_surface_at"):
+		return body.get_surface_at(height, travel)
 	if body.has_method("get_surface"):
 		return body.get_surface()
 	return { "coverage": BallisticsConfig.wall_coverage, "penetration": BallisticsConfig.wall_penetration }
@@ -194,6 +206,7 @@ func _hit_info(result: Dictionary, incoming: Vector2, speed_factor: float, dealt
 	info.speed_factor = speed_factor
 	info.penetrated = penetrated
 	info.blood = blood
+	info.height = height
 	info.source = self
 	return info
 

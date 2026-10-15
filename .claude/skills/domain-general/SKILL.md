@@ -57,7 +57,7 @@ the defaults are stored, so a changed default still reaches an action the player
 - **Main calls it, not `Keybinds._ready`**, once in `_ready` (after seeding `Settings.debug` from its own
   export), so the headless test runner — which never loads `main.tscn` — never reads a developer's file.
 - **`Settings.setup`** holds the match-setup window's last choices (`set_setup(config)` saves them, dropping the
-  start `mode`); Main feeds it back into the window so it reopens as it was left.
+  start `mode`; each side's dict is kept whole: count, loadout and `outfit`); Main feeds it back into the window so it reopens as it was left.
 - **`Settings.overlays`** holds the toggle bar's switches (`set_overlay(flag, on)` saves one); Main seeds the overlays from it.
 - **Mutators save at once:** `set_debug(on)`, `set_setup(config)`, `set_overlay(flag, on)`, `rebind(action, event) -> bool`, `reset(action)`,
   `reset_all()` (leaves `debug`). `binding_rows()` reshapes the bindings into the plain dicts the settings

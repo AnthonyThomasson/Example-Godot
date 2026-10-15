@@ -10,11 +10,11 @@ extends CanvasLayer
 ## Main opens it on a fresh launch and spawns the world only once a start button is pressed; scripted
 ## restarts (the dev command server) set an Engine `skip_setup` meta and bypass it, so the headless
 ## match harness is unaffected. A decoupled piece: it knows nothing of the domains, only the parameter
-## dicts it is given and emits (the weapon choices arrive as plain data in `open`).
+## dicts it is given and emits (the weapon, grenade and outfit choices arrive as plain data in `open`).
 
 ## Emitted when a start button is pressed, carrying the chosen parameters:
 ## `{ mode: "play"|"watch"|"endless", side: "defender"|"invader", seed: int,
-##    defenders: { count, weapon, magazine, spares, stuns, frags }, invaders: { ... } }`.
+##    defenders: { count, weapon, magazine, spares, stuns, frags, outfit: { <slot>: "<id>" } }, invaders: { ... } }`.
 ## Main applies these and builds the world.
 signal start_requested(config: Dictionary)
 ## Emitted when the Tests button is pressed: Main opens the test browser instead of a match.
@@ -27,12 +27,17 @@ const _SIDES := ["defender", "invader"]  ## The sides the human can play, in dro
 ## The grenade rows when Main gives none (`open`'s `grenades`): a Stun and a Frag count. They name no cap of their own; a row without a `max`
 ## counts up to `_MAX_COUNT` (Main's rows carry `LoadoutConfig.max_grenades`).
 const _GRENADES := [{ "id": "stun", "label": "Stun" }, { "id": "frag", "label": "Frag" }]
+const _FONT := 30         ## The controls' font size.
+const _OUTFIT_FONT := 24  ## The outfit dropdowns' font size: smaller, so a side's seven picks stay compact.
 
 var _side_option: OptionButton      ## Which side a human plays (for Start).
 var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
 var _side_rows := {}                ## "defenders"/"invaders" -> { count, weapon, magazine, spares, magazine_row } controls.
 var _weapons: Array = []            ## Weapon choices `[{ id, label, magazines: [{ id, label }] }]` handed in by Main.
 var _grenades: Array = _GRENADES    ## Grenade count rows `[{ id, label, max }]` (`max` optional): a side's count of each is reported as `<id>s`.
+## Outfit rows `[{ slot, label, choices: [{ id, label, plates? }], plate? }]` handed in by Main: one dropdown per slot. A row marked
+## `plate` is a plate slot, offered only while a choice marked `plates` (a vest that holds plates) is picked in another row.
+var _outfits: Array = []
 var _start_buttons: Array[Button] = []  ## Start / Watch / Endless: all disabled on press, so a start can't be triggered twice.
 var _scroll: ScrollContainer        ## Holds the controls; sized to fit the window.
 var _content: Control               ## The controls' margin box, whose height the scroll area tries to show whole.
@@ -41,12 +46,14 @@ var _status: Label                  ## Status line Main shows while it holds the
 
 ## Build the window seeded from `defaults` and show it. Keys (all optional): `side` ("defender" /
 ## "invader"), `seed`, `defenders` / `invaders` (each `{ count, weapon, magazine, spares, stuns, frags }`, or a bare
-## count), `weapons` (the choices described at `_weapons`; empty = no weapon rows, nor grenade rows), `grenades` (the
-## grenade rows described at `_grenades`) and `ticket` (a non-blank one is shown above the title). Called by Main
-## before the world is spawned.
+## count; a side may also carry `outfit`, `{ <slot>: id }`), `weapons` (the choices described at `_weapons`; empty = no
+## weapon rows, nor grenade rows), `grenades` (the grenade rows described at `_grenades`), `outfits` (the rows described at
+## `_outfits`; empty = no outfit rows) and `ticket` (a non-blank one is shown above the title). Called by Main before the
+## world is spawned.
 func open(defaults: Dictionary) -> void:
 	_weapons = defaults.get("weapons", [])
 	_grenades = defaults.get("grenades", _GRENADES)
+	_outfits = defaults.get("outfits", [])
 	_build_ui(defaults)
 	get_viewport().size_changed.connect(_fit_scroll)
 	_fit_scroll.call_deferred()
@@ -157,8 +164,9 @@ func _build_ui(defaults: Dictionary) -> void:
 	box.add_child(settings_button)
 
 
-## One side's controls — count, weapon, magazine, spare magazines, grenade counts — in a titled column added to
-## `parent`. `seed_values` is `{ count, weapon, magazine, spares, stuns, frags }` or a bare count. Returns the controls by name.
+## One side's controls — count, weapon, magazine, spare magazines, grenade counts, outfit — in a titled column added to
+## `parent`. `seed_values` is `{ count, weapon, magazine, spares, stuns, frags, outfit }` or a bare count. Returns the controls
+## by name (the outfit's as `outfit`: slot -> its dropdown).
 func _side_column(parent: Control, title: String, seed_values: Variant) -> Dictionary:
 	var values: Dictionary = seed_values if seed_values is Dictionary else { "count": seed_values }
 	var column := VBoxContainer.new()
@@ -187,7 +195,59 @@ func _side_column(parent: Control, title: String, seed_values: Variant) -> Dicti
 		for grenade: Dictionary in _grenades:
 			var key := _grenade_key(grenade)
 			rows[key] = _spin_row(column, str(grenade["label"]), int(values.get(key, 0)), int(grenade.get("max", _MAX_COUNT)))
+	if not _outfits.is_empty():
+		var worn: Dictionary = values.get("outfit", {}) if values.get("outfit") is Dictionary else {}
+		rows["outfit"] = _outfit_rows(column, worn)
 	return rows
+
+
+## The outfit's dropdowns (one per `_outfits` row, named `Outfit_<slot>`, each choice's id as its metadata) under an "Outfit"
+## sub-heading in `column`, smaller and tighter than the rows above so seven fit, each selecting the id `worn` names for its
+## slot (the slot's first choice when it names none offered), the plate rows then following the vest pick (`_refresh_plates`).
+## Returns slot -> dropdown.
+func _outfit_rows(column: Control, worn: Dictionary) -> Dictionary:
+	var heading := Label.new()
+	heading.text = "Outfit"
+	heading.add_theme_font_size_override("font_size", _OUTFIT_FONT + 4)
+	heading.modulate = Color(1, 1, 1, 0.75)
+	column.add_child(heading)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 6)
+	column.add_child(box)
+	var picks := {}
+	for row: Dictionary in _outfits:
+		var slot := str(row["slot"])
+		var choices: Array = row["choices"]
+		var wanted := choices.map(func(c): return str(c["id"])).find(str(worn.get(slot, "")))
+		var option := _option_row(box, str(row["label"]), choices.map(func(c): return c["label"]), maxi(wanted, 0), _OUTFIT_FONT)
+		option.name = "Outfit_%s" % slot
+		option.size_flags_horizontal = Control.SIZE_EXPAND_FILL  # one width for all seven, whatever their longest choice
+		for i in choices.size():
+			option.set_item_metadata(i, str(choices[i]["id"]))
+		picks[slot] = option
+	for slot: String in picks:
+		picks[slot].item_selected.connect(func(_i): _refresh_plates(picks))
+	_refresh_plates(picks)
+	return picks
+
+
+## Enable a side's plate dropdowns (rows marked `plate`) while one of its other picks is a choice marked `plates`, else disable
+## them and show their "None" choice (id ""), so a side never reports a plate with nothing to hold it.
+func _refresh_plates(picks: Dictionary) -> void:
+	var held := false
+	for row: Dictionary in _outfits:
+		var option: OptionButton = picks[str(row["slot"])]
+		if not row.get("plate", false) and option.selected >= 0:
+			held = held or bool(row["choices"][option.selected].get("plates", false))
+	for row: Dictionary in _outfits:
+		if not row.get("plate", false):
+			continue
+		var option: OptionButton = picks[str(row["slot"])]
+		option.disabled = not held
+		if not held:
+			var none := (row["choices"] as Array).map(func(c): return str(c["id"])).find("")
+			if none >= 0:
+				option.select(none)
 
 
 ## The key a grenade row's count is reported under: `stuns`, `frags`.
@@ -218,9 +278,9 @@ func _refresh_magazines(rows: Dictionary, wanted: StringName) -> void:
 	rows["spares"].get_parent().visible = not mags.is_empty()
 
 
-## A labelled dropdown row (label + OptionButton of `items`, `selected` clamped into range), added to
+## A labelled dropdown row (label + OptionButton of `items`, `selected` clamped into range, text at `font_size`), added to
 ## `parent`; returns the OptionButton.
-func _option_row(parent: Control, label_text: String, items: Array, selected: int) -> OptionButton:
+func _option_row(parent: Control, label_text: String, items: Array, selected: int, font_size := _FONT) -> OptionButton:
 	var row: Control = parent if parent is HBoxContainer else HBoxContainer.new()
 	if row != parent:
 		row.add_theme_constant_override("separation", 12)
@@ -228,10 +288,10 @@ func _option_row(parent: Control, label_text: String, items: Array, selected: in
 	var label := Label.new()
 	label.text = label_text
 	label.custom_minimum_size = Vector2(160, 0)
-	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_font_size_override("font_size", font_size)
 	row.add_child(label)
 	var option := OptionButton.new()
-	option.add_theme_font_size_override("font_size", 30)
+	option.add_theme_font_size_override("font_size", font_size)
 	option.custom_minimum_size = Vector2(200, 0)
 	for item in items:
 		option.add_item(str(item))
@@ -249,13 +309,13 @@ func _seed_row(parent: VBoxContainer, value: int) -> LineEdit:
 	var label := Label.new()
 	label.text = "Seed"
 	label.custom_minimum_size = Vector2(160, 0)
-	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_font_size_override("font_size", _FONT)
 	row.add_child(label)
 	var edit := LineEdit.new()
 	edit.placeholder_text = "random"
 	edit.text = "" if value == 0 else str(value)
 	edit.custom_minimum_size = Vector2(200, 0)
-	edit.add_theme_font_size_override("font_size", 30)
+	edit.add_theme_font_size_override("font_size", _FONT)
 	row.add_child(edit)
 	parent.add_child(row)
 	return edit
@@ -269,7 +329,7 @@ func _spin_row(parent: Control, label_text: String, value: int, max_value: int) 
 	var label := Label.new()
 	label.text = label_text
 	label.custom_minimum_size = Vector2(160, 0)
-	label.add_theme_font_size_override("font_size", 30)
+	label.add_theme_font_size_override("font_size", _FONT)
 	row.add_child(label)
 	var spin := SpinBox.new()
 	spin.min_value = 0
@@ -277,7 +337,7 @@ func _spin_row(parent: Control, label_text: String, value: int, max_value: int) 
 	spin.step = 1
 	spin.value = clampi(value, 0, max_value)
 	spin.custom_minimum_size = Vector2(140, 0)
-	spin.add_theme_font_size_override("font_size", 30)
+	spin.add_theme_font_size_override("font_size", _FONT)
 	row.add_child(spin)
 	parent.add_child(row)
 	return spin
@@ -293,7 +353,8 @@ func set_status(text: String) -> void:
 
 
 ## One side's chosen parameters as a plain dict: `{ count }` plus, when weapon choices were given,
-## `weapon`, `magazine` (blank when the weapon takes none), `spares` and the grenade counts.
+## `weapon`, `magazine` (blank when the weapon takes none), `spares` and the grenade counts, and when outfit rows were
+## given its `outfit` (`{ <slot>: "<id>" }`, "" for nothing worn and for a disabled plate pick).
 func _side_config(rows: Dictionary) -> Dictionary:
 	var config := { "count": int(rows["count"].value) }
 	if rows.has("weapon"):
@@ -303,6 +364,12 @@ func _side_config(rows: Dictionary) -> Dictionary:
 		config["spares"] = int(rows["spares"].value)
 		for grenade: Dictionary in _grenades:
 			config[_grenade_key(grenade)] = int(rows[_grenade_key(grenade)].value)
+	if rows.has("outfit"):
+		var outfit := {}
+		for slot: String in rows["outfit"]:
+			var option: OptionButton = rows["outfit"][slot]
+			outfit[slot] = "" if option.disabled else str(option.get_item_metadata(option.selected))
+		config["outfit"] = outfit
 	return config
 
 

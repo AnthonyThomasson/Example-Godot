@@ -1,6 +1,6 @@
 ---
 name: domain-projectile
-description: Deep implementation detail for the Projectile System domain (scenes/projectile/) — shooting: penetration, damage, cover, ricochet. Use when editing scenes/projectile/ or working on the bullet impact model, fly-over/ricochet/penetrate/blocked resolution, casings, or BallisticsConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the Projectile System domain (scenes/projectile/) — shooting: penetration, damage, cover, ricochet, armour. Use when editing scenes/projectile/ or working on the bullet impact model, fly-over/ricochet/armour/penetrate/blocked resolution, casings, or BallisticsConfig tuning. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # Projectile System domain
@@ -11,8 +11,9 @@ the burst's in the grenade's `GrenadeConfig` row (Items), which it receives as a
 ## Impact model
 
 A fired bullet (`projectile.gd`) is a **multi-hit traveler**: each physics frame it sweeps
-forward with a raycast and resolves every collider it crosses against that object's
-`get_surface()` `coverage`/`penetration` (0–100; a collider with no surface uses
+forward with a raycast and resolves every collider it crosses against that object's surface (`_surface_for(body, travel)`:
+`get_surface_at(height, travel)` when the body has it — a character, whose armour depends on where the round strikes — else
+`get_surface()`) `coverage`/`penetration` (0–100; a collider with no surface uses
 `BallisticsConfig.wall_*`). It flies until `speed < BallisticsConfig.projectile_min_speed` or it
 passes `max_distance`. Non-solid decor has no collider, so it's never raycast.
 
@@ -29,9 +30,16 @@ Per hit, with squareness `s = |dir·normal|`, speed factor `v = speed / muzzle_s
    Tests: `tests/projectile/cover_shared_bullet_height_test.gd`, `posture_hit_chance_test.gd`.
 2. **Ricochet** (`P ≥ penetration_bounce_min` and `s < bounce_square_max`) — reflects,
    `speed ×= bounce_speed_retention`, deals `damage × s × v × bounce_damage_retention`.
-3. **Penetrate** (else, while `speed ≥ penetration_min_speed / p`) — deals `damage × s × v`, bleeds
+3. **Armour** (the surface has a `stop_power`: a character's helmet, vest or plate, `docs/outfits.md` O6) — **stopped** when `p × v < stop_power`:
+   speed 0, outcome `blocked`, deals the impact (`damage × s × v`) with the armour's `material`, embeds. Else the round is **through**: the surface's
+   `material` becomes its `inner_material` (flesh, so the event, the sound and the blood carry say flesh) and it always penetrates (step 4b, skipping
+   the too-slow block), losing speed against the armour's P. So a body with armour reads `HitInfo.penetrated == false` as stopped. A glancing round
+   off steel (P 95 ≥ `penetration_bounce_min`) has already ricocheted at step 2; ceramic (70) and the soft panels (30) never do.
+4. **Penetrate** (else, while `speed ≥ penetration_min_speed / p`) — deals `damage × s × v`, bleeds
    speed by `loss = (P/100) × penetrate_loss_scale × (2 − s) / p`, deflects by up to `penetrate_deflect_max_deg × P/100 / p`.
    **Blocked** if too slow: deals the impact and embeds.
+   Every `HitInfo` carries the bullet's `height`, which the struck character turns into a hit zone (what the zone, the blunt share and the reduction
+   do to the damage is the character's `take_hit`, `domain-character`).
 
 **Two kinds of penetration.** `P` is a property of the *target's surface* (flesh 15, a wardrobe 55, a wall 100); `p` is the *bullet's* power, set
 per gun by `ProjectileSpawner.spawn(..., muzzle_speed, penetration)` from `GunConfig` (pistol 1.0, SMG 0.8, rifle 2.2). A higher `p` loses less speed to
@@ -45,7 +53,7 @@ object then shoves/deforms/sprays via Physics), re-emits `hit(body, damage)` —
 forwards to the character's `hit_landed` — and posts a `&"hit"` event on `EventBus`
 (`{ position, victim, source, direction, damage, attacker }`, interface 10 — `attacker` is the
 shooter, the projectile's `ignore` body; plus `outcome` (`&"ricochet"` / `&"blocked"` / `&"penetrate"`), the struck
-`material` (`surface.material`, `""` for a wall), `speed_factor` and the round's `power`,
+`material` (`surface.material`, `""` for a wall; a stopped round's is the armour's, one through armour the flesh's), `speed_factor` and the round's `power`,
 which the Audio domain voices impacts from; a fly-over posts nothing) so decoupled listeners (the AI's combat awareness and
 hostility) learn what was struck, where, and by whom. Console lines: `Shot flew over /
 ricocheted off / penetrated / blocked by …`.

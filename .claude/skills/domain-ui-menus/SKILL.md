@@ -1,25 +1,32 @@
 ---
 name: domain-ui-menus
-description: Deep implementation detail for the UI menus sub-domain (scenes/ui/menus/) — the pre-game setup window (Play as, seed, per-side count/weapon/magazine/spares, Start / Watch / Endless / Tests / Settings buttons, remembered choices) and the settings page (Debug switch + key rebinding with capture). Use when editing scenes/ui/menus/ or working on the setup menu, its start config, the settings page or key rebinding UI. Plain-data windows that only emit signals. Complements the `domain-ui` overview and the `architecture` skill (interfaces 13, 14).
+description: Deep implementation detail for the UI menus sub-domain (scenes/ui/menus/) — the pre-game setup window (Play as, seed, per-side count/weapon/magazine/spares/grenades/outfit, Start / Watch / Endless / Tests / Settings buttons, remembered choices) and the settings page (Debug switch + key rebinding with capture). Use when editing scenes/ui/menus/ or working on the setup menu, its start config, the settings page or key rebinding UI. Plain-data windows that only emit signals. Complements the `domain-ui` overview and the `architecture` skill (interfaces 13, 14).
 ---
 
 # UI · Menus sub-domain (`scenes/ui/menus/`)
 
 Two full-screen, code-built windows that take **plain data** and only emit signals — they know nothing of `Items`, `Keybinds` or `Settings`; Main (the composition root) feeds them dicts and applies what they report. See `domain-ui` for what all UI scripts share.
 
-- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, defenders, invaders, weapons, ticket })` shows a
+- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, defenders, invaders, weapons, grenades, outfits, ticket })` shows a
   full-screen modal (40 px margins, VBox separation 20, the controls in a `ScrollContainer` fitted to the window
   height) with: a "Play as" dropdown (Defender / Invader), a "Seed" text field (blank = random), two side
   columns (Defenders | Invaders) each with Count, Weapon, Magazine, Spares and a Stun and a Frag count row (0 to 3; Main passes the rows as `grenades`, `[{ id, label, max }]`,
   from `LoadoutConfig.grenade_options()`, else the window's own two rows, which name no cap and count up to the window's `_MAX_COUNT`; a side reports them as `stuns` / `frags`; they come with the weapon rows) (the Weapon / Magazine
   choices arrive as plain data in `weapons`, `[{ id, label, magazines: [{ id, label }] }]`, from Main — the window
   never sees Items; a weapon with no magazines hides the Magazine + Spares rows; `defenders` / `invaders` seed
-  `{ count, weapon, magazine, spares, stuns, frags }` or a bare count), and three start buttons: **Start** (play as the chosen
+  `{ count, weapon, magazine, spares, stuns, frags, outfit }` or a bare count). Each column also gets an **Outfit** block when Main passes `outfits`
+  (`[{ slot, label, choices: [{ id, label }] }]`, from `LoadoutConfig.outfit_options()`; none = no outfit rows and no `outfit` key): an "Outfit"
+  sub-heading (28pt, muted) and one `Outfit_<slot>` dropdown per row (`_OUTFIT_FONT` 24pt, VBox separation 6, the same 160 px label column, each
+  dropdown filling the column; items are the choice labels, each item's metadata its id as a String), selecting the side seed's `outfit` id or the
+  slot's first choice; a side reports `outfit: { <slot>: "<id>" }` (String ids, `""` for none). The plate picks follow the vest (`_refresh_plates`,
+  on open and on every outfit pick, keyed on the rows' marks only): a row marked `plate: true` is disabled and set to its "None" choice (id `""`) unless
+  another row's selected choice is marked `plates: true` (the plate carrier), enabled again when one is, and a disabled pick is reported as `""`
+  (`docs/outfits.md` O11b). And three start buttons: **Start** (play as the chosen
   side), **Watch** (AIs alone) and **Endless** (AIs alone, a fresh randomised match after each). (The Debug switch
   lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
   muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed,
-  defenders: { count, weapon, magazine, spares, stuns, frags }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
-  Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt; column headings 36pt; the Tests and Settings buttons 28pt;
+  defenders: { count, weapon, magazine, spares, stuns, frags, outfit }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
+  Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt (`_FONT`; `_option_row` takes an optional font size); column headings 36pt; the Tests and Settings buttons 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
 the test browser. `current_config() -> Dictionary` returns the same
   `{ side, seed, defenders, invaders }` as the window stands (empty before `open`); Main saves it through

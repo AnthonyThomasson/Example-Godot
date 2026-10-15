@@ -1,17 +1,19 @@
 ---
 name: domain-ui-hud
-description: Deep implementation detail for the UI hud sub-domain (scenes/ui/hud/) — the player debug panel (DebugUI), the spectator match HUD (MatchHUD: timer, goals, winner banner, combat feed, match_ended), the seed readout, the spectator inspector (click-to-select NPC, pause, tactical-point details) and its world-space contact markers. Use when editing scenes/ui/hud/ or working on the in-game HUDs, match verdict, the combat feed, the seed label or click-to-inspect. Decoupled observers of the Character API and the EventBus. Complements the `domain-ui` overview and the `architecture` skill.
+description: Deep implementation detail for the UI hud sub-domain (scenes/ui/hud/) — the player debug panel (DebugUI), the spectator match HUD (MatchHUD: timer, goals, winner banner, combat feed, match_ended), the seed readout, the spectator inspector (click-to-select NPC, pause, tactical-point details, the selected NPC's outfit) and its world-space contact markers, and the shared outfit lines (outfit_lines.gd). Use when editing scenes/ui/hud/ or working on the in-game HUDs, match verdict, the combat feed, the seed label or click-to-inspect. Decoupled observers of the Character API and the EventBus. Complements the `domain-ui` overview and the `architecture` skill.
 ---
 
 # UI · HUD sub-domain (`scenes/ui/hud/`)
 
-The in-game observers: each reads only the Character public API / signals, the AI controller's `goal_text()` / `debug_zones()` / `known_contacts_for_display()` and the EventBus `&"hit"` (and, for the stun screen, `&"stun"`) topic. See `domain-ui` for what all UI scripts share.
+The in-game observers: each reads only the Character public API / signals (incl. `outfit_view()`), the AI controller's `goal_text()` / `debug_zones()` / `known_contacts_for_display()` and the EventBus `&"hit"` (and, for the stun screen, `&"stun"`) topic. See `domain-ui` for what all UI scripts share.
 
 - `debug_ui.gd` — the **player debug panel** (`DebugUI` node). Bottom-right stats block: current
   item slot, an ammo line (`Ammo: 7/12  (+2 mags)`, "reloading…" mid-swap, "—" for an item without ammo, read through
   `ammo()` / `ammo_capacity()` / `spare_magazines()` / `is_reloading()`), a grenades line (`Grenades: 1 stun, 2 frag`, "—" with none, read through `item_count(slot)` for the slots of `LoadoutConfig.grenade_options()`), punch active flag, active interaction, reach, stamina (and whether running), posture (`Standing` / `Crouching`, read through `posture()`). Top-left hit banner: last body hit, method
   (punch left/right or gunshot) and damage; the bottom-right "Last Hit" block adds the time since. Attaches to its character by the
   exported `character_path`; listens to `hit_landed` on the character; freed in spectator mode. Font sizes: stats 34pt, hit banner 32pt.
+  Bottom left (26pt, growing up from the bottom edge: free in a player match, where the match HUD hides its combat feed), an `=== OUTFIT ===` block of
+  `OutfitLines.of(outfit_view())`, refreshed every frame (`docs/outfits.md` O13). Tested by `tests/ui/debug_panel_outfit_test.gd`.
 
 - `match_hud.gd` — the **spectator match HUD** (`MatchHUD` node). `begin(combatants, time_limit := 0.0, show_details := true)` wires it to
   any number of characters (a human included); it is **re-entrant** (an endless run calls it for each new match),
@@ -28,7 +30,8 @@ The in-game observers: each reads only the Character public API / signals, the A
   you like can be re-entered in the setup window. `main.gd` calls it once per match.
 
 - `spectator_inspector.gd` — the **spectator inspector** (`SpectatorInspector` node), built by `main.gd`
-  only in spectator mode via `setup(combatants, flags)` (`flags` = the current overlay toggles; `set_flag(flag, on)` updates one live from the toggle bar and re-applies it to the selected NPC).
+  only in spectator mode via `setup(combatants, flags, right_clear)` (`flags` = the current overlay toggles; `right_clear` = the screen width from the right edge its outfit
+  panel keeps clear, which Main hands it as the overlay toggle bar's `RESERVED_WIDTH`; `set_flag(flag, on)` updates one live from the toggle bar and re-applies it to the selected NPC).
   **Space** toggles `get_tree().paused`. A **left-click** on an NPC (nearest within `PICK_RADIUS` of the
   cursor's world point, via the framing camera) selects it — revealing ONLY that NPC's *enabled* overlays
   (each toggle set from `flags`) and hiding every other NPC's; clicking it again or empty ground clears
@@ -37,10 +40,18 @@ The in-game observers: each reads only the Character public API / signals, the A
   `debug_zones()`) highlights that point (overlay `set_focus`) and fills a detail panel — top-left,
   directly beneath the match HUD's goal readout — with the zone's kind, label and Von's reasoning (`desc`). It runs `PROCESS_MODE_ALWAYS` so Space/clicks work while
   paused (freeze the match, then inspect). Decoupled like the other observers: reads the combatants'
-  public `global_position`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
+  public `global_position` and `outfit_view()`, the camera, and each NPC's `debug_zones()`, and flips the debug-overlay
   toggles (every per-NPC flag of the overlay registry) by the same
   duck-typed names `main.gd`'s `_configure_debug` uses. Reads `Keybinds.PAUSE` (Space; shares it with
   `INTERACT`, unused in the player-less match). A mouse-ignoring detail label (with text shadow).
+  While an NPC is selected, an outfit panel (22pt, shadowed, mouse-ignoring) lists `<name> — OUTFIT` and `OutfitLines.of(outfit_view())`, at the bottom
+  right with its right edge `right_clear + OUTFIT_GAP` (10 px) from the screen edge, clear of the
+  toggle bar's column and the seed readout, growing up and to the left; refreshed on select and every frame (`_refresh_outfit`), so plate wear shows live;
+  hidden with no selection. Tested by `tests/ui/inspector_outfit_test.gd`.
+
+- `outfit_lines.gd` — the **outfit lines** (a `RefCounted` with one static, preloaded by the debug panel and the inspector). `OutfitLines.of(view)` turns a
+  character's `outfit_view()` into one line per slot in the view's order: a garment `Head: Helmet`, a plate `Front plate: Ceramic IV plate 68%`
+  (`"%d%%" % roundi(condition * 100)`), `—` for nothing worn. It reads nothing but the view.
 
 - `contact_markers.gd` — the **contact markers** (`ContactMarkers` Node2D, world space, built by the inspector). When an NPC is
   selected it draws a coloured ring + name label at each character that NPC has in memory (visible ones bright, remembered ones

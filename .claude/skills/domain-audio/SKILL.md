@@ -42,11 +42,13 @@ A profile is a `StringName` that fully determines a sound, so tests can assert o
 | `explosion/stun` | Sharp, very loud (+3 dB trim, then the category's +3), bright (a ring of high partials) and over in 0.42 s. |
 | `tinnitus/whine` | A seamless 0.8 s loop of three thin tones (4.3 kHz twice, 5 Hz apart so they beat, and 6.85 kHz). |
 
-- **Materials:** `wood metal glass ceramic stone plastic fabric foliage electronics flesh`, `wall` (what walls
-  report as the empty material `""`) and `default` for anything unknown.
+- **Materials:** `wood metal glass ceramic composite stone plastic fabric foliage electronics flesh`, `wall` (what walls
+  report as the empty material `""`) and `default` for anything unknown. `composite` is the helmet's (a dull, short knock: thump 0.55,
+  modes 380 / 820 / 1450 Hz); a round armour stops posts the armour's material (`metal` steel, `ceramic`, `composite`, `fabric` the soft panels,
+  `docs/outfits.md` O6), so it is heard as that and not as flesh.
 - **Bands** come from the round's penetration power (`SoundBank.band`): `light` < 0.9 (SMG 0.8), `medium`
   (pistol 1.0), `heavy` ≥ 1.6 (rifle 2.2). Heavier = lower pitch, louder crack (−4 / 0 / +4 dB by band).
-- A `hard` material (metal, glass, ceramic, stone, electronics, wall) rings long on a ricochet and adds a falling
+- A `hard` material (metal, glass, ceramic, composite, stone, electronics, wall) rings long on a ricochet and adds a falling
   whine; a soft one whips instead. Penetration adds a crunch, a hiss of air and a deeper thud. `thump` is how
   much low body a hit has (flesh and fabric thud, metal and glass do not). A material may also carry `heft` (metal 0.9): extra body gain, a longer thud and a quieter ring on a non-ricochet hit, so a round striking metal lands heavy.
 - The synth normalizes every sound, so a quiet one says so with a `db` trim in its table row (carpet −6, fabric

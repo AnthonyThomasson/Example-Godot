@@ -15,7 +15,7 @@ the domains.
 | Folder | Skill | Owns |
 |---|---|---|
 | `menus/` | `domain-ui-menus` | `setup_menu.gd` (pre-game window), `settings_menu.gd` (Debug + key rebinding) |
-| `hud/` | `domain-ui-hud` | `debug_ui.gd`, `match_hud.gd`, `seed_display.gd`, `spectator_inspector.gd`, `contact_markers.gd`, `stack_markers.gd` |
+| `hud/` | `domain-ui-hud` | `debug_ui.gd`, `match_hud.gd`, `seed_display.gd`, `spectator_inspector.gd`, `contact_markers.gd`, `stack_markers.gd`, `stun_screen.gd`, `outfit_lines.gd` |
 | `overlays/` | `domain-ui-overlays` | `overlay_registry.gd`, `overlay_toggles.gd`, `performance_overlay.gd`, `drag_handle.gd` |
 | `testing/` | `domain-ui-testing` | `test_browser_window.gd`, `test_result_hud.gd` |
 

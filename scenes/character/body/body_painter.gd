@@ -4,10 +4,13 @@ extends RefCounted
 ## Art domain's PixelArt). Painted in the canonical frame — facing +y — and kept within the body's
 ## round footprint: shoulders in the shirt color with sleeve seams, the dark ring of the neck where
 ## the head sits, and an optional backpack with straps. The head is its own part (head_painter.gd),
-## drawn over this one so it can turn on its own. Options (`opts`, defaulting to
-## CharacterConfig.art_*): `backpack`, `pack`.
+## drawn over this one so it can turn on its own. What the outfit puts on (character_visuals.gd resolves it): the shirt's
+## `sleeves` ("long": a shirt, its collar and buttons at the front; "short": a t-shirt's round neck; absent = the plain shirt) and
+## a vest over the shoulders (vest_painter.gd: `vest`, `vest_color`, the plates and their wear). Options (`opts`, defaulting to
+## CharacterConfig.art_*): `backpack`, `pack`, `sleeves`, and the vest's.
 
 const HeadPainter = preload("res://scenes/character/body/head_painter.gd")
+const VestPainter = preload("res://scenes/character/body/vest_painter.gd")
 
 const _SHOULDER_HEIGHT := 4  ## Heights for cast shadows, floor-up.
 const _PACK_HEIGHT := 6
@@ -28,10 +31,28 @@ static func paint(c: PixelCanvas, base: Color, material: String, opts: Dictionar
 	for side in [-1, 1]:
 		var x: int = o.x + side * (int(c.w / 2.0) - 5)
 		c.line(Vector2i(x, span.position.y + 3), Vector2i(x, span.end.y - 4), t.dark)
+	_neckline(c, o, head_r, span, String(opts.get("sleeves", "")), t)
+	VestPainter.paint_top(c, o, span, opts)
 	if opts.get("backpack", false):
 		_backpack(c, o, span, opts.get("pack", CharacterConfig.art_pack_color))
 	c.outline(PixelCanvas.disc(o, head_r + 1), t.shadow)
 	c.cast_shadows()
+
+
+## What shows of the shirt at the front of the neck: a shirt's collar points either side and its placket of buttons running
+## forward down the chest; a t-shirt's round neckband.
+static func _neckline(c: PixelCanvas, o: Vector2i, head_r: int, span: Rect2i, sleeves: String, t: Dictionary) -> void:
+	var front := o.y + head_r + 1
+	match sleeves:
+		"long":
+			for side in [-1, 1]:
+				c.line(Vector2i(o.x + side * (head_r + 1), o.y + 1), Vector2i(o.x + side * 2, front + 1), t.light, _SHOULDER_HEIGHT + 1)
+			for y in range(front + 1, span.end.y - 1, 2):
+				c.px(o.x, y, t.shadow)
+		"short":
+			for side in [-1, 1]:
+				c.px(o.x + side * (head_r - 1), front, t.dark)
+			c.line(Vector2i(o.x - head_r + 2, front + 1), Vector2i(o.x + head_r - 2, front + 1), t.dark)
 
 
 ## A backpack on the back (toward -y): a padded body with a flap and buckle, straps running over

@@ -68,6 +68,8 @@ const MATERIALS := {
 		"decays": [0.16, 0.12, 0.09], "lp": 9500.0, "grit": 0.006 },
 	"ceramic": { "hard": true, "db": 0.0, "thump": 0.2, "modes": [950.0, 1900.0, 2900.0], "amps": [1.0, 0.7, 0.45],
 		"decays": [0.09, 0.07, 0.05], "lp": 7000.0, "grit": 0.010 },
+	"composite": { "hard": true, "db": 0.0, "thump": 0.55, "modes": [380.0, 820.0, 1450.0], "amps": [1.0, 0.55, 0.3],
+		"decays": [0.05, 0.035, 0.025], "lp": 4200.0, "grit": 0.014 },
 	"stone": { "hard": true, "db": 0.0, "thump": 0.4, "modes": [420.0, 880.0, 1500.0], "amps": [1.0, 0.6, 0.4],
 		"decays": [0.06, 0.045, 0.03], "lp": 6000.0, "grit": 0.014 },
 	"plastic": { "hard": false, "db": -2.0, "thump": 0.35, "modes": [330.0, 720.0], "amps": [1.0, 0.5],

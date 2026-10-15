@@ -88,7 +88,8 @@ static func _blast(at: Vector2, world: Node, source: Node, row: Dictionary) -> v
 
 
 ## Hand `body` a blast `HitInfo` of `damage` and post the `&"hit"` the listeners hear (outcome `blast`). The hit carries
-## no impact of its own (`speed_factor` 0): the shove of a blast is the grenade's `blast_impulse`, applied by the caller.
+## no impact of its own (`speed_factor` 0): the shove of a blast is the grenade's `blast_impulse`, applied by the caller; and no
+## height (-1): it strikes the whole body (a character's torso armour cuts it).
 static func _strike(body: Node2D, reach: Dictionary, away: Vector2, damage: float, source: Node) -> void:
 	if damage <= 0.0:
 		return
@@ -98,6 +99,7 @@ static func _strike(body: Node2D, reach: Dictionary, away: Vector2, damage: floa
 	info.direction = away
 	info.damage = damage
 	info.speed_factor = 0.0
+	info.height = -1.0  # no height: the blast strikes the whole body
 	body.call("take_hit", info)
 	var surface: Dictionary = body.call("get_surface") if body.has_method("get_surface") else {}
 	EventBus.post(&"hit", {
