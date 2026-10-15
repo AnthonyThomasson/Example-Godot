@@ -5,7 +5,7 @@ extends CanvasLayer
 ## along the bottom a shared combat feed; and, once one side dies, the winner banner.
 ##
 ## It is a decoupled observer, reading only published contracts — the Character public API/signals
-## (`faction`, the `died` signal), the AI controller's exported `goal`, and
+## (`faction`, the `died` signal), the AI controller's `goal_text()`, and
 ## the EventBus `&"hit"` topic — so it never reaches into any domain's internals.
 ## Main calls `begin()` with the combatants when it sets up a match (and again for each new one in an
 ## endless run). `match_ended` tells Main the verdict, so it never has to work out a winner itself.
