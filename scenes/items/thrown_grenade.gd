@@ -4,7 +4,7 @@ class_name ThrownGrenade extends Node2D
 ## furniture taller than the arc is high there (the same `coverage` scale as everything else) and the characters in its
 ## way, bounces off them with energy loss, skids to a stop and goes off when its fuse runs out. Docs: `docs/grenades.md`
 ## G3, G6 and G10. A world `Node2D` like `DroppedItem`; nobody picks it up or throws it back. While it lives it is in the
-## group `live_grenades` (`kind`, `fuse_left()`, `danger_radius()`, `thrower`) for perception to query.
+## group `live_grenades` (`kind`, `fuse_left()`, `thrower`) for perception to query.
 ##
 ## The lob is planned once at the throw (`plan`): its flight time and gravity are solved so the grenade comes to REST at
 ## the aim point (the touchdown, a bounce or two and the skid are simulated with the very integrator the node then
@@ -192,11 +192,6 @@ func _physics_process(delta: float) -> void:
 ## Seconds until it goes off.
 func fuse_left() -> float:
 	return maxf(_fuse, 0.0)
-
-
-## How far (px) from it is dangerous: a frag's blast radius, a stun's flash radius.
-func danger_radius() -> float:
-	return GrenadeConfig.danger_radius(kind)
 
 
 ## What an onlooker may know of it: `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, from the row it was thrown with (the same

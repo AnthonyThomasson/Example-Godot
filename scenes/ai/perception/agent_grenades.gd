@@ -15,7 +15,7 @@ extends RefCounted
 
 const AgentThrow := preload("res://scenes/ai/perception/agent_throw.gd")
 
-## The group every live grenade is in (Items: `ThrownGrenade`: `kind`, `fuse_left()`, `danger_radius()`, `throw_stats()`, `thrower`).
+## The group every live grenade is in (Items: `ThrownGrenade`: `kind`, `fuse_left()`, `throw_stats()`, `thrower`).
 const GROUP := &"live_grenades"
 ## How far (px) from a known grenade a bounce or rest event may be, to be that grenade coming down.
 const LANDED_NEAR := 80.0
@@ -131,8 +131,8 @@ func _note(node: Node2D, point: Vector2, source: StringName, landed: bool) -> vo
 	var id := node.get_instance_id()
 	var rec: Dictionary = _known.get(id, {})
 	if rec.is_empty():
-		throw.learn(node.call("throw_stats"))  # (What a live grenade tells of its kind: its flash's cover reach, for one.)
-		rec = { "node": node, "kind": node.get("kind"), "radius": float(node.call("danger_radius")), "point": point,
+		throw.learn(node.call("throw_stats"))  # (What a live grenade tells of its kind: its danger radius and its flash's cover reach, for two.)
+		rec = { "node": node, "kind": node.get("kind"), "radius": throw.radius_of(node.get("kind")), "point": point,
 			"source": source, "landed": landed, "rested": false }
 		_known[id] = rec
 		return

@@ -91,7 +91,7 @@ static func throw_at(t: TestContext, who: StringName, slot: int, point: Vector2)
 	return at
 
 
-## The nodes in the `live_grenades` group (each has `kind`, `fuse_left()`, `danger_radius()`, `thrower`).
+## The nodes in the `live_grenades` group (each has `kind`, `fuse_left()`, `throw_stats()`, `thrower`).
 static func live(t: TestContext) -> Array:
 	return t.world.get_tree().get_nodes_in_group("live_grenades")
 

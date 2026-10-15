@@ -73,12 +73,6 @@ static func slots() -> Array:
 	return out
 
 
-## How far (px) from a live grenade of `kind` it is dangerous to stand in sight of: the frag's blast radius, the stun's flash radius.
-static func danger_radius(kind: StringName) -> float:
-	var r := row(kind)
-	return float(r.get("blast_radius", r.get("flash_radius", 0.0)))
-
-
 ## What a grenade of `kind` tells whoever holds it or watches it fly, from `source` (its row; a thrown grenade passes the row it was thrown
 ## with): `{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`. `flash_cover_reach` is INF for a frag (furniture shields from its
 ## blast at any distance); `max_blind` (s) is the longest a stun blinds anyone, 0 for a frag. The one place this dictionary is made: `GrenadeItem.throw_stats()` and `ThrownGrenade.throw_stats()` both return it, and
