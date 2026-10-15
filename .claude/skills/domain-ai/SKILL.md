@@ -39,8 +39,8 @@ walk the situation has overtaken, and the EventBus intake (`&"hit"`, allies' `&"
 `&"callout"` bus like an NPC and, when an allied team is stacking at a doorway the human is near (`reserve_range` 300 px of walking), radios the
 human's own claim for the first free slot: the same entry fields, with the human as `speaker`, repeated every 2 s. It reads the human's step
 from where it stands (`claim` / `ready` / `going_in` / `in`) and withdraws on leaving, dying, nobody left stacking, or `go_timeout` after the AI
-ahead is through. It reuses perception's `AgentEntry` statics (`claims`, `free_slot`, `stack_side`, `slot_point`) and geometry, and never moves the
-character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
+ahead is through. It reuses perception's `AgentEntry` statics (`claims`, `free_slot`, `stack_side`, `slot_point`) and geometry, and `AgentGrenades.is_call`
+(a grenade call is not a stack claim), and never moves the character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
