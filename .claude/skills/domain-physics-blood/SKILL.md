@@ -75,9 +75,9 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   register themselves (spatial hash for splatters, a list for pools; entries drop on `tree_exited`). A
   splatter is a thin film (`splat_wetness`) drying to 0 over `splat_dry_time`; a pool is its flow fill, wet for
   `pool_wet_time`. Dried blood returns 0. Ages count physics frames.
-- `BloodDecals` (`Node2D`, one per parent via `layer(parent)` / `find(parent)`): batches prints (polygons) and
-  smear ribbons at `BloodConfig.print_z_index`, drawn in 128 px chunks (each with its own mark list) that redraw only when they gain a mark or a
-  ribbon grows (and at 2 Hz while drying, `print_dry_time`); own FIFO cap `print_max` (not the Despawner).
+- `BloodDecals` (one per parent via `layer(parent)` / `find(parent)`; extends Physics' `chunked_layer.gd`, `domain-physics`): batches prints
+  (polygons) and smear ribbons at `BloodConfig.print_z_index` in the shared chunked store, whose chunks redraw only when they gain a mark or a
+  ribbon grows (and, its own chunk draw, at 2 Hz while drying, `print_dry_time`); its cap is `print_max` (not the Despawner).
   `ribbon_begin(point, width, alpha) -> mark`, `ribbon_extend(mark, point, width, alpha)` (width 0 = taper to a
   point), `ribbon_count()`; a ribbon is drawn as two quads per segment via `draw_primitive`, solid on its centre line
   and fading to `smear_feather` at the edges. `items()` / `print_count()` for tests. `print_at` drops polygons the

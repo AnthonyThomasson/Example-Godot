@@ -41,10 +41,14 @@ infrastructure (`Despawner`, `PhysicsLayers`, `DrawLayers`).
   frame (u along the wall per tile, v across its thickness), so the tile follows every wall.
 - `DebrisSpawner` / `Debris` / `DebrisLayer` — material-styled chips (`STYLES` table). A chip is a node only while it
   flies (Despawner-tracked); as it lands it hands its place, turn, colour, size and shape to the parent's `DebrisLayer`
-  (`DebrisLayer.layer(parent)`, the `BloodDecals` pattern: chips grouped in 128 px chunks, only the chunk that gained or lost
-  one redraws) and frees itself, so a floor strewn with a thousand chips costs a few draw calls and no nodes. The layer
+  (`DebrisLayer.layer(parent)`) and frees itself, so a floor strewn with a thousand chips costs a few draw calls and no nodes. The layer
   keeps at most `Despawner.max_scene_objects` chips, dropping the oldest; it draws under whatever joins its node after it.
   Test: `tests/physics/debris_rests_in_a_layer_test.gd`.
+- `chunked_layer.gd` (no `class_name`; `DebrisLayer`, `ScorchDecals` and the blood's `BloodDecals` extend it by path) — the
+  batched decal store they share: every mark kept as plain data in one node under a world node, grouped in 128 px chunks
+  (`CHUNK`) drawn by a few chunk nodes, only the chunk that gained or lost a mark redrawing, and a capped FIFO (`_add(mark, cap)`
+  drops the oldest past the layer's cap and flags it `dead`); `count()`, `items()`, `marks_in(cell)`. A layer names only its
+  recipe, its cap and its chunk's `_draw` (`_make_chunk`); its typed `find(parent)` / `layer(parent)` wrap `_get_or_make`.
 
 ## Hit particles (entry and exit bursts)
 
@@ -98,7 +102,7 @@ up to three colliderless nodes under `world`, each named for what it is, animate
 `ExplosionFlash` (a pale disc over a white one that swells a little and fades in `flash_time`), `ExplosionFireball` (frag only: a lumpy puff that swells and
 cools from yellow to deep red, fading over its last stretch) and `ExplosionSmoke` (puffs that drift out, swell and fade over `smoke_time`, ~4 s for a frag, a
 thin ~2.6 s for a stun). A frag also burns a mark into the world's `ScorchDecals` layer (`ScorchDecals.layer(world).burn(at, radius)`, node `ScorchDecals`):
-ragged stepped rows, a darker core in a lighter rim and a few specks, batched in 128 px chunks like `BloodDecals` / `DebrisLayer` (only the chunk that gained a
+ragged stepped rows, a darker core in a lighter rim and a few specks, a `chunked_layer.gd` like `DebrisLayer` and `BloodDecals` (only the chunk that gained a
 mark redraws), drawn at the blood decals' depth (`BloodConfig.print_z_index`, `DrawLayers.BLOOD`) and kept for good up to `Despawner.max_scene_objects` marks (the oldest dropped). A stun leaves no scorch.
 Tuning is `PhysicsConfig.explosion_looks` (one row per kind: `flash_*`, `fireball_*`, `smoke_*`, `scorch_radius`), `explosion_pixel` and `scorch_color`;
 `PhysicsConfig.explosion_fx_enabled` is the master switch (off: nothing spawns). Test: `tests/physics/explosion_fx`.
