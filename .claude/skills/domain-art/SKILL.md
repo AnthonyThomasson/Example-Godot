@@ -15,9 +15,9 @@ A painter is any script with
 draws in a **canonical frame** — front toward +y, width across the front — under `canvas.light`,
 the world light already turned into that frame, so its shading lands correctly after the art is
 turned. Painters live in their own domain: Objects (`objects/art/*_painter.gd` + the `ObjectArt`
-registry), Character (`character/body/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`), Items
-(`items/art/pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd` and the three `*_flat_painter.gd` for a gun lying
-dropped), Vehicles (`vehicle/art/car_painter.gd`, `van_painter.gd`, `door_painter.gd`, `wheel_painter.gd`, `lamp_painter.gd`, through
+registry), Character (`character/body/body_painter.gd`, `head_painter.gd`, `hand_painter.gd`, `limb_painter.gd`, `torso_painter.gd`,
+`vest_painter.gd`), Items (`items/art/pistol_painter.gd`, `smg_painter.gd`, `rifle_painter.gd` and the three `*_flat_painter.gd` for a gun lying
+dropped; the grenades' `stun_grenade_painter.gd`, `frag_grenade_painter.gd` and `spoon_painter.gd`), Vehicles (`vehicle/art/car_painter.gd`, `van_painter.gd`, `door_painter.gd`, `wheel_painter.gd`, `lamp_painter.gd`, through
 the shared `vehicle_art.gd`; see `domain-vehicle`). Knobs follow `opts.get(key, <DomainConfig>.<painter>_<key>)`.
 
 ## PixelArt (`pixel_art.gd`) — the renderer
@@ -63,7 +63,7 @@ through snapshots).
 ## ArtConfig (`art_config.gd`)
 
 Shared tuning: `pixel_size`, `light_from`, `turn_steps`, drop shadow (`drop_shadow_per_coverage`,
-`drop_shadow_max` — read by the object visuals; `drop_shadow_alpha` — also by the character's shadow), cast shadow,
+`drop_shadow_max` — read by the object and vehicle visuals; `drop_shadow_alpha` — also by the character, a dropped item and a grenade), cast shadow,
 the tone ramp, and the surface-finish densities. Domain-specific proportions and colors stay in
 each domain's config (`ObjectArtConfig`, `CharacterConfig.art_*`).
 
