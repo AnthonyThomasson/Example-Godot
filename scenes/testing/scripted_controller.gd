@@ -3,7 +3,8 @@ extends Node
 ## Testing domain: a puppet controller — a character's `control(character, delta)` child (interface 7)
 ## driven by a test instead of a human or an AI. Commands are queued here and carried out on the
 ## character's own frame, through only the published controller API (`move_input`, `aim_point`,
-## `run_input`, `set_posture`, `melee`, `shoot`, `select_slot`, `interact_with`, `end_interaction`, `try_use_vehicle`).
+## `run_input`, `set_posture`, `toggle_crouch`, `melee`, `leg_kick`, `shoot`, `reload`, `select_slot`, `interact_with`,
+## `end_interaction`, `try_use_vehicle`).
 ##
 ## Commands return at once; wait on their effect through the TestContext, e.g.
 ## `p.walk_to(spot)` then `await t.until(p.has_arrived, 3.0, "never arrived")`.
