@@ -11,7 +11,6 @@ extends Node
 ## How close (px) to a `walk_to` target counts as arrived.
 @export var arrive_distance := 6.0
 
-var _character: Node = null
 ## What to face: a Node2D (followed live), a Vector2 world point, or null (keep the last aim).
 var _aim: Variant = null
 ## Walking target (world), or null.
@@ -32,7 +31,6 @@ var failed_interactions: Array = []
 
 ## Called by the character at the top of its physics frame.
 func control(character, _delta: float) -> void:
-	_character = character
 	if _aim is Node2D and is_instance_valid(_aim):
 		character.aim_point = (_aim as Node2D).global_position
 	elif _aim is Vector2:
