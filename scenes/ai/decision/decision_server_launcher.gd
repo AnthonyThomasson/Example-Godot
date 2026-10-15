@@ -181,8 +181,8 @@ func _wait_then_probe() -> void:
 	_probe_once()
 
 
-## Start our own server, then poll it until it answers so `server_ready` reports a LIVE brain rather
-## than merely a spawned process. If nothing started (no `von_path`, or the spawn failed) there is
+## Start our own server, then poll it until it answers so `resolved` fires `true` only for a LIVE brain
+## rather than merely a spawned process. If nothing started (no `von_path`, or the spawn failed) there is
 ## nothing to wait for, so probing stops.
 func _launch_and_await_ready() -> void:
 	_launch()
