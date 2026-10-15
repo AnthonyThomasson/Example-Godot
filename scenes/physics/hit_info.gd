@@ -2,7 +2,7 @@ class_name HitInfo extends RefCounted
 
 ## The data packet passed to a hittable object's `take_hit()`. Whatever strikes an object
 ## fills it in; the object and the Physics System read it to shove, deform and spray debris.
-## Holds no object/projectile references, so Physics stays a leaf domain.
+## Holds no Objects or Projectile types (`source` is a plain Node), so Physics stays a leaf domain.
 
 ## World-space contact point.
 var position: Vector2
