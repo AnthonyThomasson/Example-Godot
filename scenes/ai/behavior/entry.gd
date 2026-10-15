@@ -1175,7 +1175,7 @@ func _radio(what: String, extra := {}) -> void:
 func _aim_travel() -> void:
 	if _character.move_input == Vector2.ZERO:
 		return
-	var ahead: Vector2 = _eyes.travel_point(_character)
+	var ahead: Vector2 = _eyes.travel_point()
 	var toward: Vector2 = (ahead - _character.global_position) if ahead != Vector2.INF else _character.move_input
 	_character.aim_point = _character.global_position + toward.normalized() * 100.0
 	_look_angle = toward.angle()

@@ -98,6 +98,7 @@ var rooms: Array = []:
 		if _loco != null:
 			_loco.rooms = value
 
+var _character: Node              ## The NPC's body, handed in once by `bind`: what every primitive drives.
 var _perception: Node             ## The perception sub-domain (contacts, combat geometry, engagement memory).
 var _loco: Node                   ## The Locomotion child (pathing, rooms).
 var _coverage: RefCounted         ## Room coverage by sight for a search move; see search_coverage.gd.
@@ -168,9 +169,10 @@ func setup(perception: Node, nav_agent: NavigationAgent2D) -> void:
 	_entry.setup(_loco, perception, _coverage, _watch, _combat)
 
 
-## Hand in the NPC's body, which the behaviour's modules drive from then on. The controller calls this once it knows which
-## character it drives.
+## Hand in the NPC's body, which the behaviour and its modules drive from then on. The controller calls this once it knows
+## which character it drives.
 func bind(character: Node) -> void:
+	_character = character
 	_loco.bind(character)
 	_coverage.bind(character)
 	_watch.bind(character)
@@ -425,14 +427,14 @@ func debug_coverage() -> Dictionary:
 
 
 ## Read-only: the running combat / movement / interaction state as world-space data (Vector2s, not the
-## JSON-safe digest), for the combat, territory and targets debug overlays. `character` is the NPC's body,
-## needed for its aim point and the fire-line query. A pure read — the line query only casts a ray.
-func debug_combat(character) -> Dictionary:
+## JSON-safe digest), for the combat, territory and targets debug overlays. The NPC's body gives its aim point and the
+## fire-line query. A pure read — the line query only casts a ray.
+func debug_combat() -> Dictionary:
 	var engaged := _engage_id != 0
 	var in_range := false
 	var fire_clear := false
-	if engaged and character != null:
-		in_range = character.global_position.distance_to(_engage_pos) <= shoot_range
+	if engaged and _character != null:
+		in_range = _character.global_position.distance_to(_engage_pos) <= shoot_range
 		fire_clear = in_range and _perception.has_line_to(_engage_node, _engage_pos)
 	var fighting := _primitive in [&"engage", &"melee"]
 	var obj_pos = null
@@ -455,7 +457,7 @@ func debug_combat(character) -> Dictionary:
 		"fire_timer": _combat.fire_timer,
 		"fire_cooldown": fire_cooldown,
 		"combat_dest": _combat.dest if _primitive == &"engage" and _arrived and _combat.dest != Vector2.ZERO else null,
-		"aim_point": character.aim_point if character != null else Vector2.ZERO,
+		"aim_point": _character.aim_point if _character != null else Vector2.ZERO,
 		"reloading": _reloading,
 		"requested_point": _params["point"] if _params.has("point") else null,
 		"point": (_point as Variant) if _params.has("point") else null,
@@ -570,8 +572,8 @@ func _adopt(leaf: Dictionary) -> void:
 
 ## The characters a walk accounts for: every contact the NPC knows of, less one out of sight whose last-known spot, near
 ## enough to matter (`WALK_BODY_RANGE`), it can see now with nobody on it (it has moved on unseen).
-func _walk_bodies(character) -> Array:
-	var here: Vector2 = character.global_position
+func _walk_bodies() -> Array:
+	var here: Vector2 = _character.global_position
 	var spots: Array = []
 	for c in _known:
 		if not c["visible"] and (c["pos"] as Vector2).distance_to(here) <= WALK_BODY_RANGE:
@@ -653,12 +655,12 @@ func _needs_target() -> bool:
 ## Advance an active interaction: hold it until its dwell runs out, the character leaves it, or the
 ## controller forces a rethink (`force`); then end it and flag the task resolved. Returns true while the
 ## NPC is STILL interacting (the controller should do nothing more this tick).
-func service_interaction(character, delta: float, force: bool) -> bool:
+func service_interaction(delta: float, force: bool) -> bool:
 	if not _in_interaction:
 		return false
 	_interaction_timer -= delta
-	if force or not character.is_busy() or _interaction_timer <= 0.0 or not _evade.is_empty():
-		character.end_interaction()
+	if force or not _character.is_busy() or _interaction_timer <= 0.0 or not _evade.is_empty():
+		_character.end_interaction()
 		_in_interaction = false
 		_resolved = true  # Pick the next step right away rather than wait out the cadence.
 		return false
@@ -712,43 +714,43 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 # --- Running the primitive --------------------------------------------------------------------
 
 ## Carry out the running primitive this tick.
-func apply(character, delta: float) -> void:
+func apply(delta: float) -> void:
 	_combat.tick(delta)
 	_loco.sample(delta)  # Observation only (stuck overlay); never alters the tick.
-	_loco.bodies = _walk_bodies(character)  # Every walk accounts for the characters the NPC knows of, and only those.
+	_loco.bodies = _walk_bodies()  # Every walk accounts for the characters the NPC knows of, and only those.
 	_loco.ignore_id = _engage_id if _primitive == &"melee" else 0  # A melee closes on its target: no walk round it.
 	if not _evade.is_empty():
-		_apply_evade(character, delta)
+		_apply_evade(delta)
 		return
 	match _primitive:
 		&"move":
-			_apply_move(character, delta)
+			_apply_move(delta)
 		&"engage":
-			_apply_engage(character, delta)
+			_apply_engage(delta)
 		&"melee":
-			_apply_melee(character)
+			_apply_melee()
 		&"interact":
-			_apply_interact(character)
+			_apply_interact()
 		&"reload":
-			_apply_reload(character)
+			_apply_reload()
 		&"entry":
 			_apply_entry(delta)
 		&"throw":
-			_apply_throw(character, delta)
+			_apply_throw(delta)
 		_:
-			_apply_hold(character)
+			_apply_hold()
 	if _loco.take_blocked():
 		_way_blocked()
-	_apply_watch(character, delta)
+	_apply_watch(delta)
 	_guard_clock += delta
-	_entry_guard(character)
+	_entry_guard()
 	_combat.continue_burst()
-	character.run_input = _should_run(character)
+	_character.run_input = _should_run()
 	_combat.apply_back_off(delta)
-	_apply_posture(character, delta)
-	_running = character.is_running()
-	_posture = character.posture()
-	_reloading = character.is_reloading()
+	_apply_posture(delta)
+	_running = _character.is_running()
+	_posture = _character.posture()
+	_reloading = _character.is_reloading()
 
 
 ## A body seals the only way of the walk the primitive is on and stays (`Locomotion.take_blocked`): re-plan, so the NPC is
@@ -775,10 +777,10 @@ func _way_blocked() -> void:
 ## it was) takes the eyes and the gun whatever the primitive is doing: `Combat` shoots it as soon as a shot is on, and an empty
 ## gun is reloaded. A melee and an engaged NPC in position fight their own target and aim at it themselves; an interaction has
 ## its own gaze. With nothing to look at, a resting NPC (a hold, a reload, a move that has arrived) turns among its room's doorways.
-func _apply_watch(character, delta: float) -> void:
+func _apply_watch(delta: float) -> void:
 	_threat = {}
 	_gaze = "primitive"
-	if character.is_busy():
+	if _character.is_busy():
 		return
 	match _primitive:
 		&"melee", &"interact":
@@ -798,7 +800,7 @@ func _apply_watch(character, delta: float) -> void:
 	if not t.is_empty():
 		_threat = t
 		_gaze = "threat"
-		character.aim_point = t["pos"]
+		_character.aim_point = t["pos"]
 		_combat.fire_at_will(t)
 		if not _entry.committed():
 			_combat.reload_if_dry()
@@ -829,12 +831,12 @@ func _on_dry() -> void:
 ## Take the posture `_wanted_posture` asks for. Standing back up is never delayed (a run, the end of a fight);
 ## a crouch is held for `posture_dwell` before it is dropped, so a peek-and-duck does not flicker. A
 ## change the character refuses (its own pacing, an interaction) is simply asked again next tick.
-func _apply_posture(character, delta: float) -> void:
+func _apply_posture(delta: float) -> void:
 	_posture_hold = maxf(_posture_hold - delta, 0.0)
-	var want := _wanted_posture(character)
-	if want == character.posture() or (want != &"stand" and _posture_hold > 0.0):
+	var want := _wanted_posture()
+	if want == _character.posture() or (want != &"stand" and _posture_hold > 0.0):
 		return
-	if character.set_posture(want):
+	if _character.set_posture(want):
 		_posture_hold = posture_dwell
 
 
@@ -842,10 +844,10 @@ func _apply_posture(character, delta: float) -> void:
 ## the server down. Only a standing body runs, so anything on the move to a destination stands, and so does
 ## everything outside a fight. Fighting in place (an engaged NPC in position, or one holding / reloading while a hostile is known or
 ## shots are landing) it crouches: a smaller target, and it hides behind cover as high as a crouch.
-func _wanted_posture(character) -> StringName:
+func _wanted_posture() -> StringName:
 	if not _evade.is_empty():
 		return &"crouch" if _evade_crouches() else &"stand"
-	if not posture_enabled or character.run_input:
+	if not posture_enabled or _character.run_input:
 		return &"stand"
 	var under_fire: bool = _perception != null and _perception.under_fire()
 	if _hostiles.is_empty() and not under_fire:
@@ -869,8 +871,8 @@ func _wanted_posture(character) -> StringName:
 ## `run_start_fraction`, or already running). It never sprints with a shot to take or an empty gun to reload (a running
 ## character can do neither), except a retreat (`params.run_through_fire`), which is about leaving the line, not trading shots.
 ## The Character spends the stamina and runs dry on its own.
-func _should_run(character) -> bool:
-	if not run_enabled or character.move_input == Vector2.ZERO:
+func _should_run() -> bool:
+	if not run_enabled or _character.move_input == Vector2.ZERO:
 		return false
 	var dest := _point
 	match _primitive:
@@ -886,12 +888,12 @@ func _should_run(character) -> bool:
 			return false
 	if not _params.get("run", false) and not (_perception != null and _perception.under_fire()):
 		return false
-	if character.global_position.distance_to(dest) <= run_min_distance:
+	if _character.global_position.distance_to(dest) <= run_min_distance:
 		return false
 	if not _threat.is_empty() and not bool(_params.get("run_through_fire", false)) \
 			and (_combat.can_fire_at(_threat) or _combat.reload_due()):
 		return false  # A shot (or the reload an empty gun needs) is on: a running character can do neither, so walk and take it.
-	return character.is_running() or character.stamina_fraction() >= run_start_fraction
+	return _character.is_running() or _character.stamina_fraction() >= run_start_fraction
 
 
 ## Move: walk to the destination (or into the destination room), aiming as the leaf asks (a threat in sight takes the
@@ -899,10 +901,10 @@ func _should_run(character) -> bool:
 ## point and, on arrival, COVERS the room by sight — turning and relocating until it has seen (near-)every sampled
 ## point (see `search_coverage.gd`) — before flagging the task resolved; any other move stops on arrival and flags
 ## resolved at once.
-func _apply_move(character, delta: float) -> void:
+func _apply_move(delta: float) -> void:
 	if not _arrived:
 		if _arrive_room != "" and not _look_around:
-			_arrived = _loco.room_key_at(character.global_position) == _arrive_room
+			_arrived = _loco.room_key_at(_character.global_position) == _arrive_room
 		if not _arrived:
 			_arrived = _loco.reached(_point)
 		if _arrived:
@@ -916,45 +918,45 @@ func _apply_move(character, delta: float) -> void:
 		if _coverage.step(delta):  # Look around until the room is covered by sight.
 			_look_around = false
 			_resolved = true
-			var covered: String = _loco.room_key_at(character.global_position)
+			var covered: String = _loco.room_key_at(_character.global_position)
 			if covered != "":
 				_perception.mark_cleared(covered)  # Seen all of it: cleared, as by an entry.
 		return
 	else:
-		character.move_input = Vector2.ZERO  # Arrived: stand. (The last steering input would walk it on into the wall ahead.)
-	_aim_move(character)
+		_character.move_input = Vector2.ZERO  # Arrived: stand. (The last steering input would walk it on into the wall ahead.)
+	_aim_move()
 
 
 ## Where a moving NPC looks when no threat has its eyes (`_apply_watch` puts one there): its target, the nearest known
 ## threat, the destination, or (default) a few paces down its path, so its view cone sweeps the way it is going.
-func _aim_move(character) -> void:
+func _aim_move() -> void:
 	match _params.get("aim", &"travel"):
 		&"target":
 			if _engage_id != 0:
-				character.aim_point = _engage_pos
+				_character.aim_point = _engage_pos
 				return
 		&"threat":
 			if not _hostiles.is_empty():
-				character.aim_point = _hostiles[0]["pos"]
+				_character.aim_point = _hostiles[0]["pos"]
 				return
 		&"point":
-			character.aim_point = _point
+			_character.aim_point = _point
 			return
 	var ahead: Vector2 = _watch.travel_point()
 	if ahead != Vector2.INF:
-		character.aim_point = ahead
-	elif character.move_input != Vector2.ZERO:
-		character.aim_point = character.global_position + character.move_input * 100.0
+		_character.aim_point = ahead
+	elif _character.move_input != Vector2.ZERO:
+		_character.aim_point = _character.global_position + _character.move_input * 100.0
 
 
 ## Engage: walk to the chosen spot (shooting on the way when a line opens), then fight from it —
 ## peek-and-cover, or an ambush that holds the covered spot and fires the moment a line opens. A
 ## territorial NPC fighting a contact outside the house stays inside (`_hold_ground`).
-func _apply_engage(character, delta: float) -> void:
+func _apply_engage(delta: float) -> void:
 	if _engage_id == 0:
-		_apply_hold(character)
+		_apply_hold()
 		return
-	character.aim_point = _engage_pos  # Aim at where we last saw them, not their true position.
+	_character.aim_point = _engage_pos  # Aim at where we last saw them, not their true position.
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
 	if not _arrived:
 		_arrived = _loco.reached(_point)
@@ -971,11 +973,11 @@ func _apply_engage(character, delta: float) -> void:
 
 ## Melee: close to punch range and swing on the fire cooldown (no cover cycle for fists). While
 ## holding ground it won't chase a contact out of the house — it only swings if one is already in reach.
-func _apply_melee(character) -> void:
+func _apply_melee() -> void:
 	if _engage_id == 0:
-		_apply_hold(character)
+		_apply_hold()
 		return
-	character.aim_point = _engage_pos
+	_character.aim_point = _engage_pos
 	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
 	_combat.melee(_engage_pos, _hold_ground)
 
@@ -1039,12 +1041,12 @@ func _resume_order() -> void:
 ## the nav agent was just given rather than the leaf's destination, so a path through an intermediate room, a reposition in
 ## a fight and the way to a doorway itself are all covered. Exempt: a retreat (`entry_guard: false` on its node), an NPC under
 ## fire, an entry already running, and anything that is not walking.
-func _entry_guard(character) -> void:
+func _entry_guard() -> void:
 	if _primitive == &"entry":
 		if not _resume.is_empty() and not _entry.committed() and _perception.under_fire():
 			_cancel_detour()  # Shot at before it crossed: no time to stack. (Once crossing it finishes the crossing.)
 		elif _resume.is_empty() and not _entry_pending and _entry.phase == "approach":
-			_guard_approach(character)
+			_guard_approach()
 		return
 	if not entry_guard or _perception == null or not _perception.entry_enabled:
 		return
@@ -1056,7 +1058,7 @@ func _entry_guard(character) -> void:
 			pass
 		_:
 			return
-	if (character.move_input as Vector2).length() < 0.1 or not bool(_params.get("entry_guard", true)) or _perception.under_fire():
+	if (_character.move_input as Vector2).length() < 0.1 or not bool(_params.get("entry_guard", true)) or _perception.under_fire():
 		return
 	var walk: Dictionary = _loco.path_ahead()
 	if walk.is_empty():
@@ -1074,8 +1076,8 @@ func _entry_guard(character) -> void:
 ## secured first like any other walk's. The entry pauses (it told the stack it gave its claim up and starts again afterwards). Not
 ## for a member heading for a stack that others have claimed: the team goes to its door as one, and a member that left it to cover a
 ## door on the way would leave the point to go in alone.
-func _guard_approach(character) -> void:
-	if not entry_guard or not _perception.entry_enabled or (character.move_input as Vector2).length() < 0.1 or _perception.under_fire():
+func _guard_approach() -> void:
+	if not entry_guard or not _perception.entry_enabled or (_character.move_input as Vector2).length() < 0.1 or _perception.under_fire():
 		return
 	if not _perception.entry_team(_entry.opening).is_empty():
 		return
@@ -1141,22 +1143,22 @@ func _drop_detour() -> void:
 ## Interact: walk to the chosen object facing it (or a known hostile, to keep eyes on them); once its
 ## action is in reach, face it, run it and hold the interaction. Ends (and re-decides) if the object is
 ## gone or the action can't start.
-func _apply_interact(character) -> void:
+func _apply_interact() -> void:
 	if _target_obj == null or not is_instance_valid(_target_obj):
 		_primitive = &"hold"
 		_resolved = true
-		character.move_input = Vector2.ZERO
+		_character.move_input = Vector2.ZERO
 		return
-	if not _interaction_in_reach(character):
-		character.aim_point = _hostiles[0]["pos"] if not _hostiles.is_empty() else _target_obj.global_position
+	if not _interaction_in_reach():
+		_character.aim_point = _hostiles[0]["pos"] if not _hostiles.is_empty() else _target_obj.global_position
 		_loco.move_to(_target_obj.global_position)
 		return
-	character.move_input = Vector2.ZERO
-	character.aim_point = _target_obj.global_position  # face the object to perform the interaction
+	_character.move_input = Vector2.ZERO
+	_character.aim_point = _target_obj.global_position  # face the object to perform the interaction
 	if not _act_armed:
 		_act_armed = true  # Let facing settle before acting.
 		return
-	if character.interact_with(_target_obj, _interact_id):
+	if _character.interact_with(_target_obj, _interact_id):
 		_in_interaction = true
 		_interaction_timer = interaction_dwell
 	else:
@@ -1170,13 +1172,13 @@ func _apply_interact(character) -> void:
 ## that cannot be made (the lob is blocked now, none left, the hand never free) is given up at once and the NPC re-decides. A thrower
 ## that has drifted a few px out of range since the spot was offered closes in on it (`Combat.throw_step`) instead; once the wind-up
 ## has begun the throw is committed, standing where it is.
-func _apply_throw(character, delta: float) -> void:
+func _apply_throw(delta: float) -> void:
 	if _combat.throw_stage != "away":
-		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(character.global_position, _throw_spot)
+		var blocked: bool = _combat.throw_stage == "aim" and not _perception.lob_clear(_character.global_position, _throw_spot)
 		if blocked or _combat.throw_step(delta) == &"failed":
 			_end_throw()
 		return
-	character.move_input = Vector2.ZERO
+	_character.move_input = Vector2.ZERO
 	if _throw_wait < 0.0:
 		_end_throw()
 		return
@@ -1213,36 +1215,36 @@ func take_throw_calls() -> Array:
 
 ## Read-only: the throw the NPC is about to make, `{ from, to, kind, radius }` (empty once it has left the hand, or when the NPC is
 ## not throwing), for the grenade overlay.
-func throw_plan(character) -> Dictionary:
+func throw_plan() -> Dictionary:
 	if _primitive != &"throw" or _combat.throw_stage == "away":
 		return {}
-	return { "from": character.global_position, "to": _throw_spot, "kind": _throw_kind, "radius": float(_params.get("radius", 0.0)) }
+	return { "from": _character.global_position, "to": _throw_spot, "kind": _throw_kind, "radius": float(_params.get("radius", 0.0)) }
 
 
 ## Hold: stand still. Where it looks is the watch stage's (`_apply_watch`): a threat if one has its eyes, else the doors. An
 ## empty gun is reloaded meanwhile, so a steady NPC (no decision to be had) isn't left unarmed.
-func _apply_hold(character) -> void:
-	character.move_input = Vector2.ZERO
+func _apply_hold() -> void:
+	_character.move_input = Vector2.ZERO
 	_combat.reload_if_dry()
 
 
 ## Reload: stand and swap magazines, its eyes where the watch stage puts them (a threat, else the doors); when the reload
 ## ends (or can't start) the task is resolved and the NPC re-decides. A reload refused while the previous leaf's run is
 ## still winding down is retried the next tick.
-func _apply_reload(character) -> void:
-	character.move_input = Vector2.ZERO
-	if character.is_reloading():
+func _apply_reload() -> void:
+	_character.move_input = Vector2.ZERO
+	if _character.is_reloading():
 		_reload_started = true
 		return
 	if not _reload_started:
-		var gun: int = character.gun_slot()
+		var gun: int = _character.gun_slot()
 		if gun >= 0:
-			character.select_slot(gun)
-		character.reload()
-		if character.is_reloading():
+			_character.select_slot(gun)
+		_character.reload()
+		if _character.is_reloading():
 			_reload_started = true
 			return
-		if character.is_running():
+		if _character.is_running():
 			return
 	_primitive = &"hold"
 	_resolved = true
@@ -1298,40 +1300,40 @@ func _evade_crouches() -> bool:
 
 ## Carry the evade out: run to the spot (its back to the grenade, looking away from it all the way), then hold it, crouched when the spot is
 ## cover. With no spot to reach in time it stays and turns its back (a stun's flash then blinds it for the back-turned share only).
-func _apply_evade(character, delta: float) -> void:
-	if character.is_busy():
-		character.end_interaction()  # Up off the chair: a grenade outranks what it was doing, whoever started it.
+func _apply_evade(delta: float) -> void:
+	if _character.is_busy():
+		_character.end_interaction()  # Up off the chair: a grenade outranks what it was doing, whoever started it.
 		_in_interaction = false
 	_threat = {}
 	_gaze = "evade"
 	var spot: Vector2 = evade_spot()
-	var here: Vector2 = character.global_position
+	var here: Vector2 = _character.global_position
 	var away: Vector2 = here - (_evade["point"] as Vector2)
-	away = away.normalized() if away.length() > 1.0 else -(character.facing as Vector2)
+	away = away.normalized() if away.length() > 1.0 else -(_character.facing as Vector2)
 	var running := false
 	if spot != Vector2.INF:
 		if not _evade_arrived:
 			_evade_arrived = _loco.reached(spot)
 		if not _evade_arrived:
 			_loco.move_to(spot)
-			running = run_enabled and (character.is_running() or character.stamina_fraction() >= run_start_fraction)
+			running = run_enabled and (_character.is_running() or _character.stamina_fraction() >= run_start_fraction)
 	if spot == Vector2.INF or _evade_arrived:
-		character.move_input = Vector2.ZERO
-	character.aim_point = here + away * 100.0  # Its back to the burst all the way, running or holding: a flash blinds the face.
-	character.run_input = running
+		_character.move_input = Vector2.ZERO
+	_character.aim_point = here + away * 100.0  # Its back to the burst all the way, running or holding: a flash blinds the face.
+	_character.run_input = running
 	_guard_clock += delta
-	_apply_posture(character, delta)
-	_running = character.is_running()
-	_posture = character.posture()
-	_reloading = character.is_reloading()
+	_apply_posture(delta)
+	_running = _character.is_running()
+	_posture = _character.posture()
+	_reloading = _character.is_reloading()
 
 
 # --- Helpers ---------------------------------------------------------------------------------
 
 ## Whether the chosen interaction on `_target_obj` is currently reachable (lets the approach stop and
 ## the action begin).
-func _interaction_in_reach(character) -> bool:
-	for entry in character.interactions_in_reach():
+func _interaction_in_reach() -> bool:
+	for entry in _character.interactions_in_reach():
 		if entry["object"] != _target_obj:
 			continue
 		for spec in entry["specs"]:

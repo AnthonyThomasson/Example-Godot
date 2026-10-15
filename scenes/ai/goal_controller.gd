@@ -596,7 +596,7 @@ func debug_memory() -> Dictionary:
 func debug_combat() -> Dictionary:
 	if _behavior == null or _character == null:
 		return {}
-	return _behavior.debug_combat(_character)
+	return _behavior.debug_combat()
 
 
 ## Read-only: the movement-progress sample (seconds stalled, recent trail) for the stuck overlay.
@@ -612,7 +612,7 @@ func debug_grenades() -> Dictionary:
 	if _perception == null or _behavior == null:
 		return { "known": [], "escape": Vector2.INF, "throw": {} }
 	return { "known": _perception.known_grenades(), "escape": _behavior.evade_spot(),
-		"throw": _behavior.throw_plan(_character) if _character != null else {} }
+		"throw": _behavior.throw_plan() if _character != null else {} }
 
 
 ## Read-only: the last callout this NPC radioed (`position`, `point`, `label`, `at` msec), or empty.
@@ -627,7 +627,7 @@ func debug_brain() -> Dictionary:
 	if _planner == null:
 		return {}
 	var d: Dictionary = _planner.debug_state()
-	var timers: Dictionary = _behavior.debug_combat(_character).get("timers", {}) if _character != null else {}
+	var timers: Dictionary = _behavior.debug_combat().get("timers", {}) if _character != null else {}
 	return {
 		"pending": d.get("pending", false),
 		"failed": d.get("last_failed", false),
@@ -684,10 +684,10 @@ func control(character, delta: float) -> void:
 		_client.set_npc_name(_npc_name())
 	_decide_timer -= delta
 	# SENSE.
-	_process_events(character)
+	_process_events()
 	_perception.openings = openings
 	_perception.observe(rooms)
-	_react_to_grenades(character)
+	_react_to_grenades()
 	_behavior.rooms = rooms
 	if entry_point != Vector2.ZERO:
 		_perception.entry_point = entry_point # Hand the injected entrance to the perception once.
@@ -697,7 +697,7 @@ func control(character, delta: float) -> void:
 		_force_now("lost the engaged contact") # Lost the engaged contact mid-fight → reconsider.
 	_check_salient()
 	# An active interaction holds the tick; when it or a move resolves, re-decide at once.
-	if _behavior.service_interaction(character, delta, _force):
+	if _behavior.service_interaction(delta, _force):
 		return
 	var why: String = _behavior.resolve_reason()
 	if _behavior.take_resolved():
@@ -708,11 +708,11 @@ func control(character, delta: float) -> void:
 	# THINK.
 	if _planner.is_pending():
 		if _force:
-			_maybe_interrupt(character)
+			_maybe_interrupt()
 	elif _should_decide():
 		_start_decision()
 	# ACT.
-	_behavior.apply(character, delta)
+	_behavior.apply(delta)
 	for step in _behavior.take_entry_calls():
 		if send_callouts:
 			_post_entry_call(step)
@@ -743,8 +743,8 @@ func _should_decide() -> bool:
 ## A salient event arrived while a walk is in flight: restart the walk only when the situation now
 ## calls for a different starting node (e.g. it came under fire mid-way through choosing a room to
 ## search → straight to COMBAT). Otherwise the walk in flight already fits; let it finish.
-func _maybe_interrupt(character) -> void:
-	if _behavior.evading() or character.is_blind():
+func _maybe_interrupt() -> void:
+	if _behavior.evading() or _character.is_blind():
 		return
 	if _planner.entry_for(_perception.quick_facts()) != _planner.current_entry():
 		if Budget.claim():  # Else `_force` stays and the restart is tried again next frame.
@@ -771,14 +771,14 @@ func _start_decision() -> void:
 ## immediate re-decision only when the NPC is NOT already fighting (to kick off a fight); while
 ## fighting it just refreshes the engagement, so a firefight doesn't re-ask Von every frame. Allies'
 ## callouts are folded in when this NPC listens to them.
-func _process_events(character) -> void:
+func _process_events() -> void:
 	if _event_queue.is_empty():
 		return
-	var deaf: bool = character.is_deaf()  # A deafened NPC hears no gunfire, no hit elsewhere and no radio call (G15).
+	var deaf: bool = _character.is_deaf()  # A deafened NPC hears no gunfire, no hit elsewhere and no radio call (G15).
 	for ev in _event_queue:
 		match ev[0]:
 			&"hit":
-				if deaf and ev[1].get("victim") != character:
+				if deaf and ev[1].get("victim") != _character:
 					continue
 				if _perception.process_hit(ev[1]) and not _behavior.in_combat():
 					_force_now("attacked")
@@ -795,13 +795,13 @@ func _process_events(character) -> void:
 ## The grenade reflex (G16) and the blind NPC's recovery (G15), every tick after the SEE pass: hand the behaviour the plan to get clear
 ## of the live grenade that threatens the NPC (or {}), radio the grenades it has seen or heard come down, and re-decide the moment
 ## its sight returns.
-func _react_to_grenades(character) -> void:
+func _react_to_grenades() -> void:
 	_behavior.poll_throw()
 	_behavior.set_evade(_perception.evade_plan())
 	for grenade in _perception.grenade_announcements():
 		if send_callouts:
 			_post_grenade_call(grenade)
-	var blind: bool = character.is_blind()
+	var blind: bool = _character.is_blind()
 	if _was_blind and not blind:
 		_force_now("sight returned")
 	_was_blind = blind
