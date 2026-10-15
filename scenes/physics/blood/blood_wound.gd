@@ -14,7 +14,7 @@ var _drips := 0
 var _wait := 0.0
 ## This body's splatters, oldest first.
 var _splats: Array[Node] = []
-var _stopped := false
+var _stopped := false  ## Set by `stop()` (death): no more splatters or drips.
 
 
 func _ready() -> void:

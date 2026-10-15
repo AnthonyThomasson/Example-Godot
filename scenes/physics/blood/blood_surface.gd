@@ -9,7 +9,7 @@ class_name BloodSurface
 
 ## Registered surfaces: id -> { rect: Rect2, groove: Callable, porous: bool }.
 static var _surfaces: Dictionary = {}
-static var _next_id := 1
+static var _next_id := 1  ## The id the next `register` hands out.
 ## How many registered surfaces are porous, so `is_porous` costs nothing in a world with none.
 static var _porous_count := 0
 

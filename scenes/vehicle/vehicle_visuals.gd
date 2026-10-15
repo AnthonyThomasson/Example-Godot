@@ -32,7 +32,7 @@ const MIRROR_AT := 9.0
 ## "chassis" (under the occupants) or "roof" (over them).
 @export_enum("chassis", "roof") var layer: String = "chassis"
 
-@onready var _vehicle := get_parent()
+@onready var _vehicle := get_parent()  ## The vehicle this layer draws (`vehicle.gd`).
 var _redraw_key := PackedInt32Array()  ## The `_key()` the layer was last drawn for.
 ## The next lighting step (counted out from the current one: 1, -1, 2, -2 ...) to paint ahead of time.
 var _warm := 1

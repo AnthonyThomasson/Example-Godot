@@ -162,9 +162,9 @@ static var body_shoulder_height: float = 6.3   ## Shoulder joints above the floo
 static var body_head_height: float = 7.2       ## Head center above the floor.
 static var body_shoulder_width: float = 0.8    ## Each shoulder joint off the spine.
 static var body_hip_width: float = 0.4         ## Each hip joint off the spine.
-static var body_upper_arm: float = 1.35
+static var body_upper_arm: float = 1.35        ## Shoulder to elbow.
 static var body_forearm: float = 1.4           ## Elbow to the center of the fist.
-static var body_thigh: float = 1.95
+static var body_thigh: float = 1.95            ## Hip to knee.
 static var body_shin: float = 1.85             ## Knee to ankle.
 static var body_foot: float = 1.0              ## Shoe length.
 ## How far an arm may stretch before its shoulder follows the hand (fraction of its length), and the

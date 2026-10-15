@@ -17,7 +17,7 @@ var outward: Vector2  ## Out of the body through this door (unit).
 
 var _turn := 1.0  ## Which way the door turns as it opens (the sign of the angle), so its free edge goes outward.
 var _progress := 0.0  ## Closed 0 .. open 1, linear in time; `amount()` eases it.
-var _target := 0.0
+var _target := 0.0  ## Where the progress is heading: 0 closing (or shut), 1 opening (or open).
 
 
 func _init(def: Dictionary) -> void:
