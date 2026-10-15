@@ -122,7 +122,7 @@ piece that is not at its face, so a crouched character 120 px behind a couch is 
 **400 px** is flash-blinded for up to `max_blind` **5 s**, scaled by distance (full inside 100 px, falling linearly to nothing at
 400 px) and by how much it faces the burst (the dot of its facing with the direction to the burst: facing it, x1; side-on, x0.6; back to
 it, x0.25; linear between those). So `blind = 5 * clamp((400 - d) / 300, 0, 1) * facing_factor`. No line of sight, no flash. The
-burst posts `&"explosion"` and each character stunned posts `&"stun"` `{ character, position, blind, deaf, from }` (G13; `from` is the burst point).
+burst posts `&"explosion"` and each character stunned posts `&"stun"` `{ character, position, blind, deaf }` (G13; `position` is the character's).
 Tests: `character/stun_flash_by_sight`, `character/stun_flash_cover_reach` (a crouched victim against a couch is not flashed; one 120 px behind a couch, the couch still on the line, is).
 
 **G12. Bang (by range).** Every character within `bang_radius` **350 px** is deafened and disoriented for up to `max_deaf` **6 s**,
@@ -134,7 +134,7 @@ Tests: `character/stun_bang_by_range`, `stun_bang_through_furniture`.
 **G13. Being stunned** (the character, for the player and an NPC alike). While disoriented a character moves at most `stun_speed` **x0.45**
 of its speed, with a slow drift, cannot run, and its aim sways: a wandering offset of up to `stun_sway` **25 degrees**, applied to
 where its shots go. The effect tails off over the last `recover_tail` **1.5 s** (the level falls linearly from 1 to 0 over that time),
-and then it is as before. `Character.take_stun(blind, deaf, from)` applies it (and posts `&"stun"`), `is_blind()`, `is_deaf()` and
+and then it is as before. `Character.take_stun(blind, deaf)` applies it (and posts `&"stun"`), `is_blind()`, `is_deaf()` and
 `stun_level()` (0..1) read it, `stun_view()` gives `{ blind, blind_total, deaf, level }` (seconds left blind and deaf, the blind
 seconds at the burst, the level) to the UI, and a new stun takes the longer of the old and new timers, blind and deaf each. The four numbers live in
 `CharacterConfig` (they tune the body, not the item). A character also tells a controller what it needs to judge a place in time: `posture_coverage(posture)` (the

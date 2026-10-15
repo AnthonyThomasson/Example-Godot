@@ -108,7 +108,7 @@ Called by Items' `ThrownGrenade` when its fuse is out: `Explosion.frag(at, world
   direction to the burst: 1 -> x1, 0 -> x0.6, -1 -> x0.25, linear between); no clear line, none. A wall always stops the line; a piece of furniture taller than the
   character stops it only when the character is within the row's `flash_cover_reach` (30 px) of it on the burst's side (`_reach`'s `cover_reach`, `_against`: a reverse ray from the body to the burst), so a crouched body hunched against a couch is
   shielded and one 120 px behind it is flashed. The blast (`_reach` without a reach) keeps the plain rule. The **bang** works by range: deaf
-  `max_deaf * (1 - d / bang_radius)`, x`wall_factor` when a wall stands between (`_reach(..., walls_only)`; a character hunched against a couch is out of the flash, not out of the bang). Both go through `Character.take_stun(blind, deaf, at)`, which posts the
+  `max_deaf * (1 - d / bang_radius)`, x`wall_factor` when a wall stands between (`_reach(..., walls_only)`; a character hunched against a couch is out of the flash, not out of the bang). Both go through `Character.take_stun(blind, deaf)`, which posts the
   `&"stun"` event; within `point_blank` the character also takes `point_blank_damage` through `take_damage`. A stun does no other damage.
 
 Tests: `tests/projectile/frag_blast_by_distance`, `frag_blast_blocked_by_wall`, `frag_blast_low_cover_by_posture`, `frag_fragments_hit`,
