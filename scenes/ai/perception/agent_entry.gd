@@ -232,10 +232,7 @@ func geometry(id: String, into: String, map: RID, space) -> Dictionary:
 	for o in _openings:
 		if opening_id(o) == id:
 			opening = o
-	var room := {}
-	for r in _rooms:
-		if str(r["key"]) == into:
-			room = r
+	var room := SnapshotVocab.room_by_key(_rooms, into)
 	if opening.is_empty() or room.is_empty():
 		return {}
 	var g := _build(opening, room, map, space)
