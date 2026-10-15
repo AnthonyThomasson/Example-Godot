@@ -106,7 +106,7 @@ var _entry: RefCounted            ## A tactical entry through a doorway; see ent
 var _watch: RefCounted            ## The threat that takes the eyes and the doors a resting NPC watches; see watch.gd.
 var _threat: Dictionary = {}      ## The contact holding the NPC's eyes and gun this tick ({} = none); see `_apply_watch`.
 var _gaze := "primitive"          ## What set the gaze this tick, for the read-outs: threat / doors / primitive.
-var _entry_pending := false       ## An ENTER leaf was adopted and its entry starts on the next tick (it needs the character).
+var _entry_pending := false       ## An ENTER leaf was adopted and its entry starts on the next tick (`_apply_entry`).
 var _resume := {}                 ## The leaf an entry detour paused (see `_begin_detour`); {} when the entry is the NPC's own order.
 var _guard_clock := 0.0           ## Seconds the guard has been watching (sim time), for the re-arm of a given-up doorway.
 var _guard_off := {}              ## Doorway id -> `_guard_clock` before which the guard leaves it alone.
@@ -175,6 +175,7 @@ func bind(character: Node) -> void:
 	_coverage.bind(character)
 	_watch.bind(character)
 	_combat.bind(character)
+	_entry.bind(character)
 
 
 ## Push the current config into the Locomotion child and the coverage and combat modules. The behaviour's own
@@ -731,13 +732,13 @@ func apply(character, delta: float) -> void:
 		&"reload":
 			_apply_reload(character)
 		&"entry":
-			_apply_entry(character, delta)
+			_apply_entry(delta)
 		&"throw":
 			_apply_throw(character, delta)
 		_:
 			_apply_hold(character)
 	if _loco.take_blocked():
-		_way_blocked(character)
+		_way_blocked()
 	_apply_watch(character, delta)
 	_guard_clock += delta
 	_entry_guard(character)
@@ -755,14 +756,14 @@ func apply(character, delta: float) -> void:
 ## a throw still closing on its spot (not once the wind-up has begun); an entry re-plans its own walk (`Entry.way_blocked`)
 ## and, when it gives the entry up, re-decides too, or, as a detour, hands the walk back to the order it paused. An evade
 ## (not a primitive: it replaces the order) holds the best spot it has until the burst.
-func _way_blocked(character) -> void:
+func _way_blocked() -> void:
 	if _primitive in [&"move", &"engage", &"melee", &"interact"]:
 		_resolved = true
 		_resolve_reason = "way blocked"
 	elif _primitive == &"throw" and _combat.throw_stage == "aim":
 		_end_throw()
 		_resolve_reason = "way blocked"
-	elif _primitive == &"entry" and _entry.way_blocked(character):
+	elif _primitive == &"entry" and _entry.way_blocked():
 		_finish_entry()
 		if _resolved:
 			_resolve_reason = "way blocked"
@@ -979,17 +980,17 @@ func _apply_melee(character) -> void:
 	_combat.melee(_engage_pos, _hold_ground)
 
 
-## Entry: start the entry on the first tick (it needs the character), then run its phases (the watch stage shoots a threat in
+## Entry: start the entry on the primitive's first tick, then run its phases (the watch stage shoots a threat in
 ## sight in every one of them). Done (the room clear, or the entry given up) → re-decide.
-func _apply_entry(character, delta: float) -> void:
+func _apply_entry(delta: float) -> void:
 	_entry.gaze_held = not _threat.is_empty()
 	_entry.hostile_in_view = _hostile_in_view()
 	if _entry_pending:
 		_entry_pending = false
-		if not _entry.begin(character, _params):
+		if not _entry.begin(_params):
 			_finish_entry()
 			return
-	if _entry.step(character, delta):
+	if _entry.step(delta):
 		_finish_entry()
 
 
