@@ -205,7 +205,7 @@ func _ally_in_blast(ctx: Dictionary, kind: StringName, radius: float, spot: Vect
 
 
 
-## Punching hostile `t`: one option, offered only while they are point-blank (`_dist_band`'s band), so
+## Punching hostile `t`: one option, offered only while they are point-blank (`SnapshotVocab.dist_band`'s point-blank band), so
 ## MELEE is never chosen from across a room.
 func melee_group(self_pos: Vector2, t: Dictionary) -> Dictionary:
 	var dist := self_pos.distance_to(t["pos"])
