@@ -216,7 +216,8 @@ with `cleared_room` once the rest of the stack is in), `cover` (the room is held
   `wants_decision(decide_timer_elapsed)` (the table's last column), `apply(character, delta)`,
   `fallback()` (steady hold when no decision can be had), `committed()` (crossing a doorway: no decision may
   start), `take_entry_calls()` (entry steps for the controller to radio), `debug_entry()`, `debug_entry_view(character)`,
-  `debug_combat(character)`, `debug_coverage()`, `debug_progress()`, `intent()`, `path_label()`.
+  `debug_combat(character)`, `debug_coverage()`, `debug_progress()`, `path_label()`, `throw_plan()` (the throw about to be made,
+  `{ from, to, kind, radius }`, `{}` once the grenade is away: the grenades overlay's `throw`).
 - `reached_lead()` — the investigation lead (`params.lead`) the running move has reached, which the
   controller hands to perception's `check_lead()` so it isn't offered again.
 - `ongoing()` — the running choice is still in progress (en route, fighting, using an object): only
