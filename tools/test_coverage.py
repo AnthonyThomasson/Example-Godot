@@ -4,7 +4,7 @@
   python3 tools/test_coverage.py
 
 Three views, all read from files (no Godot needed):
-  1. Domains: each scenes/<domain>/ with its test count (tests/<domain>/*_test.gd) — 0 = untested.
+  1. Domains: each scenes/<domain>/ with its test count (tests/<domain>/**/*_test.gd) — 0 = untested.
   2. Switches: rows of scenes/testing/test_switches.gd that no test turns on/off with s.switch(...).
   3. Interfaces: `Class.method` names in the `architecture` skill's "vital interfaces" section that
      never appear in tests/ or scenes/testing/ (a heuristic: a call by name counts as covered).
@@ -20,7 +20,7 @@ all_test_text = "\n".join(test_text.values())
 
 print("== Domains ==")
 for d in sorted(p.name for p in (ROOT / "scenes").iterdir() if p.is_dir()):
-    n = sum(1 for t in test_text if t.parent.name == d)
+    n = sum(1 for t in test_text if t.relative_to(ROOT / "tests").parts[0] == d)
     print(f"  {d:<12} {n} test(s){'   <-- none' if n == 0 and d != 'testing' else ''}")
 
 print("\n== Switches never used by a test ==")
