@@ -11,17 +11,19 @@ feed nothing back — so they can never affect behaviour. They are added as chil
 preset scene (`ai/npc.tscn`).
 
 Files:
+- `debug_overlay.gd` — the shared base every overlay below extends: it finds the controller (`controller_path`, the sibling
+  `GoalController`) and the character, runs `PROCESS_MODE_ALWAYS` (so it still draws while the tree is paused), redraws every frame
+  only while its `_on()` is true (the subclass's `show_<x>` toggle or toggles) and calls the subclass's `_paint()` only while the NPC
+  is alive; plus ring/arrow/line/timer-arc helpers.
 - `vision_debug.gd` — the NPC's actual visible area.
 - `agent_debug.gd` — the NPC's current decision + path.
 - `tactics_debug.gd` — the candidate navigation point zones it weighed, and the room zones it reasons over.
 - `zone_list.gd` — a static transform (`ZoneList.from_options`) that flattens a snapshot's option groups into the point zones the tactics overlay draws; the orchestrator's `debug_zones()` calls it (the only file here the orchestrator preloads).
 - `search_debug.gd` — how a searcher is covering the room it is in (which points it has seen vs. not).
 - `debug_text.gd` — the shared text helper (a label with a shadow) the overlays draw their words with.
-- Eleven further overlays, all subclasses of `debug_overlay.gd` (a shared base: finds the controller and
-  character, runs `PROCESS_MODE_ALWAYS`, redraws only while its `show_<x>` is on, plus ring/arrow/line/
-  timer-arc helpers): `contacts_debug.gd`, `hearing_debug.gd`, `combat_debug.gd`, `territory_debug.gd`,
+- Eleven further overlays, the behaviour ones: `contacts_debug.gd`, `hearing_debug.gd`, `combat_debug.gd`, `territory_debug.gd`,
   `targets_debug.gd`, `brain_debug.gd`, `routes_debug.gd`, `stuck_debug.gd`, `grenade_overlay.gd`, `entry_debug.gd`, `entry_team_debug.gd`
-  (see the section below).
+  (see the section below). These and the four above (vision, agent, tactics, search) are all subclasses of `debug_overlay.gd`.
 
 ## `vision_debug.gd` (toggle `show_vision`)
 
@@ -55,7 +57,8 @@ reading the controller's public API; both default off — they are dense).
 decision, from the controller's `debug_zones()`: a flat list of `{ point, category, label, desc, tags }`, one
 per option in the last snapshot's option groups that carries a world location (its `point` param, or an
 interactable's current position); the spectator inspector reads `label`/`desc` to detail a clicked
-point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()`. Each is a translucent disc + outline + a dot at the exact point,
+point, and the overlay highlights that point with a double ring via `set_focus()` / `clear_focus()` (drawn while a focus is set, even
+with both toggles off). Each is a translucent disc + outline + a dot at the exact point,
 coloured by `category` (`fire` red, `flank` orange, `advance` yellow, `retreat` blue, `lead` purple,
 `search` green, `entry` cyan (the stack slot beside a doorway ENTER offers), `room` teal, `interaction` white,
 `waypoint` magenta — `ZONE_COLORS`); each category
