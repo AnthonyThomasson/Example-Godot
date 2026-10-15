@@ -461,7 +461,7 @@ func debug_combat(character) -> Dictionary:
 	}
 
 
-## Read-only: the movement-progress sample (speed, seconds stalled, recent trail) for the stuck overlay.
+## Read-only: the movement-progress sample (seconds stalled, recent trail) for the stuck overlay.
 func debug_progress() -> Dictionary:
 	return _loco.debug_progress()
 

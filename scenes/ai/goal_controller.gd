@@ -596,7 +596,7 @@ func debug_combat() -> Dictionary:
 	return _behavior.debug_combat(_character)
 
 
-## Read-only: the movement-progress sample (speed, seconds stalled, recent trail) for the stuck overlay.
+## Read-only: the movement-progress sample (seconds stalled, recent trail) for the stuck overlay.
 func debug_progress() -> Dictionary:
 	return _behavior.debug_progress() if _behavior != null else {}
 

@@ -226,7 +226,7 @@ func sample(character, delta: float) -> void:
 
 ## Read-only: the movement-progress state sampled by `sample()`, for the stuck debug overlay.
 func debug_progress() -> Dictionary:
-	return { "speed": _stall_speed, "stalled_for": _stalled_for, "stall_window": STALL_WINDOW, "trail": _trail }
+	return { "stalled_for": _stalled_for, "trail": _trail }
 
 
 ## A world point as a JSON-safe [x, y] int pair.
