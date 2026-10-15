@@ -56,9 +56,11 @@ Everything one match builds lives under a fresh `World` node (group `match_world
 6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit, show_details)`, in spectator mode the camera framing + `SpectatorInspector`
    (`setup(combatants, flags, OverlayToggles.RESERVED_WIDTH)`: the width its outfit panel keeps clear; the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 
-Overlay flags live in `_overlay_flags` (one entry per row of `OverlayRegistry`); `_on_overlay_toggled` applies a flip live — the furniture holes to
+Overlay flags live in `_overlay_flags` (one entry per row of `OverlayRegistry`), seeded by `_initial_overlays`: the registry's defaults, then the
+`show_*` exports, then the player's saved toggles (`Settings.overlays`), which win over the exports; with Debug off every flag starts off.
+`_on_overlay_toggled` saves each flip with `Settings.set_overlay` and applies it live — the navigation holes (furniture and characters at rest) to
 the single NavDebug, the performance flag to its overlay, spectator mode via `SpectatorInspector.set_flag`, otherwise to every NPC's overlay
-nodes by duck-typed `show_<x>` property (`domain-ui-overlays`).
+nodes by duck-typed `show_<x>` property through `OverlayRegistry.apply` (`domain-ui-overlays`).
 
 ## NPC placement (`match_spawner.gd`, a `RefCounted`)
 
