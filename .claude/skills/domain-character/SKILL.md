@@ -216,8 +216,7 @@ frame doesn't snap speed. Tests: `tests/character/walk_into_furniture_speed_test
 
 ## Runtime shapes (built in `_ready()`)
 
-`character.gd` builds its body `CircleShape2D`; `character_hands.gd` builds the fist query
-`CircleShape2D`. The editor shows a "no shape" warning on `Player/CollisionShape2D` — expected.
+`character.gd` builds its body `CircleShape2D`; `body_strike.gd` builds each strike's query circle (a fist's or a foot's). The editor shows a "no shape" warning on `Player/CollisionShape2D` — expected.
 
 ## Scenes
 
