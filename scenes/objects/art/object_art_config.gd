@@ -13,8 +13,9 @@ class_name ObjectArtConfig
 static var table_plank_px: int = 9
 ## Bevelled rim width (art px) inside the outline.
 static var table_rim_px: int = 2
+## Corner rounding of the top (art px).
 static var table_corner_radius: int = 3
-## A recessed centre panel, inset this many art px from the edge.
+## A recessed centre panel (`table_inset`), inset `table_inset_margin` art px from the edge.
 static var table_inset: bool = false
 static var table_inset_margin: int = 7
 ## A cloth runner down the long axis: its width as a fraction of the short side, and its color.
@@ -40,24 +41,30 @@ static var chair_back_depth: float = 0.26
 static var chair_slats: int = 3
 
 # --- Cabinet (storage casegoods) ---
-## Front lip strip depth as a fraction of the cabinet's depth, and what it shows by default.
+## Front lip strip depth as a fraction of the cabinet's depth, what it shows by default
+## ("doors", "drawers", "lid" or "none") and how many doors or drawers across it.
 static var cabinet_front_depth: float = 0.16
 static var cabinet_front: String = "doors"
 static var cabinet_count: int = 2
 ## Crown moulding around the top.
 static var cabinet_crown: bool = false
+## The handles' metal, and the tint of a glass top.
 static var cabinet_handle_color: Color = Color(0.8, 0.72, 0.45)
 static var cabinet_glass_color: Color = Color(0.6, 0.7, 0.74)
 
 # --- Shelf ---
+## What fills the shelf by default ("books", "boxes" or "shoes"), and the cardboard of a box.
 static var shelf_contents: String = "books"
 static var shelf_box_color: Color = Color(0.68, 0.52, 0.34)
 
 # --- Counter ---
+## A backsplash band along the back edge by default, and the tap's metal (the bath's taps too).
 static var counter_backsplash: bool = true
 static var counter_tap_color: Color = Color(0.76, 0.78, 0.82)
 
 # --- Appliance ---
+## The front panel by default ("plain", "burners", "fridge", "microwave", "washer", "dryer" or
+## "tv"), its metal parts, and the glass of a microwave or washer door.
 static var appliance_panel: String = "plain"
 static var appliance_metal_color: Color = Color(0.68, 0.7, 0.74)
 static var appliance_glass_color: Color = Color(0.16, 0.2, 0.26)
@@ -67,35 +74,43 @@ static var appliance_glass_color: Color = Color(0.16, 0.2, 0.26)
 static var bed_pillows: int = 0
 static var bed_pattern: String = "quilt"
 static var bed_quilt_px: int = 14
+## The frame, the sheet, and the stars of the "stars" duvet pattern.
 static var bed_frame_color: Color = Color(0.45, 0.3, 0.18)
 static var bed_sheet_color: Color = Color(0.93, 0.92, 0.88)
 static var bed_star_color: Color = Color(1.0, 0.93, 0.55)
 
 # --- Office chair ---
+## The star base's metal.
 static var office_chair_base_color: Color = Color(0.22, 0.22, 0.25)
 
 # --- Bathroom ---
+## Water in a bath and a toilet bowl.
 static var bath_water_color: Color = Color(0.55, 0.76, 0.88)
 ## Shower tray tile size (art px).
 static var bath_tile_px: int = 8
+## The shower screen's glass.
 static var shower_glass_color: Color = Color(0.7, 0.85, 0.92)
 
 # --- Rug ---
+## The pattern by default ("medallion", "stripes" or "plush"), and the fringe's color.
 static var rug_pattern: String = "medallion"
 static var rug_fringe_color: Color = Color(0.92, 0.88, 0.78)
 
 # --- Plant, lamp ---
+## Leaves a plant gets, its pot and soil colors, and the glow at a lamp's centre.
 static var plant_leaves: int = 8
 static var plant_pot_color: Color = Color(0.72, 0.42, 0.28)
 static var plant_soil_color: Color = Color(0.25, 0.18, 0.12)
 static var lamp_glow_color: Color = Color(1.0, 0.95, 0.75)
 
 # --- Car ---
+## The parked car's tyres, windows and lamps.
 static var car_tyre_color: Color = Color(0.12, 0.12, 0.13)
 static var car_glass_color: Color = Color(0.2, 0.28, 0.36)
 static var car_light_color: Color = Color(0.98, 0.95, 0.8)
 
 # --- Fixture ---
+## A mirror's frame.
 static var fixture_frame_color: Color = Color(0.72, 0.6, 0.35)
 
 # --- Props ---
