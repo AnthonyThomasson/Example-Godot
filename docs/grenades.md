@@ -70,8 +70,8 @@ the arc's height at that point (tables 45, beds 35, sofas 45) but strikes walls 
 bounces off with energy loss (`restitution` **0.35**), and bounces off characters it hits. Once down it skids and rolls to a stop
 (`friction`). Nobody picks it up or throws it back. Every bounce posts `&"grenade"` `{ position, kind, stage }` with `stage = &"bounce"`,
 and the resting grenade posts `stage = &"rest"` once; the Audio domain voices a bounce (G14's sounds). A grenade in flight or on the
-floor, until it goes off, is a node in the group `live_grenades` with `kind`, `fuse_left()`, `danger_radius()` (a frag's 250 px blast
-radius, a stun's 400 px flash radius), `throw_stats()` (below) and `thrower`.
+floor, until it goes off, is a node in the group `live_grenades` with `kind`, `fuse_left()`, `throw_stats()` (below; its `danger_radius` is a
+frag's 250 px blast radius, a stun's 400 px flash radius) and `thrower`.
 Tests: `items/grenade_bounces_off_wall`, `items/grenade_lobs_over_table_not_wardrobe`.
 
 **G4. Death.** A dead character's unthrown grenades vanish with it: nothing is dropped, and nothing is ever live in a dead hand.
