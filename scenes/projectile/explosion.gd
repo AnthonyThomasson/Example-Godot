@@ -183,44 +183,79 @@ static func _bodies_near(space: PhysicsDirectSpaceState2D, at: Vector2, radius: 
 	return out
 
 
-## Where the line from `at` meets `body`, `{ position, normal }`, or {} when something stops it first: a wall, or a piece of
-## furniture taller than `body` (its `get_surface().coverage`, a character's being its posture's). Lower pieces are cleared
-## and so are the other characters. A body with no collider (the fallen) is reached at its centre. With a finite `cover_reach` (the
-## flash, G11) a piece of furniture only stops the line when `body` is within that many px of it on the burst's side; with `walls_only`
-## (the bang, G12) furniture does not stop it at all.
+## Whether something between `burst` and `p` shields a body `height` tall at `p` from a burst there (G7): a wall, or a piece of
+## furniture whose `coverage` is above `height` (the lower ones are cleared); with a finite `cover_reach` (a stun's flash, G11) a piece
+## only when `p` is within that many px of it on the burst's side. `exclude` holds the rids the line passes through (the characters').
+## The rule the blast and the flash keep, which the AI's perception asks of a grenade (interface 3).
+static func shields(space: PhysicsDirectSpaceState2D, burst: Vector2, p: Vector2, height: float, exclude: Array, cover_reach := INF) -> bool:
+	return not _walk(space, burst, p, height, exclude, cover_reach).is_empty()
+
+
+## The first wall or piece of furniture on the line from `a` to `b` that stops it for a body `height` tall, as its ray hit
+## (`{ position, normal, collider, rid, ... }`), or {} when none does: the lower pieces are cleared. `exclude` holds the rids the
+## line passes through. Where the AI's perception looks for the shadow behind cover (interface 3).
+static func first_stop(space: PhysicsDirectSpaceState2D, a: Vector2, b: Vector2, height: float, exclude: Array) -> Dictionary:
+	var found := _walk(space, a, b, height, exclude)
+	return {} if found.has("exhausted") else found
+
+
+## Where the line from `at` meets `body`, `{ position, normal }`, or {} when something stops it first (`_walk`): a wall, or a piece of
+## furniture taller than `body` (its `get_surface().coverage`, a character's being its posture's). Lower pieces are cleared and so are
+## the other characters. A body with no collider (the fallen) is reached at its centre. With a finite `cover_reach` (the flash, G11) a
+## piece of furniture only stops the line when `body` is within that many px of it on the burst's side; with `walls_only` (the bang,
+## G12) furniture does not stop it at all.
 static func _reach(space: PhysicsDirectSpaceState2D, at: Vector2, body: Node2D, characters: Array, cover_reach := INF, walls_only := false) -> Dictionary:
 	var height := float(body.call("get_surface").get("coverage", 100.0)) if body.has_method("get_surface") else 0.0
 	var skip: Array[RID] = []
 	for c: Node2D in characters:
 		if c != body and c is CollisionObject2D:
 			skip.append((c as CollisionObject2D).get_rid())
-	for _i in MAX_CLEARED:
-		var query := PhysicsRayQueryParameters2D.create(at, body.global_position, MASK)
-		query.exclude = skip
-		var found := space.intersect_ray(query)
-		if found.is_empty():
-			return { "position": body.global_position, "normal": (at - body.global_position).normalized() }
-		var collider: Object = found["collider"]
-		if collider == body:
-			return { "position": found["position"], "normal": found["normal"] }
-		if collider is StaticBody2D or (not walls_only and _stops(collider, height) and _against(space, at, body, collider, skip, cover_reach)):
-			return {}
-		skip.append(found["rid"])
+	var found := _walk(space, at, body.global_position, height, skip, cover_reach, walls_only, body)
+	if found.is_empty():
+		return { "position": body.global_position, "normal": (at - body.global_position).normalized() }
+	if found.get("collider") == body:
+		return { "position": found["position"], "normal": found["normal"] }
 	return {}
 
 
-## Whether `body` is within `cover_reach` px of `piece`, the piece's face on the burst's side taken along the line from the body to `at`.
-static func _against(space: PhysicsDirectSpaceState2D, at: Vector2, body: Node2D, piece: Object, skip: Array[RID], cover_reach: float) -> bool:
+## Walk the line from `at` to `to` past what does not stop it for a body `height` tall and return the ray hit that ends it: `target`
+## when the line meets it, else the first wall or piece of furniture that stops it (`_stops`; with a finite `cover_reach` a piece only
+## when `to` is within that many px of it, `_against`; with `walls_only` a wall only). {} when the line is clear, and
+## `{ exhausted = true }` (stopped) once it has cleared `MAX_CLEARED` pieces. `exclude` holds the rids the line passes through.
+static func _walk(space: PhysicsDirectSpaceState2D, at: Vector2, to: Vector2, height: float, exclude: Array, cover_reach := INF,
+		walls_only := false, target: Object = null) -> Dictionary:
+	var skip: Array[RID] = []
+	skip.assign(exclude)
+	var query := PhysicsRayQueryParameters2D.create(at, to, MASK)
+	for _i in MAX_CLEARED:
+		query.exclude = skip
+		var found := space.intersect_ray(query)
+		if found.is_empty():
+			return {}
+		var collider: Object = found["collider"]
+		if collider == target or collider is StaticBody2D:
+			return found
+		if not walls_only and _stops(collider, height) and _against(space, at, to, collider, skip, target, cover_reach):
+			return found
+		skip.append(found["rid"])
+	return { "exhausted": true }
+
+
+## Whether `to` is within `cover_reach` px of `piece`, the piece's face on the burst's side taken along the line from `to` to `at`
+## (`target`, the body at `to`, left out of that line).
+static func _against(space: PhysicsDirectSpaceState2D, at: Vector2, to: Vector2, piece: Object, skip: Array[RID], target: Object,
+		cover_reach: float) -> bool:
 	if cover_reach == INF:
 		return true
-	var query := PhysicsRayQueryParameters2D.create(body.global_position, at, MASK)
-	query.exclude = skip + ([(body as CollisionObject2D).get_rid()] if body is CollisionObject2D else [])
+	var query := PhysicsRayQueryParameters2D.create(to, at, MASK)
+	query.exclude = skip + ([(target as CollisionObject2D).get_rid()] if target is CollisionObject2D else [])
 	var found := space.intersect_ray(query)
-	return not found.is_empty() and found["collider"] == piece and body.global_position.distance_to(found["position"]) <= cover_reach
+	return not found.is_empty() and found["collider"] == piece and to.distance_to(found["position"]) <= cover_reach
 
 
-## Whether `collider` stops a line to something `height` tall: a wall always does, a piece of furniture when it stands above it.
+## Whether `collider` stops a line to something `height` tall: a wall always does, and so does anything that reports no height;
+## a piece of furniture when it stands above it.
 static func _stops(collider: Object, height: float) -> bool:
-	if collider is StaticBody2D or not collider.has_method("get_surface"):
+	if collider == null or collider is StaticBody2D or not collider.has_method("get_surface"):
 		return true
 	return float(collider.call("get_surface").get("coverage", 100.0)) > height

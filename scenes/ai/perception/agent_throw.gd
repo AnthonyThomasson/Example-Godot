@@ -6,8 +6,9 @@ extends RefCounted
 ## DATA only and holds no policy. Its callers: the evade reflex (`agent_grenades.gd`, docs/grenades.md G16), the snapshot's `grenade_throws`
 ## group (the GRENADE tactic, G17) and the bang entry (G18), which ask the same questions of a grenade they are about to throw.
 ##
-## **Cover** is the blast's own rule (G7, `Explosion`): a wall always stops the line from the burst, a piece of furniture
-## stops it when its `coverage` is above the height of the body, and the other characters stop nothing. A standing body and a
+## **Cover** is the blast's own rule (G7), asked of the Projectile System (`Explosion.shields`, `Explosion.first_stop`): a wall
+## always stops the line from the burst, a piece of furniture stops it when its `coverage` is above the height of the body, and
+## the other characters stop nothing. A standing body and a
 ## crouched one have the heights the character reports (`learn_body`, `docs/cover-and-stance.md`; the current posture is read off the
 ## character's own surface). So a couch (45) shields a crouched body and not a standing one, a wall or a wardrobe both.
 ##
@@ -38,8 +39,6 @@ const FAR_STEP := 20.0
 const COVER_MARGIN := 10.0
 const RING_RADII := [60.0, 120.0, 180.0, 240.0, 300.0]
 const RING_DIRECTIONS := 12
-## Most colliders a line may pass through (the ones too low to stop it) before it is called clear.
-const MAX_CLEARED := 8
 ## What a lob clears over the whole way (px, the `coverage` scale): the height a grenade leaves the hand at. A piece of
 ## furniture above it is struck near the thrower; the arc rises over the middle, so this is the safe reading.
 const LOB_CLEARANCE := 50.0
@@ -130,41 +129,17 @@ func in_zone(space, kind: StringName, radius: float, burst: Vector2, p: Vector2,
 	return p.distance_to(burst) <= zone_radius(kind, radius) and not shielded(space, burst, p, height, exclude, cover_reach(kind))
 
 
-## Whether something between `burst` and `p` shields a body `height` tall at `p`: a wall, or furniture taller than `height`.
-## The line is cast piece by piece, clearing the ones too low to stop it (`Explosion._reach`'s rule). With a finite `reach` (a stun's flash,
-## `cover_reach`) a piece of furniture only stops it when `p` is within `reach` px of it, on the burst's side.
+## Whether something between `burst` and `p` shields a body `height` tall at `p`: a wall, or furniture taller than `height`, by the
+## blast's own rule (`Explosion.shields`). With a finite `reach` (a stun's flash, `cover_reach`) a piece of furniture only stops the line
+## when `p` is within `reach` px of it, on the burst's side.
 func shielded(space, burst: Vector2, p: Vector2, height: float, exclude: Array, reach := INF) -> bool:
-	var ex := exclude
-	for _i in MAX_CLEARED:
-		var hit: Dictionary = vision.raycast(space, burst, p, ex)
-		if hit.is_empty():
-			return false
-		if stops(hit.get("collider"), height) and (reach == INF or hit.get("collider") is StaticBody2D or _against(space, burst, p, hit.get("collider"), ex, reach)):
-			return true
-		if ex == exclude:
-			ex = exclude.duplicate()
-		ex.append(hit.get("rid"))
-	return false
-
-
-## Whether `collider` stops a line to a body `height` tall: a wall always does; furniture when it stands above the body;
-## anything that does not report a height does.
-static func stops(collider: Object, height: float) -> bool:
-	if collider == null or collider is StaticBody2D or not collider.has_method("get_surface"):
-		return true
-	return float(collider.call("get_surface").get("coverage", 100.0)) > height
+	return Explosion.shields(space, burst, p, height, exclude, reach)
 
 
 ## How near (px) a body must be to furniture for it to shield it from a burst of `kind`: a stun's `flash_cover_reach`, any distance (INF) for a
 ## frag's blast, and for a kind it has never met.
 func cover_reach(kind: StringName) -> float:
 	return float(_stats.get(kind, {}).get("flash_cover_reach", INF))
-
-
-## Whether `p` is within `reach` px of `piece` along the line to `burst` (the piece's face on the burst's side).
-func _against(space, burst: Vector2, p: Vector2, piece: Object, exclude: Array, reach: float) -> bool:
-	var hit: Dictionary = vision.raycast(space, p, burst, exclude)
-	return not hit.is_empty() and hit.get("collider") == piece and p.distance_to(hit.get("position")) <= reach
 
 
 # --- The escape ----------------------------------------------------------------------------------------------
@@ -217,7 +192,7 @@ func _candidates(space, burst: Vector2, from: Vector2, out_r: float, exclude: Ar
 	for i in SHADOW_DIRECTIONS:
 		var dir := Vector2.from_angle(TAU * i / SHADOW_DIRECTIONS)
 		for height in [_crouch, _stand]:
-			var hit := _first_stop(space, burst, burst + dir * out_r, height, exclude)
+			var hit := Explosion.first_stop(space, burst, burst + dir * out_r, height, exclude)
 			if hit.is_empty():
 				continue
 			for step: float in SHADOW_STEPS:
@@ -230,19 +205,6 @@ func _candidates(space, burst: Vector2, from: Vector2, out_r: float, exclude: Ar
 		for i in RING_DIRECTIONS:
 			out.append(from + Vector2.from_angle(TAU * i / RING_DIRECTIONS) * radius)
 	return out
-
-
-## The first collider on `a`→`b` that stops a body `height` tall (the lower ones are cleared), as its ray hit, or {}.
-func _first_stop(space, a: Vector2, b: Vector2, height: float, exclude: Array) -> Dictionary:
-	var ex := exclude
-	for _i in MAX_CLEARED:
-		var hit: Dictionary = vision.raycast(space, a, b, ex)
-		if hit.is_empty() or stops(hit.get("collider"), height):
-			return hit
-		if ex == exclude:
-			ex = exclude.duplicate()
-		ex.append(hit.get("rid"))
-	return {}
 
 
 ## The speed (px/s) the NPC counts on to cover ground when it runs for it (`RUN_RELIABILITY` of `Character.run_speed`), or its walk once its
