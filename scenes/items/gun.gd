@@ -5,8 +5,9 @@ class_name GunItem extends Item
 ## barrel is too long to use against a wall). F still jabs with the weapon hand (melee); left-click fires a
 ## projectile and ejects a casing. A subclass supplies only its look and how it is held (`PistolItem`,
 ## `SmgItem`, `RifleItem`): the gun id, the painters and sizes, where the hand grips it and the stances.
-## Guns are the one place Items reach into the Projectile System — via ProjectileSpawner / CasingSpawner —
-## and a shot's `hit` is forwarded back to the character's `report_shot` for the HUD.
+## Items reach into the Projectile System in two places: here, via ProjectileSpawner / CasingSpawner (a
+## shot's `hit` is forwarded back to the character's `report_shot` for the HUD), and ThrownGrenade, via
+## `Explosion.frag` / `Explosion.stun`.
 
 ## How far the pulled-up barrel shortens at full raise (fraction of its length): pointed up, a top-down view
 ## sees it foreshortened. The art is re-rendered at `RAISE_STEPS` lengths between full and this, so it stays crisp
