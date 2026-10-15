@@ -19,7 +19,7 @@ its own child `Node2D`.
   forwards intent from its controller. Never draws.
 - **Animate and draw** live in `scenes/character/body/` — **`domain-character-body`**: `character_hands.gd` (hand geometry, punch,
   punch hit detection), `character_kick.gd` (the leg kick and its hit detection), `character_pose.gd` (the living motion, each hand's stance), `character_rig.gd` (the standing skeleton),
-  `character_legs.gd` (feet against walls), `body_sweep.gd` (the collide-and-slide hands and legs share), `character_ragdoll.gd` (the fall) and `character_visuals.gd` + the painters (appearance).
+  `character_legs.gd` (feet against walls), `body_sweep.gd` (the collide-and-slide hands and legs share), `character_ragdoll.gd` (the fall) and `character_visuals.gd` + the painters in `body/art/` (appearance).
   Load that skill for anything about how the character moves, holds a weapon, looks or falls.
 
 Ordering: a parent's `_physics_process` runs before its children's, so the hands see the

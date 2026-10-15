@@ -6,7 +6,7 @@ description: Deep implementation detail for the Character body sub-domain (scene
 # Character · Body sub-domain (`scenes/character/body/`)
 
 Everything that gives the character a body: `character_rig, character_legs, character_pose, character_ragdoll, character_hands,
-character_kick` (animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso / vest` painters (draw). `character.gd` (the root body, see
+character_kick` (animate; `body_sweep` is the collide-and-slide the hands and legs share) and `character_visuals` plus the `body / head / hand / limb / torso / vest` painters in `body/art/` (draw). `character.gd` (the root body, see
 `domain-character`) owns state and physics and steps these each frame; nothing here decides what the character *does*. Cross-domain
 edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelArt` / `PixelCanvas` / `ArtConfig` (Art, interface 12), the character's `Outfit` (Items: `look()`, `revision`), and
 `CharacterConfig` (this domain's tuning holder, in `character/`). `character_base.tscn` attaches
@@ -234,7 +234,7 @@ Test: `tests/character/run_pose_test.gd`.
 ## Pixel art
 
 The character is top-down pixel art rendered through the Art domain (interface 12):
-- Six private painters, each its own part: `body_painter.gd` — shoulders in the shirt color
+- Six private painters in `body/art/`, each its own part: `body_painter.gd` — shoulders in the shirt color
   (`body_color`) with sleeve seams, a shirt's collar points and button placket or a t-shirt's round neckband (`sleeves`), the dark neck ring,
   the vest over them and an optional backpack with straps;
   `head_painter.gd` — skin with ears and a nose toward the front under a `hair_style` (`short` /
