@@ -593,9 +593,9 @@ static func _velocity_of(body: Node, state: PhysicsDirectBodyState2D, i: int) ->
 	return state.get_contact_collider_velocity_at_position(i)
 
 
-## Whether `body` is a character (the one probe of interface 7).
+## Whether `body` is a character (the group `characters`, interface 7).
 static func _is_character(body: Node) -> bool:
-	return body.has_method("current_item")
+	return body.is_in_group(&"characters")
 
 
 ## Whether `body` is a piece the vehicle can shove on: a free rigid body with the pushable contract (furniture, another

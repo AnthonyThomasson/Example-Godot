@@ -333,6 +333,8 @@ var _was_blind := false ## The character was flash-blinded last tick, to re-deci
 ## once, _apply_config() configures (here and again each decision, so a tunable retuned at runtime
 ## still takes effect without a rebuild that would wipe memory or in-flight state).
 func _ready() -> void:
+	# The group the observers find an NPC's controller by (interface 7).
+	add_to_group(&"npc_controllers")
 	# SENSE: the perception sub-domain owns sight, hostility, memory and the combat geometry internally.
 	_perception = AgentPerception.new()
 	add_child(_perception)

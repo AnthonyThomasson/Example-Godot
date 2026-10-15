@@ -49,7 +49,7 @@ func blocker(space, a: Vector2, b: Vector2, exclude: Array) -> Object:
 ## Whether `obj` is solid enough to hide behind (coverage at or above `cover_min`). A character is never
 ## cover — it is someone to shoot or protect, and it moves.
 func is_cover(obj: Object) -> bool:
-	if obj == null or obj.has_method("current_item") or not obj.has_method("get_surface"):
+	if obj == null or (obj is Node and obj.is_in_group(&"characters")) or not obj.has_method("get_surface"):
 		return false
 	return float(obj.get_surface().get("coverage", 0.0)) >= cover_min
 
@@ -62,7 +62,7 @@ func object_label(obj: Object) -> String:
 	var named = obj.get("object_name")
 	if named is String and named != "":
 		return named.to_lower()
-	if obj.has_method("current_item"):
+	if obj is Node and obj.is_in_group(&"characters"):
 		return str(obj.get("name")).to_lower()
 	return "wall"
 
