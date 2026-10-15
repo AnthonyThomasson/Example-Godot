@@ -595,8 +595,10 @@ Two conventions hold across domains; the per-domain specifics live in each domai
   3. **Exploratory / not yet scriptable?** `godot-run` skill: drive the live game through the dev
      command server (`tools/gcmd.py`).
   4. **Whole-AI outcomes?** `tools/match.py` scores full defender-vs-invader matches.
-  **Fast enough?** `tools/run_tests.sh --domain=perf`: the performance tests (`tests/perf/`) hold a 5v5 and a 10v10 match to one 60 fps
-  frame on average (`domain-testing` skill, "Performance tests"); a change to a per-frame path should leave them green.
+  **Fast enough?** `tools/run_tests.sh --domain=perf`: the performance tests (`tests/perf/`: nine guards) hold a 5v5 and a 10v10 match to one 60 fps
+  frame on average and hold stress cases to their budgets: automatic fire, nav re-bakes and path queries, a whole match dying in one
+  frame, a furniture pile shoved at once, house generation, hundreds of hits on one body and an NPC crowd (`domain-testing` skill,
+  "Performance tests"); a change to a per-frame path should leave them green.
   A bugfix starts with a failing test on rung 2 (`fix` skill).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
   generation, movement/pushing, items, interactions, combat).
