@@ -44,7 +44,7 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
   character (keyed, superseded while visible; renewed every `SIGHT_EVERY_FRAMES` (3) physics frames, offset per NPC and target,
   for a character that stays in the view cone: the range/cone test runs every frame, so one that enters the cone is tested at once
   and one that leaves it is dropped at once, and what the NPC holds of a character it sees is at most 3 frames old;
-  `tests/ai/perception/sight_follows_a_moving_target_test.gd`) carrying `pos`, a smoothed velocity track (`vel`; `track_smoothing` is the share taken per physics frame, so a sighting several frames after the last takes the share they add up to),
+  `tests/ai/perception/sight_follows_a_moving_target_test.gd`) carrying `pos`, a smoothed velocity track (`vel`, measured on `GameClock`; `track_smoothing` is the share taken per game frame, so a sighting several frames after the last takes the share they add up to),
   `facing`, the visible wound damage (`wound_dmg`, banded by the snapshot), `reloading`, `posture`, `ally`, inside/room, held item; the room the NPC stands in is
   remembered as searched (`visited_room`); an unfamiliar NPC learns rooms/objects by sight (it skips what it already knows
   before testing sight, and reads each known set once per pass). That look runs every `LEARN_EVERY_FRAMES` (6) physics frames,
@@ -78,7 +78,14 @@ rebuild that would wipe the event memory. Nothing outside this folder holds a re
 - `process_callout(data)` — an ally's radio `&"callout"` within `callout_range` →
   `heard_callout` (keyed per speaker, ttl `callout_ttl`). One carrying `cleared_room` (an ally cleared a room in a
   tactical entry) also teaches the room, marks it `visited_room` and `cleared_room`, so the team does not clear it twice.
-- `process_grenade(data, deaf)` — a `&"grenade"` bounce / rest: marks the grenades the NPC knows as down at that spot (seen coming down, deaf or not), and one within `hear_grenade` of a NPC that is not `deaf` is heard, so known. `process_explosion(data)` forgets the grenade that went off, keeps it as `last_burst` (`{ kind, position, frame, team }`, `team`: the NPC or an ally threw it; a bang entry waits for its stun, and an entry goes in on its own team's burst in the room, E17) and, for a stun the NPC or an ally threw, marks the hostiles it knew
+- `process_order(data) -> bool` — an `&"order"` (interface 10, `docs/leadership.md` LD5) that names the NPC in `to` and comes from its own
+  side becomes its live order (memory topic `order`, permanent, keyed `live`, replacing the one it held); a `cancel` ends the one it holds;
+  true when its order changed (the controller decides at once). `order()` is the live order or {}; `end_order(id, why)` ends it (`done`,
+  `refused`, `cancelled`: kept in the memory as ended, so never a ttl); `take_ended_order()` is one that ended done or refused since the last
+  call, for the controller to radio (LD7). `mark_cleared(key)` ends a `stack` order whose `into` is `key` as done, the NPC's own clear or an
+  ally's. `quick_facts()` carries `ordered`. A callout that is only an order's progress (`order_step` with no `entry_step`) is the squad's to
+  hear: `process_callout` returns before the memory, so it never replaces what that ally last said it is doing (its entry claim).
+- `process_grenade(data, deaf)` — a `&"grenade"` bounce / rest: marks the grenades the NPC knows as down at that spot (seen coming down, deaf or not), and one within `hear_grenade` of a NPC that is not `deaf` is heard, so known. `process_explosion(data)` forgets the grenade that went off, keeps it as `last_burst` (`{ kind, position, frame, team }`, `frame` the `GameClock.frame()` it was noted in, `team`: the NPC or an ally threw it; a bang entry waits for its stun, and an entry goes in on its own team's burst in the room, E17) and, for a stun the NPC or an ally threw, marks the hostiles it knew
 within the flash radius with a clear line from the burst as `flashed` for a few seconds (`FLASH_SHARE` 0.8 of the stun's `max_blind`, 4 s, at the burst, less with distance, at least 1 s: memory topic `flashed`), which the contact view reads as `blind` (the snapshot says "blinded by a flash"). A callout whose `status` is `grenade` / `frag_out` / `bang_out` is not an ally's plan: `process_callout` hands it to the grenade tracker (`called`) and returns before the memory (so it never counts as a held flank side or an entry claim).
 - The orchestrator drops what a deaf NPC would hear (G15): its callouts, hits not on it, footfalls, grenade landings.
 - `check_lead(lead_id)` — the NPC reached an investigation lead: remember it as checked
@@ -145,8 +152,11 @@ supersedes in place within its own topic's list and every reader walks only the 
 of events of that topic, not of everything remembered (a familiar NPC holds a permanent `saw_room` / `saw_object` per room and
 furniture piece). `seq` keeps the promised order: newest first for readers and `fresh()`, oldest expirable first for volume eviction.
 `_prune` skips its scan until the earliest deadline among the stored events (`_earliest_expiry`), and every reader takes the clock
-once. `tests/ai/perception/memory_matches_reference_test.gd` runs random writes through the memory and a plain ordered log and compares every reader. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
-`cleared_room` / `hostile` / `under_fire` / `shot_from` / `engaged` / `heard_gunfire` / `heard_footsteps` / `heard_callout` / `checked_lead` / `flashed`.
+once. **The clock is `GameClock`** (General, interface 11; `docs/leadership.md` LD1): an event's `at` is `GameClock.msec()`, game time that
+stands still while the tree is paused, so a pause of any length expires nothing, and a headless `--fixed-fps` run ages events at the
+sim's pace (a contact's 4 s are 4 s of sim). The rest of the perception's ages read it too: the sightings' velocity track, `last_burst`'s
+`frame`, the grenade replan, `routes_ready`'s `WARM_CAP_MS` and `debug_memory`'s `left`. `tests/ai/perception/memory_matches_reference_test.gd` runs random writes through the memory and a plain ordered log and compares every reader. Topics: `saw_character` / `saw_room` / `saw_object` / `visited_room` /
+`cleared_room` / `hostile` / `under_fire` / `shot_from` / `engaged` / `heard_gunfire` / `heard_footsteps` / `heard_callout` / `checked_lead` / `flashed` / `order`.
 
 ## Tactics (`agent_tactics.gd`)
 
@@ -247,9 +257,23 @@ entry's), other than the NPC's own room and `exempt` (the doorway an entry's app
 into one of those views and the route on `NavBuilder.avoid_map` for the set reaches `to` (within `AVOID_REACH` 24 px) no longer than `door_avoid_ratio`
 (2.0) x the plain length + `door_avoid_slack` (300 px): `{ map, path, len, plain_len, doors, pending, views }` (`pending`: the plain route crosses a view and
 the avoid map is still baking). `warm(from, map, space)` (over `AgentPerception.routes_ready()`) asks for the avoid map of the room the NPC is in and
-says whether it answers; the controller starts no decision before it does (at most `WARM_CAP_MS` 3 s), so the route bands a snapshot reads are the walked ones.
+says whether it answers; the controller starts no decision before it does (at most `WARM_CAP_MS` 3 s of game time), so the route bands a snapshot reads are the walked ones.
 Config on the perception (from the controller's exports): `door_view_depth`, `door_avoid_ratio`, `door_avoid_slack`, `entry_pass_clear_time`; views are
 avoided only where `entry_enabled` and `entry_guard` are.
+**Defend spots (`docs/leadership.md` LD8, D2).** `defend_spot(room_key, nth, count, map, space)` is where member `nth` of `count` ordered to
+defend a room holds it: the room's doorways sorted by id, member `nth` taking doorway `nth` mod their number (the extras doubling up on its
+other side), the spot `DEFEND_DEPTHS` back from its wall and `DEFEND_LATERALS` past its jamb (best 100 / 50 px), inside the room by
+`DEFEND_INSET`, snapped onto the navmesh, scored out of every doorway's fatal funnel first (within `DEFEND_BODY` of its width, nearer its wall
+than `DEFEND_FUNNEL_DEPTH`), then with a sight line to its doorway, low furniture on that line (cover seen over), its side and the distance
+from the best; a lone member of a room with several doorways takes the spot that sees the most. `{ spot, door, door_pos, doors }` (`door` ""
+and `door_pos` INF for that lone member, who turns among them). The snapshot's `order` group calls it. `static normal_into(rect, pos)` (the
+unit normal into a room from the edge a doorway lies on) is also read by the squad (`ai/team/squad.gd`).
+**An ordered stack's walk (`docs/leadership.md` LD9, D4, D11).** `ordered_walk` (set each tick by the behaviour while it walks an ordered stack's
+way to its door) makes `_sync_walks` turn the view avoidance on (`AgentEntry.avoid_views` = `entry_guard` and (`entry_enabled` or `ordered_walk`))
+and, for an NPC with `entry_enabled` off (a defender), swap `AgentEntry.pass_clear` for `_passable` and have `threshold_ahead` pass rooms
+`seen_empty(key)` says it stood in within `entry_pass_clear_time` with no hostile sighting in them (the latest of each hostile it knows, within that
+time); `avoided` keys its per-frame cache on the `pass_clear` rule too. An invader's walks are unchanged. The team's claims (`AgentEntry.claims`)
+carry an ordered member's `order_id`, `order_bang` and `order_side` ("" / false / 0 for others), which `entry.gd` reads.
 `room_doorways(room_key)` (over `AgentEntry.room_doorways`) lists every doorway of a room, outer doors
 included, as `{ id, pos, width }`: the places a resting NPC watches (`Watch.idle_gaze`, `domain-ai-watch`).
 
@@ -283,7 +307,7 @@ spot the thrower walks to (a throw spot's `lob` callable; the bang's spot, throu
 (`shielded`'s `reach`, handed to `Explosion.shields` as its `cover_reach`); a wall always does; a frag's blast keeps the plain rule. `escape` also tries a spot right against the far face of each stopper near the burst (`FAR_PROBE`, `FAR_STEP`).
 
 **Its own grenade (`_note_own`).** A grenade the NPC threw is known at once, and until a bounce marks it landed its spot is where it was aimed (`Character.aim_target()` from the hand, no further than that kind's throw range, `AgentThrow.range_of`), not the hand
-it just left, so the zone it is in is the one the burst will have. **Replanning** is counted in physics frames (`REPLAN_EVERY` s of game time), not wall-clock ms: a fast headless run outruns the wall clock.
+it just left, so the zone it is in is the one the burst will have. **Replanning** is counted in `GameClock` frames (`REPLAN_EVERY` s of game time), not wall-clock ms: a fast headless run outruns the wall clock, and it runs on through a pause.
 `AgentThrow.escape` takes the NPC's own position as the first candidate (already behind cover that shields a crouched body, it need not move).
 
 **What it knows of a grenade it carries (`AgentThrow`).** No copy of the tuning: `learn(stats)` takes in what a grenade tells (`{ kind, max_range, danger_radius, fuse, flash_cover_reach, max_blind }`, interface 6/7) from `Character.throw_stats(slot)` of every grenade the NPC carries (`learn_carried()`, every `observe`) and from each live grenade it notes (`ThrownGrenade.throw_stats()`, in `agent_grenades.gd`), and keeps it by kind, so it outlives the last grenade thrown. `range_of(kind)`, `radius_of(kind)`, `fuse_of(kind)`, `max_blind_of(kind)` and `cover_reach(kind)` answer from it (0 / 0 / 0 / 0 / INF for a kind never met; the flash a hostile is taken to be blind for is `FLASH_SHARE` 0.8 of `max_blind_of(&"stun")`); `AgentPerception.can_lob(at, to, kind)` (range and `throw_clear`), `throw_clear(at, to)` (the lob alone, from the hand), `grenade_range(kind)`, `grenade_reach(kind)` and `grenade_fuse(kind)` wrap them for the behaviour sub-domain; the static `carried(character)` (the kinds with a count, a frag

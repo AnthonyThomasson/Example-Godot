@@ -171,7 +171,7 @@ static func time_covering(samples: Array, id: StringName, door: Dictionary, befo
 
 ## Wait until `seconds` have passed on the wall clock since `since_ms` (`Time.get_ticks_msec`) and `sim_seconds` in sim time since
 ## `since_t`, pacing the sim to about real time meanwhile (a headless scripted run otherwise outruns the clock many times over, as the
-## runner paces a Von test). The perception's memory ages in wall-clock time, so this is how a test sees a memory grow old.
+## runner paces a Von test). The perception's memory ages in game time (`GameClock`), which the `sim_seconds` half covers.
 static func wait_wall(t: TestContext, since_ms: int, seconds: float, since_t: float, sim_seconds: float) -> void:
 	while Time.get_ticks_msec() - since_ms < int(seconds * 1000.0) or t.time - since_t < sim_seconds:
 		OS.delay_msec(16)

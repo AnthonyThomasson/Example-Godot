@@ -22,7 +22,8 @@ Files:
 ## `decision_tree.gd` — the tree as data
 
 ```
-root ─┬─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
+root ─┬─ order [order; requires ordered]      → the option's own primitive (defend / entry), auto-picked
+      ├─ combat (bind target over `hostiles`) ─┬─ engage  [fire_positions]            → engage
       │                                         ├─ flank   [flank_sides, drop `held`, `crosses`, `no_shot`, `heading`, `lane`] → engage (anchored at the side)
       │                                         ├─ grenade [grenade_throws, drop `ally_in_blast`, `no_safe_spot`] → throw
       │                                         ├─ advance [advance_positions]         → move{aim target}
@@ -50,7 +51,7 @@ state, since the options carry each candidate's details), `requires` (fact names
 name counts as true), `confine` (combat subtree: a territorial NPC drops options outside the house),
 `drop_tags` (options carrying these tags are never offered — a flank side an ally holds, one whose
 route passes a known hostile, one with no shot at the target, one the target is walking toward, or one
-whose point or route lies in an ally's line of fire), `primitive` (move / engage / melee / interact / hold / reload / entry / throw), `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `run_through_fire: true` on retreat lets it keep sprinting with a shot available (every other walk drops to a walk to take it, `docs/gaze-and-fire.md` W6); `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
+whose point or route lies in an ally's line of fire), `primitive` (move / engage / melee / interact / hold / reload / entry / throw / defend), `params` (defaults merged under each option's own params; `run: true` on flank, advance, retreat and investigate lets the behaviour sprint to the destination — Von never sees it; `run_through_fire: true` on retreat lets it keep sprinting with a shot available (every other walk drops to a walk to take it, `docs/gaze-and-fire.md` W6); `entry_guard: false` on retreat exempts the walk from the behaviour's entry guard, which sends every other walk into an uncleared room through a tactical entry first).
 `ask` (INVESTIGATE: the planner never takes the node, or the level that offers it as its lone option, without asking Von — whether a
 lead is worth going to is Von's call). **Staying in the house is Von's call too, guided by the prompt, not a rule:** a territorial
 goal ("hold your ground inside the house; do not chase anyone outside") is in every state, the state and the leads say where the gunfire
@@ -113,7 +114,13 @@ phrasings were chosen by measurement with `tools/von_probe.py` — re-run it aft
 ## `decision_planner.gd` — the walk
 
 Config (pushed in from the controller): `disabled_nodes`, `node_overrides` (per-node field merge),
-`entry_rules` (ordered fact → start node), `skip_single_option`, `inside_only` (territory). The
+`entry_rules` (ordered fact → start node), `skip_single_option`, `inside_only` (territory), `confine_room` (the room a member ordered to
+defend it keeps to, `docs/leadership.md` LD8: inside a `confine` subtree an option whose `tags.room` is another room or outside is dropped,
+as `inside_only` drops one outside the house; an option naming no place stays; the leaf's params then carry `confine_room`).
+**ORDER** (`order`, a root child, `requires: ordered`, LD6): its one option is the snapshot's `order` group, so it is taken without asking Von;
+the option names its own `primitive` (`_finish` takes an option's `primitive` over the node's). The controller's entry rules put
+`ordered → order` after `under_fire` / `engaged` and before `hostile_known`. A member's live order is shown at every level after the goal
+(the `order` section, "" without one). The
 controller maps `pursue_hostiles` → `idle` disabled + `hostile_known → combat`; `defend_territory` →
 `inside_only`. All but `node_overrides` are re-pushed each decision, so retuning them at runtime takes
 effect; `node_overrides` is baked into the tree at `setup()` and is construction-time only.

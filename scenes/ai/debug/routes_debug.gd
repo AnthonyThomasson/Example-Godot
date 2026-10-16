@@ -22,7 +22,7 @@ const CACHE_TTL := 0.5
 const WEDGE_RANGE := 170.0
 
 var _cache: Dictionary = {}  ## point (Vector2) → PackedVector2Array route from the NPC.
-var _cache_ms := 0  ## When (msec) the cached routes were fetched.
+var _cache_ms := 0  ## When (game msec, `GameClock.msec()`) the cached routes were fetched.
 var _cache_from := Vector2.ZERO  ## Where the NPC stood when they were fetched (moving more than 24 px away refetches them).
 
 
@@ -35,7 +35,7 @@ func _on() -> bool:
 func _paint() -> void:
 	var map: RID = _character.get_world_2d().get_navigation_map()
 	var me := _character.global_position
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	if now - _cache_ms > CACHE_TTL * 1000.0 or me.distance_to(_cache_from) > 24.0:
 		_cache.clear()
 		_cache_ms = now

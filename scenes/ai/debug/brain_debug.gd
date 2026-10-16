@@ -37,7 +37,7 @@ func _paint() -> void:
 	var x := ORIGIN.x
 	var font := ThemeDB.fallback_font
 	if b["pending"]:
-		var dots := ".".repeat(1 + int(Time.get_ticks_msec() / 300.0) % 3)
+		var dots := ".".repeat(1 + int(GameClock.msec() / 300.0) % 3)
 		DebugText.string(self, font, Vector2(x, y), "THINKING" + dots, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE + 2, THINK)
 		y += LINE_H + 2
 	if b["failed"]:

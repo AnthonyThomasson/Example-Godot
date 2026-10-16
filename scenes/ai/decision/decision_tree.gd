@@ -35,7 +35,8 @@ extends RefCounted
 ##               already carry each candidate's details — repeating them in the state blurs the match).
 ##               Skipped when there is only one.
 ##   requires  — fact names that must be true ("!" negates); a binding name counts as a true fact.
-##   confine   — this subtree is combat: a territorial NPC drops options outside the house.
+##   confine   — this subtree is combat: a territorial NPC drops options outside the house, and a member ordered to defend a room
+##               those outside that room.
 ##   ask       — Von is always asked about this node, and about the level that offers it: the planner never
 ##               takes it without asking, even as the lone option (INVESTIGATE: whether a lead is worth
 ##               going to is Von's call, read against the goal and where the lead is).
@@ -44,7 +45,8 @@ extends RefCounted
 ##               whose route passes a known hostile; one with no shot at the target, one the target is
 ##               walking toward, or one whose point or route lies in an ally's line of fire). A node
 ##               whose options are all dropped is not offered at all.
-##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload / entry / throw). FLANK
+##   primitive — the behaviour primitive a leaf runs (move / engage / melee / interact / hold / reload / entry / throw / defend); an
+##               option that names its own `primitive` (ORDER's) runs that one. FLANK
 ##               runs `engage` anchored at the chosen side: get there, then fight from it. ADVANCE runs
 ##               `move`: it only closes the distance, then the NPC re-decides how to fight.
 ##   params    — default primitive params, merged under each option's own params. `run: true` lets the
@@ -54,7 +56,17 @@ const NODES := {
 	&"root": {
 		"question": "What should you do right now? Choose what best serves your goal, given any threat and what you know.",
 		"context": [&"situation", &"loadout", &"current", &"odds", &"contacts", &"awareness"],
-		"children": [&"combat", &"reload_quiet", &"investigate", &"search", &"idle"],
+		"children": [&"order", &"combat", &"reload_quiet", &"investigate", &"search", &"idle"],
+	},
+	&"order": {
+		# What the NPC's leader ordered it to do (docs/leadership.md LD6): one option, the order itself, so it is taken without asking
+		# Von. The controller's entry rule `ordered -> order` starts a walk here, after the fight rules. Its option names the primitive
+		# it runs (`defend`, or an `entry` for a stack), which wins over this node's own.
+		"label": "ORDER",
+		"desc": "Your leader gave you an order ({summary})",
+		"requires": [&"ordered"],
+		"options": [&"order"],
+		"primitive": &"hold",
 	},
 	&"combat": {
 		"label": "COMBAT",

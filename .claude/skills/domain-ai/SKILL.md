@@ -35,7 +35,7 @@ walk the situation has overtaken, and the EventBus intake (`&"hit"`, `&"footfall
 |---|---|---|---|
 | **Perception** | `ai/perception/` | `domain-ai-perception` (+ `domain-ai-snapshot` for the snapshot: `agent_snapshot.gd`, `perception/snapshot/`) | SENSE — what the NPC knows (sight, hostility, event memory, movement tracks, gunfire heard, allies' callouts) and the combat geometry (`agent_tactics.gd`: flanks, fire/advance/retreat spots); builds the decision SNAPSHOT — state sections, facts, option groups — worded for Von (`agent_snapshot.gd`). |
 | **Decision** | `ai/decision/` | `domain-ai-decision` | THINK — the decision TREE (data), the planner that walks it with Von one `choice` request per level, and the Von transport + dev-only server launcher. |
-| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`, `domain-ai-entry` for `entry.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry / throw) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
+| **Behaviour** | `ai/behavior/` | `domain-ai-behavior` (+ `domain-ai-combat` for `combat.gd`, `domain-ai-coverage` for `search_coverage.gd`, `domain-ai-watch` for `watch.gd`, `domain-ai-entry` for `entry.gd`) | ACT — runs the chosen leaf's primitive (move / engage / melee / interact / hold / reload / entry / throw / defend) and the commitment state Von lacks; owns a locomotion layer for pathing, and the tactical entry phase machine (`entry.gd`). |
 | **Debug** | `ai/debug/` | `domain-ai-debug` | Draw-only overlays: the vision cone/bubble, the decision-path label + movement path, the tactical zones it weighed, search coverage, and behaviour overlays (contacts, hearing/radio, combat, territory, move/use targets, Von/brain, routes, stuck, the entry plan, the entry team and guard). |
 
 **The human's stack (`ai/team/player_stack.gd`).** Not a fifth sub-domain: one small module, the human's side of the entry radio
@@ -47,6 +47,28 @@ from where it stands (`claim` / `ready` / `going_in` / `in`) and withdraws on le
 ahead in the crossing order is through. It reuses perception's `AgentEntry` (the statics `claims`, `free_slot`, `stack_side`, `crossing_order`, `place`,
 `slot_point`, and `geometry` / `stack_side_from`) and `AgentGrenades.is_call` (a grenade call is not a stack claim), and never moves the
 character. `view()` feeds `StackMarkers` (UI). `entry.gd` has no case for a human: the barrier, the lone entrant's pie and the follow rule just see one more teammate.
+
+**The squad (`ai/team/squad.gd`, `docs/leadership.md` LD3 to LD7, interface 21).** One per side, a `Node` Main builds under `World` after
+arming the characters (`setup(faction, roster, openings, rooms, human := null)`) and hands each NPC (`MatchSpawner.bind_squad`: the
+controller's `squad`). Its leader is the highest `rank`, the first spawned among equals (the human when it leads); on the leader's `died`
+the next leads within the frame and it posts `&"leader"` `{ faction, leader, previous }`. `issue(request)` turns a leader's plain request
+(`{ kind, to, pos?, room?, bang? }`) into an `&"order"` (`defend_room` / `stack` / `cancel`: the room key, or the doorway nearest `pos`
+within its width, the room on the far side of the wall plane, `stack_at` or `split`; a `defend_room` or `stack` order also carries its target
+point `pos`, the room's centre or the doorway's, which the UI's order markers draw) and posts it; no `to` is every living member but the
+leader; `resolve(request)` is that resolution read-only, without posting (what the UI's command menu names its stack items from); `view()` is `{ leader, members: [{ node,
+order, step }] }`, the steps read off the members' progress callouts (`order_step`); an order radioed `done` is no longer held (`order` {},
+`step` `done`), a `refused` one still is. It reads its members only through the Character API and
+the bus, and reuses `AgentEntry.opening_id` / `normal_into`. An AI leader issues no orders.
+
+**Orders (`docs/leadership.md`).** The controller queues `&"order"` events; one that names the NPC (and its side) becomes its live order
+(`AgentPerception.process_order`) and forces a decision (`_force_now("ordered")`). The entry rule `ordered → order` sits after the fight rules
+and before `hostile_known`, so an ordered member shot at fights, then goes back to its order. The ORDER node's one option (the snapshot's
+`order` group) is auto-picked: `defend` for a room (the behaviour's `defend` primitive, at its D2 spot), an `entry` for a stack. Each
+decision the controller pushes `confine_room` (a defend order's room) into the planner, which keeps the fight to options inside it, and
+radios the order's progress (`order_id`, `order_step`: `moving` / `in_position` from the behaviour, `done` / `refused` from the perception).
+An order the NPC cannot carry out (no option built) is ended `refused` as `_start_decision` begins the walk, and `confine_room` is cleared for that walk. An ordered stack (LD9) is an entry that goes in the order's way (its
+side, its mode, a wait for every living recipient up to `order_ready_cap`), from anywhere and for a defender too, its walk guarded, its claims
+carrying `order_id` / `order_bang` / `order_side`; it ends done at the room cleared (`domain-ai-entry`).
 
 Data flow each tick: the orchestrator folds queued hits and callouts into **Perception**, has it
 `observe()` and return `contacts()`; hands those to **Behaviour** to resolve + honour commitments;
@@ -66,7 +88,9 @@ the force reason, e.g. "task resolved", "way blocked", "attacked", or "cadence")
 server's `ai` verb dumps it and `tools/von_probe.py` replays captured levels against Von. `debug_zones() -> Array` flattens the
 last snapshot's option groups to world points, each with its `label`, `desc` (for an inspector to explain a clicked point) and
 `tags`, tagged by zone kind (fire / flank / advance / retreat / lead / search / entry / room / interaction / grenade (where a throw
-weighed would burst, with `from`, the throw spot or the NPC's own spot), plus `waypoint` for the non-room go-to points: post / entrance / approach). `debug_room_zones() -> Array` gives each room `{ rect, type, status }`
+weighed would burst, with `from`, the throw spot or the NPC's own spot), plus `waypoint` for the non-room go-to points: post / entrance / approach). `debug_state()["order"]` is the order leaf the NPC is carrying out (`{ path, primitive, params, paused }`, `paused` while an entry detour of the
+entry guard holds it, its primitive and params then the order's, not the detour's; {} with none), beside the running `primitive` / `params`.
+`debug_room_zones() -> Array` gives each room `{ rect, type, status }`
 by how the NPC regards it (current / searched / unsearched / unknown). Both feed the tactics overlay (`domain-ai-debug`).
 
 ## Grenades (`docs/grenades.md`)
@@ -94,7 +118,8 @@ The NPC hears the footsteps of characters not of its faction through walls (H1),
 ## The decision tree
 
 ```
-root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
+root ─┬─ ORDER   → the order the NPC's leader gave it, auto-picked           (defend / entry)
+      ├─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spot / ambush   (engage)
       │                             ├─ RELOAD  → swap in a magazine             (reload)
       │                             ├─ FLANK   → a side, route clear of hostiles (engage)
       │                             ├─ GRENADE → frag or stun a hostile hidden or barricaded in a room, or the shots' room (throw)
@@ -111,8 +136,8 @@ root ─┬─ COMBAT (pick the hostile) ─┬─ ENGAGE  → a safe firing spo
       └─ IDLE ─┬─ USE → an object · GO → a room · WAIT                           (interact / move / hold)
 ```
 
-Entry rules skip the broad levels when the situation is clear (under fire / engaged / — when
-pursuing — a hostile known → straight to COMBAT). A level with one option is taken without asking.
+Entry rules skip the broad levels when the situation is clear (under fire / engaged → straight to COMBAT; ordered → ORDER; — when
+pursuing — a hostile known → COMBAT). A level with one option is taken without asking.
 
 ## The two presets
 
@@ -149,4 +174,4 @@ becomes an investigation lead), and (unless `familiar_with_house`) must see room
 use them. The detail lives in `domain-ai-perception`, `domain-ai-decision` and `domain-ai-behavior`.
 
 **Interfaces:** 3 (`Explosion.shields` / `first_stop`, the blast's cover rule perception asks of a grenade), 6 (`ItemRegistry`'s
-slot ids, `throw_stats()`, `aim_target()`), 7 (Character ↔ Controller, the observer reads and overlay exports), 9 (AI → Navigation), 10 (EventBus), 11 (`PhysicsLayers`), 13 (`DecisionStub` / `DecisionServerLauncher` for tests), 17 (the human's `PlayerStack`) — signatures in `architecture`.
+slot ids, `throw_stats()`, `aim_target()`), 7 (Character ↔ Controller, the observer reads and overlay exports), 9 (AI → Navigation), 10 (EventBus), 11 (`PhysicsLayers`, `GameClock`), 13 (`DecisionStub` / `DecisionServerLauncher` for tests), 17 (the human's `PlayerStack`), 21 (the `Squad`: leader, succession, orders) — signatures in `architecture`.

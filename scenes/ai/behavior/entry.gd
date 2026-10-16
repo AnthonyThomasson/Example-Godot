@@ -100,6 +100,8 @@ var cover_time: float = 8.0        ## Most seconds a member covers a doorway on 
 var watch_dwell: float = 0.8       ## Seconds a lone entrant looks through each doorway on, once its gaze has settled.
 var approach_time: float = 20.0    ## Safety cap (s) on reaching the slot; past it the claim is given up.
 var look_rate: float = 2.5         ## Gaze turn speed (rad/s).
+var order_ready_cap: float = 60.0  ## Most seconds an ordered stack waits for all its recipients, from the first ordered `ready` (D7).
+var squad: Node = null             ## The NPC's squad (`Squad.alive`: which recipients of an order still live); null without one.
 
 var phase := ""                    ## approach / stack / pie / cross / corner / clear / rear / done ("" = idle).
 var opening := ""                  ## The doorway's id (agent_entry.gd `opening_id`).
@@ -165,11 +167,16 @@ var _quiet_seen := {}              ## Teammates whose claims said quiet during t
 var _suspect_clock := 0.0          ## Seconds until the room's suspicion is read again.
 var _listen_over := false          ## The listen hold at the stack was ended early (a hostile in view, or under fire): it is not taken up again.
 var _turned := false               ## The entry became a bang one its order did not ask for since the last `take_turned()`.
-var _burst_seen := -1              ## The physics frame of the last burst in the room this entry has taken note of.
+var _burst_seen := -1              ## The `GameClock` frame of the last burst in the room this entry has taken note of.
 var _burst_at := -INF              ## `_time` of the burst in the room (negative: before the entry began).
 var _security_clock := 0.0         ## Seconds spent holding the stack outside a short room (E13).
 var _security_held_at := -1.0      ## `_security_clock` the room was first called clear (-1 = not yet).
 var _blocked_count := 0            ## How many times the walk of this phase has been found sealed (`way_blocked`).
+var _order_id := ""                ## The order this entry carries out (`docs/leadership.md` LD9; "" for the NPC's own ENTER or a detour).
+var _order_side := 0               ## The side of the door the order names (1 / -1 along its wall, from its `stack_at`); 0 for a split stack (D6).
+var _order_bang := false           ## The order's mode: a stun thrown in first.
+var _pref_side := 0                ## The side of the door this NPC began on: the side it reaches without crossing the doorway's view (D6).
+var _order_ready_at := -1.0        ## `_time` an ordered `ready` (its own or a recipient's) was first heard or said: D7's cap runs from it.
 var _character: Node               ## The NPC's body, handed in once by `bind`.
 ## A threat holds the entrant's eyes this tick (set by `Behavior` from the watch stage): a gaze step that cannot settle
 ## because the entrant is looking at a hostile counts as settled, so the entry carries on instead of waiting at the pie
@@ -195,10 +202,11 @@ func bind(character: Node) -> void:
 	_character = character
 
 
-## Start an entry from `params`: `opening` and `into` from an ENTER leaf, `secure` from the guard's pass-by detour. False
-## when the doorway is unknown (the leaf is then dropped and the NPC re-decides). It claims the lowest slot the claims heard
-## leave free (the slots go by arrival on the radio, E2), not the one the option was measured from: a claim heard since then
-## came first. Two claims made before either heard the other are settled by instance id (`_keep_slot`).
+## Start an entry from `params`: `opening` and `into` from an ENTER leaf, `secure` from the guard's pass-by detour, and from an
+## ordered stack's leaf (`docs/leadership.md` LD9) its `order_id`, `bang` and side (`stack_at`, or `split`). False when the doorway is
+## unknown (the leaf is then dropped and the NPC re-decides). It claims the lowest slot the claims heard leave free (the slots go by
+## arrival on the radio, E2), not the one the option was measured from: a claim heard since then came first. Two claims made before
+## either heard the other are settled by instance id (`_keep_slot`).
 func begin(params: Dictionary) -> bool:
 	reset()
 	opening = str(params.get("opening", ""))
@@ -211,17 +219,29 @@ func begin(params: Dictionary) -> bool:
 	var team: Array = [] if secure else _perception.entry_team(opening)
 	_self_id = _character.get_instance_id()
 	_stuns = _character.item_count(ItemRegistry.STUN_SLOT)
-	# A room already suspect means a bang with a stun in the stack, whatever order brought the NPC here (E17).
+	_order_id = "" if secure else str(params.get("order_id", ""))
+	_order_bang = bool(params.get("bang", false))
+	_order_side = _side_named(params)
+	_pref_side = _side_of(_character.global_position)
 	var asked := bool(params.get("bang", false))
-	bang = not secure and (asked or (_stack_has_stun(team) and not _perception.room_suspicion(into).is_empty()))
-	if not team.is_empty():
-		bang = team.all(func(m): return m["bang"] and not m["bang_off"])  # The stack goes in the way its first claimer chose.
+	var ordered := _order_claim(team)
+	if not ordered.is_empty():
+		bang = bool(ordered["order_bang"])  # An ordered stack goes in the order's way, whoever claimed first (LD9, D10).
+	else:
+		# A room already suspect means a bang with a stun in the stack, whatever order brought the NPC here (E17).
+		bang = not secure and (asked or (_stack_has_stun(team) and not _perception.room_suspicion(into).is_empty()))
+		if not team.is_empty():
+			bang = team.all(func(m): return m["bang"] and not m["bang_off"])  # The stack goes in the way its first claimer chose.
 	_turned = bang and not asked
 	slot = _perception.entry_free_slot(team, _character.get_instance_id())
-	_team_side = _perception.entry_team_side(_geo, team, _character.global_position)
-	side = _perception.entry_stack_side(_geo, team)
+	if ordered.is_empty():
+		_team_side = _perception.entry_team_side(_geo, team, _character.global_position)
+		side = _perception.entry_stack_side(_geo, team)
+	else:
+		side = _ordered_side(team, ordered)
+		_team_side = side
 	_place = _perception.entry_place(team, side, slot)
-	solo = team.is_empty()
+	solo = _alone(team)
 	_team_size = team.size()
 	_points = _coverage.sample_room(into)
 	_unseen = _points.duplicate()
@@ -265,6 +285,11 @@ func reset() -> void:
 	_turned = false
 	_burst_seen = -1
 	_burst_at = -INF
+	_order_id = ""
+	_order_side = 0
+	_order_bang = false
+	_pref_side = 0
+	_order_ready_at = -1.0
 	_geo = {}
 	_calls = []
 	_last_call = {}
@@ -346,6 +371,7 @@ func debug() -> Dictionary:
 		"seen_fraction": seen_fraction, "pie_sides": pie_sides, "hidden_corners": hidden, "corner": corner,
 		"stack_point": _stack_point() if not _geo.is_empty() else Vector2.INF, "team": _team_size,
 		"covering": covering, "watch_doors": _watch.map(func(w): return w["id"]), "bang": bang, "bang_off": _bang_off, "upgraded": _upgraded, "bang_stage": _bang_stage,
+		"order_id": _order_id,
 	}
 
 
@@ -414,8 +440,12 @@ func step(delta: float) -> bool:
 			_through[m["id"]] = m["slot"]
 		if not m["bang"]:
 			_quiet_seen[m["id"]] = true
+	if _order_id != "" and _order_ready_at < 0.0 \
+			and (_ready_said or team.any(func(m): return m["order_id"] == _order_id and m["step"] != "claim")):
+		_order_ready_at = _time
 	if phase in ["approach", "stack", "pie"]:
 		_keep_slot(team)
+		_follow_order(team)
 		_maybe_upgrade(team, delta)
 	if phase in ["approach", "stack", "bang", "pie", "cross"]:
 		_lead_side = int(_perception.entry_crossing_order(team + [{ "id": _self_id, "slot": slot, "side": side }])[0]["side"])
@@ -512,13 +542,18 @@ func _to_back() -> bool:
 ## given up for the next free one, and when the side the team stacks on changes (the point's, once it is known) a member
 ## that is not the point weighs it again: it follows it, unless its way there crosses the doorway's view (E19). The side is
 ## otherwise never re-read from where this NPC stands: a lone entrant crosses in front of the door to slice its other side.
-## The place in its side's file follows the claims ahead on the other side. A change of slot or side is radioed as a new claim.
+## In an ordered stack (LD9) the order's side holds instead, for every member (`_ordered_side`). The place in its side's file
+## follows the claims ahead on the other side. A change of slot or side is radioed as a new claim.
 func _keep_slot(team: Array) -> void:
 	var was := slot
 	var was_side := side
 	var was_place := _place
 	slot = _perception.entry_free_slot(team, _character.get_instance_id(), slot)
-	if slot != 1:
+	var ordered := _order_claim(team)
+	if not ordered.is_empty():
+		side = _ordered_side(team, ordered)
+		_team_side = side
+	elif slot != 1:
 		var team_side: int = _perception.entry_team_side(_geo, team, _character.global_position)
 		if team_side != _team_side:
 			_team_side = team_side
@@ -529,6 +564,111 @@ func _keep_slot(team: Array) -> void:
 			_enter_approach()  # Walk to the new slot.
 		if slot != was or side != was_side:
 			_radio("claim")
+
+
+# --- An ordered stack (`docs/leadership.md` LD9) -------------------------------------------------
+
+## The order this stack goes in under, as a claim's `{ order_id, order_bang, order_side }`: this NPC's own, else the lowest slot's of the
+## teammates' claims that carry one (an unordered member that joins an ordered stack follows its mode and side, D10). {} for a stack nobody
+## was ordered to, which keeps its own rules, and for a pass-by.
+func _order_claim(team: Array) -> Dictionary:
+	if secure:
+		return {}
+	if _order_id != "":
+		return { "order_id": _order_id, "order_bang": _order_bang, "order_side": _order_side }
+	for m in team:
+		if m["order_id"] != "":
+			return m
+	return {}
+
+
+## Whether this stack goes in under an order (`_order_claim`): its mode and side are the order's, not its first claimer's, and nothing turns
+## or vetoes it but its own members' lost stun (D1).
+func _ordered(team: Array) -> bool:
+	return not _order_claim(team).is_empty()
+
+
+## The side of the door the order in `params` names (D3): the side along the doorway's wall its `stack_at` lies on; 0 for a split stack
+## (D6) and for an entry that is no order.
+func _side_named(params: Dictionary) -> int:
+	if _order_id == "" or bool(params.get("split", false)):
+		return 0
+	var at = params.get("stack_at")
+	if at is Vector2:
+		return _side_of(at)
+	return _perception.entry_team_side(_geo, [], _character.global_position)
+
+
+## The side of the door (1 / -1 along its wall) point `p` is on.
+func _side_of(p: Vector2) -> int:
+	return 1 if (p - (_geo["pos"] as Vector2)).dot(_geo["along"]) >= 0.0 else -1
+
+
+## The side an ordered stack (`ordered`, `_order_claim`) has this NPC stack on: the side the order names (D3); on a split stack, D6's.
+func _ordered_side(team: Array, ordered: Dictionary) -> int:
+	if int(ordered["order_side"]) != 0:
+		return int(ordered["order_side"])
+	return _split_side(team)
+
+
+## A split stack's side for this NPC (D6): the side it stands on (the one it began on, `_pref_side`, which it reaches without crossing the
+## doorway's view), but when that side holds two more of the stack than the other with it there, the other side for the last of that side
+## to have claimed (the highest slot), so the sides differ by one at most. Every member weighs it the same way off the radio; it moves the
+## one member, and once the sides are even nobody moves again.
+func _split_side(team: Array) -> int:
+	var own := side if side != 0 else _pref_side
+	var mine := 1 + team.filter(func(m): return int(m["side"]) == own).size()
+	var other := team.filter(func(m): return int(m["side"]) == -own).size()
+	if mine - other < 2:
+		return own
+	for m in team:
+		if int(m["side"]) == own and (int(m["slot"]) > slot or (int(m["slot"]) == slot and int(m["id"]) > _self_id)):
+			return own  # A later claimer on this side moves instead.
+	return -own
+
+
+## An unordered member of an ordered stack goes in the order's way (D10): with a stun when the order says so (and none of the order's own
+## members gave it up, D1), quietly when it does not; radioed with its next claim. A point slicing the pie that turns goes back to its slot
+## to hold for the bang.
+func _follow_order(team: Array) -> void:
+	if _order_id != "" or _bang_over:
+		return
+	var ordered := _order_claim(team)
+	if ordered.is_empty():
+		return
+	var wanted := bool(ordered["order_bang"]) and not _bang_off and not _vetoed(team)
+	if wanted == bang:
+		return
+	bang = wanted
+	_upgraded = false
+	_turned = _turned or wanted
+	if wanted and phase == "pie":
+		_pie_queue = []
+		_set_phase("stack")
+	_radio(str(_last_call.get("step", "claim")), _last_call)
+
+
+## The other living recipients of the order this NPC stacks under (D7): the order's `to` less itself and the dead (`Squad.alive`; with no
+## squad, the living as the radio tells them). [] for an entry that is no order, or once the order has ended.
+func _recipients() -> Array:
+	if _order_id == "":
+		return []
+	var held: Dictionary = _perception.order()
+	if str(held.get("id", "")) != _order_id:
+		return []
+	return (held.get("to", []) as Array).filter(func(m): return is_instance_valid(m) and m != _character and _alive(m))
+
+
+## Whether `member`, a recipient of the order, still lives: as its squad says (`Squad.alive`), else as the radio tells the living.
+func _alive(member: Node) -> bool:
+	if squad != null and squad.has_method("alive"):
+		return squad.alive(member)
+	return member.get("is_dead") != true
+
+
+## Whether this NPC goes in alone: nobody claims the doorway, and no other living recipient of its order is coming (D7).
+func _alone(team: Array) -> bool:
+	return team.is_empty() and _recipients().is_empty()
 
 
 # --- Approach (E1) and stack (E2, E6) ----------------------------------------------------------
@@ -703,10 +843,21 @@ func _tick_security(team: Array, delta: float) -> void:
 
 
 ## The members of the stack still ahead of this one in the crossing order (`_before`), the first to cross first. One that never
-## reached its slot is dropped once this NPC has waited `ready_timeout` for it.
+## reached its slot is dropped once this NPC has waited `ready_timeout` for it; a recipient of the order this NPC stacks under only
+## once `order_ready_cap` has run out (D7).
 func _ahead(team: Array) -> Array:
 	var waited := _ready_at >= 0.0 and _time - _ready_at >= ready_timeout
-	return _before(team).filter(func(m): return not (waited and m["step"] == "claim"))
+	return _before(team).filter(func(m): return not (m["step"] == "claim" and (_order_capped() or (waited and not _waits_for(m)))))
+
+
+## Whether this NPC waits for teammate `m` (a claim) past `ready_timeout`: a recipient of the order it stacks under (D7).
+func _waits_for(m: Dictionary) -> bool:
+	return _order_id != "" and m["order_id"] == _order_id
+
+
+## Whether an ordered stack's wait for its recipients has run out: `order_ready_cap` s since the first ordered `ready` (D7).
+func _order_capped() -> bool:
+	return _order_ready_at >= 0.0 and _time - _order_ready_at >= order_ready_cap
 
 
 ## The members of the stack that cross before this one (agent_entry.gd `crossing_order`: by slot, and on a split stack the two
@@ -724,10 +875,11 @@ func _before(team: Array) -> Array:
 # --- The bang (G18) ------------------------------------------------------------------------------
 
 ## Whether the stack is in bang mode and has a stun to throw: every member's claim says bang (one that gave it up vetoes it), or this
-## member's quiet entry has just turned and the rest have yet to follow (`_upgraded`: their claims say bang within a call or two), and a
-## member carries one. The mode is the first claimer's (`begin`), so a stack goes in all one way.
+## member's quiet entry has just turned and the rest have yet to follow (`_upgraded`: their claims say bang within a call or two), or the
+## stack goes in under an order that says bang (LD9: a member still quiet follows it), and a member carries one. The mode is the order's,
+## else the first claimer's (`begin`), so a stack goes in all one way.
 func _banging(team: Array) -> bool:
-	return bang and not _bang_over and (_upgraded or team.all(func(m): return m["bang"])) and _thrower(team) != -1
+	return bang and not _bang_over and (_upgraded or _ordered(team) or team.all(func(m): return m["bang"])) and _thrower(team) != -1
 
 
 ## The instance id of the member who throws the stun, or -1 when nobody can: the second of the stack if it carries one, else the lowest
@@ -750,16 +902,20 @@ func _thrower(team: Array) -> int:
 func _bang_due(team: Array, delta: float) -> bool:
 	if _bang_over or not bang:
 		return false
+	var ordered := _ordered(team)
 	if _vetoed(team) or (_upgraded and _crossing(team)):
 		_give_up_bang()  # A teammate gave the bang up, or went in quietly before the stack turned: this member goes in quietly too, and its claims say so.
 		return false
-	if not team.all(func(m): return m["bang"]):
+	if not ordered and not team.all(func(m): return m["bang"]):
 		if not _upgraded:
 			_go_quiet()  # The stack goes in the way its first claimer chose (a claim heard after this one was made).
 		return false  # A quiet entry just turned: the rest of the stack follows within a call or two.
 	if team.any(func(m): return m["step"] == "bang"):
 		_enter_bang()  # The thrower called it: hold, turned away, until the stun goes off.
 		return true
+	if ordered and _stack_ready(team) and not _stack_has_stun(team):
+		_give_up_bang()  # D1: the stack is in and the order's stun is gone: it goes in quietly, and its claims say so (`bang_off`).
+		return false
 	if _thrower(team) == -1 or not _stack_ready(team) or hostile_in_view:
 		return false
 	if _thrower(team) != _self_id:
@@ -782,8 +938,11 @@ func _enter_bang() -> void:
 
 
 ## Whether the point holds in its slot for the bang the stack's thrower is about to call, rather than slicing the pie: the stack is in
-## bang mode and has waited less than `BANG_CALL_CAP` for it.
+## bang mode and has waited less than `BANG_CALL_CAP` for it, or it goes in with a stun under an order and the rest of the stack, the
+## thrower among them, is still on its way (D7).
 func _waits_for_bang(team: Array) -> bool:
+	if bang and not _bang_over and _ordered(team) and not _stack_ready(team):
+		return true
 	if not _banging(team):
 		return false
 	if _bang_wait >= BANG_CALL_CAP:
@@ -807,9 +966,13 @@ func _go_quiet() -> void:
 	_radio(str(_last_call.get("step", "ready")), _last_call)
 
 
-## Whether a teammate gave the bang up (its claims say `bang_off`): the stack goes in quietly.
+## Whether a teammate gave the bang up (its claims say `bang_off`): the stack goes in quietly. In an ordered stack only a member under
+## the same order does (its stun lost or no lob, D1): an ordered stun stack is never vetoed by anyone else (LD9).
 func _vetoed(team: Array) -> bool:
-	return team.any(func(m): return m["bang_off"])
+	var ordered := _order_claim(team)
+	if ordered.is_empty():
+		return team.any(func(m): return m["bang_off"])
+	return team.any(func(m): return m["bang_off"] and m["order_id"] == ordered["order_id"])
 
 
 ## Whether a member of the stack is crossing or through the doorway.
@@ -856,9 +1019,10 @@ func _listening(team: Array) -> bool:
 
 
 ## Whether a late reason could still turn this quiet entry into a bang one (`_maybe_upgrade`): the stack carries a stun, nobody has crossed,
-## no member gave the bang up, the stack is not over a burst already, and it is not a pass-by.
+## no member gave the bang up, the stack is not over a burst already, it is not a pass-by, and nobody in it was ordered (LD9: an ordered
+## quiet stack stays quiet).
 func _may_turn(team: Array) -> bool:
-	return not (_bang_off or _bang_over or secure or _vetoed(team) or _crossing(team)) and _stack_has_stun(team)
+	return not (_bang_off or _bang_over or secure or _vetoed(team) or _crossing(team) or _ordered(team)) and _stack_has_stun(team)
 
 
 ## Whether the stack carries a stun: this NPC, or a teammate whose claims say so (`stuns`).
@@ -928,7 +1092,7 @@ func _tick_bang(team: Array, delta: float) -> void:
 		_bang_over = true
 		_set_phase("stack")
 		return
-	if _clock > BANG_BURST_CAP or _vetoed(team) or not team.all(func(m): return m["bang"]):
+	if _clock > BANG_BURST_CAP or _vetoed(team) or (not _ordered(team) and not team.all(func(m): return m["bang"])):
 		_give_up_bang()
 		_set_phase("stack")
 		return
@@ -994,7 +1158,7 @@ func _note_burst_before() -> void:
 	_burst_seen = int(burst["frame"])
 	if secure or not burst.get("team", false) or not (_geo.get("room", Rect2()) as Rect2).has_point(burst["position"]):
 		return
-	var age := float(Engine.get_physics_frames() - int(burst["frame"])) / float(Engine.physics_ticks_per_second)
+	var age := float(GameClock.frame() - int(burst["frame"])) / float(Engine.physics_ticks_per_second)
 	if age > BANG_WINDOW:
 		return
 	_burst_at = -age
@@ -1017,7 +1181,7 @@ func expects_burst(kind: StringName) -> bool:
 
 ## Become the point: slice the pie from this side (and, alone, from the other side after).
 func _start_pie(team: Array) -> void:
-	solo = team.is_empty()
+	solo = _alone(team)
 	_set_phase("pie")
 	_pie_side = side
 	_pie_queue = (_geo["pie"][side] as Array).duplicate()
@@ -1080,11 +1244,19 @@ func _pie_other_side() -> void:
 
 
 ## Whether the point may go in: every other member of the stack is in its slot, or the wait (from when the point was
-## ready, or the stack last grew) has run out.
+## ready, or the stack last grew) has run out. Under an order (D7) every living recipient of it is in its slot first, whatever
+## the wait, until `order_ready_cap` runs out; a member that was not ordered is waited for `ready_timeout` as ever.
 func _stack_ready(team: Array) -> bool:
-	if team.all(func(m): return m["step"] != "claim"):
+	var waited := _time - maxf(_ready_at, _team_grew_at) >= ready_timeout
+	if _order_id == "":
+		return waited or team.all(func(m): return m["step"] != "claim")
+	if _order_capped():
 		return true
-	return _time - maxf(_ready_at, _team_grew_at) >= ready_timeout
+	for m: Node in _recipients():
+		var id := m.get_instance_id()
+		if not team.any(func(c): return c["id"] == id and c["step"] != "claim"):
+			return false
+	return waited or team.all(func(m): return m["step"] != "claim" or _waits_for(m))
 
 
 ## Drop every room point and corner now in sight from the unseen sets, and update the share seen.
@@ -1404,6 +1576,10 @@ func _radio(what: String, extra := {}) -> void:
 	msg["bang"] = bang
 	msg["bang_off"] = _bang_off
 	msg["stuns"] = _stuns
+	if _order_id != "":
+		msg["order_id"] = _order_id  # An ordered stack's claim (LD9): the order, its mode and its side, so the stack goes in the order's way.
+		msg["order_bang"] = _order_bang
+		msg["order_side"] = _order_side
 	_calls.append(msg)
 	_last_call = msg.duplicate()
 	_heartbeat = HEARTBEAT

@@ -383,6 +383,9 @@ split the stack); `AgentEntry.place` is a member's place in its side's file (its
 `_follow`, `_corner_for`); `PlayerStack` uses them for the human.
 Test: `entry_split_stack_criss_cross` (two invaders at the Terrace house's back door from its north and south; real Von, `requires_von`).
 
+A stack a leader orders (its side, its mode, its wait for every member it names, its guarded way across the house, for a defender too) is
+`docs/leadership.md` LD9: E1 to E19 hold for it but where LD9 says otherwise, and a stack nobody was ordered to is as written here.
+
 ## Situations
 
 The two common room shapes, `#` wall, `D` opening, `S` stack slots outside (1 is the point), `p` the pie

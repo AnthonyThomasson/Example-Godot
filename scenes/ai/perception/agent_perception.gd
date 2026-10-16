@@ -48,7 +48,7 @@ const FLASH_SHARE := 0.8
 ## sight and the sighting written from it are renewed this often, offset per NPC and target so a squad does not test on the
 ## same frame. What the NPC holds of a character it sees is at most this many frames old.
 const SIGHT_EVERY_FRAMES := 3
-## The longest (ms, wall clock) a decision waits for the avoid map its routes are measured on (`routes_ready`).
+## The longest (game ms, `GameClock`) a decision waits for the avoid map its routes are measured on (`routes_ready`).
 const WARM_CAP_MS := 3000
 
 ## Lifetime (s) of a live contact: the window the NPC keeps acting on a last-seen position.
@@ -125,6 +125,14 @@ var door_view_depth: float = 450.0     ## How far (px) out of a doorway its view
 var door_avoid_ratio: float = 2.0      ## A walk round the doorway views is taken when no longer than this many times the plain route...
 var door_avoid_slack: float = 300.0    ## ... plus this many px.
 var entry_pass_clear_time: float = 60.0 ## Seconds a cleared room counts as safe to walk past.
+## Whether the NPC is walking an ordered stack's way to its door (`docs/leadership.md` LD9), set each tick by the behaviour: that walk keeps
+## out of the doorway views whatever `entry_enabled` says (D4), and for an NPC that does not clear rooms by entry (`entry_enabled` off) a
+## room it has stood in lately and seen no hostile in counts as clear for passing (`seen_empty`, D11).
+var ordered_walk := false:
+	set(value):
+		if value != ordered_walk:
+			ordered_walk = value
+			_sync_walks()
 # Grenades (live ones known by sight, hearing and callouts, and the danger zone; see agent_grenades.gd).
 var grenades_enabled: bool = true      ## Whether the NPC reacts to live grenades at all.
 var hear_grenade: float = 300.0        ## How far (px) a grenade coming down is heard.
@@ -137,7 +145,7 @@ var _hostility: RefCounted       ## The hostility rules; see agent_hostility.gd.
 var _memory: RefCounted          ## The event memory; see agent_memory.gd.
 var _tactics: RefCounted         ## The combat geometry; see agent_tactics.gd.
 var _entry: RefCounted           ## The doorway geometry and the team's claims; see agent_entry.gd.
-var _warming_since := -1         ## When (`Time.get_ticks_msec`) the decision began waiting for the avoid map; -1: not waiting.
+var _warming_since := -1         ## When (`GameClock.msec()`) the decision began waiting for the avoid map; -1: not waiting.
 var _throw: RefCounted           ## The grenade geometry (danger zone, escape spot, lob); see agent_throw.gd.
 var _grenades: RefCounted        ## The live grenades known and the plan to get clear of them; see agent_grenades.gd.
 var _snapshot: RefCounted        ## The BUILD half: writes the decision snapshot; see agent_snapshot.gd.
@@ -153,11 +161,12 @@ var _learned_frame := -1         ## Physics frame of the latest such look (-1 = 
 var _visible_now := {}           ## Instance ids of characters visible on the latest observe() tick.
 var _visible_before := {}        ## The same one tick earlier (what a character not due for a sight test keeps).
 var _looked := {}                ## Instance ids of characters in the view cone that have had a sight test since they entered it.
-var _tracks := {}                ## Per-character movement track: id → { pos, vel, t } (last seen).
+var _tracks := {}                ## Per-character movement track: id → { pos, vel, t, f } (last seen, game msec and game frame).
 var _blind := false              ## The NPC was flash-blinded on the latest observe() tick: it sees nothing new.
-## The latest grenade burst (`{ kind, position, frame, team }`: the physics frame it was taken note of in, and whether the NPC or an ally
+## The latest grenade burst (`{ kind, position, frame, team }`: the game-clock frame (`GameClock.frame()`) it was taken note of in, and whether the NPC or an ally
 ## threw it), or {}: a bang entry waits for its stun's, and an entry goes in on its own team's burst in the room (E17).
 var last_burst := {}
+var _ended_order := {}           ## The order that ended done or refused, until the controller radios it (`take_ended_order`).
 
 
 ## Build the owned sensing modules. The controller calls this once in its _ready(); it then pushes the
@@ -172,7 +181,6 @@ func setup() -> void:
 	_tactics.vision = _vision
 	_entry = AgentEntry.new()
 	_entry.vision = _vision
-	_entry.pass_clear = is_pass_clear
 	_throw = AgentThrow.new()
 	_throw.vision = _vision
 	_grenades = AgentGrenades.new()
@@ -219,7 +227,7 @@ func apply_config() -> void:
 	_entry.door_view_depth = door_view_depth
 	_entry.door_avoid_ratio = door_avoid_ratio
 	_entry.door_avoid_slack = door_avoid_slack
-	_entry.avoid_views = entry_enabled and entry_guard
+	_sync_walks()
 	_throw.evade_margin = evade_margin
 	_grenades.enabled = grenades_enabled
 	_grenades.hear_grenade = hear_grenade
@@ -240,6 +248,16 @@ func apply_config() -> void:
 	_snapshot.vocab.low_ammo_fraction = low_ammo_fraction
 	_snapshot.vocab.max_contacts_in_state = max_contacts_in_state
 	_snapshot.vocab.search_memory_ttl = search_memory_ttl
+
+
+## Push the walk rules into the entry geometry: walks keep out of the doorway views where the entry guard runs (`entry_guard`, with
+## `entry_enabled` or on an ordered stack's walk, D4), and a room counts as clear for passing when it was cleared lately (`is_pass_clear`)
+## or, on an ordered walk of an NPC that does not clear rooms by entry, when it has seen it empty (`seen_empty`, D11).
+func _sync_walks() -> void:
+	if _entry == null:
+		return
+	_entry.avoid_views = entry_guard and (entry_enabled or ordered_walk)
+	_entry.pass_clear = _passable if ordered_walk and not entry_enabled else is_pass_clear
 
 
 ## Hand the perception the NPC's body, which every sense and query reads from then on, and tell the hostility rules its
@@ -362,12 +380,57 @@ func process_callout(data: Dictionary) -> void:
 	if AgentGrenades.is_call(data.get("status")):
 		_grenades.called(data)  # "Grenade!": a live grenade, not what the ally is doing, so not a callout to weigh.
 		return
+	if String(data.get("order_step", "")) != "" and String(data.get("entry_step", "")) == "":
+		return  # How an ally's order goes (LD7) is its squad's to hear: it leaves what the ally last said it is doing standing.
 	_memory.remember(&"heard_callout", data, callout_ttl, str(speaker.get_instance_id()))
 	var cleared := str(data.get("cleared_room", ""))
 	if cleared != "":
 		_learn_room({ "key": cleared })
 		_memory.remember(&"visited_room", { "key": cleared }, search_memory_ttl, cleared)
 		mark_cleared(cleared)
+
+
+## Take one `&"order"` (interface 10, `docs/leadership.md` LD5: `{ id, leader, faction, to, kind, ... }`) when it names this NPC in `to`
+## and comes from its own side: kept as the live order (memory topic `order`, permanent, one per NPC), replacing the one it held; a
+## `cancel` ends the one it holds. An order never lapses on a timer: it ends only when it is done, cancelled or replaced (`end_order`).
+## True when the NPC's order changed (the controller then decides at once).
+func process_order(data: Dictionary) -> bool:
+	if not (data.get("to", []) as Array).has(_character) or not _hostility.is_ally(data.get("faction", &"")):
+		return false
+	if String(data.get("kind", "")) == "cancel":
+		var held := order()
+		if held.is_empty():
+			return false
+		end_order(held["id"], "cancelled")
+		return true
+	_memory.remember(&"order", data.duplicate(), 0.0, "live")
+	return true
+
+
+## The live order (`process_order`), or {} when the NPC holds none.
+func order() -> Dictionary:
+	var held: Dictionary = _memory.recall(&"order")
+	return {} if held.is_empty() or held.has("ended") else held
+
+
+## End the live order when it is order `id`, for `why` (`done`, `refused`, `cancelled`): kept as ended, so it is no longer the NPC's.
+## One done or refused is the leader's to hear (`take_ended_order`).
+func end_order(id: Variant, why: String) -> void:
+	var held := order()
+	if held.is_empty() or str(held.get("id", "")) != str(id):
+		return
+	var ended := held.duplicate()
+	ended["ended"] = why
+	_memory.remember(&"order", ended, 0.0, "live")
+	if why != "cancelled":
+		_ended_order = { "id": held["id"], "why": why }
+
+
+## The order that ended done or refused since the last call (`{ id, why }`), or {}: the controller radios it (LD7).
+func take_ended_order() -> Dictionary:
+	var out := _ended_order
+	_ended_order = {}
+	return out
 
 
 ## A grenade came down (`&"grenade"`, `{ position, kind, stage }`): heard if within earshot and the NPC is not `deaf`,
@@ -382,7 +445,7 @@ func process_explosion(data: Dictionary) -> void:
 	_grenades.burst(data.get("position", Vector2.INF), data.get("kind", &""))
 	var by = data.get("attacker")
 	var team: bool = by == _character or (by is Node and is_instance_valid(by) and _hostility.is_ally(by.get("faction") if by.get("faction") != null else &""))
-	last_burst = { "kind": data.get("kind", &""), "position": data.get("position", Vector2.INF), "frame": Engine.get_physics_frames(), "team": team }
+	last_burst = { "kind": data.get("kind", &""), "position": data.get("position", Vector2.INF), "frame": GameClock.frame(), "team": team }
 	if data.get("kind") == &"stun":
 		_note_flash(data)
 
@@ -430,6 +493,7 @@ func quick_facts() -> Dictionary:
 		"engaged": engaged_fresh(),
 		"hostile_known": hostile_known,
 		"threat_known": hostile_known or under_fire(),
+		"ordered": not order().is_empty(),
 	}
 
 
@@ -467,7 +531,7 @@ func room_suspicion(key: String) -> Array:
 ## heard (`pos`, `point`, `label`, `name`, `age`), checked leads, the
 ## hostiles it has lost track of, and the hearing/awareness radii. A pure read of memory; never writes it.
 func debug_memory() -> Dictionary:
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	var gunfire: Array = []
 	for rec in _memory.recall_aged(&"heard_gunfire"):
 		gunfire.append({ "pos": rec["data"].get("pos", Vector2.ZERO), "age": rec["age"] })
@@ -557,7 +621,7 @@ func observe(rooms: Array) -> void:
 	var facing: Vector2 = _character.facing
 	var space: PhysicsDirectSpaceState2D = _character.get_world_2d().direct_space_state
 	var exclude := [_character.get_rid()]
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 
 	# Every other character (the player included): one sighting per character, superseded while it
 	# stays visible. Dead characters are skipped — corpses add no tactical information. A flash-blinded NPC
@@ -596,7 +660,7 @@ func observe(rooms: Array) -> void:
 			"faction": f if f != null else &"",
 			"ally": _hostility.is_ally(f if f != null else &""),
 			"pos": pos,
-			"vel": _track(id, pos, now, frame),
+			"vel": _track(id, pos, now),
 			"facing": other.get("facing") if other.get("facing") is Vector2 else Vector2.ZERO,
 			"wound_dmg": other.damage_taken(),
 			"inside": not room.is_empty(),
@@ -649,10 +713,12 @@ func _learn_by_sight(rooms: Array) -> void:
 			_learn_object(obj)
 
 
-## Update character `id`'s movement track with a sighting at `pos` (physics frame `frame`) and return its smoothed
-## velocity. A sighting after a long gap restarts the track (no velocity across the gap). `track_smoothing` is the share of a
-## new velocity taken per physics frame, so a sighting that comes several frames after the last takes the share they add up to.
-func _track(id: int, pos: Vector2, now: int, frame: int) -> Vector2:
+## Update character `id`'s movement track with a sighting at `pos` (game msec `now`) and return its smoothed velocity, both
+## measured on the game clock (`GameClock`). A sighting after a long gap restarts the track (no velocity across the gap).
+## `track_smoothing` is the share of a new velocity taken per game frame, so a sighting that comes several frames after the
+## last takes the share they add up to.
+func _track(id: int, pos: Vector2, now: int) -> Vector2:
+	var frame := GameClock.frame()
 	var vel := Vector2.ZERO
 	var track = _tracks.get(id)
 	if track != null:
@@ -768,6 +834,7 @@ func sense(rooms: Array, goal: String, activity: String) -> Dictionary:
 		"lost": lost_hostiles(),
 		"carried_grenades": carried,  # The kinds of grenade it holds, and the bodies a throw's line goes through.
 		"character_rids": _character_rids() if not carried.is_empty() else [],
+		"order": order(),
 	}
 	return _snapshot.build(rooms, goal, activity, contacts(self_pos), _callouts(), knowledge)
 
@@ -909,9 +976,12 @@ func entry_geometry(opening_id: String, into: String) -> Dictionary:
 
 ## Mark room `key` cleared: its entry was carried through to the end (or searched by sight to the end), by this NPC or
 ## by an ally who radioed it. Not the same as having stood in it (`visited_room`): a room walked through unprepared is
-## visited, not cleared. It lapses after `search_memory_ttl`, like a searched room.
+## visited, not cleared. It lapses after `search_memory_ttl`, like a searched room. A stack order into it is done.
 func mark_cleared(key: String) -> void:
 	_memory.remember(&"cleared_room", { "key": key }, search_memory_ttl, key)
+	var held := order()
+	if String(held.get("kind", "")) == "stack" and String(held.get("into", "")) == key:
+		end_order(held["id"], "done")  # A stack order ends at its room cleared (LD9), by this NPC or by an ally who radioed it.
 
 
 ## Whether room `key` is cleared (see `mark_cleared`).
@@ -920,9 +990,13 @@ func is_cleared(key: String) -> bool:
 
 
 ## The first doorway on the walk `path` (from waypoint `from_idx`, `max_dist` px of it at most) that leads into a room that
-## is not cleared, as `{ opening, into, dist }`, or {} (see agent_entry.gd `threshold_ahead`).
+## is not cleared (nor, on an ordered walk of an NPC that does not clear rooms by entry, seen empty: D11), as `{ opening, into, dist }`,
+## or {} (see agent_entry.gd `threshold_ahead`).
 func threshold_ahead(path: PackedVector2Array, from_idx: int, max_dist: float) -> Dictionary:
-	return _entry.threshold_ahead(path, from_idx, _character.global_position, is_cleared, max_dist)
+	var clear := is_cleared
+	if ordered_walk and not entry_enabled:
+		clear = func(key: String) -> bool: return is_cleared(key) or seen_empty(key)  # D11: a room seen empty is passed through.
+	return _entry.threshold_ahead(path, from_idx, _character.global_position, clear, max_dist)
 
 
 ## The first doorway view the walk `path` goes into without entering the room behind it, as `{ opening, into, dist }`, or {} (see
@@ -938,6 +1012,24 @@ func is_pass_clear(key: String) -> bool:
 	return _memory.age_of(&"cleared_room", "key", key) <= entry_pass_clear_time
 
 
+## Whether the NPC has stood in room `key` within `entry_pass_clear_time` and has seen no hostile in it since (the latest sighting of
+## each hostile it knows of, within that time, lies elsewhere): a room seen empty (`docs/leadership.md` D11). A room only glimpsed through
+## its doorway was not stood in, so it is not.
+func seen_empty(key: String) -> bool:
+	if _memory.age_of(&"visited_room", "key", key) > entry_pass_clear_time:
+		return false
+	for c in _sightings(null, entry_pass_clear_time, -1.0, true):
+		if str(SnapshotVocab.room_at(c["pos"], _rooms).get("key", "")) == key:
+			return false
+	return true
+
+
+## Whether room `key` counts as clear for passing on an ordered walk of an NPC that does not clear rooms by entry (D11): cleared lately,
+## or seen empty.
+func _passable(key: String) -> bool:
+	return is_pass_clear(key) or seen_empty(key)
+
+
 ## Whether the routes a snapshot measures can be the ones the NPC will walk (see agent_entry.gd `warm`): the avoid map for the doorway
 ## views from the room it stands in is baked. Asking starts the bake. After `WARM_CAP_MS` of waiting it is true anyway, so a decision
 ## never waits for good.
@@ -946,7 +1038,7 @@ func routes_ready() -> bool:
 	if _entry.warm(_character.global_position, world.navigation_map, world.direct_space_state):
 		_warming_since = -1
 		return true
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	if _warming_since < 0:
 		_warming_since = now
 	return now - _warming_since > WARM_CAP_MS

@@ -34,6 +34,20 @@ const VIEW_SIDE_RAYS := 6
 const VIEW_FAR_RAYS := 10
 ## How far (px) the door-avoiding route may end short of the point it was asked for before it counts as not reaching it.
 const AVOID_REACH := 24.0
+## A defend spot (`defend_spot`, `docs/leadership.md` D2): how far back from its doorway's wall (px) it is sought, at best `DEFEND_DEPTH`...
+const DEFEND_DEPTHS := [60.0, 90.0, 120.0, 150.0]
+const DEFEND_DEPTH := 100.0
+## ... and how far along the wall past the doorway's jamb (px), at best `DEFEND_LATERAL`: off the doorway's axis, out of its funnel.
+const DEFEND_LATERALS := [30.0, 50.0, 75.0, 100.0]
+const DEFEND_LATERAL := 50.0
+## Inset (px) of a defend spot from the room's walls (a body and half a wall), and the most a snap onto the navmesh may move it.
+const DEFEND_INSET := 22.0
+const DEFEND_SNAP := 10.0
+## A spot within a body (px) of a doorway's width and closer than `DEFEND_FUNNEL_DEPTH` (px) to its wall stands in its fatal funnel.
+const DEFEND_BODY := 14.0
+const DEFEND_FUNNEL_DEPTH := 200.0
+## Where (px into the room from the doorway's centre) a defender's sight line to its doorway ends.
+const DEFEND_DOOR_IN := 8.0
 
 var vision: RefCounted = AgentVision.new()  ## The sight sense (sight rays over low cover): the perception hands in its own.
 var stack_spacing: float = 44.0       ## Distance (px) between neighbouring stack slots: clear of a neighbour's footprint.
@@ -45,8 +59,8 @@ var short_room: float = 150.0         ## A room with a side under this (px) is t
 var door_view_depth: float = 450.0    ## How far (px) out of a doorway its view reaches, along its edge rays (E18).
 var door_avoid_ratio: float = 2.0     ## A walk round the views is taken when no longer than this many times the plain route...
 var door_avoid_slack: float = 300.0   ## ... plus this many px.
-var avoid_views := true               ## Whether a walk keeps out of doorway views at all (the controller's `entry_guard` and `entry_enabled`).
-var pass_clear: Callable              ## Room key -> whether that room counts as safe to walk past (cleared lately enough).
+var avoid_views := true               ## Whether a walk keeps out of doorway views at all (the controller's `entry_guard`, with `entry_enabled` or on an ordered stack's walk).
+var pass_clear: Callable              ## Room key -> whether that room counts as safe to walk past (cleared lately enough, or on an ordered walk seen empty).
 
 var _openings: Array = []             ## The house's doorways (`{ pos, width, front, exit, rooms }`), as injected.
 var _rooms: Array = []                ## The house's rooms (`{ key, type, rect }`).
@@ -55,6 +69,7 @@ var _views := {}                      ## "<opening id>><room key>@<depth>" -> th
 var _avoided_frame := -1              ## The physics frame `avoided` last worked out its answer in, and for which room...
 var _avoided_here := ""
 var _avoided_exempt := ""
+var _avoided_clear: Callable          ## ... with which `pass_clear` rule...
 var _avoided_set := {}                ## ... and the answer: `{ key, holes, views }`.
 
 
@@ -104,6 +119,80 @@ func room_doorways(room_key: String) -> Array:
 	return out
 
 
+## Where member `nth` of `count` holds room `room_key` it was ordered to defend (`docs/leadership.md` LD8, D2), and what it watches: the
+## members share out the room's doorways (sorted by id; member `nth` takes doorway `nth` mod their number, the extras doubling up on
+## the other side of it), each standing back in the room off its doorway's axis, out of every doorway's fatal funnel, with a sight line
+## to it and, where there is one, low furniture between (cover it sees over); a lone member takes the spot from which it sees the most
+## doorways. `{ spot, door, door_pos, doors }`: `door` is the id of the doorway it keeps its gun on ("" for a lone member of a room with
+## several: it turns among `doors`, the room's doorways), `door_pos` that doorway's centre (INF for none). {} for a room it does not know.
+func defend_spot(room_key: String, nth: int, count: int, map: RID, space) -> Dictionary:
+	var rect := _room_rect(room_key)
+	if rect.size == Vector2.ZERO:
+		return {}
+	var doors := room_doorways(room_key)
+	doors.sort_custom(func(a, b): return String(a["id"]) < String(b["id"]))
+	if doors.is_empty():
+		return { "spot": NavBuilder.snap(map, rect.get_center()), "door": "", "door_pos": Vector2.INF, "doors": doors }
+	var lone := count <= 1 and doors.size() > 1
+	var own: Dictionary = doors[posmod(nth, doors.size())]
+	var round_no := int(float(nth) / float(doors.size()))
+	var best := {}
+	for d in (doors if lone else [own]):
+		var pos: Vector2 = d["pos"]
+		var width := float(d["width"])
+		var into := normal_into(rect, pos)
+		var along := into.orthogonal()
+		var first := 1 if _wall_length(rect, pos, along) >= _wall_length(rect, pos, -along) else -1
+		var wanted := first if round_no % 2 == 0 else -first
+		for depth in DEFEND_DEPTHS:
+			for lateral in DEFEND_LATERALS:
+				for s in [1, -1]:
+					var raw: Vector2 = pos + into * depth + along * s * (width * 0.5 + lateral)
+					var c := _defend_candidate(rect, raw, doors, map, space)
+					if c.is_empty():
+						continue
+					var score: float = absf(depth - DEFEND_DEPTH) + absf(lateral - DEFEND_LATERAL) + float(c["funnel"]) * 1000.0
+					if lone:
+						score -= float(c["sees"]) * 2000.0
+					else:
+						score += (0.0 if c["sees_door"].has(d["id"]) else 3000.0) + (0.0 if s == wanted else 400.0)
+					score += 0.0 if c["cover"].has(d["id"]) or (lone and not c["cover"].is_empty()) else 300.0
+					if best.is_empty() or score < float(best["score"]):
+						best = { "score": score, "spot": c["spot"] }
+	if best.is_empty():
+		return { "spot": NavBuilder.snap(map, rect.get_center()), "door": "" if lone else String(own["id"]),
+			"door_pos": Vector2.INF if lone else own["pos"], "doors": doors }
+	return { "spot": best["spot"], "door": "" if lone else String(own["id"]), "door_pos": Vector2.INF if lone else own["pos"], "doors": doors }
+
+
+## A candidate defend spot near `raw` (`defend_spot`): snapped onto the navmesh inside the room (dropped when the snap moves it off),
+## with `funnel` (how many of the room's `doors` it stands in the fatal funnel of), `sees` / `sees_door` (the doorways it has a sight line
+## to, how many and which) and `cover` (the ids of those with low furniture on the line, which it sees over). {} when it is no spot.
+func _defend_candidate(rect: Rect2, raw: Vector2, doors: Array, map: RID, space) -> Dictionary:
+	var inner := rect.grow(-DEFEND_INSET)
+	if not inner.has_point(raw):
+		return {}
+	var p := NavBuilder.snap(map, raw)
+	if p.distance_to(raw) > DEFEND_SNAP or not inner.has_point(p):
+		return {}
+	var funnel := 0
+	var sees: Dictionary = {}
+	var cover: Dictionary = {}
+	for d in doors:
+		var pos: Vector2 = d["pos"]
+		var into := normal_into(rect, pos)
+		var off := p - pos
+		if absf(off.dot(into.orthogonal())) < float(d["width"]) * 0.5 + DEFEND_BODY and off.dot(into) < DEFEND_FUNNEL_DEPTH:
+			funnel += 1
+		var aim := pos + into * DEFEND_DOOR_IN
+		if _sees(space, p, aim):
+			sees[d["id"]] = true
+			var hit: Dictionary = vision.raycast(space, p, aim, []) if vision != null and space != null else {}
+			if hit.get("collider") is RigidBody2D:
+				cover[d["id"]] = true
+	return { "spot": p, "funnel": funnel, "sees": sees.size(), "sees_door": sees, "cover": cover }
+
+
 ## The doorways out of room `room_key` (one already cleared) that lead on into another room that `is_cleared` (a Callable
 ## on the room key) says is not cleared, other than doorway `exclude_id` (the one the NPC came in by). Doors to outside
 ## are left out. Each `{ id, into, pos, width }`. What the team covers once it has cleared a room (E8).
@@ -141,7 +230,7 @@ func threshold_ahead(path: PackedVector2Array, from_idx: int, from_pos: Vector2,
 				var room := _room_rect(into)
 				if room.size == Vector2.ZERO:
 					continue
-				var inward := _inward(room, pos)
+				var inward := normal_into(room, pos)
 				var sa := (a - pos).dot(inward)
 				var sb := (b - pos).dot(inward)
 				if sa >= 0.0 or sb < 0.0:
@@ -248,7 +337,7 @@ func views_from(from: Vector2, map: RID, space) -> Array:
 ## `exempt` (the doorway a walk is for) are left out.
 func avoided(here_key: String, map: RID, space, exempt := "") -> Dictionary:
 	var frame := Engine.get_physics_frames()
-	if frame == _avoided_frame and here_key == _avoided_here and exempt == _avoided_exempt:
+	if frame == _avoided_frame and here_key == _avoided_here and exempt == _avoided_exempt and pass_clear == _avoided_clear:
 		return _avoided_set
 	var keys: Array = []
 	var holes: Array = []
@@ -268,6 +357,7 @@ func avoided(here_key: String, map: RID, space, exempt := "") -> Dictionary:
 	_avoided_frame = frame
 	_avoided_here = here_key
 	_avoided_exempt = exempt
+	_avoided_clear = pass_clear
 	return _avoided_set
 
 
@@ -314,7 +404,7 @@ func _area(ring: PackedVector2Array) -> float:
 func _build_view(opening: Dictionary, rect: Rect2, space) -> PackedVector2Array:
 	var pos: Vector2 = opening["pos"]
 	var half := float(opening.get("width", 80.0)) * 0.5
-	var out := -_inward(rect, pos)
+	var out := -normal_into(rect, pos)
 	var along := out.orthogonal()
 	var corners := [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]
 	corners.sort_custom(func(a, b): return (a - pos).dot(out) < (b - pos).dot(out))
@@ -367,7 +457,7 @@ func _entered_rooms(pts: Array) -> Dictionary:
 			if entered.has(key):
 				continue
 			var room := _room_rect(key)
-			if room.size != Vector2.ZERO and _walk_enters(pts, o["pos"], _inward(room, o["pos"]), float(o.get("width", 80.0))):
+			if room.size != Vector2.ZERO and _walk_enters(pts, o["pos"], normal_into(room, o["pos"]), float(o.get("width", 80.0))):
 				entered[key] = true
 	return entered
 
@@ -442,7 +532,7 @@ func _build(opening: Dictionary, room: Dictionary, map: RID, space) -> Dictionar
 	var pos: Vector2 = opening["pos"]
 	var width := float(opening.get("width", 80.0))
 	var rect: Rect2 = room["rect"]
-	var inward := _inward(rect, pos)
+	var inward := normal_into(rect, pos)
 	var out := -inward
 	var along := out.orthogonal()
 	var wall := { 1: _wall_length(rect, pos, along), -1: _wall_length(rect, pos, -along) }
@@ -485,8 +575,9 @@ func _build(opening: Dictionary, room: Dictionary, map: RID, space) -> Dictionar
 		"capacity": SHORT_ROOM_CAPACITY if minf(rect.size.x, rect.size.y) < short_room else MAX_SLOTS }
 
 
-## The unit normal pointing into `rect` from the edge door `pos` lies on (the nearest edge).
-func _inward(rect: Rect2, pos: Vector2) -> Vector2:
+## The unit normal pointing into `rect` from the edge door `pos` lies on (the nearest edge). Also read by the squad (`ai/team/squad.gd`),
+## which tells which side of a doorway's wall a leader clicked.
+static func normal_into(rect: Rect2, pos: Vector2) -> Vector2:
 	var edges := [
 		[absf(pos.x - rect.position.x), Vector2.RIGHT],
 		[absf(pos.x - rect.end.x), Vector2.LEFT],
@@ -514,8 +605,9 @@ func _sees(space, from: Vector2, to: Vector2) -> bool:
 ## The allies' live claims on opening `id`, from the callouts heard (latest per speaker, see the perception's
 ## `_callouts()`): `{ id (speaker instance id), name, slot, side, step, covering, pos, age }`, lowest slot first
 ## (`covering` = the doorway a member holding the cleared room watches, with step `cover`; `bang` = it goes in with a stun thrown first, true
-## for a member that says nothing of it, such as the human; `stuns` = how many stun grenades it carries). A member who aborted or is
-## done with the doorway, or whose latest call is about something else, holds no claim.
+## for a member that says nothing of it, such as the human; `stuns` = how many stun grenades it carries; `order_id` = the order it stacks
+## under, "" for none, with the order's mode `order_bang` and side `order_side`, 1 / -1 along the wall or 0 for a split stack:
+## `docs/leadership.md` LD9). A member who aborted or is done with the doorway, or whose latest call is about something else, holds no claim.
 static func claims(id: String, callouts: Array) -> Array:
 	var out: Array = []
 	for c in callouts:
@@ -526,7 +618,8 @@ static func claims(id: String, callouts: Array) -> Array:
 			continue
 		out.append({ "id": c["id"], "name": c.get("name", ""), "slot": int(c.get("slot", 0)), "side": int(c.get("side", 0)),
 			"step": step, "covering": str(c.get("covering", "")), "pos": c.get("position", Vector2.ZERO), "age": c.get("age", 0.0),
-			"bang": bool(c.get("bang", true)), "bang_off": bool(c.get("bang_off", false)), "stuns": int(c.get("stuns", 0)) })
+			"bang": bool(c.get("bang", true)), "bang_off": bool(c.get("bang_off", false)), "stuns": int(c.get("stuns", 0)),
+			"order_id": str(c.get("order_id", "")), "order_bang": bool(c.get("order_bang", false)), "order_side": int(c.get("order_side", 0)) })
 	out.sort_custom(func(a, b): return a["slot"] < b["slot"] if a["slot"] != b["slot"] else a["id"] < b["id"])
 	return out
 

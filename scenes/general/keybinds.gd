@@ -25,6 +25,9 @@ const INTERACT := "interact"
 const RELOAD := "reload"
 ## Get into the vehicle whose door is nearest, or out of the one the player sits in.
 const USE_VEHICLE := "use_vehicle"
+## Command teammates (the UI's command menu, built only when the human leads its side): pause and open the menu on what is
+## under the cursor.
+const COMMAND := "command"
 ## Return to the pre-game setup window to start a fresh match (handled by main.gd, works in both
 ## player and spectator mode).
 const MENU := "menu"
@@ -85,6 +88,7 @@ const DEFAULTS := {
 ## live apart from DEFAULTS).
 const MOUSE_DEFAULTS := {
 	FIRE: MOUSE_BUTTON_LEFT,
+	COMMAND: MOUSE_BUTTON_RIGHT,
 	ZOOM_IN: MOUSE_BUTTON_WHEEL_UP,
 	ZOOM_OUT: MOUSE_BUTTON_WHEEL_DOWN,
 }
@@ -104,6 +108,7 @@ const LABELS := {
 	RELOAD: "Reload",
 	INTERACT: "Interact",
 	USE_VEHICLE: "Get in / out of vehicle",
+	COMMAND: "Command teammates",
 	ITEM_1: "Item 1",
 	ITEM_2: "Item 2",
 	ITEM_3: "Item 3",
@@ -137,6 +142,7 @@ const GROUPS := {
 	RELOAD: "Combat",
 	INTERACT: "Interaction",
 	USE_VEHICLE: "Interaction",
+	COMMAND: "Interaction",
 	ITEM_1: "Items",
 	ITEM_2: "Items",
 	ITEM_3: "Items",

@@ -1,12 +1,12 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers), the draw-order ladder (DrawLayers) and the light masks (LightMasks: occluder bits, shadow masks, light layers, the occluder shape). Use when editing scenes/general/ or working on input/keybinds/rebinding, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant, a draw-order rung or a light mask. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), the pausable game clock (GameClock), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers), the draw-order ladder (DrawLayers) and the light masks (LightMasks: occluder bits, shadow masks, light layers, the occluder shape). Use when editing scenes/general/ or working on input/keybinds/rebinding, the game clock AI timers run on, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant, a draw-order rung or a light mask. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
 
 Infrastructure: input (Keybinds), saved settings (Settings), despawner, event bus, camera, dev command
-server, shared physics-layer ids. `Keybinds`, `Despawner` and `EventBus` are the General autoloads (`project.godot`; the Audio domain adds a fourth, `Sound`).
+server, shared physics-layer ids, the pausable game clock. `Keybinds`, `Despawner`, `EventBus` and `GameClock` are the General autoloads (`project.godot`; the Audio domain adds a fifth, `Sound`).
 HUDs and menus are the **UI domain** (`scenes/ui/`) — see the `domain-ui` skill.
 
 `physics_layers.gd` (`class_name PhysicsLayers`, no instance/autoload — same style as the other
@@ -27,12 +27,20 @@ and culled counter-clockwise, so the shape itself stays lit and only what lies b
 Objects' walls and solid pieces and the Character's body build theirs through it; Objects' street floors put themselves on
 `STREET`.
 
+`game_clock.gd` (autoload `GameClock`, interface 11) is the pausable game clock. A node, `PROCESS_MODE_PAUSABLE`, that counts
+physics frames in `_physics_process`, so it stands still while the tree is paused (the spectator inspector's pause, the test runner's). `msec()` is frames × 1000 / `Engine.physics_ticks_per_second` (an int, the drop-in for
+`Time.get_ticks_msec()`), `seconds()` the same in seconds, `frame()` the frame count. Under `--fixed-fps` a headless run reads the same
+times every run, however far it outpaces the wall clock. It is an autoload node, not a `class_name` holder (an autoload and a class cannot
+share a name), so callers read it off the singleton. Every AI ttl, timer and age runs on it (`docs/leadership.md` LD1, the AI's skills);
+what measures real time (the Von launcher's boot timeout, Von's reply latency) stays on `Time`. Autoloads come before the main scene in
+the tree, so it has counted the current frame before any NPC reads it.
+
 `draw_layers.gd` (`class_name DrawLayers`, the same kind of holder) is the world's draw-order ladder (interface 11): `FLOOR` −5,
 `RUG` −4, `BLOOD` −3 (blood and scorch decals), `LYING` −2 (a dead body, casings, a dropped item, a grenade at rest),
 `UNDER_VEHICLE` −1 (a vehicle's chassis), `STANDING` 0 (the default: the living, furniture, walls), `ABOVE` 1 (a vehicle's roof, a
 grenade in flight, the UI's stack markers), `OVERHEAD` 2 (a piece's overhang: a streetlight's arm and head over the road; a room's ceiling fixture), `EFFECTS` 4
 (an explosion's flash and smoke). Every domain's z knob starts from its rung (`ObjectArtConfig`,
-`BloodConfig`, `CharacterConfig`, the casing, the dropped item and grenade, the vehicle's layers, `ExplosionFx`, the UI's `StackMarkers`), so a new layer is a
+`BloodConfig`, `CharacterConfig`, the casing, the dropped item and grenade, the vehicle's layers, `ExplosionFx`, the UI's `StackMarkers`, `OrderMarkers` and `LeaderOverlay`), so a new layer is a
 rung here, not a number in a domain.
 
 ## Input architecture
@@ -44,7 +52,8 @@ Keybinds (movement, `RUN` — held, default Shift —, `CROUCH` (C) — a toggle
 "Get in / out of vehicle", in the "Interaction" group after Interact: `is_use_vehicle_just_pressed()` → `character.try_use_vehicle()`;
 while the player drives, its movement keys and `RUN` are the vehicle's throttle, steer and handbrake, read by the Vehicles domain off the
 character's `move_input` / `run_input`, so driving adds no action). Everything else reads its own actions: `main.gd` and the test runner `MENU`, the spectator
-inspector `PAUSE`, the camera its pan and zoom actions; `settings.gd` persists the bindings, and
+inspector `PAUSE`, the UI's command menu `COMMAND` ("Command teammates", default right mouse, in the "Interaction" group after Get in / out of
+vehicle; read only by the menu, which Main builds only when the human leads, and which reads `MENU` too, only to close itself), the camera its pan and zoom actions; `settings.gd` persists the bindings, and
 `command_server.gd` (dev-only) reads the action *names* to inject real input when driving the game from
 outside. `Keybinds._ready` registers every action in the InputMap, so there is no `project.godot [input]` section: this file
 is the source of truth. `PAUSE`
@@ -52,7 +61,7 @@ is the source of truth. `PAUSE`
 harmless because the spectator match has no player to interact.
 
 Each action holds exactly one binding, a key (stored by physical keycode) or a mouse button. Keyboard
-defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `ZOOM_IN` /
+defaults live in `DEFAULTS`, pointer defaults in `MOUSE_DEFAULTS` (`FIRE` left-click, `COMMAND` right-click, `ZOOM_IN` /
 `ZOOM_OUT` wheel up/down); `actions()` is their union and what resets, overrides and loading cover.
 `FIRE` is read two ways, both by the player controller: `is_fire_just_pressed()` (a click: one round) and `is_fire_pressed()`
 (held: an automatic gun keeps firing, `Character.is_automatic()`); no new action, so rebinding `FIRE` moves both.
@@ -72,7 +81,7 @@ defaults, as `{ "key": int }` / `{ "mouse": int }`; malformed entries are skippe
 `settings.gd` (`class_name Settings`, a static holder like the config holders — no instance, no autoload)
 keeps the **Debug** switch (`Settings.debug`, the master switch for the AI overlays), the setup window's last choices, the overlay
 toggles and the key-binding overrides in one JSON file, `Settings.path` (`user://settings.json`):
-`{ "debug": bool, "setup": { side, seed, defenders, invaders }, "overlays": { show_<x>: bool }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
+`{ "debug": bool, "setup": { side, seed, lead, defenders, invaders }, "overlays": { show_<x>: bool }, "keybinds": { action: { "key": int } | { "mouse": int } } }`. Only differences from
 the defaults are stored, so a changed default still reaches an action the player never touched.
 - **`load_file()`** resets every binding, applies the saved overrides and takes the saved `debug`, `setup` and `overlays`; a
   missing file keeps the defaults, an unreadable one `push_warning`s and does the same, and a file that
@@ -80,7 +89,7 @@ the defaults are stored, so a changed default still reaches an action the player
 - **Main calls it, not `Keybinds._ready`**, once in `_ready` (after seeding `Settings.debug` from its own
   export), so the headless test runner — which never loads `main.tscn` — never reads a developer's file.
 - **`Settings.setup`** holds the match-setup window's last choices (`set_setup(config)` saves them, dropping the
-  start `mode`; each side's dict is kept whole: count, loadout and `outfit`); Main feeds it back into the window so it reopens as it was left.
+  start `mode`; `lead`, "Lead the team", is kept; each side's dict is kept whole: count, loadout and `outfit`); Main feeds it back into the window so it reopens as it was left.
 - **`Settings.overlays`** holds the toggle bar's switches (`set_overlay(flag, on)` saves one); Main seeds the overlays from it.
 - **Mutators save at once:** `set_debug(on)`, `set_setup(config)`, `set_overlay(flag, on)`, `rebind(action, event) -> bool`, `reset(action)`,
   `reset_all()` (leaves `debug`). `binding_rows()` reshapes the bindings into the plain dicts the settings
@@ -183,4 +192,4 @@ human `Player` and `DebugUI`, points the camera at every combatant in framing mo
 for watching and regression-testing both AI agent-types (defender and invader). Composition-root
 wiring lives in `main.gd`; the General observers only read published contracts.
 
-**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`, `DrawLayers`, `LightMasks`), 14 (`Settings`, the dev command server), 15 (`GameLog`), 19 (the camera's `vehicle().view_zoom_out()`, `USE_VEHICLE`) — signatures in `architecture`.
+**Interfaces:** 7 (the `Keybinds` consumers and observers), 10 (EventBus), 11 (`PhysicsLayers`, `DrawLayers`, `LightMasks`, `GameClock`), 14 (`Settings`, the dev command server), 15 (`GameLog`), 19 (the camera's `vehicle().view_zoom_out()`, `USE_VEHICLE`) — signatures in `architecture`.

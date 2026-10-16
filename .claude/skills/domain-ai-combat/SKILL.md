@@ -15,7 +15,7 @@ the world only through the perception (`has_line_to`, `combat_spots`, `note_enga
 (cooldown), `begin_fight()` (reset to the peek phase), `can_fire_at(target)` (a
 loaded gun, the known contact in range on a clear line: a shot is on), `fire_at_will(target)`
 (shoot it when `can_fire_at`, once facing settles; aims at it; the watch stage calls it for the threat in every primitive, `domain-ai-watch`), `reload_due()`, `has_line_of_fire(target) -> bool` (in range on a clear line, whatever the gun's state; what `can_fire_at` adds a loaded gun to, and the entry reads for E14), `top_off() -> bool` (a tactical reload of a part-spent gun, called by the entry at the stack: starts it, true while it runs or is wanted; `docs/tactical-entry.md` E11), `ambush(node, pos)`,
-`peek_cover(delta, node, pos, hold_ground)`, `melee(pos, hold_ground)`, `shoot() -> bool`, `strike()` / `punch()` / `kick()`,
+`peek_cover(delta, node, pos, hold_ground, room := "")`, `melee(pos, hold_ground)`, `shoot() -> bool`, `strike()` / `punch()` / `kick()`,
 `continue_burst()`, `apply_back_off(delta)`, `reload_if_dry()`; `signal dry`
 (an empty gun was pulled on — `Behavior` flags the task resolved so the controller re-decides). Tunables (copied from the controller
 exports): `shoot_range`, `punch_range`, `combat_ring_radius` / `combat_ring_count` (the ring of candidate spots), `cover_time`,
@@ -28,7 +28,9 @@ smoothly. A peek shoots only once the facing has settled on the contact (`AIM_TO
 of an empty gun, where the cover phase reloads it), not after a refused one. **Ambush** holds the covered spot and fires the moment a line opens (facing settled). **Melee** closes to `punch_range` and strikes on the
 cooldown (no cover cycle): `Combat.strike` kicks (`Combat.kick`, `Character.leg_kick()`) while standing with a gun in hand, so the gun stays in hand,
 and otherwise (crouched, or no gun held) equips the fists and punches (`Combat.punch`). With `hold_ground` (a territorial NPC fighting a contact outside), spots are restricted to inside
-the house, the peek fallback holds instead of advancing, and melee won't chase out of the house.
+the house, the peek fallback holds instead of advancing, and melee won't chase out of the house. With a `room` (a member ordered to defend
+it, `docs/leadership.md` LD8) the peek and cover spots are restricted to inside that room whatever the contact, and `hold_ground` is set
+against a contact outside the room.
 
 **No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
 lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
@@ -48,7 +50,7 @@ bulletproof though a rifle shoots through them.
 
 **Throwing a grenade** (`begin_throw(slot, spot, reach, from := Vector2.INF)`, `throw_step(delta)`, `throw_released()`, `end_throw()`; `throw_stage` `""` / `"walk"` / `"aim"` / `"windup"` / `"away"`): the `throw` primitive's hands (`docs/grenades.md` G17), also used by the
 bang entry's thrower. `reach` is how far from the spot it lets go (`AgentPerception.grenade_reach`: the range less `AgentThrow.REACH_SLACK` 15 px). With a throw spot `from` (issue #51 R13) it first walks all the way to it (`"walk"`, `THROW_SPOT_REACH` 6 px: the lob was judged from there), the gun still in hand (the watch stage keeps its eyes and gun on a threat; the caller's commit timer and the locomotion's held walk bound the walk). Then standing still (but for the last few px: a thrower farther than `reach` from the spot, because it moved on since the spot was offered, walks toward it first, within the same `THROW_START_CAP`; the bang's thrower plans a spot already within the reach), it selects the grenade's slot (`select_slot`), aims at the spot (`aim_point`; the item throws to `Character.aim_target()`) and clicks `shoot()` once the facing has settled (`_faces`); `shoot()` answers true when the
-throw STARTS (`GrenadeItem.secondary`), not for a round leaving a barrel. It gives up after `THROW_START_CAP` (2 s) without a start or `THROW_RELEASE_CAP` (1.5 s) without the grenade leaving the hand (`throw_step` returns `&"failed"`).
+throw STARTS (`GrenadeItem.secondary`), not for a round leaving a barrel. It never reads the contact: it throws onto the spot it was handed, and `Behavior` keeps the order (and so that spot) when the contact ages out on the way, and ends it (the NPC re-decides) when that hostile dies before the wind-up (G17). It gives up after `THROW_START_CAP` (2 s) without a start or `THROW_RELEASE_CAP` (1.5 s) without the grenade leaving the hand (`throw_step` returns `&"failed"`).
 `throw_released` is true once, on the tick the carried count has dropped (the wind-up is over); it takes the gun back in hand (`select_slot(gun_slot())`, a last grenade empties its slot by itself). It is polled by `Behavior.poll_throw`
 before the evade reflex gets its plan, since the grenade just thrown is a live one the thrower may be inside the zone of.
 

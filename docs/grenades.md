@@ -265,7 +265,13 @@ in the state and the ADVANCE option, for a few seconds, `flashed` in memory). A 
 with the gun in hand and shoots what it can. The NPC decided on a snapshot of a moment ago, so when the order is adopted it may stand a few px past its range
 of the spot: it then closes in until it is 15 px inside it (`AgentThrow.REACH_SLACK`) and throws (it does not give the throw up and flap in and out of the offer at
 the edge of the range). The throw is dropped, and the NPC re-decides, if the lob has become impossible (blocked by something taller than a lob clears) by the
-time the wind-up starts; once the wind-up has begun the throw is committed and radioed whatever happens to the line meanwhile.
+time the wind-up starts; once the wind-up has begun the throw is committed and radioed whatever happens to the line meanwhile. The throw order keeps
+the spot it was offered on (the hostile's last-known spot) when that contact ages out on the way (out of sight past `contact_memory_ttl` while it walks
+to a throw spot, or while the entry guard's detour on that walk secures a doorway): losing the contact is not a change of belief that re-decides (the
+order keeps its hostile in the salient key while it runs, and while a detour has paused it), so the walk goes on, the detour hands the throw back and the
+grenade goes onto that spot. A new hostile still re-decides, and so does the death of the hostile the throw was offered on: a dead character is no
+contact and no lost hostile, so it leaves the salient key, and a throw not yet in its wind-up whose hostile the NPC no longer knows of at all ends then
+and there, so no grenade goes onto a body while the next decision is on its way.
 Options are `frag` and `stun`. What the AI knows of a grenade it has not thrown yet (how far it throws, its blast or flash radius, its fuse, how
 near furniture must be to shield from a flash) it reads off the grenades it carries, `Character.throw_stats(slot)` (G1), and off a live one it sees
 (`ThrownGrenade.throw_stats()`); it keeps no mirror of the numbers, so retuning a `GrenadeConfig` row retunes the AI (the tests
@@ -288,7 +294,10 @@ scripted, `ai/combat/locate_not_into_shots_room` (shot at from the kitchen: GREN
 (shot at from the open garden: LOCATE offered); the throw spots (R13, R15): `ai/grenade/grenade_throw_spot_out_of_range` (scripted: an invader 640 px from a
 hidden hostile walks to a throw spot and throws; with a frag whose zone reaches past the throw range the throw spot is tagged `no_safe_spot`),
 `ai/grenade/grenade_throw_spot_round_wall` (scripted: an invader that saw the householder through the back door is behind the house wall, with no lob,
-when it first decides (the premise: Von down for the question asked in sight): the throw from a spot at the back doorway),
+when it first decides (the premise: Von down for the question asked in sight): the throw from a spot at the back doorway, kept through the entry guard's
+detour at the back door after the contact has aged out, and the stun on the householder's spot),
+`ai/grenade/grenade_throw_target_killed_redecides` (scripted, the same premise: the householder killed while the invader walks to its throw spot, a new
+decision at once and nothing thrown),
 `ai/grenade/grenade_throw_spot_round_jamb` (scripted: the line from the invader's centre clears the back door's jamb, the lob from its hand does not:
 a throw spot, not in place, and the stun goes in), `ai/grenade/grenade_lob_follows_throw_stance` (scripted: the same with the `throw` stance retuned to
 the left hand, whose lob clears the jamb: thrown from where it stands), `ai/grenade/shots_origin_not_the_landing_room` (scripted: shot at in the kitchen

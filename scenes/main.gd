@@ -86,6 +86,13 @@ const NAV_UPDATER := preload("res://scenes/navigation/nav_updater.gd")
 const SPECTATOR_INSPECTOR := preload("res://scenes/ui/hud/spectator_inspector.gd")
 ## The floor markers of the human's place in an AI stack (world space, under `World`).
 const STACK_MARKERS := preload("res://scenes/ui/hud/stack_markers.gd")
+## One side's squad: its leader, succession and the orders its leader gives (`docs/leadership.md`, interface 21).
+const SQUAD := preload("res://scenes/ai/team/squad.gd")
+## The human leader's command menu (UI, a right-click pauses and orders the teammates) and the order markers on the floor (world space,
+## under `World`), built only when the human leads (`docs/leadership.md` LD11, LD12).
+const COMMAND_MENU := preload("res://scenes/ui/hud/command_menu.gd")
+const ORDER_MARKERS := preload("res://scenes/ui/hud/order_markers.gd")
+const LEADER_OVERLAY := preload("res://scenes/ui/overlays/leader_overlay.gd")
 const STUN_SCREEN := preload("res://scenes/ui/hud/stun_screen.gd")
 ## The overlay table (UI) and the in-game bar of toggle buttons built from it.
 const OVERLAY_REGISTRY := preload("res://scenes/ui/overlays/overlay_registry.gd")
@@ -114,6 +121,10 @@ var _anchor: Vector2 = Vector2.ZERO
 var _world: Node2D = null
 ## Endless run: on while the setup window's Endless button chose it.
 var _endless: bool = false
+## "Lead the team" (the setup window's `lead`, a played match only): the human leads its side's squad and orders it.
+var _lead: bool = false
+## This match's squads (`ai/team/squad.gd`), by faction.
+var _squads: Dictionary = {}
 ## Endless run: the highest defender / invader counts a random match may draw (the counts chosen in setup).
 var _endless_max := { "defenders": 1, "invaders": 1 }
 ## Endless run: seconds left until the next match (-1 while a match is being played).
@@ -126,6 +137,8 @@ var _overlay_flags: Dictionary = {}
 var _inspector: Node = null
 ## The world-space navigation-hole overlay, one of the two overlays that aren't per NPC.
 var _nav_debug: Node2D = null
+## The squad-leaders debug overlay (one per match, under `World`): a crown over each side's leader while `show_leaders` is on.
+var _leader_overlay: Node2D = null
 ## The performance overlay (the other global overlay); null when Debug is off.
 var _perf_overlay: CanvasLayer = null
 ## The overlay toggle bar (built once, kept across an endless run's matches); null when Debug is off.
@@ -212,6 +225,7 @@ func _on_setup_chosen(config: Dictionary) -> void:
 	var mode := str(config.get("mode", "play" if not spectator_mode else "watch"))
 	spectator_mode = mode != "play"
 	_endless = mode == "endless"
+	_lead = not spectator_mode and bool(config.get("lead", false))
 	player_side = StringName(config.get("side", player_side))
 	house_seed = int(config.get("seed", house_seed))
 	defender_count = int(_side_value(config.get("defenders"), "count", defender_count))
@@ -401,6 +415,10 @@ func _spawn_world() -> void:
 		_build_stack_markers(rooms)
 		_build_stun_screen()
 	_arm_characters(combatants)
+	_build_squads(combatants, rooms)
+	_build_leader_overlay()
+	if not spectator_mode and is_instance_valid(_player):
+		_build_command_menu(rooms)
 	_configure_debug()
 	_begin_match_hud(combatants)
 	if spectator_mode:
@@ -423,7 +441,8 @@ const STYLE_SEED_SALT := 0x4C4F4F4B
 ## build their own characters and never come through here, so they keep the weapon they ask for.
 ## Each is styled as it is armed (`docs/outfits.md`, styles), from its own draws off the house seed: the invaders (the human
 ## invader too) are one police unit drawn for the match (the first draw), its first the lead and its second the sergeant; each
-## defender is drawn one of the defenders' styles, a look seed of its own and one of its style's weapon styles.
+## defender is drawn one of the defenders' styles, a look seed of its own and one of its style's weapon styles. A human invader who
+## leads ("Lead the team") is the unit's lead instead, and the NPC invaders are ranked from the sergeant down; the draws are the same.
 func _arm_characters(characters: Array) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = house_seed ^ LOADOUT_SEED_SALT
@@ -432,7 +451,8 @@ func _arm_characters(characters: Array) -> void:
 	var units := _styles_of(INVADER_FACTION)
 	var crews := _styles_of(DEFENDER_FACTION)
 	var unit: StringName = units[looks.randi() % units.size()] if not units.is_empty() else CharacterConfig.default_style
-	var rank := 2  # The unit's first is its lead, the next its sergeant, the rest troopers.
+	var human_lead: bool = _lead and is_instance_valid(_player) and characters.has(_player) and _player.get("faction") == INVADER_FACTION
+	var rank := 1 if human_lead else 2  # The unit's first is its lead, the next its sergeant, the rest troopers.
 	for character in characters:
 		var defending: bool = character.get("faction") == DEFENDER_FACTION
 		var look: StringName = unit
@@ -440,12 +460,69 @@ func _arm_characters(characters: Array) -> void:
 			look = crews[looks.randi() % crews.size()]
 		var weapons: Array = CharacterConfig.styles[look].get("weapons", [&"police"])
 		var style := { "look": look, "seed": looks.randi(), "weapon": weapons[looks.randi() % weapons.size()] }
-		if not defending:
+		if not defending and human_lead and character == _player:
+			style["rank"] = 2
+		elif not defending:
 			style["rank"] = rank
 			rank = maxi(rank - 1, 0)
 		var gun := LoadoutConfig.apply(character, defender_loadout if defending else invader_loadout, rng, style)
 		if gun != &"":
 			GameLog.say("%s is armed with the %s" % [character.name, character.item_name()])
+
+
+## One squad per side over `combatants` (in spawn order) and the house's `rooms`, under `World`, each NPC handed its own (`MatchSpawner.bind_squad`;
+## `docs/leadership.md` LD3): the leader by the squad's rule (rank, then spawn order), so after `_arm_characters` has ranked the unit;
+## the human's side is led by the human when it leads ("Lead the team").
+func _build_squads(combatants: Array, rooms: Array) -> void:
+	_squads = {}
+	for faction in [DEFENDER_FACTION, INVADER_FACTION]:
+		var members: Array = combatants.filter(func(c): return is_instance_valid(c) and c.get("faction") == faction)
+		if members.is_empty():
+			continue
+		var squad: Node = SQUAD.new()
+		squad.name = "Squad_%s" % faction
+		_world.add_child(squad)
+		var human: Node = _player if _lead and is_instance_valid(_player) and members.has(_player) else null
+		squad.setup(faction, members, _spawner.openings, rooms, human)
+		for member in members:
+			_spawner.bind_squad(member, squad)
+		_squads[faction] = squad
+
+
+## The squad-leaders debug overlay under `World`, watching every squad's `view()`, shown while the overlay bar's `show_leaders` is on.
+func _build_leader_overlay() -> void:
+	_leader_overlay = LEADER_OVERLAY.new()
+	_leader_overlay.name = "LeaderOverlay"
+	_world.add_child(_leader_overlay)
+	_leader_overlay.watch(_squads.values().map(func(squad): return squad.view))
+	_leader_overlay.show_leaders = _overlay_flags.get(OVERLAY_REGISTRY.LEADERS, false)
+
+
+## When the human leads its squad (interface 21, `docs/leadership.md` LD11, LD12): the command menu, set up with the house's `rooms`,
+## the human's teammates and the squad's `view()` and `resolve()`, its `order_requested` handed to the squad's `issue`; and the order markers
+## under `World`, watching the same view and showing the menu's selection. Nothing is built, and nothing reads the COMMAND key, otherwise.
+func _build_command_menu(rooms: Array) -> void:
+	if not _lead or not is_instance_valid(_player):
+		return
+	var squad: Node = _squads.get(_player.get("faction"))
+	if squad == null or squad.leader() != _player:
+		return
+	var markers: Node2D = ORDER_MARKERS.new()
+	markers.name = "OrderMarkers"
+	_world.add_child(markers)
+	markers.watch(squad.view)
+	var menu: CanvasLayer = COMMAND_MENU.new()
+	menu.name = "CommandMenu"
+	_world.add_child(menu)
+	menu.setup({
+		"rooms": rooms,
+		"teammates": squad.members().filter(func(m): return m != _player),
+		"view": squad.view,
+		"resolve": squad.resolve,
+		"leader": _player,
+	})
+	menu.order_requested.connect(squad.issue)
+	menu.selection_changed.connect(markers.set_selection)
 
 
 ## The styles (`CharacterConfig.styles` keys) of the side `faction` fights on, in table order.
@@ -467,8 +544,10 @@ func _teardown_world() -> void:
 	_world = null
 	Sound.focus = null  # nobody's ears until the next match names the human
 	_spawner = null
+	_squads = {}
 	_inspector = null
 	_nav_debug = null
+	_leader_overlay = null
 
 
 ## Start the match HUD on `combatants` (every character in the match, a human included, so a result is
@@ -633,7 +712,7 @@ func _configure_debug() -> void:
 
 
 ## A toggle-bar button was pressed: record the flag and apply it live. The navigation holes go to the single
-## NavDebug node and the performance flag to the performance overlay; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
+## NavDebug node, the squad leaders to the single LeaderOverlay and the performance flag to the performance overlay; spectator mode hands the flag to the inspector (it shows overlays on the selected NPC
 ## only); in player mode every NPC's overlay takes it directly.
 func _on_overlay_toggled(flag: String, on: bool) -> void:
 	_overlay_flags[flag] = on
@@ -642,6 +721,9 @@ func _on_overlay_toggled(flag: String, on: bool) -> void:
 		if is_instance_valid(_nav_debug):
 			_nav_debug.show_holes = on
 			_nav_debug.queue_redraw()
+	elif flag == OVERLAY_REGISTRY.LEADERS:
+		if is_instance_valid(_leader_overlay):
+			_leader_overlay.show_leaders = on
 	elif flag == OVERLAY_REGISTRY.PERF:
 		if is_instance_valid(_perf_overlay):
 			_perf_overlay.set_shown(on)

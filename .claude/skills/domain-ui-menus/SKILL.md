@@ -1,15 +1,17 @@
 ---
 name: domain-ui-menus
-description: Deep implementation detail for the UI menus sub-domain (scenes/ui/menus/) — the pre-game setup window (Play as, seed, per-side count/weapon/magazine/spares/grenades/outfit, Start / Watch / Endless / Tests / Settings buttons, remembered choices) and the settings page (Debug switch + key rebinding with capture). Use when editing scenes/ui/menus/ or working on the setup menu, its start config, the settings page or key rebinding UI. Plain-data windows that only emit signals. Complements the `domain-ui` overview and the `architecture` skill (interfaces 13, 14).
+description: Deep implementation detail for the UI menus sub-domain (scenes/ui/menus/) — the pre-game setup window (Play as, Lead the team, seed, per-side count/weapon/magazine/spares/grenades/outfit, Start / Watch / Endless / Tests / Settings buttons, remembered choices) and the settings page (Debug switch + key rebinding with capture). Use when editing scenes/ui/menus/ or working on the setup menu, its start config, the settings page or key rebinding UI. Plain-data windows that only emit signals. Complements the `domain-ui` overview and the `architecture` skill (interfaces 13, 14).
 ---
 
 # UI · Menus sub-domain (`scenes/ui/menus/`)
 
 Two full-screen, code-built windows that take **plain data** and only emit signals — they know nothing of `Items`, `Keybinds` or `Settings`; Main (the composition root) feeds them dicts and applies what they report. See `domain-ui` for what all UI scripts share.
 
-- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, defenders, invaders, weapons, grenades, outfits, ticket })` shows a
+- `setup_menu.gd` — the **pre-game setup window** (`SetupMenu` node). `open({ side, seed, lead, defenders, invaders, weapons, grenades, outfits, ticket })` shows a
   full-screen modal (40 px margins, VBox separation 20, the controls in a `ScrollContainer` fitted to the window
-  height) with: a "Play as" dropdown (Defender / Invader), a "Seed" text field (blank = random), two side
+  height) with: a "Play as" dropdown (Defender / Invader), a **Lead the team** checkbox under it (`LeadCheck`, 30pt, off unless the defaults' `lead`
+  ticks it; for Start only, the human then leads its side and orders it from the command menu: `docs/leadership.md` LD10; Main ignores it for
+  Watch and Endless), a "Seed" text field (blank = random), two side
   columns (Defenders | Invaders) each with Count, Weapon, Magazine, Spares and a Stun and a Frag count row (0 to 3; Main passes the rows as `grenades`, `[{ id, label, max }]`,
   from `LoadoutConfig.grenade_options()`, else the window's own two rows, which name no cap and count up to the window's `_MAX_COUNT`; a side reports them as `stuns` / `frags`; they come with the weapon rows) (the Weapon / Magazine
   choices arrive as plain data in `weapons`, `[{ id, label, magazines: [{ id, label }] }]`, from Main — the window
@@ -24,12 +26,12 @@ Two full-screen, code-built windows that take **plain data** and only emit signa
   (`docs/outfits.md` O11b). And three start buttons: **Start** (play as the chosen
   side), **Watch** (AIs alone) and **Endless** (AIs alone, a fresh randomised match after each). (The Debug switch
   lives on the settings page.) A non-blank `ticket` in the defaults shows as a "TicketLabel" (32pt,
-  muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed,
+  muted) above the title. Pressing a start button emits `start_requested({ mode: "play"|"watch"|"endless", side, seed, lead,
   defenders: { count, weapon, magazine, spares, stuns, frags, outfit }, invaders: { … } })`. Main opens it on a fresh launch; a scripted `restart` sets the
   Engine `skip_setup` meta so the harness bypasses it. Title 64pt; controls 30pt (`_FONT`; `_option_row` takes an optional font size); column headings 36pt; the Tests and Settings buttons 28pt;
   Start button 32pt. A **Tests** button (28pt) below Start emits `tests_requested`; Main changes scene to
 the test browser. `current_config() -> Dictionary` returns the same
-  `{ side, seed, defenders, invaders }` as the window stands (empty before `open`); Main saves it through
+  `{ side, seed, lead, defenders, invaders }` as the window stands (empty before `open`); Main saves it through
   `Settings.set_setup` on Start, on Tests and on Escape, and feeds `Settings.setup` back into `open`'s defaults, so the
   window reopens as it was left. Pressing a start button also **disables all three**, because Main may hold the start
   open for a moment (it waits for the Von decision server) and a second press would build the world

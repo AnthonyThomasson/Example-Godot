@@ -2,8 +2,9 @@ extends CanvasLayer
 
 ## UI domain, pre-game setup window: a modal shown before the match starts so a human can choose
 ## the run's parameters — which side they play, how many defenders and invaders spawn and what each
-## side carries — then pick how to run it: **Start** (play as the chosen side), **Watch** (the AI
-## alone) or **Endless** (the AI alone, a fresh randomised match after each one ends). Hands the choice
+## side carries, and whether the human leads its side ("Lead the team", for Start only) — then pick how to run it: **Start**
+## (play as the chosen side), **Watch** (the AI alone) or **Endless** (the AI alone, a fresh randomised match after each one
+## ends). Hands the choice
 ## back to Main, which builds the world. Built entirely in code (no scene-side layout), like the other
 ## UI HUDs.
 ##
@@ -13,7 +14,7 @@ extends CanvasLayer
 ## dicts it is given and emits (the weapon, grenade and outfit choices arrive as plain data in `open`).
 
 ## Emitted when a start button is pressed, carrying the chosen parameters:
-## `{ mode: "play"|"watch"|"endless", side: "defender"|"invader", seed: int,
+## `{ mode: "play"|"watch"|"endless", side: "defender"|"invader", seed: int, lead: bool,
 ##    defenders: { count, weapon, magazine, spares, stuns, frags, outfit: { <slot>: "<id>" } }, invaders: { ... } }`.
 ## Main applies these and builds the world.
 signal start_requested(config: Dictionary)
@@ -32,6 +33,7 @@ const _OUTFIT_FONT := 24  ## The outfit dropdowns' font size: smaller, so a side
 
 var _side_option: OptionButton      ## Which side a human plays (for Start).
 var _seed_edit: LineEdit            ## The level seed; blank/0 = a fresh random seed each run.
+var _lead_box: CheckBox             ## "Lead the team": the human leads its side's squad (Start only; Main ignores it otherwise).
 var _side_rows := {}                ## "defenders"/"invaders" -> { count, weapon, magazine, spares, magazine_row } controls.
 var _weapons: Array = []            ## Weapon choices `[{ id, label, magazines: [{ id, label }] }]` handed in by Main.
 var _grenades: Array = _GRENADES    ## Grenade count rows `[{ id, label, max }]` (`max` optional): a side's count of each is reported as `<id>s`.
@@ -45,7 +47,7 @@ var _status: Label                  ## Status line Main shows while it holds the
 
 
 ## Build the window seeded from `defaults` and show it. Keys (all optional): `side` ("defender" /
-## "invader"), `seed`, `defenders` / `invaders` (each `{ count, weapon, magazine, spares, stuns, frags }`, or a bare
+## "invader"), `seed`, `lead` (whether "Lead the team" starts ticked; off when absent), `defenders` / `invaders` (each `{ count, weapon, magazine, spares, stuns, frags }`, or a bare
 ## count; a side may also carry `outfit`, `{ <slot>: id }`), `weapons` (the choices described at `_weapons`; empty = no
 ## weapon rows, nor grenade rows), `grenades` (the grenade rows described at `_grenades`), `outfits` (the rows described at
 ## `_outfits`; empty = no outfit rows) and `ticket` (a non-blank one is shown above the title). Called by Main before the
@@ -118,6 +120,9 @@ func _build_ui(defaults: Dictionary) -> void:
 
 	_side_option = _option_row(box, "Play as", ["Defender", "Invader"], _SIDES.find(str(defaults.get("side", "defender"))))
 	_side_option.name = "SideOption"
+	_lead_box = _check_row(box, "Lead the team", bool(defaults.get("lead", false)))
+	_lead_box.name = "LeadCheck"
+	_lead_box.tooltip_text = "Start only: you lead your side. Right-click in the match to order your teammates."
 
 	_seed_edit = _seed_row(box, int(defaults.get("seed", 0)))
 
@@ -301,6 +306,23 @@ func _option_row(parent: Control, label_text: String, items: Array, selected: in
 	return option
 
 
+## A checkbox row (`text`, ticked when `on`, the label column left empty so it lines up with the rows above), added to `parent`;
+## returns the CheckBox.
+func _check_row(parent: VBoxContainer, text: String, on: bool) -> CheckBox:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(160, 0)
+	row.add_child(spacer)
+	var check := CheckBox.new()
+	check.text = text
+	check.button_pressed = on
+	check.add_theme_font_size_override("font_size", _FONT)
+	row.add_child(check)
+	parent.add_child(row)
+	return check
+
+
 ## A labelled seed row (label + LineEdit), added to `parent`; returns the LineEdit so the caller can
 ## read it on Start. Prefilled with `value` unless it is 0, which shows as blank (= random).
 func _seed_row(parent: VBoxContainer, value: int) -> LineEdit:
@@ -373,7 +395,7 @@ func _side_config(rows: Dictionary) -> Dictionary:
 	return config
 
 
-## The window's choices as they stand: `{ side, seed, defenders, invaders }` (the shape `start_requested`
+## The window's choices as they stand: `{ side, seed, lead, defenders, invaders }` (the shape `start_requested`
 ## carries, without `mode`). Main reads it to remember them when the window is left without starting.
 ## Empty until `open` has built the controls.
 func current_config() -> Dictionary:
@@ -382,6 +404,7 @@ func current_config() -> Dictionary:
 	return {
 		"side": _SIDES[_side_option.selected],
 		"seed": _seed_edit.text.strip_edges().to_int(),
+		"lead": _lead_box.button_pressed,
 		"defenders": _side_config(_side_rows["defenders"]),
 		"invaders": _side_config(_side_rows["invaders"]),
 	}

@@ -48,7 +48,7 @@ func run(t: TestContext) -> void:
 					mismatches += 1
 					t.check(false, "batch %d write %d: %s" % [batch, w, mid])
 		if batch % 4 == 3:
-			OS.delay_msec(70)  # Every 0.05 s event written so far has expired; nothing is near its deadline.
+			await t.frames(5)  # 83 ms of game time: every 0.05 s event written so far has expired; nothing is near its deadline.
 		var after := _compare(real, plain, rng)
 		checked += 1
 		if after != "":
@@ -109,7 +109,7 @@ class PlainLog:
 				var old: Dictionary = _entries[i]
 				if old["topic"] == topic and old["key"] == key:
 					_entries.remove_at(i)
-		var at := Time.get_ticks_msec()
+		var at := GameClock.msec()
 		var life: float = ttl
 		_entries.append({ "topic": topic, "key": key, "data": data, "at": at, "ttl": life })
 		if life > 0.0:
@@ -117,7 +117,7 @@ class PlainLog:
 		_prune()
 
 	func age_of(topic: StringName, field: String, value: Variant) -> float:
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for i in range(_entries.size() - 1, -1, -1):
 			var entry: Dictionary = _entries[i]
 			if entry["topic"] == topic and not _expired(entry, now) and entry["data"].get(field) == value:
@@ -126,7 +126,7 @@ class PlainLog:
 
 	func recall_aged(topic: StringName) -> Array:
 		var out: Array = []
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for i in range(_entries.size() - 1, -1, -1):
 			var entry: Dictionary = _entries[i]
 			if entry["topic"] == topic and not _expired(entry, now):
@@ -137,14 +137,14 @@ class PlainLog:
 		return _entries.size()
 
 	func is_fresh(topic: StringName) -> bool:
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for entry in _entries:
 			if entry["topic"] == topic and not _expired(entry, now):
 				return true
 		return false
 
 	func recall(topic: StringName) -> Dictionary:
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for i in range(_entries.size() - 1, -1, -1):
 			var entry: Dictionary = _entries[i]
 			if entry["topic"] == topic and not _expired(entry, now):
@@ -153,7 +153,7 @@ class PlainLog:
 
 	func recall_all(topic: StringName) -> Array:
 		var out: Array = []
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for i in range(_entries.size() - 1, -1, -1):
 			var entry: Dictionary = _entries[i]
 			if entry["topic"] == topic and not _expired(entry, now):
@@ -162,14 +162,14 @@ class PlainLog:
 
 	func fresh() -> Array:
 		var out: Array = []
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		for i in range(_entries.size() - 1, -1, -1):
 			if not _expired(_entries[i], now):
 				out.append(_entries[i])
 		return out
 
 	func _prune() -> void:
-		var now := Time.get_ticks_msec()
+		var now := GameClock.msec()
 		if now >= _earliest_expiry:
 			var live: Array = []
 			var earliest := INF

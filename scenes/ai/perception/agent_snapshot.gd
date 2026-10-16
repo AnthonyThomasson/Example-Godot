@@ -132,6 +132,7 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"hurt": dmg >= vocab.hurt_threshold,
 		"inside": not SnapshotVocab.room_at(self_pos, rooms).is_empty(),
 		"exposed": line.get("clear", false) or (primary.is_empty() and _memory.under_fire()),
+		"ordered": not (knowledge["order"] as Dictionary).is_empty(),
 	}
 	var sections := {
 		"goal": fill_goal(goal),
@@ -144,6 +145,7 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"allies": per_sections[primary["id"]]["allies"] if not primary.is_empty() else _sections.allies_text(ctx, {}, {}),
 		"flanks": per_sections[primary["id"]]["flanks"] if not primary.is_empty() else "",
 		"awareness": _sections.awareness_text(self_pos, not hostiles.is_empty()),
+		"order": _sections.order_text(knowledge["order"], rooms),
 	}
 	var options := {
 		"per_target": per_target,
@@ -159,7 +161,9 @@ func build(rooms: Array, goal: String, activity: String, known: Array, callouts:
 		"explore": _options.explore_group(ctx, rooms, entered),
 		"interactions": _options.interaction_group(self_pos),
 		"rooms": _options.room_group(ctx, known_rooms, rooms),
+		"order": _options.order_group(ctx, knowledge["order"], rooms),
 	}
+	SnapshotOptions.tag_rooms(options, rooms)
 	return { "facts": facts, "sections": sections, "sections_per_target": per_sections, "options": options,
 		"gun": vocab.gun_noun(gun) }
 

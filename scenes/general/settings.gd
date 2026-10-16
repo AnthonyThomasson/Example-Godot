@@ -15,7 +15,7 @@ static var path: String = "user://settings.json"
 ## Master switch for the AI debug overlays and their in-game toggle bar. Main seeds it from its own
 ## export before `load_file()`, so a file that doesn't name it leaves that value standing.
 static var debug: bool = true
-## The match-setup window's last choices (`{ side, seed, defenders, invaders }`, plain data as the window emits
+## The match-setup window's last choices (`{ side, seed, lead, defenders, invaders }`, plain data as the window emits
 ## them), so it reopens the way it was left. Empty until something has been chosen.
 static var setup: Dictionary = {}
 ## The overlay toggle bar's last states (`{ show_<x>: bool }`), so the overlays reopen as they were left. Only
@@ -72,7 +72,7 @@ static func set_debug(on: bool) -> void:
 ## it reopens with are kept, not the start `mode`) and save.
 static func set_setup(config: Dictionary) -> void:
 	setup = {}
-	for key in ["side", "seed", "defenders", "invaders"]:
+	for key in ["side", "seed", "lead", "defenders", "invaders"]:
 		if config.has(key):
 			setup[key] = config[key]
 	save()

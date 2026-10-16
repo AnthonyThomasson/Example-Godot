@@ -313,8 +313,8 @@ finding, not as the doctrine gap. Their maps: the box room (`Maps.box_room`, `En
 
 **Doorway views (E18, tag `door_view`).** `tests/_ai/door_view_probe.gd` (`const View := preload(...)`) holds the test's own copy of a doorway's view (`polygon`, `in_view`: the
 spec numbers `DEPTH` 450, `AVOID_RATIO` 2.0, `AVOID_SLACK` 300, `PASS_CLEAR_TIME` 60 are consts there, so a test checks the plan and not the code) and the reads on a `watch` sample
-set (`first_in_view`, `time_in_view`, `longest_pause_in_view`, `axis_crossed_at`, `crossing_span`, `time_covering`), plus `wait_wall` (the memory ages on the wall clock, which a headless run outpaces: it paces
-the sim to real time). The tests: `entry_route_round_door_view_outside` / `_inside`, `entry_secure_exterior_door_then_cross`, `entry_pass_far_out_secured` (real Von, gunfire heard as the premise),
+set (`first_in_view`, `time_in_view`, `longest_pause_in_view`, `axis_crossed_at`, `crossing_span`, `time_covering`), plus `wait_wall` (waits until a span has passed both on the wall clock and in sim time, pacing the sim
+to real time meanwhile; the memory ages on `GameClock`, so the sim-time half is the one that ages it). The tests: `entry_route_round_door_view_outside` / `_inside`, `entry_secure_exterior_door_then_cross`, `entry_pass_far_out_secured` (real Von, gunfire heard as the premise),
 `entry_cleared_room_pass_expires` (scripted, about 65 s of wall time) and `entry_route_band_as_walked` (scripted, the snapshot's wording); `navigation/avoid_map_carves_the_views` tests the map.
 `entry_split_stack_criss_cross` (E19, real Von) uses the view to check a split stack: two invaders at the back door from north and south, neither walking across the view.
 An invader that starts south of the back door outside its view (e.g. (990, 450)) and joins a stack on the north splits it (E19); a test that
@@ -348,6 +348,26 @@ not, its NPCs are set up in the frame the navmesh is baked. `tests/_ai/match_wor
 `SubViewport` with a `World2D` of its own (fresh maps, as each match's), bakes it, adds the re-baker, the invaders (`MatchSpawner.add_npc`) and
 the human (the player's character and controller, `MatchSpawner.bind_player`) in the same frame, and returns the nodes (they are not test actors:
 `Match.calls(t, speaker, step)` reads their radio). `tests/ai/stack/stack_ai_goes_round_player_in_slot` uses it.
+
+## Leadership tests (tag `leadership`)
+
+The rules are `docs/leadership.md` (LD1 to LD12, each with its tests named under it); `tools/run_tests.sh leadership` runs them, the three
+real-Von ones (`ai/decision/order_fight_then_resume`, `ai/combat/defend_room_stays_inside`, `ai/decision/von_request_across_pause`) with
+`--include-von --require-von`. They are spread by domain: the clock in `tests/ai/perception/clock_pauses` (LD1 also names
+`memory_matches_reference`, which is not tagged `leadership`), the order transport, ORDER node, progress radio and a refused order in `tests/ai/decision/` (`order_*`, and
+`unordered_state_unchanged`, which compares an unordered NPC's first walk and state text with the capture `unordered_state_unchanged.json`
+beside it), defending a room in `tests/ai/combat/defend_room_*`, the ordered stack in `tests/ai/entry/order_stack_*` (scripted, the Terrace
+house's back door), the squad and Main's wiring in `tests/general/` (`squad_leader_rule`, `squad_succession`, `squad_done_order_not_cancellable`, `lead_rank`,
+`command_menu_wiring`) and the UI in `tests/ui/` (`command_menu_items`, `command_menu_label_matches_order`, `order_markers_draw`, `leader_overlay_draw`,
+and `setup_menu_config`'s "Lead the team").
+The shared helper is `tests/_ai/order_probe.gd` (`const Order := preload(...)`; not a test): the squad built as Main builds it (`squad`,
+`raid`: invader actors led by a puppet standing in for the human, `bind` hands NPCs their squad), `issue` / `post` / `view` /
+`member_view` / `orders`, the brain's reads (`brain`, `ordered`, `decisions`, `primitive`, `params`, `on_order`, `levels`), the radio
+(`progress`, `ordered_claims`, `raw_calls`, `first_time`), `gunfire_near` (forces a decision without touching the brain),
+`pause_for(t, wall_s)` (holds the tree paused for that much wall time: the test clock stops with it), the command menu (`command_menu`,
+`items`, `item`, `labels`, `choose`, `tick`, `click`, `screen_of`) and the back door's click points (`BACK_NORTH`, `BACK_SOUTH`,
+`BACK_ON`, `BACK_INSIDE_NORTH`, `back_side`, `stack_point`, `stacked`), with the spec's numbers as consts (`ORDER_READY_CAP`). The squad,
+menu and markers are loaded by path and read duck-typed, so a missing piece fails an assertion that names it.
 
 ## Investigation tests (tag `investigate`)
 
@@ -412,8 +432,9 @@ asserts a behaviour the AI does not show yet is written first, left red and tagg
   within 55° of the NPC's line to the target, with no wall or pillar between. An ally outside it leaves
   `allies` empty and no rule fires. The lane rule also tests the NPC's *route*: a route that passes between an
   ally and the target is dropped, so place a held-side ally off the routes the test expects to be offered.
-- **Not testable here: TTL lapse.** Memory ages in wall-clock ms (`Time.get_ticks_msec`), which a headless
-  `--fixed-fps` run outruns, so a callout or contact never lapses in test time.
+- **TTL lapse is in sim time.** Memory ages on the game clock (`GameClock.msec()`, physics frames, `docs/leadership.md` LD1),
+  so a callout or contact lapses after its ttl of test time (`t.seconds`) as in the game, and not while the tree is paused
+  (`ai/perception/clock_pauses`).
 - **Flank point sampling** prefers any sampled point with a clear shot, so a "line blocked" scenario needs
   a barrier across the whole arc (a row of shelves), not one piece.
 
@@ -583,6 +604,9 @@ physics frame so they are in the space. `build` is a coroutine. Also `restore()`
 
 - **A body added this frame is not in the physics space.** A direct-space query (a shape query, a ray) on the frame a body was added
   misses it: it joins the broadphase at the next physics step (`TestWorld` waits one after placing vehicles).
+- **A click at a world point needs a still view.** The runner's camera eases in from where the previous test in the process left it
+  (and keeps easing while the tree is paused), and an injected mouse event is handled a frame after it was aimed, so a click aimed while
+  the view moves lands elsewhere: such a test first waits for the canvas transform to hold still (`ui/command_menu_items`, `_view_still`).
 - **A test camera reads its screen centre only while current.** Godot updates `Camera2D.get_screen_center_position()` only for the
   viewport's current camera, and the runner's own camera stays current: a test that adds its own camera and reads where it looks calls
   `make_current()` on it (`tests/general/camera_zooms_out_driving_test.gd`).

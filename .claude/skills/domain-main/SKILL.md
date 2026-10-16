@@ -1,6 +1,6 @@
 ---
 name: domain-main
-description: Deep implementation detail for the composition root (scenes/main.gd, scenes/main.tscn, scenes/match_spawner.gd) — the one place that wires every domain: the pre-game setup flow (Start / Watch / Endless / Tests / Settings), awaiting the Von decision server, building one match under a World node (house, nav map and re-baker, the dusk lighting, NPC placement, loadout arming, match HUD, spectator inspector, debug overlays), endless-run teardown and randomisation, the settings page wiring, and the Main exports. Use when editing main.gd or match_spawner.gd, or working on match start-up, spawn placement rules, loadout arming, the endless run or how the overlays are toggled. Complements the `architecture` skill (interfaces 1, 9, 13, 14, 20).
+description: Deep implementation detail for the composition root (scenes/main.gd, scenes/main.tscn, scenes/match_spawner.gd) — the one place that wires every domain: the pre-game setup flow (Start / Watch / Endless / Tests / Settings), awaiting the Von decision server, building one match under a World node (house, nav map and re-baker, the dusk lighting, NPC placement, loadout arming, the squads and the human leader's command menu, match HUD, spectator inspector, debug overlays), endless-run teardown and randomisation, the settings page wiring, and the Main exports. Use when editing main.gd or match_spawner.gd, or working on match start-up, spawn placement rules, loadout arming, the endless run or how the overlays are toggled. Complements the `architecture` skill (interfaces 1, 9, 13, 14, 20, 21).
 ---
 
 # Main — the composition root (`scenes/main.gd`, `main.tscn`, `match_spawner.gd`)
@@ -18,7 +18,8 @@ On a fresh launch Main loads the saved settings (`Settings.load_file()` after se
 runner never reads a developer's file), opens the UI setup window (`domain-ui-menus`) and builds nothing until a start button is pressed.
 A scripted `restart` (the dev command server) sets the Engine `skip_setup` meta so the reloaded scene builds at once. The window offers:
 
-- **Start** — a human joins the chosen side, on top of its NPC count, with the side's loadout and faction;
+- **Start** — a human joins the chosen side, on top of its NPC count, with the side's loadout and faction; with **Lead the team** ticked (the
+  window's `lead`, read in `_on_setup_chosen` into `_lead`, a played match only) the human leads its side's squad (`docs/leadership.md` LD10);
 - **Watch** — AIs alone (spectator mode);
 - **Endless** — AIs alone; 5 s after each match ends (the MatchHUD's `match_ended`) Main frees its `World` node and builds a fresh match with
   a new seed, random counts up to the chosen ones and random loadouts (`LoadoutConfig.random`: a gun and an outfit per side, the grenade counts it was
@@ -28,7 +29,7 @@ A scripted `restart` (the dev command server) sets the Engine `skip_setup` meta 
 The window gets `weapons`, `grenades` and `outfits` (`LoadoutConfig.options()` / `grenade_options()` / `outfit_options()`) and each side's defaults
 from `_side_defaults` (`LoadoutConfig.normalize` of the side's loadout, so `outfit` included); `_side_loadout` copies the window's `weapon`, `magazine`,
 `spares`, `stuns`, `frags` and `outfit` back into the side's loadout.
-Main saves the window's choices (`Settings.set_setup`, the outfit with them) on Start, Tests and Escape and feeds them back into the window's defaults
+Main saves the window's choices (`Settings.set_setup`, the outfit and `lead` with them) on Start, Tests and Escape and feeds them back into the window's defaults
 (`_with_saved_setup`: a choice an older save does not name, such as the outfit, keeps its default).
 Before `_spawn_world()` it **awaits the AI domain's `DecisionServerLauncher.resolved(live)`**, so no NPC makes its first decision against a
 still-booting Von server; the launcher is a root node of `main.tscn`, probes at scene load and always resolves (a run with no server still
@@ -58,10 +59,20 @@ Everything one match builds lives under a fresh `World` node (group `match_world
    one random gun drawn from an RNG seeded with the house seed XOR `LOADOUT_SEED_SALT`, so a pinned seed pins the loadouts without shifting placement. Each is
    styled as it is armed (`docs/outfits.md` O15), from a second RNG seeded with the house seed XOR `STYLE_SEED_SALT` (so the styles never shift the guns):
    its first draw is the match's police unit, one of the `CharacterConfig.styles` whose `side` is the invaders' (`zenitex`, `trauma`), worn by every invader,
-   the human invader too, the first of them its lead (`rank` 2) and the second its sergeant (1); each defender, the human defender too, draws one of the
+   the human invader too, the first of them its lead (`rank` 2) and the second its sergeant (1) (with "Lead the team" on, a human invader is the lead
+   and the NPC invaders are ranked from the sergeant down, the draws unchanged: LD10); each defender, the human defender too, draws one of the
    defenders' styles (`merc`, `borg`), a look seed of its own and one of its style's `weapons` (`scrap`, `pipe`; an invader's is `police`), all handed to
    `LoadoutConfig.apply` as its `style` (`{ look, seed, rank, weapon }`). Tests and sandboxes never come through here and keep the weapon they ask for;
-6. `_configure_debug`, `MatchHUD.begin(combatants, time_limit)`, in spectator mode the camera framing + `SpectatorInspector`
+6. `_build_squads(combatants, rooms)`: one `Squad` (`ai/team/squad.gd`, interface 21, `docs/leadership.md`) per side under `World`, over that side's
+   combatants in spawn order (after `_arm_characters`, which ranks the unit), with `_spawner.openings` and the house's `rooms` (and the human as
+   `human` when it leads), kept in `_squads` by faction; each NPC is handed its squad (`MatchSpawner.bind_squad`). The leader is the squad's own
+   rule (rank, then spawn order), or the human when it leads. Then, in every match, `_build_leader_overlay()`: the `LeaderOverlay` (UI
+   overlays, `watch` over every squad's `view`) under `World`, its `show_leaders` from `_overlay_flags` (the global `OverlayRegistry.LEADERS`
+   row; `_on_overlay_toggled` sets it live, `_teardown_world` drops it): a crown over each side's leader while on. Then, in a played match, `_build_command_menu(rooms)`: when the human leads, the
+   `OrderMarkers` (UI hud, `watch(squad.view)`) and the `CommandMenu` (UI hud, `setup({ rooms, teammates, view, resolve, leader })`, the squad's `view` and `resolve`) under
+   `World`, the menu's `order_requested` connected to the squad's `issue` and its `selection_changed` to the markers' `set_selection`
+   (interface 21, LD11, LD12); nothing is built otherwise, so nothing reads the right button;
+7. `_configure_debug`, `MatchHUD.begin(combatants, time_limit)`, in spectator mode the camera framing + `SpectatorInspector`
    (`setup(combatants, flags, OverlayToggles.RESERVED_WIDTH)`: the width its outfit panel keeps clear; the player and its panel are freed), and the performance overlay + overlay toggle bar when Debug is on (built once, kept across an endless run).
 
 Overlay flags live in `_overlay_flags` (one entry per row of `OverlayRegistry`), seeded by `_initial_overlays`: the registry's defaults, then the
@@ -84,8 +95,11 @@ inspector and overlays observe.
   straight for it.
 - `add_npc` instances the scene, sets its position and only THEN adds it under `world` (a body added at the world origin and moved afterwards
   overlaps whatever stands there for a frame, and the physics launches that piece across the map), hands its controller the house `rooms`, its `openings` (the spawner's field, which `main.gd` sets from
-  `WorldGen.get_openings` before spawning; for tactical entry) and `entry_point` through the `control` duck-type (`bind_npc`), and appends it to
-  `combatants`; `bind_player(player, rooms)` does the human's equivalent (a `PlayerStack`); the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
+  `WorldGen.get_openings` before spawning; for tactical entry) and `entry_point` through the `control` duck-type (`bind_npc`), and appends it to `combatants`; `bind_squad(npc, squad)` hands an NPC its side's squad (its
+  controller's `squad`) the same way; `bind_player(player, rooms)` does the human's equivalent (a `PlayerStack`); the first of a kind is named plainly (`Defender`, `Invader`), the rest `<base> 2`, …
+- Tests of the leadership wiring: `tests/general/lead_rank_test.gd` (LD10: the ranks with and without "Lead the team", the same style draws, `lead`
+  saved), `command_menu_wiring_test.gd` (LD11: a Main-built match, the menu orders a stun stack and both NPCs claim in bang mode),
+  `squad_leader_rule_test.gd` and `squad_succession_test.gd` (LD3, LD4).
 - Test: `tests/general/match_spawn_clear_test.gd` (two defenders in a room with a bed over its centre start clear and apart);
   `match_spawn_origin_test.gd` (a counter against the world origin is not launched by a spawn); `stack_player_wiring_test.gd` (`bind_player` attaches the stack with the house's doorways); `match_setup_test.gd`
   covers the setup dicts, loadout arming and the endless randomisation; `match_styles_test.gd` the crews' styles (one unit per match from the seed, defenders mixed,

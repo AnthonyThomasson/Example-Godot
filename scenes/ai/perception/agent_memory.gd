@@ -2,7 +2,8 @@ extends RefCounted
 
 ## AI domain: a generic, behaviour-agnostic memory for a non-player agent. It is an event log — an
 ## ordered list of remembered events, each a `topic` (what happened) with free-form `data` and a
-## lifetime. Many events coexist, including many of the same topic; nothing is capped per topic.
+## lifetime. Many events coexist, including many of the same topic; nothing is capped per topic. Ages and lifetimes
+## run on the pausable game clock (`GameClock`), so a pause of the tree expires nothing.
 ## Behaviours (the controller) write events with `remember()` and read them back by topic to drive
 ## decisions; the perception renders fresh events into the decision state. It holds NO policy — it
 ## does not know what any topic means, beyond naming the reads of the two the whole perception asks about
@@ -26,14 +27,14 @@ extends RefCounted
 ## Hard cap on total stored events; the oldest are evicted past it. <= 0 = unlimited.
 var capacity: int = 128
 
-## The stored events by topic, each list oldest first. An entry is `{ topic, key, data, at, ttl, seq }` (`at` in msec,
+## The stored events by topic, each list oldest first. An entry is `{ topic, key, data, at, ttl, seq }` (`at` in game msec, `GameClock.msec()`,
 ## `ttl` in s, `seq` the write order across all topics).
 var _by_topic: Dictionary = {}
 ## How many events are stored in all, live or awaiting cleanup.
 var _count := 0
 ## The `seq` the next write takes.
 var _next_seq := 0
-## Milliseconds (`Time.get_ticks_msec`) before which no stored event can have outlived its ttl (a little early,
+## Game milliseconds (`GameClock.msec()`) before which no stored event can have outlived its ttl (a little early,
 ## never late), so `_prune` can skip its scan until then. INF = nothing stored expires.
 var _earliest_expiry := INF
 
@@ -50,7 +51,7 @@ func remember(topic: StringName, data: Dictionary, ttl: float, key: String = "")
 			if list[i]["key"] == key:
 				list.remove_at(i)
 				_count -= 1
-	var at := Time.get_ticks_msec()
+	var at := GameClock.msec()
 	var life: float = ttl
 	list.append({
 		"topic": topic,
@@ -71,7 +72,7 @@ func remember(topic: StringName, data: Dictionary, ttl: float, key: String = "")
 ## (INF when none is remembered) — how long ago something was last observed.
 func age_of(topic: StringName, field: String, value: Variant) -> float:
 	var list: Array = _by_topic.get(topic, [])
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for i in range(list.size() - 1, -1, -1):
 		var entry: Dictionary = list[i]
 		if not _expired(entry, now) and entry["data"].get(field) == value:
@@ -84,7 +85,7 @@ func age_of(topic: StringName, field: String, value: Variant) -> float:
 func recall_aged(topic: StringName) -> Array:
 	var out: Array = []
 	var list: Array = _by_topic.get(topic, [])
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for i in range(list.size() - 1, -1, -1):
 		var entry: Dictionary = list[i]
 		if not _expired(entry, now):
@@ -99,7 +100,7 @@ func size() -> int:
 
 ## Whether any non-expired event of `topic` is remembered.
 func is_fresh(topic: StringName) -> bool:
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for entry in _by_topic.get(topic, []):
 		if not _expired(entry, now):
 			return true
@@ -109,7 +110,7 @@ func is_fresh(topic: StringName) -> bool:
 ## The freshest non-expired event's `data` for `topic`, or an empty dict when none is remembered.
 func recall(topic: StringName) -> Dictionary:
 	var list: Array = _by_topic.get(topic, [])
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for i in range(list.size() - 1, -1, -1):
 		var entry: Dictionary = list[i]
 		if not _expired(entry, now):
@@ -136,7 +137,7 @@ func engaged() -> bool:
 func recall_all(topic: StringName) -> Array:
 	var out: Array = []
 	var list: Array = _by_topic.get(topic, [])
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for i in range(list.size() - 1, -1, -1):
 		var entry: Dictionary = list[i]
 		if not _expired(entry, now):
@@ -147,7 +148,7 @@ func recall_all(topic: StringName) -> Array:
 ## Every non-expired event (full entries), newest first — for rendering what the agent remembers.
 func fresh() -> Array:
 	var out: Array = []
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	for list: Array in _by_topic.values():
 		for entry: Dictionary in list:
 			if not _expired(entry, now):
@@ -160,7 +161,7 @@ func fresh() -> Array:
 ## EXPIRABLE events (positive ttl). Permanent events (ttl <= 0) are long-term facts and are never
 ## volume-evicted — they persist for the agent's lifetime.
 func _prune() -> void:
-	var now := Time.get_ticks_msec()
+	var now := GameClock.msec()
 	if now >= _earliest_expiry:  # Otherwise nothing has outlived its ttl yet: skip the scan.
 		var earliest := INF
 		for topic in _by_topic.keys():
@@ -204,7 +205,7 @@ func _evict_oldest_expirable() -> bool:
 	return true
 
 
-## Whether an event has outlived its ttl at `now` (`Time.get_ticks_msec`; ttl <= 0 never expires on age).
+## Whether an event has outlived its ttl at `now` (`GameClock.msec()`; ttl <= 0 never expires on age).
 func _expired(entry: Dictionary, now: int) -> bool:
 	var ttl: float = entry["ttl"]
 	if ttl <= 0.0:

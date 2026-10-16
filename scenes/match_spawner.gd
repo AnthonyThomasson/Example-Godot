@@ -138,6 +138,16 @@ func bind_npc(npc: Node, rooms: Array, entry_point: Vector2 = Vector2.ZERO) -> v
 			return
 
 
+## Hand an NPC its side's squad (`ai/team/squad.gd`, `docs/leadership.md` LD3), as `bind_npc` hands it the house: its controller's
+## `squad`, found by the same `control` duck-type.
+func bind_squad(npc: Node, squad: Node) -> void:
+	for child in npc.get_children():
+		if child.has_method("control"):
+			if "squad" in child:
+				child.squad = squad
+			return
+
+
 ## Give the human the stack radio, as `bind_npc` hands an NPC its doorways: a `PlayerStack` child of `player` that knows the
 ## house's `rooms` and `openings`. Returned, for the stack markers to watch.
 func bind_player(player: Node, rooms: Array) -> Node:

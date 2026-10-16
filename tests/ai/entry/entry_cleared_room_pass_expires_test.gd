@@ -6,10 +6,10 @@ extends GameTest
 ## sent back west past the same door it goes round the house or covers the door from the jamb first (E15 / E18). Scripted Von (one
 ## mechanism): each walk is an investigation of gunfire heard on the far side.
 ##
-## The clear's age is the perception memory's, which counts in wall-clock time (`Time.get_ticks_msec`), and a scripted test runs
-## many times faster than that; so the test waits, paced to real time (`door_view_probe.wait_wall`), until 61 s have passed on the
-## wall clock and in sim time alike. While it waits the invader is held still (`speed` 0) where its first walk ended, so the second
-## walk starts from the far side (a held move re-decides only at its commit cap, so the second order is waited for).
+## The clear's age is the perception memory's, which counts game time (`GameClock`, frames run while unpaused); the test waits
+## (`door_view_probe.wait_wall`, paced to real time) until 61 s have passed in sim time, and on the wall clock as well. While it
+## waits the invader is held still (`speed` 0) where its first walk ended, so the second walk starts from the far side (a held
+## move re-decides only at its commit cap, so the second order is waited for).
 
 const Entry := preload("res://tests/_ai/entry_probe.gd")
 const View := preload("res://tests/_ai/door_view_probe.gd")

@@ -6,15 +6,17 @@ extends RefCounted
 ##
 ## `flag` is the overlay node's `show_<x>` property name (found by duck-typed property, like Main's
 ## `_configure_debug` and the spectator inspector's `_flags`), except the GLOBAL flags (not per NPC):
-## `show_nav_holes` (the navmesh holes of furniture and characters at rest, applied to Main's single NavDebug node) and
-## `show_perf` (the performance overlay).
+## `show_nav_holes` (the navmesh holes of furniture and characters at rest, applied to Main's single NavDebug node),
+## `show_leaders` (a crown over each squad's leader, Main's single LeaderOverlay node) and `show_perf` (the performance overlay).
 
 ## Flag of the world-space navmesh-holes overlay (furniture and characters at rest).
 const NAV_HOLES := "show_nav_holes"
+## Flag of the squad-leaders overlay (a crown over each side's leader).
+const LEADERS := "show_leaders"
 ## Flag of the performance overlay.
 const PERF := "show_perf"
 ## Flags that belong to one global overlay rather than to every NPC.
-const GLOBAL := [NAV_HOLES, PERF]
+const GLOBAL := [NAV_HOLES, LEADERS, PERF]
 
 ## `{ flag, label, group, default }` rows, in display order, grouped for the toggle bar.
 const ENTRIES := [
@@ -33,6 +35,7 @@ const ENTRIES := [
 	{ "flag": "show_targets", "label": "Move & use targets", "group": "Movement", "default": false },
 	{ "flag": "show_stuck", "label": "Stuck detection", "group": "Movement", "default": false },
 	{ "flag": "show_brain", "label": "Brain (Von)", "group": "Brain", "default": false },
+	{ "flag": "show_leaders", "label": "Squad leaders", "group": "Team", "default": false },
 	{ "flag": "show_entry", "label": "Entry plan", "group": "Entry", "default": false },
 	{ "flag": "show_entry_team", "label": "Entry team & guard", "group": "Entry", "default": false },
 	{ "flag": "show_nav_holes", "label": "Navigation holes", "group": "Map", "default": false },

@@ -747,6 +747,67 @@ func room_group(ctx: Dictionary, known_rooms: Array, rooms: Array) -> Dictionary
 	return { "summary": "", "options": options }
 
 
+## The order this NPC's leader gave it (`docs/leadership.md` LD5, LD6), as the one option of the ORDER node, carrying the primitive it
+## runs and that primitive's params: `defend_room` is a `defend` of the room at this member's defend spot with its gun on its doorway
+## (D2, `AgentEntry.defend_spot`: the members of the order share the room's doorways out in the order `to` names them); `stack` is an
+## `entry` through the ordered doorway into the ordered room (`opening`, `into`, `bang`, and the side: `stack_at` or `split`). Each
+## carries the order's `order_id`. Empty with no order, or one this NPC cannot carry out (a room or doorway it does not know): refused.
+func order_group(ctx: Dictionary, order: Dictionary, rooms: Array) -> Dictionary:
+	if order.is_empty():
+		return { "summary": "", "options": [] }
+	var kind := String(order.get("kind", ""))
+	var option := {}
+	match kind:
+		"defend_room":
+			var room := SnapshotVocab.room_by_key(rooms, String(order.get("room", "")))
+			if room.is_empty():
+				return { "summary": "", "options": [] }
+			var to: Array = (order.get("to", []) as Array).filter(func(m): return is_instance_valid(m))
+			var nth := maxi(to.find(_character), 0)
+			var at: Dictionary = _entry.defend_spot(String(room["key"]), nth, to.size(), ctx["map"], ctx["space"])
+			if at.is_empty():
+				return { "summary": "", "options": [] }
+			var params := { "room": String(room["key"]), "spot": at["spot"], "door": at["door"], "order_id": order["id"] }
+			if at["door_pos"] != Vector2.INF:
+				params["door_pos"] = at["door_pos"]
+			var label := "defend the %s" % _v.room_name(room["type"])
+			option = { "id": "defend_%s" % room["key"], "label": label, "desc": label, "primitive": &"defend", "params": params,
+				"tags": { "inside": true } }
+		"stack":
+			var into := SnapshotVocab.room_by_key(rooms, String(order.get("into", "")))
+			if into.is_empty() or _entry.geometry(String(order.get("opening", "")), String(into["key"]), ctx["map"], ctx["space"]).is_empty():
+				return { "summary": "", "options": [] }
+			var params := { "opening": String(order["opening"]), "into": String(into["key"]), "bang": bool(order.get("bang", false)),
+				"split": bool(order.get("split", false)), "order_id": order["id"] }
+			if order.get("stack_at") is Vector2:
+				params["stack_at"] = order["stack_at"]
+			var label := "the doorway into the %s%s" % [_v.room_name(into["type"]), " with a stun" if params["bang"] else ""]
+			option = { "id": "stack_%s" % order["opening"], "label": label, "desc": label, "primitive": &"entry", "params": params,
+				"tags": { "inside": _v.is_inside(ctx["self_pos"]) } }
+		_:
+			return { "summary": "", "options": [] }
+	return { "summary": option["label"], "options": [option] }
+
+
+## Tag every option that names a place with the room it lies in (`tags.room`, the room key, "" outside): where its walk ends, the
+## spot a throw is made `from` or else its `point`. The planner keeps a member ordered to defend a room to the options in it (LD8).
+## Tags are not text: what Von reads is unchanged.
+static func tag_rooms(groups: Dictionary, rooms: Array) -> void:
+	for name in groups:
+		var group = groups[name]
+		if name == "per_target":
+			for per in (group as Dictionary).values():
+				tag_rooms(per, rooms)
+			continue
+		if not group is Dictionary:
+			continue
+		for o in group.get("options", []):
+			var params: Dictionary = o.get("params", {})
+			var at = params.get("from", params.get("point"))
+			if at is Vector2 and at != Vector2.INF and o.get("tags") is Dictionary:
+				o["tags"]["room"] = String(SnapshotVocab.room_at(at, rooms).get("key", ""))
+
+
 ## `tags` plus the spot's geometry, kept for the routes debug overlay (`clear_shot`, `route_exposed`,
 ## `cover`, and the flank `ally_lane` / `held_by` / `crosses` names). Planner
 ## filters read only the boolean tags (`inside` / `hidden`, and on a flank side `held` / `crosses` /

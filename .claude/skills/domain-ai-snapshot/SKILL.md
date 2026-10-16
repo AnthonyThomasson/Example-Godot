@@ -49,7 +49,8 @@ lives in `agent_snapshot.gd`.
   `weapon_low` (at or below `low_ammo_fraction` of its magazine, empty included), `can_reload` (a carried magazine would add
   rounds), `under_fire`, `engaged`, `leads`, `lead_outside` (the NPC is inside the house and an offered lead lies outside it:
   gates the `stay` child of INVESTIGATE), `hurt`, `inside`, `exposed`, and the grenade ones: `grenade_ready` (some known hostile has a `grenade_throws` option),
-  `stack_has_stun` (it carries a stun, or a teammate's entry callout says `stuns` > 0: gates STUN ENTRY). The brain overlay shows the ones that hold.
+  `stack_has_stun` (it carries a stun, or a teammate's entry callout says `stuns` > 0: gates STUN ENTRY), `ordered` (it holds a live order from its
+  leader, `docs/leadership.md` LD5: gates the ORDER node and its entry rule). The brain overlay shows the ones that hold.
 - **sections** — named state-text blocks; each tree level shows the ones it lists: `goal` (the controller's goal with `{gun}` filled in by `fill_goal`, the same noun as `loadout`),
   `situation` (place, item, own health as its own sentence), `current` (activity line), `odds`
   (hostiles vs allies; "All quiet so far." only when there are no leads), `contacts`, `exposure`
@@ -59,6 +60,10 @@ lives in `agent_snapshot.gd`.
   once it runs low "You carry spare magazines." or "You are out of spare magazines."; "You are reloading your pistol.";
   empty without a gun; the noun is the gun's display name lower-cased, `gun_noun` ("pistol", "assault rifle", an acronym like "SMG" kept), so a
   pistol user's text is unchanged and the Von scenario fixtures stay valid; listed in the contexts of root, combat, engage, flank, advance), `awareness` (being hit / under fire; gunfire and footsteps heard only while no hostile is known; noted events).
+  `order` (`order_text`, LD6): one sentence while the NPC holds an order, "Your leader ordered you to defend the kitchen." / "... to go into the
+  kitchen by its doorway quietly." ("with a stun grenade first"), "" otherwise; the planner shows it after the goal at every level, so an NPC
+  with no order reads exactly what it read before. Measured with `tools/von_probe.py` (`docs/leadership.md` LD6: at the combat levels the top
+  pick unchanged in 17/18 levels for the defend sentence, 18/18 for the stack ones).
   `sections_per_target[id]` re-frames exposure/flanks/allies around each known hostile. The snapshot also carries `gun` (that noun), which the planner
   fills into `{gun}` in the tree's templates. `shoot_range` and the "in pistol range" distance band are deliberately left gun-agnostic (pinned wording).
 - **options** — named groups `{ summary, summary_inside?, options: [{ id, label, desc, params, tags }] }`:
@@ -85,7 +90,13 @@ lives in `agent_snapshot.gd`.
   only, minus those an entry leads into),
   `interactions` (deduped by label, uncapped), `rooms` (uncapped). The other groups are capped at `max_options_per_level`
   (`explore` at two).
-  Options are places and things, never verbs; `tags.inside` drives the territorial filter.
+  `order` (`order_group`, LD6): the ORDER node's one option, the live order, carrying its own `primitive` and params with `order_id`:
+  `defend_<room>` runs `defend` (`room`, `spot`, `door`, `door_pos` from `AgentEntry.defend_spot`, the member's place being its index in
+  the order's `to`), `stack_<opening>` runs `entry` (`opening`, `into`, `bang`, `split`, `stack_at`); empty with no order or one it cannot
+  carry out (a room or doorway it does not know: the controller ends it `refused`).
+  Options are places and things, never verbs; `tags.inside` drives the territorial filter. After the groups are built `tag_rooms` tags every
+  option that names a place with the room it lies in (`tags.room`: the room key of its `from`, else its `point`; "" outside): the planner's
+  `confine_room` keeps a member ordered to defend a room to the options in it (LD8). Tags are not text.
 
 
 ## Wording rules for Von (measured with `tools/von_probe.py`)

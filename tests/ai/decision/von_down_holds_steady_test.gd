@@ -18,7 +18,10 @@ func configure(s: TestSetup) -> void:
 	s.von_down()
 	s.switch(&"projectile.flyover", false)
 	s.actor(&"defender", &"defender", Vector2(650, 300))
-	s.actor(&"attacker", &"puppet", Vector2(200, 300), { "start_slot": 3, "faction": &"invader", "max_health": 400.0 })
+	# The premise: the hostile stays alive, so known, through the check. Its one round puts the defender under fire only until ~3.75 s
+	# on the game clock; a dead hostile would then leave no threat, and the quiet reload (no Von needed) would be taken. The
+	# defender's return fire lands at most ten rounds of at most 50 damage (a head hit) by the check.
+	s.actor(&"attacker", &"puppet", Vector2(200, 300), { "start_slot": 3, "faction": &"invader", "max_health": 2000.0 })
 
 
 func run(t: TestContext) -> void:

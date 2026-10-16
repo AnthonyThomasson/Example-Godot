@@ -23,8 +23,8 @@ const LANDED_NEAR := 80.0
 const HEARD_NEAR := 40.0
 const CALLED_NEAR := 150.0
 ## A plan is made again when its grenade has moved this far (px), or any distance that brings its spot into the grenade's line, and not
-## more often than every `REPLAN_EVERY` s of game time (counted in physics frames, as the game's clock: the wall clock runs ahead of it in
-## a fast headless run).
+## more often than every `REPLAN_EVERY` s of game time (counted in `GameClock` frames: the wall clock runs ahead of it in a fast headless
+## run, and on through a pause).
 const REPLAN_DIST := 48.0
 const REPLAN_EVERY := 0.15
 ## A grenade that came to rest this far (px) from where it was first called is called again, so the allies plan from the real spot.
@@ -38,7 +38,7 @@ var throw: AgentThrow                  ## The danger-zone and escape geometry.
 
 var _character: Node  ## The NPC's body, handed in once by `bind`.
 var _known := {}   ## Grenade node instance id -> { node, kind, radius, point, source, landed }.
-var _plans := {}   ## Grenade node instance id -> { id, point, kind, radius, spot, crouch, at (the physics frame it was made in) }.
+var _plans := {}   ## Grenade node instance id -> { id, point, kind, radius, spot, crouch, at (the `GameClock` frame it was made in) }.
 var _told := {}    ## Grenade node instance id -> { point, rested }: where it was last radioed, and whether that was after it came to rest.
 
 
@@ -207,7 +207,7 @@ func plan(space, map: RID, exclude: Array) -> Dictionary:
 		return {}
 	var self_pos: Vector2 = _character.global_position
 	var height := float(_character.get_surface().get("coverage", throw.stand_height()))
-	var now := Engine.get_physics_frames()
+	var now := GameClock.frame()
 	var best := {}
 	var best_fuse := INF
 	for id in _known:
@@ -249,7 +249,7 @@ func _make(space, map: RID, exclude: Array, id: int, rec: Dictionary, fuse: floa
 	var found: Dictionary = throw.escape(space, map, rec["kind"], rec["radius"], rec["point"], _character.global_position, fuse,
 		throw.run_speed(), exclude)
 	return { "id": id, "point": rec["point"], "kind": rec["kind"], "radius": rec["radius"], "spot": found["spot"],
-		"crouch": found["crouch"], "at": Engine.get_physics_frames() }
+		"crouch": found["crouch"], "at": GameClock.frame() }
 
 
 ## The grenades to radio now, `{ point, kind }`: ones the NPC has seen or heard come down and is running from, each once when it

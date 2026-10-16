@@ -120,14 +120,15 @@ func ambush(node, pos: Vector2) -> void:
 ## Peek-and-cover shooting at the known contact (`node` at `pos`): in the PEEK phase, move to a spot with a clear shot and
 ## fire, then duck; in the COVER phase, hold behind a shielding object for `cover_time` before peeking again. The
 ## fire/cover destination is committed for `reposition_interval` rather than re-picked every frame, so the NPC steers
-## smoothly instead of vibrating between near-equal candidates. `hold_ground` keeps the chosen spots inside the house.
-func peek_cover(delta: float, node, pos: Vector2, hold_ground: bool) -> void:
+## smoothly instead of vibrating between near-equal candidates. `hold_ground` keeps the chosen spots inside the house, or inside room
+## `room` when given (a member ordered to defend it, `docs/leadership.md` LD8).
+func peek_cover(delta: float, node, pos: Vector2, hold_ground: bool, room := "") -> void:
 	var dist: float = _character.global_position.distance_to(pos)
 	dest_timer -= delta
 	if phase == "cover":
 		cover_timer -= delta
 		if dest_timer <= 0.0:
-			dest = _choose_dest("cover", node, pos, hold_ground)
+			dest = _choose_dest("cover", node, pos, hold_ground, room)
 			dest_timer = reposition_interval
 		_loco.move_to(dest)
 		reload_if_dry()
@@ -149,7 +150,7 @@ func peek_cover(delta: float, node, pos: Vector2, hold_ground: bool) -> void:
 				dest_timer = 0.0  # Pick a cover spot immediately after shooting.
 		return
 	if dest_timer <= 0.0:
-		dest = _choose_dest("peek", node, pos, hold_ground)
+		dest = _choose_dest("peek", node, pos, hold_ground, room)
 		dest_timer = reposition_interval
 	_loco.move_to(dest)
 
@@ -353,15 +354,16 @@ func _faces(pos: Vector2) -> bool:
 
 ## The committed destination for the current phase `kind`: the nearest spot with a clear shot ("peek") or the nearest
 ## shielded spot ("cover") around the known contact; falls back to closing on the contact (peek) or holding (cover)
-## when no suitable spot exists this sample. While holding ground, spots are restricted to inside the house and the
-## peek fallback holds position instead of advancing out.
-func _choose_dest(kind: String, node, pos: Vector2, hold_ground: bool) -> Vector2:
+## when no suitable spot exists this sample. While holding ground, spots are restricted to inside the house and the peek fallback
+## holds position instead of advancing out; with a `room` (kept to by order) spots are restricted to inside that room in any case.
+func _choose_dest(kind: String, node, pos: Vector2, hold_ground: bool, room := "") -> Vector2:
 	var spots: Dictionary = _perception.combat_spots(node, pos, ring_radius, ring_count)
 	var fire: Array = spots["fire"]
 	var cover: Array = spots["cover"]
-	if hold_ground:
-		fire = fire.filter(func(p): return _loco.inside_house(p))
-		cover = cover.filter(func(p): return _loco.inside_house(p))
+	if hold_ground or room != "":
+		var keep := func(p): return _loco.room_key_at(p) == room if room != "" else _loco.inside_house(p)
+		fire = fire.filter(keep)
+		cover = cover.filter(keep)
 	if kind == "cover":
 		return cover[0] if not cover.is_empty() else _character.global_position
 	if not fire.is_empty():

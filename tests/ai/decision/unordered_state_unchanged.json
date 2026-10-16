@@ -1,0 +1,106 @@
+{
+ "a": {
+  "act": "search/enter/door_840_190",
+  "levels": [
+   {
+    "auto": true,
+    "node": "root",
+    "offered": {
+     "search": "All is quiet and there are rooms left to search (find your way into the house and explore it)"
+    },
+    "pick": "search",
+    "question": "",
+    "state": ""
+   },
+   {
+    "auto": false,
+    "node": "search",
+    "offered": {
+     "enter": "A doorway leads into a room left to search (the doorway to the west — unexplored — short route)",
+     "explore_west": "an unexplored part of the house to the west — medium route"
+    },
+    "pick": "enter",
+    "question": "Where should you search next? Prefer unsearched rooms and unexplored areas, nearest first.",
+    "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH."
+   },
+   {
+    "auto": false,
+    "node": "enter",
+    "offered": {
+     "door_0_415": "the doorway to the west — unexplored — long route",
+     "door_840_190": "the doorway to the west — unexplored — short route"
+    },
+    "pick": "door_840_190",
+    "question": "Which doorway should you go through? Prefer the shortest route.",
+    "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are outside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH → ENTER."
+   }
+  ]
+ },
+ "c": {
+  "act": "combat/t_ID/engage/fire_here",
+  "levels": [
+   {
+    "auto": true,
+    "node": "combat",
+    "offered": {
+     "t_ID": "h — in sight — close, in pistol range, east of you — aiming at you — holding a Unarmed — you have a clear shot at them"
+    },
+    "pick": "t_ID",
+    "question": "",
+    "state": ""
+   },
+   {
+    "auto": false,
+    "node": "combat",
+    "offered": {
+     "advance": "h looks badly wounded, is unarmed, or is moving away from you (they are close, in pistol range, standing still, holding a Unarmed)",
+     "engage": "You have a clear shot at h, and you are not badly wounded (from where you stand)",
+     "flank": "Your line to h is blocked, or they are aiming at someone else (1 free side; best: their right side via the living room, short hidden route, cover)",
+     "retreat": "You are badly wounded and being hit (best: behind the wall close by, out of their sight; you are unhurt)"
+    },
+    "pick": "engage",
+    "question": "How should you fight h? Shoot from where you have a clear line, flank to an open side, advance on them when they are weak, fleeing or unarmed, punch when they are point-blank, or retreat when you are badly hurt, exposed or outnumbered, or reload when your pistol is nearly empty or empty.",
+    "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYou are in the living room, inside the house, holding a Pistol. You are crouching. You are unhurt.\nYour pistol is loaded.\nKnown hostiles: 1 (1 in sight). Allies near you: a.\nYou have a clear shot at h from where you stand. You are exposed to their fire. They are aiming at you.\nh — HOSTILE (seen) — in sight — close, in pistol range, east of you, in the living room — standing still — aiming at you — holding a Unarmed.\na (radio, just now): SEARCH - ENTER - the doorway to the west.\nFlanks on h (you are on their front): their left side — route passes h, clear shot, cover, short exposed route; their right side — free, clear shot, cover, short hidden route; behind them — route passes h, clear shot, cover, short exposed route.\nDecided so far: COMBAT → h."
+   },
+   {
+    "auto": false,
+    "node": "engage",
+    "offered": {
+     "ambush": "wait in ambush behind the wall — you shoot when they show — they are standing still",
+     "fire_here": "fire from where you stand (in the living room) — clear shot — in the open",
+     "fire_south_west": "fire from behind the wall in the living room, south-west of them — clear shot — cover close by (the wall) — short exposed route",
+     "fire_west": "fire from behind the wall in the living room, west of them — clear shot — cover close by (the wall) — short exposed route"
+    },
+    "pick": "fire_here",
+    "question": "Where should you fight h from? Prefer a clear shot with cover close by, hidden from other hostiles; wait in ambush when they are coming to you.",
+    "state": "You are breaking into this house. Search it and shoot everyone you find with your pistol.\nYour pistol is loaded.\nYou have a clear shot at h from where you stand. You are exposed to their fire. They are aiming at you.\nh — HOSTILE (seen) — in sight — close, in pistol range, east of you, in the living room — standing still — aiming at you — holding a Unarmed.\na (radio, just now): SEARCH - ENTER - the doorway to the west.\nDecided so far: COMBAT → h → ENGAGE."
+   }
+  ]
+ },
+ "d": {
+  "act": "search/room_living_room",
+  "levels": [
+   {
+    "auto": true,
+    "node": "root",
+    "offered": {
+     "search": "All is quiet and there are rooms left to search (2 of 3 known rooms unsearched)"
+    },
+    "pick": "search",
+    "question": "",
+    "state": ""
+   },
+   {
+    "auto": false,
+    "node": "search",
+    "offered": {
+     "room_kitchen": "the kitchen — unsearched — medium route",
+     "room_living_room": "the living room — unsearched — short route"
+    },
+    "pick": "room_living_room",
+    "question": "Where should you search next? Prefer unsearched rooms and unexplored areas, nearest first.",
+    "state": "You are the armed guard of this house. Shoot hostile intruders with your pistol to stop them. If you are fired upon, return fire, but hold your ground inside the house; do not chase anyone outside.\nYou are in the hallway, inside the house, holding a Pistol. You are unhurt.\nDecided so far: SEARCH."
+   }
+  ]
+ }
+}

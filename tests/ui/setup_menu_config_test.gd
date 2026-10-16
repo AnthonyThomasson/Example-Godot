@@ -6,6 +6,8 @@ extends GameTest
 ## passes (`LoadoutConfig.outfit_options()`'s shape), reported as the side's `outfit` (`{ <slot>: id }`, "" for nothing)
 ## and restored from the side's seeded `outfit`. Plates need a carrier (11b on issue #38): the vest choice that holds plates comes
 ## marked `plates: true`, and while a side's vest pick is any other its two plate picks are disabled, show "None" and report "".
+## "Lead the team" (LD10 in docs/leadership.md): a checkbox, off by default, reported as the config's `lead` by
+## `current_config()` and Start, and restored from a remembered config.
 
 const SetupMenu := preload("res://scenes/ui/menus/setup_menu.gd")
 
@@ -43,8 +45,8 @@ const SOFT_VEST_PLATES := { "head": "helmet", "body": "shirt", "vest": "tactical
 func describe() -> Dictionary:
 	return {
 		"name": "Setup window reports mode, side and loadouts",
-		"description": "Start / Watch / Endless emit their mode with the chosen side, counts, weapons, magazines, spares and outfits; a gunless weapon hides the magazine rows; each side picks a garment per slot; the plate picks are disabled and none without the plate carrier.",
-		"tags": ["setup", "ui", "outfit"],
+		"description": "Start / Watch / Endless emit their mode with the chosen side, counts, weapons, magazines, spares and outfits; a gunless weapon hides the magazine rows; each side picks a garment per slot; the plate picks are disabled and none without the plate carrier; \"Lead the team\" is off by default and reported as lead.",
+		"tags": ["setup", "ui", "outfit", "leadership"],
 		"timeout": 5.0,
 	}
 
@@ -105,6 +107,44 @@ func run(t: TestContext) -> void:
 
 	_check_outfits(t)
 	_check_plates(t)
+	_check_lead(t)
+
+
+## LD10: the "Lead the team" checkbox: off by default, reported as `lead`, restored on reopening.
+func _check_lead(t: TestContext) -> void:
+	var menu := SetupMenu.new()
+	t.world.add_child(menu)
+	menu.open({ "side": "invader", "seed": 42, "weapons": WEAPONS, "defenders": { "count": 2, "weapon": "pistol" },
+		"invaders": { "count": 3, "weapon": "pistol" } })
+	var box := _lead_box(menu)
+	if not t.check(box != null, "the window has a \"Lead the team\" checkbox"):
+		menu.queue_free()
+		return
+	t.check(not box.button_pressed, "it is off by default")
+	t.expect_eq(menu.current_config().get("lead"), false, "current_config reports lead off by default")
+	box.button_pressed = true
+	box.toggled.emit(true)
+	t.expect_eq(menu.current_config().get("lead"), true, "ticked, current_config reports lead on")
+	var started := _start(menu)
+	t.expect_eq(started.get("lead"), true, "Start reports lead on")
+	t.expect_eq(started.get("mode"), "play", "for a played match")
+	var kept: Dictionary = menu.current_config()
+	menu.queue_free()
+	var again := SetupMenu.new()
+	t.world.add_child(again)
+	again.open(kept.merged({ "weapons": WEAPONS }))
+	var reopened := _lead_box(again)
+	t.check(reopened != null and reopened.button_pressed, "reopening with the remembered config ticks it again")
+	t.expect_eq(again.current_config().get("lead"), true, "and reports lead on")
+	again.queue_free()
+
+
+## The window's "Lead the team" checkbox (a CheckBox or CheckButton showing that text), or null.
+func _lead_box(menu: Node) -> BaseButton:
+	for b: BaseButton in menu.find_children("*", "BaseButton", true, false):
+		if (b is CheckBox or b is CheckButton) and String(b.text).to_lower().contains("lead the team"):
+			return b
+	return null
 
 
 ## O11: the per-side outfit picks.

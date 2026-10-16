@@ -221,6 +221,9 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 @export var entry_watch_dwell: float = 0.8
 ## Safety cap (s) on reaching the stack: an entrant that cannot get to its slot in this time gives up its claim.
 @export var entry_approach_time: float = 20.0
+## Most seconds an ordered stack waits for every living recipient of the order to be in its slot, from the first ordered `ready` heard or
+## said (`docs/leadership.md` LD9, D7); an unordered joiner is waited for `entry_ready_timeout` as ever.
+@export var order_ready_cap: float = 60.0
 ## The entry guard (E9): any walk that would cross into a room that is not cleared goes in by tactical entry first, whatever
 ## order it came from. Needs `entry_enabled`. A retreat and an NPC under fire are exempt.
 @export var entry_guard: bool = true
@@ -327,6 +330,9 @@ var rooms: Array = []
 var entry_point: Vector2 = Vector2.ZERO
 ## The house's doorways (`{ pos, width, front, exit, rooms }`) from Main, for tactical entry.
 var openings: Array = []
+## The NPC's side's squad (`ai/team/squad.gd`, `docs/leadership.md` LD3), handed in by Main (`MatchSpawner.bind_squad`): who leads it
+## and who is in it. The orders themselves come off the bus (`&"order"`), so an NPC with none still takes the ones that name it.
+var squad: Node = null
 
 var _perception: Node ## SENSE sub-domain: knowledge, the decision snapshot, combat geometry.
 var _client: Node ## THINK transport: the Von round-trip (decision/decision_client.gd).
@@ -339,8 +345,8 @@ var _force := false ## Force a decision now (task resolved or salient event).
 var _force_reason := "" ## Why `_force` was last raised, kept (with `_force_ms`) for the brain overlay.
 var _decisions := 0 ## Decision walks started so far (`debug_state()["decisions"]`).
 var _decision_reason := "" ## Why the latest walk was started: the force reason, or "cadence" (`debug_state()["decision_reason"]`).
-var _force_ms := 0 ## When `_force_reason` was raised (msec).
-var _last_callout := {} ## The last callout this NPC radioed (`position`, `point`, `label`, `at`), for the hearing overlay.
+var _force_ms := 0 ## When `_force_reason` was raised (game msec, `GameClock.msec()`).
+var _last_callout := {} ## The last callout this NPC radioed (`position`, `point`, `label`, `at` in game msec), for the hearing overlay.
 var _salient_key := "" ## Known-hostile set + engaged contact's inside state, for edge detection.
 var _salient_init := false ## Whether _salient_key has been seeded.
 # EventBus events are queued here, then handed to perception on the next control() tick.
@@ -459,6 +465,10 @@ func _apply_config() -> void:
 	var disabled: Array[StringName] = []
 	disabled.assign(disabled_nodes)
 	var rules := entry_rules.duplicate()
+	# An order (docs/leadership.md LD6) is carried out unless the NPC is shot at or fighting (the fight rules above come first); it
+	# comes before `hostile_known`, which would otherwise hide it whenever any hostile is known.
+	if not rules.has(&"ordered") and not rules.has("ordered"):
+		rules[&"ordered"] = &"order"
 	if pursue_hostiles:
 		if not disabled.has(&"idle"):
 			disabled.append(&"idle")
@@ -468,6 +478,8 @@ func _apply_config() -> void:
 	_planner.entry_rules = rules
 	_planner.skip_single_option = skip_single_option
 	_planner.inside_only = defend_territory
+	var held: Dictionary = _perception.order()
+	_planner.confine_room = String(held.get("room", "")) if String(held.get("kind", "")) == "defend_room" else ""
 	_behavior.interaction_dwell = interaction_dwell
 	_behavior.max_commit_time = max_commit_time
 	_behavior.search_look_rate = search_look_rate
@@ -502,6 +514,8 @@ func _apply_config() -> void:
 	_behavior.entry_cover_time = entry_cover_time
 	_behavior.entry_watch_dwell = entry_watch_dwell
 	_behavior.entry_approach_time = entry_approach_time
+	_behavior.order_ready_cap = order_ready_cap
+	_behavior.squad = squad
 	_behavior.entry_guard = entry_guard
 	_behavior.entry_guard_range = entry_guard_range
 	_behavior.entry_guard_rearm = entry_guard_rearm
@@ -515,9 +529,9 @@ func _apply_config() -> void:
 ## Buffer a world event for processing on the next control() tick (the signal can fire before the
 ## controller knows which character it drives): hits (combat awareness, gunfire heard), footfalls (footsteps
 ## heard; one out of earshot of every gait is dropped here, as they come many a second), allies' radio
-## callouts, and a grenade coming down or going off.
+## callouts, a grenade coming down or going off, and the leader's orders.
 func _on_event(topic: StringName, data: Dictionary) -> void:
-	if topic == &"hit" or topic == &"callout" or topic == &"grenade" or topic == &"explosion":
+	if topic == &"hit" or topic == &"callout" or topic == &"grenade" or topic == &"explosion" or topic == &"order":
 		_event_queue.append([topic, data])
 	elif topic == &"footfall" and _character != null \
 			and _character.global_position.distance_to(data.get("position", Vector2.INF)) <= _perception.footfall_reach():
@@ -673,7 +687,7 @@ func debug_brain() -> Dictionary:
 		"decide_interval": decide_interval,
 		"forced": _force,
 		"force_reason": _force_reason,
-		"force_age": (Time.get_ticks_msec() - _force_ms) / 1000.0 if _force_reason != "" else INF,
+		"force_age": (GameClock.msec() - _force_ms) / 1000.0 if _force_reason != "" else INF,
 		"timers": timers,
 		"facts": _last_facts,
 	}
@@ -757,6 +771,38 @@ func control(character, delta: float) -> void:
 	for throw in _behavior.take_throw_calls():
 		if send_callouts:
 			_post_throw_call(throw)
+	_report_order()
+
+
+## The progress of the order the NPC holds, on the radio (`docs/leadership.md` LD7): the steps the behaviour reports as it carries it
+## out (`moving`, `in_position`), and `done` / `refused` once it has ended so; on the team radio, so only with `send_callouts`.
+func _report_order() -> void:
+	var steps: Array = _behavior.take_order_steps()
+	var ended: Dictionary = _perception.take_ended_order()
+	if not ended.is_empty():
+		steps.append({ "order_id": ended["id"], "step": ended["why"] })
+	if send_callouts:
+		for step in steps:
+			_post_order_step(step["order_id"], step["step"])
+
+
+## Radio step `step` of order `order_id` as an `&"callout"` with `order_id` and `order_step`: the speaker, where it stands and what it
+## is doing. Allies leave it out of what they weigh; its squad keeps it as the member's latest step.
+func _post_order_step(order_id: Variant, step: String) -> void:
+	_last_callout = { "position": _character.global_position, "point": _character.global_position,
+		"label": "%s (%s)" % [_behavior.path_label(), step.replace("_", " ")], "at": GameClock.msec() }
+	EventBus.post(&"callout", {
+		"speaker": _character,
+		"faction": _character.faction,
+		"position": _character.global_position,
+		"status": ", ".join(_status(false)),
+		"path": _behavior.current_act(),
+		"label": _behavior.path_label(),
+		"target_id": 0,
+		"point": _character.global_position,
+		"order_id": order_id,
+		"order_step": step,
+	})
 
 
 ## The running ENTER became a bang one, its room suspect (`docs/tactical-entry.md` E17: at its start, or on a late reason): the order is
@@ -779,7 +825,7 @@ func _on_entry_turned() -> void:
 func _force_now(reason: String) -> void:
 	_force = true
 	_force_reason = reason
-	_force_ms = Time.get_ticks_msec()
+	_force_ms = GameClock.msec()
 
 
 ## Whether a new decision may start now: never while crossing a doorway (a forced one waits until the NPC is
@@ -820,6 +866,11 @@ func _start_decision() -> void:
 	var snapshot: Dictionary = _perception.sense(rooms, goal, _behavior.activity_text())
 	_last_facts = snapshot["facts"]
 	_last_options = snapshot["options"]
+	var held: Dictionary = _perception.order()
+	if not held.is_empty() and (snapshot["options"]["order"]["options"] as Array).is_empty():
+		_perception.end_order(held["id"], "refused")  # An order it cannot carry out (a room or doorway it does not know): said so, and dropped.
+		_last_facts["ordered"] = false
+		_planner.confine_room = ""  # `_apply_config` confined the walk to the order's room: the walk is the NPC's own now.
 	_planner.begin(snapshot, _behavior.ongoing())
 
 
@@ -848,6 +899,11 @@ func _process_events() -> void:
 				_perception.process_grenade(ev[1], deaf)
 			&"explosion":
 				_perception.process_explosion(ev[1])
+			&"order":
+				# An order (LD5) reaches its recipients whatever their state, deaf included, and is decided on at once, as a hit is
+				# (after a crossing or an evade, which hold every decision).
+				if _perception.process_order(ev[1]):
+					_force_now("ordered")
 	_event_queue.clear()
 
 
@@ -904,7 +960,7 @@ func _post_callout(leaf: Dictionary) -> void:
 	var params: Dictionary = leaf["params"]
 	var status := _status(leaf["primitive"] == &"reload")
 	_last_callout = { "position": _character.global_position, "point": params.get("point", _character.global_position),
-		"label": " - ".join(leaf["labels"]), "at": Time.get_ticks_msec() }
+		"label": " - ".join(leaf["labels"]), "at": GameClock.msec() }
 	var radio := {
 		"speaker": _character,
 		"faction": _character.faction,
@@ -925,7 +981,7 @@ func _post_callout(leaf: Dictionary) -> void:
 ## at and its kind, for the allies in its danger zone who neither saw nor heard it (G16). `point` is the landing.
 func _post_grenade_call(grenade: Dictionary) -> void:
 	var label := "a %s grenade" % grenade["kind"]
-	_last_callout = { "position": _character.global_position, "point": grenade["point"], "label": label, "at": Time.get_ticks_msec() }
+	_last_callout = { "position": _character.global_position, "point": grenade["point"], "label": label, "at": GameClock.msec() }
 	EventBus.post(&"callout", {
 		"speaker": _character,
 		"faction": _character.faction,
@@ -944,7 +1000,7 @@ func _post_grenade_call(grenade: Dictionary) -> void:
 func _post_throw_call(throw: Dictionary) -> void:
 	var status := "frag_out" if throw["kind"] == &"frag" else "bang_out"
 	var label := "%s!" % status.replace("_", " ")
-	_last_callout = { "position": _character.global_position, "point": throw["point"], "label": label, "at": Time.get_ticks_msec() }
+	_last_callout = { "position": _character.global_position, "point": throw["point"], "label": label, "at": GameClock.msec() }
 	EventBus.post(&"callout", {
 		"speaker": _character,
 		"faction": _character.faction,
@@ -961,16 +1017,17 @@ func _post_throw_call(throw: Dictionary) -> void:
 ## Radio one step of a tactical entry (`{ step, opening, slot, side, cleared_room? }` from the behaviour) as an
 ## `&"callout"`: the usual fields plus `opening`, `into` (the room it leads into), `slot`, `side` and `entry_step` (claim / ready / going_in / in /
 ## clear / cover / rear / done / abort), `cleared_room` with a clear and `covering` (the doorway on it watches) with a
-## cover, and the bang entry's `bang` (its mode), `bang_off` (it gave the bang up) and `stuns`. It is how the stack claims slots, waits for the team and
-## crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
+## cover, and the bang entry's `bang` (its mode), `bang_off` (it gave the bang up) and `stuns`; an ordered stack's member adds `order_id`,
+## `order_bang` and `order_side` (the order, its mode and its side, `docs/leadership.md` LD9). It is how the stack claims slots, waits for
+## the team and crosses in order; "going in" is also said in `status`. `point` is where the speaker stands.
 func _post_entry_call(step: Dictionary) -> void:
 	var status := _status(false)
 	if step["step"] == "going_in":
 		status.push_front("going in")
 	var labels: String = _behavior.path_label()
 	_last_callout = { "position": _character.global_position, "point": _character.global_position,
-		"label": "%s (%s)" % [labels, String(step["step"]).replace("_", " ")], "at": Time.get_ticks_msec() }
-	EventBus.post(&"callout", {
+		"label": "%s (%s)" % [labels, String(step["step"]).replace("_", " ")], "at": GameClock.msec() }
+	var msg := {
 		"speaker": _character,
 		"faction": _character.faction,
 		"position": _character.global_position,
@@ -989,7 +1046,11 @@ func _post_entry_call(step: Dictionary) -> void:
 		"stuns": step.get("stuns", 0),
 		"cleared_room": step.get("cleared_room", ""),
 		"covering": step.get("covering", ""),
-	})
+	}
+	if step.has("order_id"):
+		for key in ["order_id", "order_bang", "order_side"]:
+			msg[key] = step[key]  # An ordered stack's claim (LD9): the order, its mode and its side.
+	EventBus.post(&"callout", msg)
 
 
 ## The speaker's state for a callout: under fire, wounded, reloading.

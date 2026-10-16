@@ -18,6 +18,8 @@ extends Node
 ##   throw    — walk to the throw spot `from` when it has one (`walk`), take a grenade in hand, aim at `point`, throw it, radio it and
 ##              wait out the fuse with the gun back in hand
 ##              (`combat.gd`; the GRENADE tactic, `docs/grenades.md` G17).
+##   defend   — the order to defend `room` (`docs/leadership.md` LD8): walk to the defend `spot`, then hold it with the gun on its
+##              doorway `door_pos` (or, with none, turning among the room's doorways), as long as the order stands.
 ##   hold     — stay and watch.
 ## Outside the primitives, **the evade reflex** (`set_evade`, `docs/grenades.md` G16) takes over the NPC whatever it is doing, an
 ## entry included, while a live grenade threatens it: it runs to the safe spot the perception found, crouches there if it is
@@ -44,6 +46,10 @@ const WALK_BODY_RANGE := 450.0
 ## How close (px) an evade walks into its safe spot: the spot is out of the burst's line with only a little room to spare either
 ## side of it, so a body that stops the agent's usual stride short of it can still be in the line (`AgentThrow`).
 const EVADE_REACH := 6.0
+## How close (px) a defender walks into its defend spot.
+const DEFEND_REACH := 8.0
+## How far (px) a defender at its post may be pushed off its defend spot before it walks back.
+const DEFEND_DRIFT := 24.0
 
 # --- Config fields the controller copies from its exports before setup(). ---
 var interaction_dwell: float = 3.0 ## Copy of GoalController.interaction_dwell.
@@ -86,6 +92,10 @@ var rear_security_time: float = 10.0 ## Copy of GoalController.rear_security_tim
 var entry_cover_time: float = 8.0 ## Copy of GoalController.entry_cover_time.
 var entry_watch_dwell: float = 0.8 ## Copy of GoalController.entry_watch_dwell.
 var entry_approach_time: float = 20.0 ## Copy of GoalController.entry_approach_time.
+var order_ready_cap: float = 60.0 ## Copy of GoalController.order_ready_cap.
+## The NPC's squad (`ai/team/squad.gd`, set by the controller): which recipients of an order still live (`Squad.alive`), for an ordered
+## stack's wait (`docs/leadership.md` D7). Null without one.
+var squad: Node = null
 ## The entry guard: any walk into a room that is not cleared goes in by tactical entry (`_entry_guard`; `docs/tactical-entry.md` E9).
 var entry_guard: bool = true
 var entry_guard_range: float = 300.0 ## Start the entry once the doorway is this near (px of walking).
@@ -122,7 +132,7 @@ var _primitive: StringName = &"hold" ## The running primitive.
 var _params := {}                 ## Its params (from the leaf).
 var _path: Array = []             ## The decision path ids (e.g. ["combat", "t_12", "flank", "side_left"]).
 var _labels: Array = []           ## The decision path as labels (e.g. ["COMBAT", "Intruder", "FLANK", "their left side (kitchen)"]).
-var _leaf_ms := 0                 ## When the running leaf was adopted.
+var _leaf_ms := 0                 ## When the running leaf was adopted (game msec, `GameClock.msec()`).
 var _point := Vector2.ZERO        ## The leaf's destination, snapped onto the navmesh.
 var _arrive_room := ""            ## A move that completes on ENTERING this room ("" = on reaching `_point`); ignored while looking around.
 var _arrived := false             ## Whether the destination has been reached.
@@ -154,6 +164,8 @@ var _throw_spot := Vector2.ZERO   ## Where it is thrown to.
 var _throw_calls: Array = []      ## Throws to radio since the last `take_throw_calls()`: { kind, point }.
 var _throw_wait := -1.0           ## Seconds left waiting out the grenade's fuse once it has left the hand (-1: not thrown yet).
 var _throw_seen := false          ## The grenade thrown has been seen in the world (it is its own, always known): the wait ends when it is gone.
+var _order_steps: Array = []      ## Progress on the order being carried out, to radio since the last `take_order_steps()`: { order_id, step }.
+var _order_said := {}             ## The last step said of an order (`{ id, step }`), so a step is said once until the next differs.
 
 
 ## Build the Locomotion child and capture the perception sub-domain. The controller calls this once in
@@ -221,6 +233,8 @@ func apply_config() -> void:
 	_entry.cover_time = entry_cover_time
 	_entry.watch_dwell = entry_watch_dwell
 	_entry.approach_time = entry_approach_time
+	_entry.order_ready_cap = order_ready_cap
+	_entry.squad = squad
 	_entry.look_rate = search_look_rate
 
 
@@ -279,17 +293,38 @@ func ongoing() -> bool:
 			return _reloading
 		&"entry":
 			return _entry_pending or _entry.phase not in ["", "done"]
-		&"throw":
+		&"throw", &"defend":
 			return true
 	return false
 
 
 ## Read-only: the engaged contact's last-seen inside/outside state packed into the salient key — the
-## controller re-decides when this (or the known-hostile set) changes.
+## controller re-decides when this (or the known-hostile set) changes. A throw order keeps its target in the key after the contact
+## ages out (`_throw_target`), so the lapse is no change: the throw goes on to the spot it was offered on (G17). A target that died
+## leaves the key, so the NPC re-decides.
 func salient_key() -> String:
 	var ids: Array = _hostiles.map(func(c): return c["id"])
+	var engaged := _engage_id != 0
+	var held := _throw_target()
+	if held != 0 and not ids.has(held):
+		ids.append(held)
+		engaged = true  # `_engage_inside` keeps the lost contact's last-seen state.
 	ids.sort()
-	return "%s|%s" % [str(ids), str(_engage_inside) if _engage_id != 0 else "-"]
+	return "%s|%s" % [str(ids), str(_engage_inside) if engaged else "-"]
+
+
+## The hostile a running throw order was offered on (its `target_id`), also while an entry detour has paused it, while the perception
+## still holds it as lost (aged out of the contacts, not dead: `lost_hostiles()` drops the dead); 0 for none. The throw is aimed at that
+## hostile's last-known spot and keeps it when the contact ages out on the way (G17).
+func _throw_target() -> int:
+	var id := 0
+	if _primitive == &"throw":
+		id = int(_params.get("target_id", 0))
+	elif _primitive == &"entry" and _resume.get("primitive") == &"throw":
+		id = int((_resume["params"] as Dictionary).get("target_id", 0))
+	if id == 0 or _perception == null or not _perception.lost_hostiles().any(func(c): return c["id"] == id):
+		return 0
+	return id
 
 
 ## Read-only: the FULL decision path the NPC is carrying out, every level from the broad mode down to
@@ -312,7 +347,7 @@ func debug_status() -> String:
 func activity_text() -> String:
 	if _labels.is_empty():
 		return ""
-	var secs := int((Time.get_ticks_msec() - _leaf_ms) / 1000.0)
+	var secs := int((GameClock.msec() - _leaf_ms) / 1000.0)
 	return "%s (%s, for %ds)" % [" - ".join(_labels), _progress(), secs]
 
 
@@ -347,6 +382,8 @@ func _progress() -> String:
 			if _combat.throw_stage == "walk":
 				return "walking to the throw spot"
 			return "throwing it" if _throw_wait < 0.0 else "waiting for it to go off"
+		&"defend":
+			return "holding the room" if _arrived else "on the way to its post"
 	return "waiting" if not _labels.is_empty() else ""
 
 
@@ -381,6 +418,22 @@ func debug_state() -> Dictionary:
 		},
 		"entry": _json_safe(debug_entry()),
 		"loco": _loco.debug_state(),
+		"order": _order_leaf(),
+	}
+
+
+## The order leaf the NPC is carrying out (a walk that began at the ORDER node, `docs/leadership.md` LD6), as `{ path, primitive, params,
+## paused }` (JSON-safe; `paused` while an entry detour of the entry guard holds it, its primitive and params then the paused order's,
+## not the detour's), or {} when it carries out no order. `debug_state()`'s own `primitive` and `params` are always the running ones.
+func _order_leaf() -> Dictionary:
+	if _path.is_empty() or str(_path[0]) != "order":
+		return {}
+	var paused := _primitive == &"entry" and not _resume.is_empty()
+	return {
+		"path": current_act(),
+		"primitive": String(_resume["primitive"] if paused else _primitive),
+		"params": _json_safe(_resume["params"] if paused else _params),
+		"paused": paused,
 	}
 
 
@@ -536,6 +589,8 @@ func set_leaf(leaf: Dictionary) -> void:
 		# re-decision). The bang's thrower (E17) throws first, then decides again from where it stands (`_apply_entry`).
 		_held = _held or (_primitive == &"entry" and _entry.throwing())
 		return
+	if _same_order(leaf):
+		return  # The ordered stack it is carrying out, decided again: its entry (or the detour paused in front of it) runs on (LD9).
 	var carry := {}
 	if _primitive == &"entry" and not _resume.is_empty() and (committed() or _guards(leaf, _entry.into)):
 		# A detour's entry carries on: the new order replaces the one paused behind it (a fight that began, the same order
@@ -553,12 +608,32 @@ func set_leaf(leaf: Dictionary) -> void:
 		_entry_pending = carry["pending"]
 
 
+## Whether `leaf` is the ordered stack the NPC is already carrying out (the same `order_id`), its entry running or paused behind a
+## detour of the entry guard (`docs/leadership.md` LD9).
+func _same_order(leaf: Dictionary) -> bool:
+	var id = (leaf.get("params", {}) as Dictionary).get("order_id")
+	if id == null or leaf.get("primitive") != &"entry":
+		return false
+	var running: Dictionary = _resume if not _resume.is_empty() else { "primitive": _primitive, "params": _params }
+	if running["primitive"] != &"entry" or str((running["params"] as Dictionary).get("order_id", "")) != str(id):
+		return false
+	return not _resume.is_empty() or _entry_pending or not _entry.phase in ["", "done"]
+
+
+## Whether the NPC is on an ordered stack's way to its door (`docs/leadership.md` LD9): running the entry an order gave it, or a detour
+## of the entry guard paused in front of one. Its walk is guarded whatever `entry_enabled` says (D4).
+func _ordered_stack() -> bool:
+	if _primitive == &"entry" and _params.has("order_id"):
+		return true
+	return not _resume.is_empty() and _resume["primitive"] == &"entry" and (_resume["params"] as Dictionary).has("order_id")
+
+
 ## Whether the entry guard applies to `leaf` for a doorway into room `into`: a walk (move / engage / interact, or a throw from a throw spot)
 ## that is not a retreat, while the NPC is not under fire, or, under fire, into the room the shots came from (`_into_the_shots`).
 func _guards(leaf: Dictionary, into: String) -> bool:
 	var params: Dictionary = leaf.get("params", {})
 	var prim: StringName = leaf.get("primitive", &"hold")
-	var walks: bool = prim in [&"move", &"engage", &"interact"] or (prim == &"throw" and bool(params.get("walk", false)))
+	var walks: bool = prim in [&"move", &"engage", &"interact", &"defend"] or (prim == &"throw" and bool(params.get("walk", false)))
 	return entry_guard and walks and bool(params.get("entry_guard", true)) and (not _perception.under_fire() or _into_the_shots(into))
 
 
@@ -575,7 +650,7 @@ func _adopt(leaf: Dictionary) -> void:
 	_params = leaf.get("params", {})
 	_path = leaf.get("path", [])
 	_labels = leaf.get("labels", [])
-	_leaf_ms = Time.get_ticks_msec()
+	_leaf_ms = GameClock.msec()
 	_arrived = false
 	_act_armed = false
 	_commit_timer = max_commit_time
@@ -609,6 +684,9 @@ func _adopt(leaf: Dictionary) -> void:
 			_entry_pending = true
 		&"throw":
 			_begin_throw_order()
+		&"defend":
+			_point = _loco.reachable(_params.get("spot", _character.global_position))
+	_say_order_step("moving")
 
 
 ## Start the throw order in `_params` afresh: with a throw spot (`walk`), from the walk to it (a throw resumed after a detour's entry, whose
@@ -674,6 +752,9 @@ func update_known(known: Array, delta: float) -> bool:
 	_tactic_timer -= delta
 	_known = known
 	_hostiles = known.filter(func(c): return c["hostile"])
+	if _throw_target_gone():
+		_end_throw()
+		return true
 	if _engage_id == 0:
 		return false
 	var engaged: Dictionary = {}
@@ -698,6 +779,15 @@ func update_known(known: Array, delta: float) -> bool:
 		_primitive = &"hold"
 		return true
 	return false
+
+
+## A throw order not yet in its wind-up whose target the NPC no longer knows of at all, neither as a contact nor as lost (it died, or
+## was forgotten): there is nobody left on its spot, so the throw ends and the NPC re-decides (G17).
+func _throw_target_gone() -> bool:
+	if _primitive != &"throw" or _combat.throw_stage in ["windup", "away"]:
+		return false
+	var id := int(_params.get("target_id", 0))
+	return id != 0 and not _hostiles.any(func(c): return c["id"] == id) and _throw_target() == 0
 
 
 ## Whether the running leaf is pointless without its target (a fight, or a move aimed at it).
@@ -761,6 +851,10 @@ func wants_decision(decide_timer_elapsed: bool) -> bool:
 			return _commit_timer <= 0.0
 		&"entry":
 			return false  # It ends itself: the room clear, or the entry given up.
+		&"defend":
+			# On the way, the walk's safety cap; at its post it holds as long as the order stands, until a fight it began from there
+			# (its shots keep it engaged) is the decision's to weigh, in the room (LD8).
+			return _commit_timer <= 0.0 if not _arrived else _perception.engaged_fresh()
 	return decide_timer_elapsed
 
 
@@ -772,6 +866,7 @@ func apply(delta: float) -> void:
 	_loco.sample(delta)  # Observation only (stuck overlay); never alters the tick.
 	_loco.bodies = _walk_bodies()  # Every walk accounts for the characters the NPC knows of, and only those.
 	_loco.ignore_id = _engage_id if _primitive == &"melee" else 0  # A melee closes on its target: no walk round it.
+	_perception.ordered_walk = _ordered_stack()
 	_loco.avoid_doors = _keeps_out_of_views()
 	_loco.avoid_exempt = _entry.opening if _primitive == &"entry" else ""
 	if not _evade.is_empty():
@@ -792,6 +887,8 @@ func apply(delta: float) -> void:
 			_apply_entry(delta)
 		&"throw":
 			_apply_throw(delta)
+		&"defend":
+			_apply_defend()
 		_:
 			_apply_hold()
 	if _loco.take_blocked():
@@ -810,15 +907,15 @@ func apply(delta: float) -> void:
 
 ## Whether the walk the running primitive is on keeps out of the doorway views (E18): the walks the entry guard covers, so a move, an
 ## engage or an interact that is not a retreat, a throw's walk to its throw spot, and an entry's approach to its stack (its other walks, the pie and the crossing, are
-## the entry's own), while the NPC is not under fire. Not an evade.
+## the entry's own), while the NPC is not under fire. Not an evade. An ordered stack's walk does whatever `entry_enabled` says (D4).
 func _keeps_out_of_views() -> bool:
-	if not entry_guard or not _perception.entry_enabled or not _evade.is_empty() or _perception.under_fire():
+	if not entry_guard or not (_perception.entry_enabled or _ordered_stack()) or not _evade.is_empty() or _perception.under_fire():
 		return false
 	if _primitive == &"entry":
 		return _entry.phase == "approach"
 	if _primitive == &"throw":
 		return _combat.throw_stage == "walk"
-	return _primitive in [&"move", &"engage", &"interact"] and bool(_params.get("entry_guard", true))
+	return _primitive in [&"move", &"engage", &"interact", &"defend"] and bool(_params.get("entry_guard", true))
 
 
 ## A body seals the only way of the walk the primitive is on and stays (`Locomotion.take_blocked`): re-plan, so the NPC is
@@ -827,7 +924,7 @@ func _keeps_out_of_views() -> bool:
 ## and, when it gives the entry up, re-decides too, or, as a detour, hands the walk back to the order it paused. An evade
 ## (not a primitive: it replaces the order) holds the best spot it has until the burst.
 func _way_blocked() -> void:
-	if _primitive in [&"move", &"engage", &"melee", &"interact"]:
+	if _primitive in [&"move", &"engage", &"melee", &"interact", &"defend"]:
 		_resolved = true
 		_resolve_reason = "way blocked"
 	elif _primitive == &"throw" and _combat.throw_stage in ["walk", "aim"]:
@@ -875,7 +972,11 @@ func _apply_watch(delta: float) -> void:
 		return
 	if _resting():
 		_gaze = "doors"
-		_watch.idle_gaze(delta)
+		var door = _params.get("door_pos") if _primitive == &"defend" else null
+		if door is Vector2:
+			Watch.ease_gaze(_character, door, search_look_rate, delta)  # A defender's gun on its own doorway (D2).
+		else:
+			_watch.idle_gaze(delta)
 
 
 ## Whether the running primitive leaves the NPC standing with nowhere in particular to look: a hold, a reload, a move that has
@@ -888,6 +989,8 @@ func _resting() -> bool:
 			return _arrived and not _look_around
 		&"throw":
 			return _combat.throw_stage == "away"
+		&"defend":
+			return _arrived
 	return false
 
 
@@ -926,6 +1029,9 @@ func _wanted_posture() -> StringName:
 				return &"stand"
 		&"hold", &"reload":
 			pass
+		&"defend":
+			if not _arrived:
+				return &"stand"
 		_:
 			return &"stand"
 	return &"crouch"
@@ -952,6 +1058,9 @@ func _should_run() -> bool:
 				return false
 		&"melee":
 			dest = _engage_pos
+		&"defend":
+			if _arrived:
+				return false
 		_:
 			return false
 	if not _params.get("run", false) and not (_perception != null and _perception.under_fire()):
@@ -1025,7 +1134,7 @@ func _apply_engage(delta: float) -> void:
 		_apply_hold()
 		return
 	_character.aim_point = _engage_pos  # Aim at where we last saw them, not their true position.
-	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
+	_hold_ground = _keeps_in(_engage_pos)
 	if not _arrived:
 		_arrived = _loco.reached(_point)
 		if not _arrived:
@@ -1036,7 +1145,7 @@ func _apply_engage(delta: float) -> void:
 	if _params.get("style", &"peek_cover") == &"ambush":
 		_combat.ambush(_engage_node, _engage_pos)
 		return
-	_combat.peek_cover(delta, _engage_node, _engage_pos, _hold_ground)
+	_combat.peek_cover(delta, _engage_node, _engage_pos, _hold_ground, str(_params.get("confine_room", "")))
 
 
 ## Melee: close to punch range and swing on the fire cooldown (no cover cycle for fists). While
@@ -1046,8 +1155,17 @@ func _apply_melee() -> void:
 		_apply_hold()
 		return
 	_character.aim_point = _engage_pos
-	_hold_ground = _params.get("confine_inside", false) and not _engage_inside
+	_hold_ground = _keeps_in(_engage_pos)
 	_combat.melee(_engage_pos, _hold_ground)
+
+
+## Whether the fight is held where it is against a contact at `pos`: a member ordered to defend a room (`confine_room`, LD8) against
+## one outside that room; a territorial NPC (`confine_inside`) against one last seen outside the house.
+func _keeps_in(pos: Vector2) -> bool:
+	var room := str(_params.get("confine_room", ""))
+	if room != "":
+		return _loco.room_key_at(pos) != room
+	return _params.get("confine_inside", false) and not _engage_inside
 
 
 ## Entry: start the entry on the primitive's first tick, then run its phases (the watch stage shoots a threat in
@@ -1127,7 +1245,7 @@ func _entry_guard() -> void:
 	if not entry_guard or _perception == null or not _perception.entry_enabled:
 		return
 	match _primitive:
-		&"move":
+		&"move", &"defend":
 			if _arrived:
 				return  # Holding at the destination, or covering the room by sight.
 		&"engage", &"interact":
@@ -1158,20 +1276,28 @@ func _entry_guard() -> void:
 ## An ENTER order's own walk to its stack (E15): a doorway it goes past on the way (in a corridor, not the one it is stacking at) is
 ## secured first like any other walk's. The entry pauses (it told the stack it gave its claim up and starts again afterwards). Not
 ## for a member heading for a stack that others have claimed: the team goes to its door as one, and a member that left it to cover a
-## door on the way would leave the point to go in alone.
+## door on the way would leave the point to go in alone. An ordered stack's walk (`docs/leadership.md` LD9, D4), whatever
+## `entry_enabled` says, also goes into a room that is not cleared on its way by entry first, as any walk does (E9), team or none, and
+## its entry starts afresh after it.
 func _guard_approach() -> void:
-	if not entry_guard or not _perception.entry_enabled or (_character.move_input as Vector2).length() < 0.1 or _perception.under_fire():
-		return
-	if not _perception.entry_team(_entry.opening).is_empty():
+	var ordered := _params.has("order_id")
+	if not entry_guard or not (_perception.entry_enabled or ordered) or (_character.move_input as Vector2).length() < 0.1 or _perception.under_fire():
 		return
 	var walk: Dictionary = _loco.path_ahead()
 	if walk.is_empty():
 		return
-	var passing := _passing_gate(walk, {})
-	if passing.is_empty() or passing["opening"] == _entry.opening:
+	var gate := {}
+	if ordered:
+		gate = _perception.threshold_ahead(walk["path"], walk["index"], entry_guard_range)
+		if not gate.is_empty() and (gate["opening"] == _entry.opening or float(_guard_off.get(gate["opening"], -1.0)) > _guard_clock):
+			gate = {}
+	var passing := {} if not _perception.entry_team(_entry.opening).is_empty() else _passing_gate(walk, gate)
+	if not passing.is_empty() and passing["opening"] != _entry.opening:
+		gate = passing
+	if gate.is_empty():
 		return
 	_entry.abandon()
-	_begin_detour(passing)
+	_begin_detour(gate)
 
 
 ## The doorway the walk goes past before it reaches `gate` (the doorway it crosses, {} for none), as a gate to secure (E15), or {}:
@@ -1306,6 +1432,43 @@ func throw_plan() -> Dictionary:
 	return { "from": from, "to": _throw_spot, "kind": _throw_kind, "radius": float(_params.get("radius", 0.0)) }
 
 
+## Defend (LD8): walk to the defend spot (a guarded walk where the entry guard applies, as any walk), then hold it, still; the watch stage
+## keeps the gun on its doorway, or turns it among the room's doorways, and on a threat in sight. Pushed off the spot, it walks back.
+## It says `in_position` on the radio once there. An empty gun is reloaded meanwhile, as in a hold.
+func _apply_defend() -> void:
+	if _arrived and _character.global_position.distance_to(_point) > DEFEND_DRIFT:
+		_arrived = false
+	if not _arrived:
+		_arrived = _loco.reached(_point, DEFEND_REACH)
+		if _arrived:
+			_say_order_step("in_position")
+	if not _arrived:
+		_loco.move_to(_point, DEFEND_REACH)
+		_aim_move()
+		return
+	_character.move_input = Vector2.ZERO
+	_combat.reload_if_dry()
+
+
+## Note step `step` of the order the running leaf carries out (its `order_id`), once until the next step differs, for the controller to
+## radio (`take_order_steps`, `docs/leadership.md` LD7). Nothing for a leaf that is no order.
+func _say_order_step(step: String) -> void:
+	if not _params.has("order_id"):
+		return
+	var id = _params["order_id"]
+	if str(_order_said.get("id", "")) == str(id) and _order_said.get("step", "") == step:
+		return
+	_order_said = { "id": id, "step": step }
+	_order_steps.append({ "order_id": id, "step": step })
+
+
+## The order steps to radio since the last call (`{ order_id, step }`).
+func take_order_steps() -> Array:
+	var out := _order_steps
+	_order_steps = []
+	return out
+
+
 ## Hold: stand still. Where it looks is the watch stage's (`_apply_watch`): a threat if one has its eyes, else the doors. An
 ## empty gun is reloaded meanwhile, so a steady NPC (no decision to be had) isn't left unarmed.
 func _apply_hold() -> void:
@@ -1372,7 +1535,7 @@ func set_evade(plan: Dictionary) -> void:
 		_params = {}
 		_path = ["evade"]
 		_labels = ["EVADE", "a live %s grenade" % plan.get("kind", "")]
-		_leaf_ms = Time.get_ticks_msec()
+		_leaf_ms = GameClock.msec()
 		_target_obj = null
 	elif (plan["spot"] as Vector2) != (_evade["spot"] as Vector2):
 		_evade_arrived = false  # A new spot (the grenade moved): run to that one.

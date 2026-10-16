@@ -32,13 +32,16 @@ var entry_rules: Dictionary = {}
 var skip_single_option: bool = true
 ## Territory: inside a `confine` subtree (combat), drop options outside the house.
 var inside_only: bool = false
+## The room a member ordered to defend it keeps to (`docs/leadership.md` LD8; "" = none): inside a `confine` subtree, drop options whose
+## `tags.room` is another room or outside, as `inside_only` drops those outside the house. Pushed each decision from the live order.
+var confine_room: String = ""
 
 var _client: Node                  ## The Von transport (decision_client.gd).
 var _nodes := {}                   ## The tree with overrides merged, keyed by node id.
 var _snap := {}                    ## The perception snapshot the walk in flight decides over.
 var _node: StringName = &""        ## The node whose level is being decided.
 var _binding := {}                 ## Bound values so far (e.g. { "target": "Intruder", "target_id": 123 }).
-var _confine := false              ## Whether the walk is inside a confined subtree for a territorial NPC.
+var _confine := false              ## Whether the walk is inside a confined subtree for a territorial NPC or one keeping to a room.
 var _entry: StringName = &"root"   ## Where the walk in flight started.
 var _steps: Array = []             ## The path chosen so far: [{ id, label }].
 var _offered := {}                 ## The in-flight level's options: id → { kind, desc, label, … }.
@@ -154,7 +157,7 @@ func _enter(id: StringName) -> void:
 	var node: Dictionary = _nodes[id]
 	if node.has("label"):
 		_steps.append({ "id": String(id), "label": node["label"] })
-	_confine = _confine or (inside_only and node.get("confine", false))
+	_confine = _confine or (_confines() and node.get("confine", false))
 	if _is_leaf_node(node):
 		_finish(id, { "id": String(id), "label": node.get("label", String(id)) })
 		return
@@ -245,13 +248,15 @@ func _finish(node_id: StringName, option: Dictionary) -> void:
 	params.merge(option.get("params", {}), true)
 	if _binding.has("target_id") and not params.has("target_id"):
 		params["target_id"] = _binding["target_id"]
-	params["confine_inside"] = _confine
+	params["confine_inside"] = _confine and inside_only
+	if _confine and confine_room != "":
+		params["confine_room"] = confine_room
 	if option["id"] != String(node_id):
 		_steps.append({ "id": option["id"], "label": option.get("label", option["id"]) })
 	var leaf := {
 		"path": _steps.map(func(s): return s["id"]),
 		"labels": _steps.map(func(s): return s["label"]),
-		"primitive": node.get("primitive", &"hold"),
+		"primitive": option.get("primitive", node.get("primitive", &"hold")),
 		"params": params,
 	}
 	_pending = false
@@ -306,7 +311,7 @@ func _available(id: StringName, confine: bool) -> bool:
 	var node: Dictionary = _nodes[id]
 	if not _requires_ok(node.get("requires", [])):
 		return false
-	confine = confine or (inside_only and node.get("confine", false))
+	confine = confine or (_confines() and node.get("confine", false))
 	if _needs_bind(node):
 		for opt in _group(node["bind_options"]).get("options", []):
 			if _leaf_under_binding(id, opt.get("bind", {}), confine):
@@ -349,12 +354,19 @@ func _is_leaf_node(node: Dictionary) -> bool:
 	return node.has("primitive") and node.get("options", []).is_empty() and node.get("children", []).is_empty()
 
 
-## `options` minus those carrying any `drop` tag, and minus those outside the house when `confine`
-## applies.
+## Whether a `confine` subtree confines this NPC: it is territorial, or keeps to the room it was ordered to defend.
+func _confines() -> bool:
+	return inside_only or confine_room != ""
+
+
+## `options` minus those carrying any `drop` tag, and, when `confine` applies, minus those outside the house (a territorial NPC) and
+## those placed outside the room it keeps to (`confine_room`; an option that names no place, a reload or a punch, stays).
 func _allowed(options: Array, confine: bool, drop: Array = []) -> Array:
 	return options.filter(func(o):
 		var tags: Dictionary = o.get("tags", {})
-		if confine and not tags.get("inside", true):
+		if confine and inside_only and not tags.get("inside", true):
+			return false
+		if confine and confine_room != "" and tags.has("room") and String(tags["room"]) != confine_room:
 			return false
 		for tag in drop:
 			if tags.get(String(tag), false):
@@ -398,7 +410,7 @@ func _fill(template: String, id: StringName) -> String:
 	var situation := ""
 	if summary_group != &"":
 		var group := _group(summary_group)
-		var confined: bool = _confine or (inside_only and node.get("confine", false))
+		var confined: bool = inside_only and (_confine or node.get("confine", false))
 		summary = group.get("summary_inside", group.get("summary", "")) if confined else group.get("summary", "")
 		situation = group.get("situation", "")
 	var text := template.format({ "target": _binding.get("target", "the hostile"), "blinded": _binding.get("blinded", ""),
@@ -406,13 +418,13 @@ func _fill(template: String, id: StringName) -> String:
 	return text.trim_suffix(" — ").trim_suffix(" ()").strip_edges()
 
 
-## The state Von sees at node `node`'s level: the goal, the node's context sections (its
-## `bind_context` on a bind level; the bound target's own version of a section first), then the path
+## The state Von sees at node `node`'s level: the goal and the order its leader gave it (empty without one), shown at every level,
+## the node's context sections (its `bind_context` on a bind level; the bound target's own version of a section first), then the path
 ## decided so far.
 func _state_text(node: Dictionary, bind_level: bool) -> String:
 	var lines: Array = []
 	var context: Array = node.get("bind_context", node.get("context", [])) if bind_level else node.get("context", [])
-	for section_name in [&"goal"] + context:
+	for section_name in [&"goal", &"order"] + context:
 		var text := _section(String(section_name))
 		if text != "":
 			lines.append(text)

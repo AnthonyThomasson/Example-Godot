@@ -1,6 +1,6 @@
 ---
 name: domain-ui
-description: Overview of the UI domain (scenes/ui/) — all HUDs and menus, split into four sub-domains by folder: menus (setup window, settings page), hud (debug panel, match HUD, seed label, spectator inspector), overlays (overlay registry, toggle bar, performance overlay) and testing (test browser window, result banner). Start here for what they share (decoupled observers of the Character API, the AI controller's debug getters and the EventBus), then load the matching `domain-ui-<name>` skill. Complements the `architecture` skill.
+description: Overview of the UI domain (scenes/ui/) — all HUDs and menus, split into four sub-domains by folder: menus (setup window, settings page), hud (debug panel, match HUD, spectator inspector, stack markers, stun screen, the human leader's command menu and order markers), overlays (overlay registry, toggle bar, performance overlay, squad-leaders overlay) and testing (test browser window, result banner). Start here for what they share (decoupled observers of the Character API, the AI controller's debug getters and the EventBus), then load the matching `domain-ui-<name>` skill. Complements the `architecture` skill.
 ---
 
 # UI domain (`scenes/ui/`) — overview
@@ -8,7 +8,8 @@ description: Overview of the UI domain (scenes/ui/) — all HUDs and menus, spli
 `CanvasLayer` / `Node` widgets, all built entirely in code (no scene-side layout), all decoupled observers
 that read only these contracts — Character public API/signals, the AI controller's
 `debug_zones()` and `known_contacts_for_display()`, the tactics overlay's `set_focus(point)` / `clear_focus()` (the spectator
-inspector), `PlayerStack.view()` (the stack markers, interface 17), and the EventBus `&"hit"` and `&"stun"` topics. They know nothing else of
+inspector), `PlayerStack.view()` (the stack markers, interface 17), a squad's `view()` callable (the command menu, the order markers and the squad-leaders overlay) and `resolve()` callable (the command menu,
+interface 21), and the EventBus `&"hit"` and `&"stun"` topics. They know nothing else of
 the domains.
 
 ## Sub-domains (one folder, one skill each)
@@ -16,8 +17,8 @@ the domains.
 | Folder | Skill | Owns |
 |---|---|---|
 | `menus/` | `domain-ui-menus` | `setup_menu.gd` (pre-game window), `settings_menu.gd` (Debug + key rebinding) |
-| `hud/` | `domain-ui-hud` | `debug_ui.gd`, `match_hud.gd`, `spectator_inspector.gd`, `contact_markers.gd`, `stack_markers.gd`, `stun_screen.gd`, `outfit_lines.gd` |
-| `overlays/` | `domain-ui-overlays` | `overlay_registry.gd`, `overlay_toggles.gd`, `performance_overlay.gd`, `drag_handle.gd` |
+| `hud/` | `domain-ui-hud` | `debug_ui.gd`, `match_hud.gd`, `spectator_inspector.gd`, `contact_markers.gd`, `stack_markers.gd`, `stun_screen.gd`, `outfit_lines.gd`, `command_menu.gd`, `order_markers.gd` |
+| `overlays/` | `domain-ui-overlays` | `overlay_registry.gd`, `overlay_toggles.gd`, `performance_overlay.gd`, `leader_overlay.gd`, `drag_handle.gd` |
 | `testing/` | `domain-ui-testing` | `test_browser_window.gd`, `test_result_hud.gd` |
 
 Load the matching sub-skill before editing a folder. What they share: every widget is built in code (no scene-side layout), takes plain
@@ -27,4 +28,4 @@ working while the match is paused. There are no `class_name`s in this domain; ca
 `OverlayToggles.setup`, …); `main.gd` finds its HUD nodes by name (`get_node_or_null("MatchHUD")`, `"DebugUI"`)
 and calls them duck-typed. Each sub-skill lists the calls its folder receives.
 
-**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus), 13 (Testing), 14 (settings page), 17 (stack markers), 18 (stun screen) — signatures in `architecture`.
+**Interfaces:** 7 (observers of the Character API and the AI controller), 10 (EventBus), 13 (Testing), 14 (settings page), 17 (stack markers), 18 (stun screen), 21 (the command menu, the order markers and the squad-leaders overlay) — signatures in `architecture`.

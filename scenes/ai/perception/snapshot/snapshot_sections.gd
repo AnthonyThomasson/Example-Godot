@@ -34,6 +34,23 @@ func situation_text(rooms: Array) -> String:
 		_v.health_band(_character.damage_taken())]
 
 
+## The order the NPC's leader gave it, in one sentence Von reads at every level while it holds one (`docs/leadership.md` LD6; measured
+## with tools/von_probe.py): "Your leader ordered you to defend the kitchen." / "... to go into the kitchen by its doorway quietly." (or
+## "with a stun grenade first"). Empty with no order, so an NPC that holds none reads exactly what it read before.
+func order_text(order: Dictionary, rooms: Array) -> String:
+	match String(order.get("kind", "")):
+		"defend_room":
+			var room := SnapshotVocab.room_by_key(rooms, String(order.get("room", "")))
+			if not room.is_empty():
+				return "Your leader ordered you to defend the %s." % _v.room_name(room["type"])
+		"stack":
+			var into := SnapshotVocab.room_by_key(rooms, String(order.get("into", "")))
+			if not into.is_empty():
+				return "Your leader ordered you to go into the %s by its doorway %s." % [_v.room_name(into["type"]),
+					"with a stun grenade first" if bool(order.get("bang", false)) else "quietly"]
+	return ""
+
+
 ## The gun's state in the bands Von reads (never a round count): loaded, nearly empty, empty or being
 ## reloaded; once it runs low, whether spare magazines are carried. Then the grenades carried (`grenades`: the kinds, a frag
 ## first): "You carry a frag grenade and a stun grenade." Empty without a gun or a grenade.
