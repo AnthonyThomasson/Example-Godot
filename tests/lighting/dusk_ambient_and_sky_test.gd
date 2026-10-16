@@ -1,10 +1,9 @@
 extends GameTest
 
 ## R10 (ticket #61): the dusk. A generated house is tinted by one ambient CanvasModulate in the configured colour (the plan's
-## blue-violet 0.40 / 0.37 / 0.55), and lit by the sky: DirectionalLight2Ds in the configured sky colour, shining from the
-## south-west (toward +x, -y). Every sky light that reaches the street's floors is unshadowed, every one that reaches the
-## rooms' floors is shadowed, by the walls among others (its shadow mask meets the wall occluders'), so only the doorways let it
-## in; the street and the rooms are each reached by one.
+## blue-violet 0.40 / 0.37 / 0.55), and its street lit by the sky: DirectionalLight2Ds in the configured sky colour, shining
+## from the south-west (toward +x, -y). Every sky light that reaches the street's floors is unshadowed, and one does; none
+## reaches the rooms' floors (the house has a roof: a room is lit by the ambient, its fixture and its pieces).
 ##
 ## It reads (tests/_lighting/lighting_probe.gd) `WorldLighting` in the group `world_lighting`, `LightingConfig.ambient_color` and
 ## `LightingConfig.sky_color`. The ambient and the sky are plain Godot nodes under the world.
@@ -16,7 +15,7 @@ const SEED := 4
 func describe() -> Dictionary:
 	return {
 		"name": "Dusk: the ambient and the sky light",
-		"description": "One CanvasModulate in the configured blue-violet; sky lights in the configured colour from the south-west, unshadowed on the street and shadowed by the walls in the house.",
+		"description": "One CanvasModulate in the configured blue-violet; a sky light in the configured colour from the south-west, unshadowed on the street; none in the house.",
 		"tags": ["lighting"],
 		"timeout": 6.0,
 	}
@@ -52,14 +51,6 @@ func run(t: TestContext) -> void:
 	if not t.require(not room_floors.is_empty() and not street_floors.is_empty(), "the house has room floors and street floors (%d, %d)" % [
 			room_floors.size(), street_floors.size()]):
 		return
-	var walls := house.find_children("*", "Node2D", true, false).filter(func(n: Node) -> bool: return n.has_method(&"wall_segments"))
-	var wall_occluders: Array = []
-	for wall: Node2D in walls:
-		for seg: PackedVector2Array in wall.wall_segments():
-			if seg[0].distance_to(seg[1]) >= 1.0:
-				wall_occluders.append_array(Probe.occluders_at(t.world, wall.global_transform * seg[0].lerp(seg[1], 0.5)))
-	t.check(not wall_occluders.is_empty(), "the house's walls carry occluders")
-
 	var lights_rooms := false
 	var lights_street := false
 	for sky: DirectionalLight2D in skies:
@@ -72,9 +63,6 @@ func run(t: TestContext) -> void:
 		lights_street = lights_street or on_street
 		if on_street:
 			t.check(not sky.shadow_enabled, "the sky light %s on the street is unshadowed" % sky.name)
-		if on_rooms:
-			t.check(sky.shadow_enabled, "the sky light %s in the house is shadowed" % sky.name)
-			t.check(wall_occluders.all(func(o: LightOccluder2D) -> bool: return sky.shadow_item_cull_mask & o.occluder_light_mask != 0),
-				"the walls shadow the sky light %s (its shadow mask %d)" % [sky.name, sky.shadow_item_cull_mask])
-	t.check(lights_rooms, "a sky light reaches the rooms' floors")
+		t.check(not on_rooms, "the sky light %s does not reach the rooms' floors (the house has a roof)" % sky.name)
+	t.check(not lights_rooms, "no sky light reaches the rooms' floors")
 	t.check(lights_street, "a sky light reaches the street's floors")

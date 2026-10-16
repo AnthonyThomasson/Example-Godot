@@ -452,13 +452,15 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  bullet's `collision_mask` (`projectile/projectile.gd`), the blast's lines (`projectile/explosion.gd`), Physics' `PhysicsConfig.wall_mask` and a vehicle's body layer and mask, door
 	  checks and pile queries (`scenes/vehicle/`) and the character's clearing check (`keep_clear_of`) read it too.
     - `LightMasks` (`general/light_masks.gd`, a `class_name` static holder) — the light masks every domain builds its shadows and
-	  light layers on, so who shadows whom is decided in one place (`docs/lighting.md` L6): the occluder bits `WALL` 1, `FURNITURE` 2,
-	  `EMITTER` 4 (a solid piece that gives light: it shadows only the flashes and the sky), `CHARACTER` 8; the shadow masks the
-	  Lighting domain gives its lights (`PIECE_SHADOWS` walls + furniture + characters, `FIXTURE_SHADOWS` walls, `ALL_SHADOWS`); the item
-	  light layers `HOUSE` 1 (Godot's default) and `STREET` 2 (the street, lit only by the street lamps, the flashes and its own sky);
-	  `shadows` (whether occluders are built: off with the Testing domain's `lighting.enabled`) and
-	  `occluder(polygon, bit) -> LightOccluder2D` (null while `shadows` is off; wound and culled so the shape itself stays lit). Read by
-	  Objects (walls, solid pieces, the street floors), Character (the living body) and the Lighting domain (interface 20).
+	  light layers on, so who shadows whom is decided in one place (`docs/lighting.md` L6): the occluder bits `WALL` 1,
+	  `FURNITURE` 2, `EMITTER` 4 (a solid piece that gives light: it shadows only the flashes), `CHARACTER` 8, `TALL` 16 (a solid
+	  piece with no light of its own as tall as `TALL_COVERAGE` 75 `coverage`, above a standing person); the shadow masks the
+	  Lighting domain gives its lights by their height (`OVERHEAD_SHADOWS` walls: an overhead light; `LOW_SHADOWS` walls + tall
+	  pieces: a low light; `ALL_SHADOWS` everything: a flash); the item light layers `HOUSE` 1 (Godot's default) and `STREET` 2
+	  (the street, lit only by the street lamps, the flashes and its own sky); `shadows` (whether occluders are built: off with
+	  the Testing domain's `lighting.enabled`) and `occluder(polygon, bit) -> LightOccluder2D` (null while `shadows` is off; wound
+	  and culled so the shape itself stays lit). Read by Objects (walls, solid pieces, the street floors), Character (the living
+	  body) and the Lighting domain (interface 20).
     - `DrawLayers` (`general/draw_layers.gd`, a `class_name` static holder) — the world's draw-order ladder, one rung per kind of thing,
 	  so what lies on the floor, what a vehicle covers and what flies over it keep one order across domains: `FLOOR` −5 (Objects' `Floor`,
 	  via `ObjectArtConfig.floor_z_index`) < `RUG` −4 (rugs and mats, `ObjectArtConfig.rug_z_index`) < `BLOOD` −3 (Physics: splats, a
@@ -613,18 +615,21 @@ interfaces it takes part in (by number) and describes how they're implemented.
       `dropped` = `{ piece, index }` per declared light left without a light). `LightingConfig` (static holder): `enabled`,
       `ambient_color`, `sky_color` and the rest of the dusk, fixture, flash and budget tuning; the Testing domain's `lighting.enabled`
       switch sets `LightingConfig.enabled` and General's `LightMasks.shadows`.
-    - **Objects → Lighting: `get_lights() -> Array`** on a light-giving piece (an EnvironmentObject; read duck-typed, like Audio reads a
-      vehicle): one plain dict per light in the piece's frame, `offset` (Vector2), `turn` (rad, the pool's long axis), `colour`,
-      `energy`, `radius` (px, along the long axis), `shape` (`round` / `wide` / `tube`), `rhythm` (`[[mode, weight], ...]`, modes
-      `steady buzz failing blink shimmer pulse`), `room_light` (it lights its room: no fixture there), `street` (it lights the street
-      too) and `glow` (the piece's `Emissive` overlay, dimmed with the light; or null). The Lighting domain parents each light it
-      keeps to the piece, so a shoved piece carries it.
-    - **The shadows and light layers** (on General's `LightMasks`, interface 11): Objects' walls (one occluder per wall run, `WALL`) and
-      solid pieces (their footprint, `FURNITURE` or `EMITTER`) and Character's living body (an oval turned with `facing`, `CHARACTER`,
-      freed on death) build their own `LightOccluder2D` children with `LightMasks.occluder`, like their colliders; Objects' street
-      floors (catalogue `light_layer: "street"`) put their canvas items on `LightMasks.STREET`; Objects' `Emissive` overlays draw
-      unshaded. The Lighting domain reads the floors (`floor_material`, `size`, the `light_mask` of their canvas items) for the per-floor
-      budget, and each frame the characters in the group `characters` (`is_dead`, `radius`, interface 7) for whom stands in a light.
+    - **Objects → Lighting: `get_lights() -> Array`** on a light-giving piece (an EnvironmentObject; read duck-typed, like Audio
+      reads a vehicle): one plain dict per light in the piece's frame, `offset` (Vector2), `turn` (rad, the pool's long axis),
+      `colour`, `energy`, `radius` (px, along the long axis), `shape` (`round` / `wide` / `tube`), `rhythm` (`[[mode, weight],
+      ...]`, modes `steady buzz failing blink shimmer pulse`), `room_light` (it lights its room: no fixture there), `street` (it
+      lights the street too), `height` (`overhead`: above the heads, a lamp's bulb, a street lamp's head; `low`: a screen, a tube,
+      LEDs; the Lighting domain picks the light's shadows and pool by it, `docs/lighting.md` L2 / L6) and `glow` (the piece's
+      `Emissive` overlay, dimmed with the light; or null). The Lighting domain parents each light it keeps to the piece, so a
+      shoved piece carries it.
+    - **The shadows and light layers** (on General's `LightMasks`, interface 11): Objects' walls (one occluder per wall run,
+      `WALL`) and solid pieces (their footprint, `EMITTER`, `TALL` or `FURNITURE`) and Character's living body (an oval turned
+      with `facing`, `CHARACTER`, freed on death) build their own `LightOccluder2D` children with `LightMasks.occluder`, like
+      their colliders; Objects' street floors (catalogue `light_layer: "street"`) put their canvas items on `LightMasks.STREET`;
+      Objects' `Emissive` overlays draw unshaded. The Lighting domain reads the floors (`floor_material`, `size`, the `light_mask`
+      of their canvas items) for the per-floor budget, and each frame the characters in the group `characters` (`is_dead`,
+      `radius`, interface 7) for whom stands in a flash.
     - **The flash events:** the `&"shot"` and `&"explosion"` topics (interface 10) light its flash pool.
 
 ### Dependency graph (arrows = "calls / knows"; no cycles)

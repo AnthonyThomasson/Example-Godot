@@ -1,14 +1,15 @@
 extends GameTest
 
 ## R10 (ticket #61): shadows. Occluders stand on the walls, on solid pieces and on living characters, and a character's goes
-## when it dies. In one room with a lamp, an armchair, a rug and two puppets:
+## when it dies. In one room with a lamp, a TV, a wardrobe, an armchair, a rug and two puppets:
 ## - every wall run is covered by a casting LightOccluder2D (sampled along each `wall_segments()` run);
-## - each solid piece (the armchair, the lamp) carries its own occluder over its footprint, so it follows a shove; the rug,
-##   walk-over decor, carries none;
+## - each solid piece (the armchair, the wardrobe, the lamp, the TV) carries its own occluder over its footprint, so it follows
+##   a shove; the rug, walk-over decor, carries none;
 ## - a living puppet stands in a casting occluder, and still does after walking a stretch (it follows the body);
 ## - once the other puppet is dead, no casting occluder is under it or over where it lies;
-## - the lamp's light casts shadows that the walls', the armchair's and the living character's occluders take part in (its
-##   shadow mask meets each one's occluder mask).
+## - shadows by height (`docs/lighting.md` L6): the lamp's light hangs overhead, so only the walls shadow it (its shadow mask
+##   meets the wall's occluder mask and not the wardrobe's, the armchair's or the walker's); the TV's light is low, so the walls
+##   and the wardrobe (a tall piece) shadow it, and the armchair (a low piece) and the walker do not.
 ##
 ## It reads (tests/_lighting/lighting_probe.gd) `WorldLighting` in the group `world_lighting`
 ## with `lights()`; the lamp's light a PointLight2D under it. The occluders are plain LightOccluder2Ds anywhere under the world
@@ -24,7 +25,7 @@ const VICTIM_AT := Vector2(650, 450)
 func describe() -> Dictionary:
 	return {
 		"name": "Walls, solid pieces and living characters cast shadows; the dead do not",
-		"description": "Casting occluders cover every wall run, sit on each solid piece (not on a rug) and on a living character as it walks; a dead character has none; the lamp's light is shadowed by them.",
+		"description": "Casting occluders cover every wall run, sit on each solid piece (not on a rug) and on a living character as it walks; a dead character has none; the overhead lamp is shadowed by the walls only, the low TV by the walls and the tall wardrobe only.",
 		"tags": ["lighting"],
 		"timeout": 6.0,
 	}
@@ -36,6 +37,8 @@ func configure(s: TestSetup) -> void:
 	s.object(&"lamp", "lamp", Vector2(450, 120), { "neon": "" })
 	s.object(&"armchair", "armchair", Vector2(450, 300), { "neon": "" })
 	s.object(&"rug", "rug", Vector2(700, 200))
+	s.object(&"wardrobe", "wardrobe", Vector2(150, 120), { "neon": "" })
+	s.object(&"tv", "tv", Vector2(780, 330), { "neon": "" })
 	s.actor(&"walker", &"puppet", WALKER_AT)
 	s.actor(&"victim", &"puppet", VICTIM_AT)
 
@@ -58,7 +61,7 @@ func run(t: TestContext) -> void:
 
 	# Solid pieces: their own occluder over their footprint; walk-over decor none.
 	var piece_occluders := {}
-	for id in [&"armchair", &"lamp"]:
+	for id in [&"armchair", &"wardrobe", &"lamp", &"tv"]:
 		var piece: Node2D = t.object(id)
 		var own := Probe.own_occluders(piece).filter(func(o: LightOccluder2D) -> bool: return Probe.holds(o, piece.global_position))
 		t.check(not own.is_empty(), "the solid %s carries an occluder over its footprint" % id)
@@ -91,18 +94,24 @@ func run(t: TestContext) -> void:
 	for p: Vector2 in lies:
 		t.check(Probe.occluders_at(world, p).is_empty(), "no occluder over where the dead victim lies (%s)" % p.round())
 
-	# The lamp's light is shadowed by them.
+	# Shadows by height: the overhead lamp by the walls only, the low TV by the walls and the tall wardrobe only.
 	var lighting := Probe.require_lighting(t)
 	if lighting == null:
 		return
-	var lamp_lights := Probe.lights_of(lighting, t.object(&"lamp"))
-	if not t.require(not lamp_lights.is_empty(), "the lamp has its light"):
-		return
-	var light: PointLight2D = lamp_lights[0]
-	t.check(light.shadow_enabled, "the lamp's light casts shadows")
-	var casters := { "wall": wall_occluder, "armchair": piece_occluders.get(&"armchair"), "walker": body_occluder }
-	for what: String in casters:
-		var occ: LightOccluder2D = casters[what]
-		if occ != null:
-			t.check(light.shadow_item_cull_mask & occ.occluder_light_mask != 0, "the %s shadows the lamp's light (mask %d, occluder %d)" % [
-				what, light.shadow_item_cull_mask, occ.occluder_light_mask])
+	var casters := { "wall": wall_occluder, "wardrobe": piece_occluders.get(&"wardrobe"),
+		"armchair": piece_occluders.get(&"armchair"), "walker": body_occluder }
+	var shadowed_by := { &"lamp": ["wall"], &"tv": ["wall", "wardrobe"] }
+	for id: StringName in shadowed_by:
+		var own_lights := Probe.lights_of(lighting, t.object(id))
+		if not t.require(not own_lights.is_empty(), "the %s has its light" % id):
+			return
+		var light: PointLight2D = own_lights[0]
+		t.check(light.shadow_enabled, "the %s's light casts shadows" % id)
+		for what: String in casters:
+			var occ: LightOccluder2D = casters[what]
+			if occ == null:
+				continue
+			var shadows := light.shadow_item_cull_mask & occ.occluder_light_mask != 0
+			var wanted: bool = what in shadowed_by[id]
+			t.check(shadows == wanted, "the %s %s the %s's light (mask %d, occluder %d)" % [
+				what, "shadows" if wanted else "does not shadow", id, light.shadow_item_cull_mask, occ.occluder_light_mask])

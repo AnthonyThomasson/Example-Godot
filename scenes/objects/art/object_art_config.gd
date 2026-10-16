@@ -191,26 +191,31 @@ static var prop_colors: Dictionary = {
 # --- The lights the pieces give (object_lights.gd: a piece's `get_lights()`, read by the Lighting domain) ---
 ## One row per kind of light a piece gives: its `energy`, its pool's `radius` (px, out along the pool's long axis; a `wide`
 ## pool is half as deep, a `tube` a third), `shape` (`round`, `wide`: a screen's spill across its front, `tube`: along a neon
-## tube), how far `ahead` (px) of the piece's front edge it stands (a screen's spill; none: the piece's centre), the rhythms
-## it is drawn from by weight (`[[mode, weight], ...]`: steady, buzz, failing, blink, shimmer, pulse) and `room_light` (it
-## lights its room, so the room needs no ceiling fixture). Its colour is what the piece draws glowing (its neon, its
-## screen, its bulb). `trim` is a piece's neon trim or under-glow; a tube's `radius` is its length × `tube_reach`.
+## tube), how far `ahead` (px) of the piece's front edge it stands (a screen's spill; none: the piece's centre), the rhythms it
+## is drawn from by weight (`[[mode, weight], ...]`: steady, buzz, failing, blink, shimmer, pulse), `room_light` (it lights its
+## room, so the room needs no ceiling fixture) and `height` (`overhead`: above the heads, a lamp's bulb, a street lamp's head,
+## shadowed by the walls only and pooling downward; `low` when absent: shadowed by the walls and the tall pieces). Its colour
+## is what the piece draws glowing (its neon, its screen, its bulb). `trim` is a piece's neon trim or under-glow; a tube's
+## `radius` is its length × `tube_reach`.
 static var light_specs: Dictionary = {
-	"lamp": { "energy": 0.95, "radius": 190.0, "shape": &"round",
+	"lamp": { "energy": 0.95, "radius": 160.0, "shape": &"round", "height": &"overhead",
 		"rhythm": [[&"steady", 6.0], [&"buzz", 1.5], [&"pulse", 1.0], [&"failing", 1.5]], "room_light": true },
 	"tv": { "energy": 0.8, "radius": 110.0, "shape": &"wide", "ahead": 26.0, "rhythm": [[&"shimmer", 1.0]] },
 	"desk": { "energy": 0.6, "radius": 105.0, "shape": &"wide", "ahead": -12.0, "rhythm": [[&"shimmer", 1.0]] },
 	"monitor_wall": { "energy": 0.9, "radius": 128.0, "shape": &"wide", "ahead": 30.0, "rhythm": [[&"shimmer", 1.0]] },
 	"server_rack": { "energy": 0.5, "radius": 65.0, "shape": &"round", "ahead": 8.0, "rhythm": [[&"blink", 1.0], [&"pulse", 1.0]] },
 	"rig": { "energy": 0.4, "radius": 80.0, "shape": &"round", "rhythm": [[&"shimmer", 1.0]] },
-	"surgical": { "energy": 1.1, "radius": 160.0, "shape": &"round", "rhythm": [[&"steady", 1.0]], "room_light": true },
+	"surgical": { "energy": 1.1, "radius": 160.0, "shape": &"round", "height": &"overhead", "rhythm": [[&"steady", 1.0]],
+		"room_light": true },
 	"tool_cart": { "energy": 0.4, "radius": 60.0, "shape": &"round", "rhythm": [[&"shimmer", 1.0]] },
 	"scanner": { "energy": 0.6, "radius": 90.0, "shape": &"wide", "ahead": 9.0, "rhythm": [[&"pulse", 1.0]] },
 	"hotplate": { "energy": 0.6, "radius": 60.0, "shape": &"round", "rhythm": [[&"pulse", 1.0]] },
 	"neon_tube": { "energy": 0.85, "tube_reach": 1.7, "shape": &"tube",
 		"rhythm": [[&"steady", 4.0], [&"failing", 3.5], [&"buzz", 2.5]] },
-	"cobra": { "energy": 1.0, "radius": 210.0, "shape": &"round", "rhythm": [[&"steady", 3.0], [&"failing", 1.0]] },
-	"sign": { "energy": 1.0, "radius": 210.0, "shape": &"round", "rhythm": [[&"blink", 3.0], [&"buzz", 2.0]] },
+	"cobra": { "energy": 1.0, "radius": 130.0, "shape": &"round", "height": &"overhead",
+		"rhythm": [[&"steady", 3.0], [&"failing", 1.0]] },
+	"sign": { "energy": 1.0, "radius": 130.0, "shape": &"round", "height": &"overhead",
+		"rhythm": [[&"blink", 3.0], [&"buzz", 2.0]] },
 	"trim": { "energy": 0.45, "radius": 45.0, "shape": &"round", "rhythm": [[&"steady", 4.0], [&"buzz", 1.0]] },
 }
 

@@ -125,7 +125,7 @@ func take_hit(hit: HitInfo) -> void:
 # --- Lights (read duck-typed by the Lighting domain) -----------------------------------
 
 ## The lights this piece gives, as plain dicts in its own frame (`offset`, `turn`, `colour`, `energy`, `radius`, `shape`,
-## `rhythm`, `room_light`, `street`, `glow`: see object_lights.gd); empty for a piece that gives none.
+## `rhythm`, `room_light`, `street`, `height`, `glow`: see object_lights.gd); empty for a piece that gives none.
 func get_lights() -> Array:
 	return _lights
 
@@ -174,7 +174,8 @@ func _rebuild_collider() -> void:
 
 ## The piece's shadow: an occluder over its undented footprint (its rect, or a circle as a `OCCLUDER_SIDES`-gon: a shadow
 ## needs no more, and every edge is drawn into each light's shadow map; dents are too small to show in one). A piece that
-## gives light is on `LightMasks.EMITTER`, so its own light, sitting inside it, is never shut in; the rest on `FURNITURE`.
+## gives light is on `LightMasks.EMITTER`, so its own light, sitting inside it, is never shut in; one as tall as
+## `LightMasks.TALL_COVERAGE` on `TALL` (it shadows the low lights too); the rest on `FURNITURE`.
 ## None while `LightMasks.shadows` is off.
 func _build_occluder() -> void:
 	var poly := PackedVector2Array()
@@ -184,7 +185,12 @@ func _build_occluder() -> void:
 	else:
 		var h := size * 0.5
 		poly = PackedVector2Array([-h, Vector2(h.x, -h.y), h, Vector2(-h.x, h.y)])
-	var occ := LightMasks.occluder(poly, LightMasks.EMITTER if not _lights.is_empty() else LightMasks.FURNITURE)
+	var bit := LightMasks.FURNITURE
+	if not _lights.is_empty():
+		bit = LightMasks.EMITTER
+	elif coverage >= LightMasks.TALL_COVERAGE:
+		bit = LightMasks.TALL
+	var occ := LightMasks.occluder(poly, bit)
 	if occ != null:
 		add_child(occ)
 

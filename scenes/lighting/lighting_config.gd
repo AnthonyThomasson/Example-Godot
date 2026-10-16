@@ -11,17 +11,16 @@ static var enabled := true
 # --- Dusk --------------------------------------------------------------------------------------------------------------
 ## The ambient (one CanvasModulate over the world): a cool blue-violet, bright enough to read a room and the characters.
 static var ambient_color := Color(0.40, 0.37, 0.55)
-## The sky light: a dim orange-magenta, low in the south-west (the front of a house is south), from `sky_from`.
+## The sky light on the street (none in the house: it has a roof): a dim orange-magenta, low in the south-west (the front
+## of a house is south), from `sky_from`, unshadowed.
 static var sky_color := Color(1.0, 0.5, 0.42)
 static var sky_from := Vector2(-0.38, 1.0)
-## Its energy on the street (unshadowed) and on the house's items (shadowed by everything, so only doorways let it in).
-static var sky_street_energy := 0.42
-static var sky_house_energy := 0.36
+static var sky_energy := 0.42
 
 # --- Room fixtures -----------------------------------------------------------------------------------------------------
 ## A room no piece lights (none of its lights is a kept `room_light`) gets a ceiling fixture at its centre: a bare bulb on its
-## flex (drawn unshaded) and its light, shadowed by the walls only (it hangs over the furniture and the characters). Its pool
-## spans the room and barely past its walls: the room's longer side × `fixture_reach_scale` + `fixture_reach_pad`, clamped.
+## flex (drawn unshaded) and its light, overhead: shadowed by the walls only and pooling downward. Its pool spans the room
+## and barely past its walls: the room's longer side × `fixture_reach_scale` + `fixture_reach_pad`, clamped.
 static var fixture_color := Color(1.0, 0.62, 0.22)
 static var fixture_energy := 0.8
 static var fixture_reach_scale := 1.1
@@ -50,16 +49,23 @@ static var item_lights := 15
 static var floor_reach := 8.0
 
 # --- Characters --------------------------------------------------------------------------------------------------------
-## A light whose centre a living character stands within this many of its radii leaves the characters out of its shadows
-## that frame: a body would black out the light it stands in (a screen's spill, under a street lamp's head).
+## A flash whose centre a living character stands within this many of its radii leaves the characters out of its shadows
+## that frame: a body would black out the light it stands in (a muzzle flash, a blast at its feet). Only the flashes are
+## shadowed by the characters.
 static var body_clear := 1.3
 
 # --- Textures ----------------------------------------------------------------------------------------------------------
-## The pool textures, by a light's `shape`: a round pool, a wide one (2:1, a screen's spill) and a tube's (3:1). Stepped, as
-## pixel-art light is: bright in the middle, in bands down to nothing at the rim.
+## The pool textures, by a light's `shape`: a round pool, a wide one (2:1, a screen's spill) and a tube's (3:1). Each fades
+## smoothly (no rings) along one of two profiles, given as points (offsets out to the rim, 0..1, and the level there, joined
+## linearly):
 static var textures: Dictionary = { &"round": Vector2i(128, 128), &"wide": Vector2i(256, 128), &"tube": Vector2i(240, 80) }
-static var texture_bands := PackedFloat32Array([0.0, 0.22, 0.4, 0.56, 0.7, 0.82, 0.92, 0.985])
-static var texture_levels := PackedFloat32Array([1.0, 0.82, 0.64, 0.46, 0.3, 0.16, 0.06, 0.0])
+## A low light's glow (a screen, a tube, the flashes): brightest in the middle, fading out to nothing at the rim.
+static var glow_offsets := PackedFloat32Array([0.0, 0.2, 0.4, 0.6, 0.8, 1.0])
+static var glow_levels := PackedFloat32Array([1.0, 0.82, 0.58, 0.34, 0.12, 0.0])
+## An overhead light's pool (a fixture, a lamp, a street lamp): its cone meets the floor, so it is nearly flat out to half its
+## radius, then fades quickly to the rim.
+static var pool_offsets := PackedFloat32Array([0.0, 0.5, 0.65, 0.8, 0.92, 1.0])
+static var pool_levels := PackedFloat32Array([1.0, 0.96, 0.75, 0.4, 0.12, 0.0])
 
 
 ## The most piece and fixture lights one floor may be reached by.

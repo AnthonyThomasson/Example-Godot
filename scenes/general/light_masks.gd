@@ -11,20 +11,29 @@ class_name LightMasks
 static var shadows := true
 
 # --- Occluder bits (`LightOccluder2D.occluder_light_mask`): an occluder shadows a light whose shadow mask holds its bit ----
+## A 2D occluder has no height (its shadow runs to the rim of the light's pool), so who shadows whom is chosen by height
+## instead: a light overhead is shadowed only by what reaches the ceiling (the walls), a low one also by what stands taller
+## than a person (`TALL`), a flash at hand height by everything.
 const WALL := 1  ## A wall run.
-const FURNITURE := 2  ## A solid piece that gives no light.
-## A solid piece that gives light: shadows only the flashes and the sky, never a piece's light (its own sits inside it, and a
-## 2D occluder has no height, so a street lamp's own post would throw a shadow across the sidewalk).
+const FURNITURE := 2  ## A solid piece that gives no light, lower than `TALL_COVERAGE`.
+## A solid piece that gives light: shadows only the flashes, never a piece's light (its own sits inside it, and a street
+## lamp's own post would throw a shadow across the sidewalk).
 const EMITTER := 4
 const CHARACTER := 8  ## A living character (the dead cast none: a body on the floor would throw a wall-long shadow).
+## A solid piece that gives no light and stands taller than a person (a wardrobe, a fridge, shelving, lockers): it shadows the
+## low lights too.
+const TALL := 16
+## The `coverage` (the hittable's 0..100 height) from which a piece is `TALL`: above a standing character's 60.
+const TALL_COVERAGE := 75.0
 
 # --- Shadow masks (`Light2D.shadow_item_cull_mask`) ------------------------------------------------------------------
-## A piece's light and a street lamp's: walls, furniture and the living.
-const PIECE_SHADOWS := WALL | FURNITURE | CHARACTER
-## A ceiling fixture: the walls only (it hangs over the furniture and the characters).
-const FIXTURE_SHADOWS := WALL
-## A flash and the house's sky: everything.
-const ALL_SHADOWS := WALL | FURNITURE | EMITTER | CHARACTER
+## An overhead light (a ceiling fixture, a standing lamp, the surgeon's lamp, a street lamp or sign): the walls only (they
+## hang over the furniture and the characters).
+const OVERHEAD_SHADOWS := WALL
+## A low light (a screen, a neon tube, LEDs, a hotplate, neon trim): the walls and the tall pieces.
+const LOW_SHADOWS := WALL | TALL
+## A flash (a muzzle, a burst at hand height): everything.
+const ALL_SHADOWS := WALL | FURNITURE | EMITTER | CHARACTER | TALL
 
 # --- Item light layers (`CanvasItem.light_mask`; a light lights an item whose light mask meets its `range_item_cull_mask`) --
 const HOUSE := 1  ## Godot's default: everything but the street.

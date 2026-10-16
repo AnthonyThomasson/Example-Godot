@@ -3,7 +3,9 @@ extends GameTest
 ## R10 (ticket #61): a shot and an explosion each light a flash for a moment, then it goes. A puppet fires a pistol at the far
 ## wall: within a few frames of the `shot` event one of the lighting's flash lights is lit at the muzzle, and within 0.25 s every
 ## flash is dark again. It then throws a frag into the open: within a few frames of the `explosion` event a flash is lit where
-## the grenade went off, and within 1.5 s every flash is dark again.
+## the grenade went off, and within 1.5 s every flash is dark again. A flash is at hand height, so everything shadows it
+## (`docs/lighting.md` L6): every flash's shadow mask meets the walls', a tall piece's (the wardrobe), a low piece's (the chair)
+## and the living gunner's occluders.
 ##
 ## It reads (tests/_lighting/lighting_probe.gd) `WorldLighting` in the group `world_lighting`
 ## with `flashes()`, the pooled PointLight2Ds (lit: enabled with energy).
@@ -31,6 +33,8 @@ func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 900, 600))
 	s.switch(&"nav.rebake", false)
 	s.switch(&"physics.debris", false)
+	s.object(&"wardrobe", "wardrobe", Vector2(450, 540), { "neon": "" })
+	s.object(&"chair", "chair", Vector2(250, 540), { "neon": "" })
 	s.actor(&"gunner", &"puppet", GUNNER_AT, { "start_slot": 3, "max_health": 100000.0 })
 
 
@@ -43,6 +47,19 @@ func run(t: TestContext) -> void:
 			"the lighting has a pool of flash PointLight2Ds (%d)" % flashes.size()):
 		return
 	t.check(not flashes.any(func(l: PointLight2D) -> bool: return Probe.lit(l)), "no flash is lit before anything happens")
+	var casters := {
+		"wall": Probe.occluders_at(t.world, Vector2(450, 0)),
+		"wardrobe": Probe.own_occluders(t.object(&"wardrobe")),
+		"chair": Probe.own_occluders(t.object(&"chair")),
+		"gunner": Probe.own_occluders(t.actor(&"gunner")),
+	}
+	for what: String in casters:
+		var own: Array = casters[what]
+		if not t.require(not own.is_empty(), "the %s carries an occluder" % what):
+			return
+		var occ: LightOccluder2D = own[0]
+		t.check(flashes.all(func(l: PointLight2D) -> bool: return l.shadow_item_cull_mask & occ.occluder_light_mask != 0),
+			"the %s shadows every flash (occluder %d)" % [what, occ.occluder_light_mask])
 
 	var gunner := t.puppet(&"gunner")
 	gunner.aim_at(AIM)

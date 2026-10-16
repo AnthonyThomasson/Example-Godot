@@ -50,8 +50,8 @@ A living character casts a shadow: `_ready` builds a `LightOccluder2D` child thr
 `LightMasks.shadows` is off) on `LightMasks.CHARACTER`, an oval `CharacterConfig.shadow_depth` (0.72) radii deep along its +x by
 `shadow_width` (1.05) across, a `shadow_sides`-gon (`_shadow_footprint`). It moves with the body (its parent, never rotated) and
 `_turn_shadow` (after each physics step) turns it to `facing` only when the facing has turned. `_die` frees it: a 2D occluder has no
-height, so a body on the floor would throw a shadow as long as a wall's. The Lighting domain leaves the characters out of the
-shadows of a light one stands in. Test: `tests/lighting/occluders_walls_pieces_characters`.
+height, so a body on the floor would throw a shadow as long as a wall's. Only the flashes are shadowed by a body
+(`docs/lighting.md` L6); the Lighting domain leaves the characters out of a flash's shadows while one stands in it. Test: `tests/lighting/occluders_walls_pieces_characters`.
 
 ## Footsteps (bloody footprints)
 

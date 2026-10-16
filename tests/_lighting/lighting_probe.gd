@@ -16,7 +16,9 @@ extends RefCounted
 ##     `WorldGen.get_rooms` dicts, for the fixtures; the call Main and the Testing world make).
 ## - `LightingConfig` (class_name static holder): `ambient_color`, `sky_color` and `enabled` (the `lighting.enabled` switch).
 ## - On a piece that gives light (Objects): `get_lights() -> Array`, one plain dict per light (`offset`, `colour`, `energy`,
-##   `radius`, `shape`, `rhythm`, and `room_light`: true when it lights its room, so the room needs no fixture), read duck-typed.
+##   `radius`, `shape`, `rhythm`, `room_light`: true when it lights its room, so the room needs no fixture, and `height`:
+##   `overhead` or `low`), read duck-typed.
+## - A light's pool is its texture: a radial GradientTexture2D, read through its `gradient` (`profile`).
 ## - Occluders, flashes, the ambient and the sky are plain Godot nodes (LightOccluder2D, PointLight2D, CanvasModulate,
 ##   DirectionalLight2D) under the test world, read by their own properties.
 
@@ -29,6 +31,20 @@ const PER_FLOOR := 12
 const AMBIENT := Color(0.40, 0.37, 0.55)
 ## How far (px) from the event a flash's light may stand.
 const FLASH_NEAR := 24.0
+## An overhead light's pool shines down: still this bright (of its centre) at half its radius; a low light's glow falls below
+## `LOW_HALF_MAX` there.
+const OVERHEAD_HALF_MIN := 0.9
+const LOW_HALF_MAX := 0.7
+## A light's pool falls off smoothly, without rings: sampled `SMOOTH_SAMPLES` times from its centre to its rim, no two
+## neighbouring samples differ by more than `SMOOTH_STEP_MAX` of its centre's brightness.
+const SMOOTH_SAMPLES := 64
+const SMOOTH_STEP_MAX := 0.08
+## A street lamp's (or sign's) pool: at most this radius (px), centred within `STREET_POOL_CENTRE` px of its head.
+const STREET_POOL_MAX := 140.0
+const STREET_POOL_CENTRE := 4.0
+## A standing lamp's pool radius (px), within `LAMP_POOL_SLACK`.
+const LAMP_POOL := 160.0
+const LAMP_POOL_SLACK := 10.0
 
 
 # --- The domain -------------------------------------------------------------------------------------------------------
@@ -84,6 +100,30 @@ static func light_kind(piece: Node) -> String:
 ## The lights `piece` (a piece from `pieces`) declares: its `get_lights()`.
 static func declared(piece: Node) -> Array:
 	return piece.get_lights()
+
+
+## The brightness of light `l`'s pool at `at` of its radius (0 the centre, 1 the rim), over its centre's; -1 when its texture
+## is not a radial gradient.
+static func profile(l: PointLight2D, at: float) -> float:
+	var tex := l.texture as GradientTexture2D
+	if tex == null or tex.gradient == null or tex.fill != GradientTexture2D.FILL_RADIAL:
+		return -1.0
+	var centre := tex.gradient.sample(0.0).v
+	return tex.gradient.sample(at).v / centre if centre > 0.0 else -1.0
+
+
+## The biggest jump in light `l`'s pool between neighbouring samples from its centre to its rim (`SMOOTH_SAMPLES` of them),
+## over its centre's brightness; -1 when its texture is not a radial gradient.
+static func largest_step(l: PointLight2D) -> float:
+	var worst := 0.0
+	var last := profile(l, 0.0)
+	if last < 0.0:
+		return -1.0
+	for k in range(1, SMOOTH_SAMPLES + 1):
+		var v := profile(l, float(k) / SMOOTH_SAMPLES)
+		worst = maxf(worst, absf(v - last))
+		last = v
+	return worst
 
 
 ## The lights of `node` that are under `piece`.

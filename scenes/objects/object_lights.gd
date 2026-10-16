@@ -7,8 +7,10 @@ extends RefCounted
 ## sign, and a piece's neon trim. Each light is plain data, in the piece's own frame:
 ##   `offset` (Vector2) and `turn` (rad, the pool's long axis from +x), `colour`, `energy`, `radius` (px, out along the long
 ##   axis), `shape` (`round` / `wide` / `tube`), `rhythm` (`[[mode, weight], ...]`, the rhythms it may be drawn with),
-##   `room_light` (it lights its room), `street` (it lights the street too: a street lamp) and `glow` (the piece's
-##   `Emissive` overlay that shows the source, dimming with the light; null when it has none).
+##   `room_light` (it lights its room), `street` (it lights the street too: a street lamp), `height` (`overhead`: it hangs
+##   or stands above the heads, a lamp's bulb, a street lamp's head; `low`: a screen, a tube, LEDs; which shadows it, and
+##   whether it pools downward, is the Lighting domain's) and `glow` (the piece's `Emissive` overlay that shows the source,
+##   dimming with the light; null when it has none).
 ## Tuning: ObjectArtConfig.light_specs (the per-kind numbers) and the painters' colours.
 
 const Decay = preload("res://scenes/objects/art/decay.gd")
@@ -73,7 +75,7 @@ static func of(piece: Node2D) -> Array:
 	return [{
 		"offset": offset, "turn": turn, "colour": colour, "energy": float(spec["energy"]), "radius": radius,
 		"shape": spec.get("shape", &"round"), "rhythm": spec.get("rhythm", []), "room_light": spec.get("room_light", false),
-		"street": street, "glow": glow,
+		"street": street, "height": spec.get("height", &"low"), "glow": glow,
 	}]
 
 

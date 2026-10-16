@@ -72,21 +72,24 @@ piece's visuals it has `emissive()` / `emissive_layer()` (a child `Emissive`) fo
 
 The Lighting domain lights the world; Objects declares and builds what its pieces, walls and floors take part with, on General's
 `LightMasks` (interface 11):
-- **`get_lights() -> Array`** (`environment_object.gd`, worked out once in `_ready`, after the visuals, by `object_lights.gd`): the lights
-  a piece gives, one plain dict each in its own frame (`offset`, `turn`, `colour`, `energy`, `radius`, `shape`, `rhythm`,
-  `room_light`, `street`, `glow`). What gives light is what its painter draws glowing; the kind is read off the painter and its
-  options (`_kind`: a `lamp`; a `tv` (appliance panel), a `desk` (a table with a monitor prop), the den's `monitor_wall`, `server_rack`
-  and `rig`, the ripperdoc's `surgical` chair and `tool_cart`, the vestibule's `scanner`, the `hotplate`, the `neon_tube` decor, a
-  streetlight's `cobra` or `sign` head (at the `Overhang`'s centre, its overlay the glow, `street` on), and any other piece with a
-  `neon` option, its `trim`), and the numbers are that kind's row of `ObjectArtConfig.light_specs` (energy, radius, shape, how far
-  ahead of the front edge, the rhythms by weight, `room_light`: the lamp and the surgeon's lamp). Its colour is the painter's glowing
-  colour: the neon (cyan / magenta), else the screen's green, the bulb's `lamp_glow_color`, the tube's tone, the lens's
-  `streetlight_lens_color`, the beam's, the ring's. A screen's pool lies across its front (`turn` = facing + 90°), a tube's along it.
-  The Lighting domain parents each light it keeps to the piece, so a shove carries it (`tests/lighting/shoved_lamp_light_follows`).
+- **`get_lights() -> Array`** (`environment_object.gd`, worked out once in `_ready`, after the visuals, by `object_lights.gd`):
+  the lights a piece gives, one plain dict each in its own frame (`offset`, `turn`, `colour`, `energy`, `radius`, `shape`,
+  `rhythm`, `room_light`, `street`, `height`, `glow`). What gives light is what its painter draws glowing; the kind is read off
+  the painter and its options (`_kind`: a `lamp`; a `tv` (appliance panel), a `desk` (a table with a monitor prop), the den's
+  `monitor_wall`, `server_rack` and `rig`, the ripperdoc's `surgical` chair and `tool_cart`, the vestibule's `scanner`, the
+  `hotplate`, the `neon_tube` decor, a streetlight's `cobra` or `sign` head (at the `Overhang`'s centre, its overlay the glow,
+  `street` on), and any other piece with a `neon` option, its `trim`), and the numbers are that kind's row of
+  `ObjectArtConfig.light_specs` (energy, radius, shape, how far ahead of the front edge, the rhythms by weight, `room_light`: the
+  lamp and the surgeon's lamp, `height` `overhead`: the lamp, the surgeon's lamp and the streetlight's heads, `low` the rest). Its
+  colour is the painter's glowing colour: the neon (cyan / magenta), else the screen's green, the bulb's `lamp_glow_color`, the
+  tube's tone, the lens's `streetlight_lens_color`, the beam's, the ring's. A screen's pool lies across its front (`turn` =
+  facing + 90°), a tube's along it. The Lighting domain parents each light it keeps to the piece, so a shove carries it
+  (`tests/lighting/shoved_lamp_light_follows`).
 - **Occluders**, built like the colliders, through `LightMasks.occluder` (none while `LightMasks.shadows` is off): a solid piece one
   over its undented footprint (its rect, or a 12-gon, `OCCLUDER_SIDES`, for a round one), a child so it follows a shove, on `EMITTER`
-  when `get_lights()` is not empty (its own light sits inside it) and `FURNITURE` otherwise; walk-over decor none; a wall one per
-  segment, its collider's rect (`WALL`), built in `_build_walls`. Dents are not followed (too small for a shadow).
+  when `get_lights()` is not empty (its own light sits inside it), `TALL` when its `coverage` is `LightMasks.TALL_COVERAGE` or more
+  (it shadows the low lights too) and `FURNITURE` otherwise; walk-over decor none; a wall one per segment, its collider's rect
+  (`WALL`), built in `_build_walls`. Dents are not followed (too small for a shadow).
   (`tests/lighting/occluders_walls_pieces_characters`.)
 - **The street's light layer:** a floor whose definition says `light_layer: "street"` (the catalogue's street and sidewalk) puts
   itself and every canvas item under it on `LightMasks.STREET`, so only the street lamps, the flashes and the street's sky light it.

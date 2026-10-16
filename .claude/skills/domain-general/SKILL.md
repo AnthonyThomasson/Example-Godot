@@ -18,12 +18,14 @@ explosion's line (`projectile/explosion.gd`), `PhysicsConfig.wall_mask` and a ve
 
 `light_masks.gd` (`class_name LightMasks`, the same kind of holder, interface 11) is the light masks every domain builds its
 shadows and light layers on (`docs/lighting.md` L6): the occluder bits `WALL` 1, `FURNITURE` 2, `EMITTER` 4 (a solid piece that
-gives light), `CHARACTER` 8; the shadow masks `PIECE_SHADOWS`, `FIXTURE_SHADOWS`, `ALL_SHADOWS` the Lighting domain gives its
-lights; the item light layers `HOUSE` 1 and `STREET` 2; `shadows` (whether occluders are built; the Testing domain's
-`lighting.enabled` turns it off with `LightingConfig.enabled`) and `occluder(polygon, bit)`, the one place an occluder is shaped:
-wound clockwise on screen and culled counter-clockwise, so the shape itself stays lit and only what lies behind it falls dark
-(null while `shadows` is off). Objects' walls and solid pieces and the Character's body build theirs through it; Objects' street
-floors put themselves on `STREET`.
+gives light), `CHARACTER` 8, `TALL` 16 (a piece with no light as tall as `TALL_COVERAGE` 75 `coverage`); the shadow masks the
+Lighting domain gives its lights by their height (a 2D shadow has no length, so who shadows whom is picked by height):
+`OVERHEAD_SHADOWS` (walls: an overhead light), `LOW_SHADOWS` (walls + tall pieces: a low light), `ALL_SHADOWS` (a flash); the item
+light layers `HOUSE` 1 and `STREET` 2; `shadows` (whether occluders are built; the Testing domain's `lighting.enabled` turns it
+off with `LightingConfig.enabled`) and `occluder(polygon, bit)`, the one place an occluder is shaped: wound clockwise on screen
+and culled counter-clockwise, so the shape itself stays lit and only what lies behind it falls dark (null while `shadows` is off).
+Objects' walls and solid pieces and the Character's body build theirs through it; Objects' street floors put themselves on
+`STREET`.
 
 `draw_layers.gd` (`class_name DrawLayers`, the same kind of holder) is the world's draw-order ladder (interface 11): `FLOOR` −5,
 `RUG` −4, `BLOOD` −3 (blood and scorch decals), `LYING` −2 (a dead body, casings, a dropped item, a grenade at rest),
