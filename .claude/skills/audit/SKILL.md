@@ -147,6 +147,18 @@ done
 - **Behaviour** (movement, combat, items, interactions, world-gen): also drive it live with `godot-run`
   (`tools/editor.sh` + `tools/gcmd.py`). Report what you drove and what the game did.
 
+## Step 5b — Spec
+
+Does the change build what its ticket asked (the Spec axis of `mattpocock-skills:code-review`)? Find the ticket: the
+one the brief names, else `orca worktree current --json` → `linkedIssue`, else a `#<n>` in the branch's commits. Read
+its `## Agent Brief` (`gh issue view <n> --json body`) and report, each quoting the brief line:
+
+- acceptance criteria missing or only partly met;
+- behaviour in the diff the brief did not ask for, or that its **Out of scope** rules out;
+- criteria that look built but wrong.
+
+No ticket, or a ticket with no `## Agent Brief`: one line saying so, and skip.
+
 ## Step 6 — Show
 
 Only when step 5 is green: invoke `show-me`. Report the worktree name, port and pid (or that it was already running).
@@ -170,6 +182,9 @@ Base origin/main @ 1a2b3c4, 3 commits, nothing staged.
 ### Load check & tests
 - [x] Load clean. `tools/lint.sh`: no warnings, no `@warning_ignore` added.
 - [x] `tools/run_tests.sh`: 6 passed, 0 failed, 2 skipped.
+
+### Spec (#58)
+- [ ] "Entry waypoints sit inside the room for every doorway" — only covered for a single door. Fix: add the two-door room to the scenario.
 
 ### Worktree editor
 - [x] `fix-the-flicker` running (pid 4242, port 9345).

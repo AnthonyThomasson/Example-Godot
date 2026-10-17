@@ -23,10 +23,14 @@ Empty, or too vague to tell expected from actual: ask one concise question first
    (purely visual, windowed-only): say so, reproduce with `godot-run` or `--shots`, and tell the user the fix has no
    regression test.
 4. **Fix** the root cause with the smallest production change. Cross-domain calls only through `architecture`'s
-   interfaces. Never loosen, skip or delete the test, or special-case its scenario.
+   interfaces. Never loosen, skip or delete the test, or special-case its scenario. The cause is not plain from the red
+   test and the bundle: follow `mattpocock-skills:diagnosing-bugs` phases 2–4 (shrink the repro until every part is
+   load-bearing; 3–5 ranked, falsifiable hypotheses shown to the user before testing; one variable per probe, logs
+   tagged `[DEBUG-<id>]` and grepped out before green). A perf regression: its perf branch, a baseline measured on a
+   quiet machine first, then bisect.
 5. **Green.** The test passes (`--id=<id> --repeat=10` for an intermittent bug; no `FLAKY`). Then
    `tools/run_tests.sh --changed --summary`, last `tools/run_tests.sh --summary --jobs=auto`. On a failure, fix and rerun
    with `tools/run_tests.sh --failed`. Report unrelated failures; don't paper over them.
 6. **Wrap up.** A changed domain internal or interface: update that `domain-<name>` skill (and `architecture` for an
-   interface). Don't commit unless asked. Report: root cause, the test added (path), red → green lines, files changed,
-   anything uncovered.
+   interface). Don't commit unless asked. Report: root cause (the hypothesis that proved right), the test added (path), red →
+   green lines, files changed, anything uncovered.

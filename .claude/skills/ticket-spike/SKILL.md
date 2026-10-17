@@ -10,17 +10,25 @@ implementation commits. Reading code and running the game or tests to learn is f
 
 ## Steps
 
-1. Read the ticket (`ticket`) and state the question the spike answers.
+1. Read the ticket (`ticket`), run `ticket` → "Triage checks" (already answered? asked before?) and state the question
+   the spike answers.
 2. **Investigate.** Load `architecture`, then the domain skills involved. Read code; run `tools/run_tests.sh` or drive
-   the game (`godot-run`) where that answers a question. Note the files, domains and interfaces the work would touch,
-   the risks and unknowns, and the order the pieces must come in.
-3. **Break it into tickets**, each:
-   - small and independent enough to finish in one go, split along domain boundaries where possible;
-   - self-contained: problem, intended outcome, relevant files / interfaces / skills, acceptance criteria (tests or
-     behaviour that prove it done), and any ticket it depends on;
-   - labelled by kind (`spike` for a further unknown, else what the repo's labels call for).
-4. **Create them with `gh issue create`** on the spike's repo (`--repo`, `--label` per label), in dependency order so
-   later ones link earlier ones by number, each linked back to the spike (`gh issue comment <n>`).
+   the game (`godot-run`) where that answers a question. A question only outside sources answer (published tactics, an
+   engine or API fact): `mattpocock-skills:research` in the background, its cited notes in `docs/research/<slug>.md`.
+   Note the files, domains and interfaces the work would touch, the risks and unknowns, and the order the pieces must
+   come in. Still too foggy for one round of tickets (each answer opens new questions, more than a session's worth):
+   say so and suggest the user charts it with `/wayfinder` instead.
+3. **Break it into tickets** (`to-tickets`' rules), each:
+   - a tracer bullet: one narrow behaviour working end to end through every domain it needs, demoable or testable on
+     its own; never one domain's layer of a behaviour that only works once a sibling lands. A refactor that makes the
+     rest easy comes first, as its own ticket;
+   - small enough for one session;
+   - its body an `## Agent Brief` (`ticket` → "Brief and plan on the ticket": current and desired behaviour, key
+     interfaces and the skills to load, acceptance criteria, out of scope; no file paths, they go stale);
+   - labelled by kind (`spike` for a further unknown, else what the repo's labels call for) plus `ready-for-agent`.
+4. **Create them with `gh issue create --parent <spike>`** on the spike's repo (`--repo`, `--label` per label),
+   blockers first, then wire each blocker as a native GitHub dependency (`docs/agents/issue-tracker.md`, "Blocking").
+   Only where that fails, a `Blocked by: #<n>` line at the top of the body.
 5. **Report** on the spike ticket: findings, the created tickets (number, title, one line each), and what stays unknown.
 
 ## Rules

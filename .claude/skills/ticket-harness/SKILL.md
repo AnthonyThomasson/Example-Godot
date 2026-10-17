@@ -7,7 +7,9 @@ description: Extra rules for a ticket labelled `harness` (skills, AGENTS.md, hoo
 
 Covers `.claude/skills/`, `AGENTS.md`, hooks, `tools/` scripts (`gcmd.py`, `run_tests.sh`, `editor.sh`, `von_probe.py`,
 `match.py` …), the dev command server (`scenes/general/command_server.gd`) and the test runner (`scenes/testing/`).
-Follow every `ticket-story` phase; only what gets tested differs.
+Follow every `ticket-story` phase; only what gets tested differs. Writing or editing a skill, `AGENTS.md` or a doc an
+agent reads: load `mattpocock-skills:writing-for-agents` (a description is an always-loaded pointer: short, one
+trigger per case).
 
 ## What is tested
 

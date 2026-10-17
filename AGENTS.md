@@ -15,3 +15,17 @@ ticket's label and tells you which `ticket-<label>` skill to invoke (e.g. `spike
 pre-commit hook (`.githooks/pre-commit`) runs the game tests a commit can break (`tools/run_tests.sh --changed`), only
 when it touches `scenes/`, `tests/` or `project.godot`, and without the performance tests, which are a separate
 `tools/run_tests.sh --domain=perf`; enable it once per clone with `tools/install_hooks.sh`.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues on `AnthonyThomasson/Forced-Entry`, managed with the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default triage labels, each named after its role (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.

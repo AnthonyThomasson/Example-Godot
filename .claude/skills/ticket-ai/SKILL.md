@@ -11,8 +11,10 @@ already exists is a bug: `ticket-bug`.
 ## Grilling: real tactics
 
 Search the web for how it is done for real: published tactics and doctrine, training material, how people move,
-shoot, communicate and react in that setting. Put what you find (and where reality differs) into the questions, the
-plan and the test scenarios. Don't shape the behaviour around what the AI, snapshot or navmesh can do today.
+shoot, communicate and react in that setting. Run it through `mattpocock-skills:research` (a background agent, primary
+sources, a cited file in `docs/research/<slug>.md`) and keep grilling while it reads; the questions that hang on it
+wait for it. Put what you find (and where reality differs) into the questions, the brief and the test scenarios, and
+link the file from the plan. Don't shape the behaviour around what the AI, snapshot or navmesh can do today.
 
 ## Tests: the whole pipeline
 

@@ -11,8 +11,15 @@ to workers, the audit always does. Label `ai`: also `ticket-ai`; `harness`: also
 
 ## 1. Orient and grill
 
-Load `architecture` and the `domain-<name>` skills the ticket touches; read the code it names. Answer from the code what
-the code can answer. Grill the user (`AskUserQuestion`) until nothing material is open:
+Load `architecture` and the `domain-<name>` skills the ticket touches; read the code it names. Run `ticket` → "Triage
+checks". Answer from the code what the code can answer.
+
+Grill with `mattpocock-skills:grilling` and `mattpocock-skills:domain-modeling`: each round asks the whole frontier
+(every question whose prerequisites are settled), a recommended answer on each, through `AskUserQuestion` up to four
+at a time; a term the grilling sharpens goes in `GLOSSARY.md`, a hard-to-reverse decision with a real trade-off in
+`docs/adr/`. A question only something runnable can settle (does this state model feel right, how should it behave):
+a throwaway sandbox under `mattpocock-skills:prototype`'s rules (named as a prototype, kept on a `prototype/<name>`
+branch, the verdict on the ticket). Grill until nothing material is open:
 
 - the outcome: what the user or player sees or can do afterwards, and what stays as it is;
 - edge cases: wrong moment, nothing to act on, two at once, the thing absent;
@@ -24,22 +31,24 @@ The ticket text is a starting point. Stop when questions would only restate deci
 
 ## 2. Plan
 
-A plan someone else could build from:
+A brief and a plan someone else could build from (the shape is `ticket` → "Brief and plan on the ticket"):
 
-- **Behaviour:** rule by rule, with the grilling's decisions.
-- **Design:** per domain, files and types added or changed, cross-domain interfaces used (only those in
-  `architecture`), data and tunables with defaults.
-- **Tests:** scenarios and test files, one per rule.
-- **Phases:** build order and what each produces.
-- **Out of scope** and **open risks**.
+- **Agent Brief:** current behaviour; **desired behaviour** rule by rule, with the grilling's decisions; key
+  interfaces (only those in `architecture`) and tunables with defaults; **acceptance criteria**, one per rule, each
+  naming the test scenario and the seam it runs at (the world or `house()` it builds, the switches on); out of scope.
+- **Plan:** per domain, files and types added or changed, data; test files; phases (build order and what each
+  produces); open risks.
 
 `ticket-assets`: the plan follows the showroom picks. Revise until accepted. Then `ticket` → "Rebase after
-acceptance", "Plan on the ticket", "Show the user".
+acceptance", "Brief and plan on the ticket", "Show the user".
 
 ## 3. Tests first
 
-Before any production code, write the tests (`domain-testing`, `test-debug`). Extend an existing test rather than add a
-near-duplicate (`tools/run_tests.sh --list <words>`). One test per plan rule, through published interfaces only. Run
+Before any production code, write the tests (`domain-testing`, `test-debug`; `mattpocock-skills:tdd` for what makes a
+test worth keeping: behaviour through published interfaces, expected values from the brief, never recomputed the way
+the code computes them). All of them come before code on purpose, unlike `tdd`'s one-test-at-a-time loop: they are
+the brief's acceptance criteria, fixed at acceptance. Extend an existing test rather than add a
+near-duplicate (`tools/run_tests.sh --list <words>`). One test per acceptance criterion, through published interfaces only. Run
 each alone, Bash sandbox disabled (`tools/run_tests.sh --id=<domain>/<name>`); it must **fail for the right reason**
 (the feature is missing, not a parse error, race or setup mistake). Passes at once: too loose or already built; tighten
 or say so. `git status` shows only test files (plus `sandboxes/showroom/` and any variant switch, `ticket-assets`).

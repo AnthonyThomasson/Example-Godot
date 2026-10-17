@@ -87,7 +87,8 @@ each exhibit has a pick. All before the plan is accepted.
 
 ## Plan
 
-Per exhibit: the pick, its parameters, the references, the rejected variants and why.
+The brief's desired behaviour names each new asset, sound, effect or animation and where it shows or plays. In
+`## Plan`, per exhibit: the pick, its parameters, the references, the rejected variants and why.
 
 ## Build and tests
 

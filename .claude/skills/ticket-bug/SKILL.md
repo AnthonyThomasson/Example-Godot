@@ -10,9 +10,10 @@ are `fix`'s steps and may go to workers.
 
 ## 1. Grill
 
-Load `architecture` and the `domain-<name>` skill where the bug seems to live; read what the ticket points at. Answer
-from the code what it can answer. Grill the user (`AskUserQuestion`) until the bug is *expected vs. actual* with nothing
-guessed:
+Load `architecture` and the `domain-<name>` skill where the bug seems to live; read what the ticket points at. Run
+`ticket` → "Triage checks" (already fixed? reported before?). Answer from the code what it can answer. Grill with
+`mattpocock-skills:grilling` (the whole frontier per round, a recommended answer on each, through `AskUserQuestion`)
+until the bug is *expected vs. actual* with nothing guessed:
 
 - what should happen and what happens instead (exact symptom, any error text);
 - the trigger: map, seed, who is in it, what they carry, the moment;
@@ -20,8 +21,11 @@ guessed:
 - what they tried or ruled out, anything related;
 - what "fixed" looks like to them.
 
-Restate it in one or two lines and get agreement. Then `ticket` → "Rebase after acceptance" (a change in the bug's area,
-already fixed or moved, reopens the questions) and "Show the user".
+Restate it in one or two lines and get agreement. It works as intended: `ticket` → "Closing without building". Then
+`ticket` → "Rebase after acceptance" (a change in the bug's area, already fixed or moved, reopens the questions), then
+"Brief and plan on the ticket" with the brief only: **Category** bug, **Current behavior** the actual, **Desired
+behavior** the expected, the trigger, **Acceptance criteria** the regression test and the user's "fixed" check, and
+`ready-for-agent`. Then "Show the user".
 
 ## 2–4. Reproduce, fix, green
 

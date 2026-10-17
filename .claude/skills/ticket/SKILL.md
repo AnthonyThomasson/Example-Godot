@@ -20,11 +20,23 @@ Use the GitHub CLI: `gh issue view`, `gh issue comment`, `gh issue edit`, `gh is
    | `ai` | `ticket-ai` plus `ticket-story` |
    | `harness` | `ticket-harness` plus `ticket-story` |
    | `assets` / `graphics` / `audio` | `ticket-assets` plus `ticket-story` |
+   | `wayfinder:map` / `wayfinder:<type>` | none: a decision ticket, not build work. Stop and tell the user to run `/wayfinder <map>` |
 
    A `bug` or `spike` label wins: the kind rows don't apply. No `bug` or `spike` label (no label, `ai`, `harness`,
    `assets`, `graphics`, `audio`, or topic tags only): `ticket-story`. A label not in the table (e.g. `physics`) is a
-   topic tag; ignore it. Kind unclear: say so, don't guess.
-3. Work it in phases (below). New kind: add `.claude/skills/ticket-<label>/SKILL.md` and a row here.
+   topic tag; ignore it. Kind unclear: say so, don't guess. The kind is the triage category (`bug` is a bug, everything
+   else but `spike` an enhancement); the labels are mapped in `docs/agents/triage-labels.md`.
+3. Read the **state** label (one of them; two at once: ask which holds):
+
+   | State | Then |
+   |---|---|
+   | none / `needs-triage` | go on |
+   | `needs-info` | read the latest `## Triage Notes` comment; ask its open questions before anything else |
+   | `ready-for-agent` | the `## Agent Brief` on the ticket is the contract: grilling covers only what it leaves open |
+   | `ready-for-human` | read why the brief says it needs the user's hands; agree with the user what you do |
+   | `wontfix` | stop and say so |
+
+4. Work it in phases (below). New kind: add `.claude/skills/ticket-<label>/SKILL.md` and a row here.
 
 ## Work in phases
 
@@ -70,11 +82,47 @@ Load `orchestration`. You are the coordinator: one task per phase of the kind sk
 
 The kind skills point here.
 
-### Plan on the ticket
+### Triage checks (before grilling)
 
-After acceptance and the rebase: read the body (`gh issue view <n> --json body`), write it unchanged plus `## Plan` to
-a scratchpad file, `gh issue edit <n> --body-file <file>`, re-read the ticket to check. Never edit before acceptance;
-never drop or reword what is there. A revised plan replaces the old `## Plan`.
+Answer from the code before asking the user anything:
+
+1. **Already built?** Search for the asked-for behaviour by domain concept, not the ticket's wording; say where you
+   looked. Fully built: offer to close it ("Closing without building"). Partly built: say what exists and narrow the
+   ticket in the grilling.
+2. **Rejected before?** Read `.out-of-scope/*.md` (if any) and match by concept ("night theme" matches `dark-mode.md`).
+   A match: quote its reason and ask whether it still holds.
+3. **Right kind?** The text reads as another kind than its label (a broken behaviour without `bug`, an unknown to
+   investigate without `spike`): ask before routing on.
+
+### Brief and plan on the ticket
+
+After acceptance and the rebase: read the body (`gh issue view <n> --json body`), write it unchanged plus the two
+sections below to a scratchpad file, `gh issue edit <n> --body-file <file>`, re-read the ticket to check. Never edit
+before acceptance; never drop or reword what is there. A revised plan replaces both sections.
+
+- **`## Agent Brief`**, the durable contract (Matt's `triage` `AGENT-BRIEF.md` format): **Category** (bug /
+  enhancement / spike), **Summary** (one line), **Current behavior**, **Desired behavior** (rule by rule, with edge
+  cases), **Key interfaces** (`architecture` interfaces, `class_name`s, signals, tunables; no file paths or line
+  numbers), **Acceptance criteria** (`- [ ]`, each independently checkable: the tests or behaviour that prove it),
+  **Out of scope**.
+- **`## Plan`**, the build detail that may go stale: design per domain (files and types), phases, open risks.
+
+Then set the state: `gh issue edit <n> --add-label ready-for-agent --remove-label needs-triage --remove-label
+needs-info` (a missing label is fine). `ready-for-human` instead when the accepted work needs the user's own hands
+(an outside account, manual-only checks, a call that can't be made up front); the brief says why.
+
+### Closing without building
+
+The user's call, never yours. Comment, then `gh issue close <n> --reason "not planned"` and add `wontfix`:
+
+- **Already implemented:** point to where it lives. Nothing goes in `.out-of-scope/`.
+- **Rejected enhancement:** create or extend `.out-of-scope/<concept>.md` (one file per concept: what is out, why, in
+  durable terms, and a `## Prior requests` list with this ticket), following Matt's `triage` `OUT-OF-SCOPE.md`; the
+  comment links it.
+- **Rejected bug** (works as intended): a short explanation of the intended behaviour.
+
+Waiting on information only someone else has: post `## Triage Notes` (**What we've established so far** /
+**What we still need**, specific questions), set `needs-info`, stop.
 
 ### Rebase after acceptance
 
@@ -93,7 +141,7 @@ reuses an open one. `ticket-assets`: also before the showroom's first feedback r
 
 All green: you tell the user in a few lines what is built and passing, point them at the `show-me` editor (rerun if
 gone; Play restarted for the latest code), and ask ("looks right, go on to the audit" / "I have changes"). Feedback is a
-new round: update `## Plan` if scope moved, test first, code, green, ask again. Audit only once the behaviour is right.
+new round: update `## Agent Brief` and `## Plan` if scope moved, test first, code, green, ask again. Audit only once the behaviour is right.
 
 ### Audit
 
@@ -108,7 +156,8 @@ tell it which files are only in the working tree. Start it with
 tab `review`. Spec:
 
 - **Target:** worktree and branch, ticket number, base ref (default `origin/main`).
-- **Change:** invoke `audit` and run it to its checklist; do every step itself, start no workers.
+- **Change:** invoke `audit` and run it to its checklist, its Spec step against the ticket's `## Agent Brief`; do
+  every step itself, start no workers.
 - **Constraints:** report only: no fix, edit, stage, commit, push or ticket comment; start the editor only when green.
 - **Ownership:** the audit's scratch directory and one report file; no file in the tree.
 - **Observable acceptance:** `worker_done` gives the issue count and report path; the report is the checklist with a
@@ -131,11 +180,13 @@ Go on when it is clean or the user accepts what is left.
 
 ### Report, then feedback or finish
 
-On the ticket and to the user: what was built against the plan, tests red → green, the audit verdict and what was done
-per finding, files changed, anything uncovered or deviating and why. Ask: **give feedback** (try it in the `show-me`
-editor, Play restarted) or **finish**. Wait.
+On the ticket and to the user: what was built against the plan, the brief's acceptance criteria ticked, tests red →
+green, the audit verdict and what was done per finding, files changed, anything uncovered or deviating and why. Ask:
+**give feedback** (try it in the `show-me` editor, Play restarted) or **finish**. Wait. If the ticket went sideways
+(grilling reopened, more than one audit round, tests red for the wrong reason), also suggest the user run `/retro`
+before finishing: it reads this session and proposes skill, check and tooling changes.
 
-- Feedback: a new round (update `## Plan` if scope moved, a test first, code, `wrap-up`, audit), then report and ask again.
+- Feedback: a new round (update `## Agent Brief` and `## Plan` if scope moved, a test first, code, `wrap-up`, audit), then report and ask again.
 - Finish: release every settled worker, then invoke `finish` yourself. That answer is the go-ahead; without it never
   commit or close the ticket.
 
