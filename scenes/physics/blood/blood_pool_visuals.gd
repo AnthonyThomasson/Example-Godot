@@ -136,15 +136,20 @@ func _draw_flow() -> void:
 	draw_texture_rect(_flow_texture, Rect2(Vector2(lo) * size, Vector2(w, h) * size), false)
 
 
-## One 3x3 box-blur pass (edges read as empty).
-func _box_blur(src: PackedFloat32Array, w: int, h: int) -> PackedFloat32Array:
+## One 3x3 box-blur pass (edges read as empty), as the sum of each cell's three-cell row sums above, at and below it. The
+## row sums are kept in doubles: a sum of float32 fills is exact in a double, so the nine-cell sum, and the field, are the
+## same whatever the order they are added in.
+static func _box_blur(src: PackedFloat32Array, w: int, h: int) -> PackedFloat32Array:
+	var rows := PackedFloat64Array()
+	rows.resize(w * h)
+	for y in h:
+		var i := y * w
+		for x in range(1, w - 1):
+			rows[i + x] = src[i + x - 1] + src[i + x] + src[i + x + 1]
 	var out := PackedFloat32Array()
 	out.resize(w * h)
 	for y in range(1, h - 1):
+		var i := y * w
 		for x in range(1, w - 1):
-			var sum := 0.0
-			for dy in range(-1, 2):
-				for dx in range(-1, 2):
-					sum += src[(y + dy) * w + x + dx]
-			out[y * w + x] = sum / 9.0
+			out[i + x] = (rows[i + x - w] + rows[i + x] + rows[i + x + w]) / 9.0
 	return out

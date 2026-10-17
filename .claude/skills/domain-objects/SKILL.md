@@ -59,7 +59,8 @@ The editor shows "no shape" warnings on each `Wall` — expected; the shapes exi
 
 `environment_object.gd` / `wall.gd` / `floor/floor.gd` are the control nodes (geometry, colliders,
 look data — never draw). `environment_object_visuals` / `wall_visuals` / `floor_visuals` (own
-child `Node2D`s) read from their control node and draw it.
+child `Node2D`s) read from their control node and draw it. `collider_cuts.gd` (`ColliderCuts`, a `RefCounted`) is the control nodes' shared
+queue of convex collider cuts, cut side by side on worker threads (below, under the drop shadow).
 
 **The overhang** (`overhang_visuals.gd`, interface 2): a definition's `overhang` (`{ size, reach }`) makes `ObjectFactory` add a
 child `Overhang` to the piece, the overhead part that reaches beyond the footprint (a streetlight's arm and lamp head over the road).
@@ -209,9 +210,21 @@ World-Gen; visual only, a cardinal direction in the local frame — the `rotated
 owns the footprint). The visuals draw a drop shadow — the art's own alpha through the deformed
 outline, offset away from the light in world space by `coverage × drop_shadow_per_coverage`
 (capped; non-solid decor casts none) — then `Deformation.draw_shape(..., texture)` so dents and
-chunks cut into the art. A piece repaints only when that can have changed — its `Deformable` recorded an impact or its rotation
-changed (the shadow's offset is fixed in world space) — not every frame (a house has ~90 pieces); a hit also queues one deferred
-collider rebuild however many hits land before it runs. Walls: `WallFactory`'s `style` sets `art` / `art_color` / `art_opts` on
+chunks cut into the art. The drop shadow is the visuals' `DropShadow` child (`show_behind_parent`), drawn in the piece's own frame
+and placed at the shadow's offset (`_shadow_shift`): a turn moves that child, it repaints nothing. A piece repaints (art and shadow)
+only when its `Deformable` recorded an impact, not every frame (a house has ~90 pieces); a hit also queues one deferred
+collider rebuild however many hits land before it runs (a wall: one per struck segment, `_rebuild_queued`; and each segment is drawn
+by its own child of `WallVisuals`, `Segment<i>`, so a hit repaints that segment alone, `redraw_segment`;
+`tests/objects/wall_segment_repaints_alone_test.gd`). A blast dents a room's worth of pieces in one frame, and cutting a dented
+silhouette into convex pieces is the costly part of a rebuild: the hit that queues a rebuild also queues its cut (`collider_cuts.gd`,
+`ColliderCuts.queue(make)`: a piece's `_cut` from `_prepare_cut`, a wall segment's `_seg_cuts[i]`). When the first rebuild of the
+flush runs, the dents are final: its `take()` starts every other waiting cut on a worker thread (`make` runs on the main thread,
+copies the dents and returns a pure job, `Deformation.cut_shape` / `cut_wall`) and leaves its own to the caller, who cuts it
+(`Deformation.convex_pieces`); each later rebuild's `take()` waits for its finished cut and uses it when its polygon is the silhouette
+as it stands then (else cuts it there, `_pieces_of`). A cut whose piece leaves the tree first is dropped (`cancel()`, in `_exit_tree`;
+a running one is waited for). Each collider changes in its own deferred call, into the pieces a cut at the rebuild would make, and a piece hit several
+times in a frame is cut once (`tests/objects/blast_colliders_match_plain_test.gd`, which also checks cuts ran on workers through
+`ColliderCuts.started`, and `wall_dents_share_a_rebuild_test.gd`). Test: `tests/objects/drop_shadow_follows_turn_test.gd`. Walls: `WallFactory`'s `style` sets `art` / `art_color` / `art_opts` on
 the wall (its debris takes the drawn colour); `wall_visuals.gd` fetches a
 `wall_tile_px × wall_thickness` tile and passes it to `Deformation.draw_wall(..., texture,
 wall_tile_px)`. To add a painter: write `<name>_painter.gd` (its shape, then its run-down finish from `decay.gd`, anything that

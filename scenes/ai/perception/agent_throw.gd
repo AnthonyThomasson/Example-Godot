@@ -182,24 +182,44 @@ func escape(space, map: RID, kind: StringName, radius: float, burst: Vector2, fr
 		speed: float, exclude: Array) -> Dictionary:
 	var out_r := zone_radius(kind, radius) + OUTSIDE_SLACK
 	var reach := cover_reach(kind)
+	# Candidates often repeat (the standing and the crouching probe meet the same wall) and snap onto the same spot, so each
+	# point is snapped, each spot judged and each route measured once: the same answers, in the same order.
+	var on_mesh := {}  # candidate -> its spot on the navmesh
+	var judged := {}   # spot -> NOT_SAFE, or whether it is safe only crouched
 	var spots: Array = []
 	for p in _candidates(space, burst, from, out_r, exclude, kind):
-		var q := NavBuilder.snap(map, p)
+		var q: Vector2 = on_mesh.get(p, Vector2.INF)
+		if q == Vector2.INF:
+			q = NavBuilder.snap(map, p)
+			on_mesh[p] = q
 		if q.distance_to(p) > SNAP_TOLERANCE:
 			continue
-		var crouch := false
-		if q.distance_to(burst) < out_r and not _covered(space, burst, q, _stand, exclude, reach):
-			if not _covered(space, burst, q, _crouch, exclude, reach):
-				continue
-			crouch = true
-		spots.append({ "spot": q, "crouch": crouch })
+		var verdict: int = judged.get(q, UNJUDGED)
+		if verdict == UNJUDGED:
+			verdict = SAFE_STANDING
+			if q.distance_to(burst) < out_r and not _covered(space, burst, q, _stand, exclude, reach):
+				verdict = SAFE_CROUCHED if _covered(space, burst, q, _crouch, exclude, reach) else NOT_SAFE
+			judged[q] = verdict
+		if verdict != NOT_SAFE:
+			spots.append({ "spot": q, "crouch": verdict == SAFE_CROUCHED })
 	var best := { "spot": Vector2.INF, "crouch": false, "route": INF }
 	var allowed := maxf(fuse_left - ARRIVE_MARGIN, 0.0) * speed
+	var routes := {}  # spot -> its route's length
 	for s: Dictionary in spots:
-		var length := NavBuilder.path_length(NavBuilder.route(map, from, s["spot"]))
+		var length: float = routes.get(s["spot"], -1.0)
+		if length < 0.0:
+			length = NavBuilder.path_length(NavBuilder.route(map, from, s["spot"]))
+			routes[s["spot"]] = length
 		if length <= allowed and length < best["route"]:
 			best = { "spot": s["spot"], "crouch": s["crouch"], "route": length }
 	return best
+
+
+## A spot's verdict in `escape`: not judged yet, out of the zone or shielded standing, shielded only crouched, or neither.
+const UNJUDGED := -1
+const SAFE_STANDING := 0
+const SAFE_CROUCHED := 1
+const NOT_SAFE := 2
 
 
 ## Whether a body `height` tall at `p` is shielded from `burst` with room to spare: also `COVER_MARGIN` px to either side of the line, so a spot on the

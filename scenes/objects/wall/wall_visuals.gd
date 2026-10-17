@@ -15,6 +15,10 @@ const EmissiveLayer = preload("res://scenes/objects/emissive_layer.gd")
 var _tile: Texture2D  ## The cap tile (x along the wall, y across it), or null for a flat line.
 var _emissive: Texture2D  ## The tile's light-giving pixels, or null.
 var _emissive_layer: Node2D  ## The child drawing `_emissive` (null without one).
+## One child per wall segment (`wall_segments()` order), each drawing its own segment: a struck segment repaints alone
+## (`redraw_segment`), the others keep their drawing. They draw in segment order.
+var _segments: Array[Node2D] = []
+var _segs: Array = []  ## The segments as they were at `_ready` (a wall's openings never change).
 
 
 func _ready() -> void:
@@ -27,8 +31,24 @@ func _ready() -> void:
 		if _emissive:
 			_emissive_layer = EmissiveLayer.new().setup(self)
 	# The parent's _ready has already run (parent before child), so segments exist.
-	# Walls are static, so a single draw is enough.
-	queue_redraw()
+	# Walls are static, so each segment draws once, and again when it is struck.
+	_segs = _wall.wall_segments()
+	for i in _segs.size():
+		var piece := Node2D.new()
+		piece.name = "Segment%d" % i
+		piece.draw.connect(_draw_segment.bind(piece, i))
+		add_child(piece)
+		_segments.append(piece)
+	if _emissive_layer:
+		move_child(_emissive_layer, -1)  # Over every segment, as over the whole wall.
+
+
+## Repaint segment `i` (its dents changed), and the light-giving overlay that follows the dents.
+func redraw_segment(i: int) -> void:
+	if i >= 0 and i < _segments.size():
+		_segments[i].queue_redraw()
+	if _emissive_layer:
+		_emissive_layer.queue_redraw()
 
 
 ## What in the cap tile gives light, or null when nothing does. Drawn over the walls by the `Emissive` child.
@@ -52,16 +72,11 @@ func draw_emissive(layer: CanvasItem) -> void:
 					ObjectArtConfig.wall_tile_px)
 
 
-func _draw() -> void:
-	var t: float = _wall.wall_thickness
-	var segs: Array = _wall.wall_segments()
-	for i in segs.size():
-		var seg: PackedVector2Array = segs[i]
-		if seg[0].is_equal_approx(seg[1]):
-			continue
-		# Deformed segment (dents / missing pieces where damaged) + crack/hole marks.
-		# The helper extends the ends by half-thickness, matching the colliders in wall.gd.
-		Deformation.draw_wall(self, seg[0], seg[1], t, line_color, _wall._seg_impacts.get(i, []),
-				_tile, ObjectArtConfig.wall_tile_px)
-	if _emissive_layer:
-		_emissive_layer.queue_redraw()  # Follows the dents.
+## Segment `i` on its child `piece`: the deformed segment (dents / missing pieces where damaged) + crack/hole marks. The helper
+## extends the ends by half-thickness, matching the colliders in wall.gd.
+func _draw_segment(piece: Node2D, i: int) -> void:
+	var seg: PackedVector2Array = _segs[i]
+	if seg[0].is_equal_approx(seg[1]):
+		return
+	Deformation.draw_wall(piece, seg[0], seg[1], _wall.wall_thickness, line_color, _wall._seg_impacts.get(i, []),
+			_tile, ObjectArtConfig.wall_tile_px)

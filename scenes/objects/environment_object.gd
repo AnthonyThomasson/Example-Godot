@@ -92,6 +92,8 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	BloodSurface.unregister(_surface_id)
+	if _cut != null:
+		_cut.cancel()
 
 
 ## A rug has no grooves (BloodSurface callback; a porous surface never asks).
@@ -149,17 +151,44 @@ func get_interactions() -> Array:
 ## Rebuild the collider when the silhouette deforms. Deferred: record() runs mid-physics
 ## (from the projectile), when swapping shapes is disallowed.
 ## Hits that land before the deferred call runs share it: it rebuilds from the impacts as they stand then.
+## Cutting the dented silhouette into convex pieces is the costly part of a rebuild, and a blast dents a room's worth of furniture
+## at once: the cut is queued with the rebuild (`ColliderCuts`), and the first rebuild of the batch cuts the others on worker
+## threads beside its own. The collider changes in its deferred rebuild, into the pieces a cut there would make.
 func _on_deformable_changed() -> void:
 	if solid and PhysicsConfig.deform_update_collider and not _collider_rebuild_queued:
 		_collider_rebuild_queued = true
+		_cut = ColliderCuts.queue(_prepare_cut)
 		call_deferred("_rebuild_collider")
+
+
+## The cut queued with the rebuild, null when none waits.
+var _cut: ColliderCuts = null
+
+
+## The cut of this piece's silhouette as its dents stand now (on the main thread): a pure job on a copy of them.
+func _prepare_cut() -> Callable:
+	var shape := shape_type
+	var footprint := size
+	var dents: Array = _deformable.impacts.duplicate(true)
+	return func() -> Array: return Deformation.cut_shape(shape, footprint, dents)
+
+
+## The convex pieces of `poly`, this piece's silhouette now: the queued cut's, or cut here should it be of another silhouette.
+func _pieces_of(poly: PackedVector2Array) -> Array:
+	var cut := _cut
+	_cut = null
+	if cut != null:
+		var made := cut.take()
+		if not made.is_empty() and made[0] == poly:
+			return made[1]
+	return Deformation.convex_pieces(poly)
 
 
 ## Replace the collider(s) with convex pieces of the current deformed polygon.
 func _rebuild_collider() -> void:
 	_collider_rebuild_queued = false
 	var poly := Deformation.shape_polygon(shape_type, size, _deformable.impacts)
-	var shapes := Deformation.convex_shapes(poly)
+	var shapes := Deformation.shapes_of(_pieces_of(poly))
 	if shapes.is_empty():
 		return
 	_smear.set_footprint(poly)

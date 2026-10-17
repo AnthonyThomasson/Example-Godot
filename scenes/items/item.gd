@@ -210,6 +210,12 @@ func _look_handle(look: Dictionary) -> int:
 	return _look_id
 
 
+## Paint ahead of time the art this item can be drawn with, so no first paint lands mid-fight (`ItemRegistry` asks every item
+## it makes). Only fills PixelArt's cache with the textures the draws would paint: what is drawn never changes. Default: none.
+func prepaint() -> void:
+	pass
+
+
 ## Draw the item's weapon art onto `canvas` (the character's visuals Node2D). Default: none.
 func draw_weapon(_canvas: CanvasItem, _user) -> void:
 	pass

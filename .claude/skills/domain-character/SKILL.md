@@ -189,6 +189,17 @@ out-of-step sines, up to `stun_sway` degrees x the level). `stun_view()` feeds t
 back (`apply_impulse`), a dead one's ragdoll is woken and thrown (`CharacterRagdoll.blast`). The `throw` stance (`CharacterConfig.stances`) is the wind-up's drawn-back arm.
 `set_loadout(..., grenades := {})` takes a slot -> count dict. Tests: `tests/items/grenade_*`, `tests/character/stunned_slow_and_sway_test.gd`.
 
+**The stunned look and one-handed fire** (`docs/grenades.md` G13, issue #56; drawn only, every character). `pose.update` takes the stun level as its last
+argument (`stun_level()`, on foot and in an interaction; 0 in `_ride_frame`, so a ride's pose wins and the look eases back in once out); the pose eases it
+(`stun_look_ease`) into the hunch and the stagger (`domain-character-body`). `_stances()` puts the free hand (`1 - weapon_hand()`, hand 1 with nothing
+held) in the `eyes` stance and a held gun's weapon hand in `one_hand` (its raised grip instead while `_blocked`) while `_covers_eyes(item)`: blind, not
+riding, running or dead, not reloading (`_reloading_item`), no punch swing (`_hands.is_attacking()`) and the weapon hand not in a throw's wind-up (its
+`hand_stance` is not `throw`). `one_handed()` (interfaces 6 and 7) is that, for a held gun (`gun_id() != &""`): `GunItem.secondary` adds the row's
+`one_hand_spread_deg` to its spread, and `kick` multiplies a long gun's (`raises_at_contact()`) recoil by `CharacterConfig.one_hand_recoil`.
+`posture_hand_ahead()` adds the hunched chest's forward shift (half the spine's lean at `pose.hunch()`) to the crouch's, so the hands (and the
+long-gun raise ray, which follows the drawn reach) keep their reach past the leaning chest. Tests: `tests/character/stunned_hand_over_eyes_test.gd`,
+`stunned_hunch_and_stagger_test.gd`, `tests/items/one_handed_fire_test.gd`.
+
 ## Riding a vehicle (interface 19, `docs/vehicles.md`)
 
 The character composes the Vehicles domain's `CharacterVehicleUse` (`scenes/vehicle/character_vehicle_use.gd`, preloaded and
@@ -204,7 +215,7 @@ disables the collision shape (`set_deferred`); each pose sets `global_position`,
 `_posture_height` between standing and the crouch height by `fold` (so `posture_folded()` and the body art read the seated fold), keeps
 `_ride_step` and drops `_rig_cache`. While `_riding`, `_ease_posture` is skipped, `current_item()` returns null (the item put away: no
 firing, nothing drawn in the hands) and `_ride_frame` replaces the rest of the frame: no movement, knockback or push, stamina refilling,
-legs and kick cleared, and `pose.update` with `_ride_step` as the motion (the legs step with the pose through the vehicle's frame, not
+legs and kick cleared, and `pose.update` with `_ride_step` as the motion and no stun (the stunned look waits until the ride is over) (the legs step with the pose through the vehicle's frame, not
 with the vehicle). `end_ride()` clears `_riding`, re-enables the shape, zeroes the step and points the aim along the facing. The collision
 exception with the vehicle is added at boarding; after the ride the component hands the vehicle to `keep_clear_of(body)`, below.
 

@@ -4,6 +4,8 @@ extends GameTest
 ## it, so what it knows of it stays where it was last seen; it may fire blindly at that last-known spot (with the stun's sway, at most
 ## 25 degrees off); and when the blindness lifts it re-decides from what it sees. A defender is fighting a hostile it can see; the flash
 ## hits it; the hostile then walks across its front.
+## S6 (ticket #56): whether it fires blind is one roll against its `blind_fire_chance` as it goes blind; this defender's is 1, so it
+## does, and one-handed (S4: its other hand over its eyes, `Character.one_handed()`). The 0 case is `stunned_defender_holds_fire`.
 ##
 ## Premises: the flash is `take_stun(6, 6)` called on the defender, as a grenade's flash would (the grenade's own throw is
 ## tested elsewhere); the hostile is an invader *puppet* that cannot be killed and never shoots. Real Von; everything else is on.
@@ -18,7 +20,7 @@ const BLIND := 6.0
 func describe() -> Dictionary:
 	return {
 		"name": "A blinded defender neither spots the intruder nor stops firing at the old spot",
-		"description": "Blinded for 6 s, a defender fighting an invader keeps the invader's last-known spot while it walks 45 degrees across its front, fires only toward that spot, and sees it again once it can see.",
+		"description": "Blinded for 6 s, a defender fighting an invader (blind_fire_chance 1) keeps the invader's last-known spot while it walks 45 degrees across its front, fires one-handed only toward that spot, and sees it again once it can see.",
 		"tags": ["ai", "grenade", "stun", "blind", "von"],
 		"requires_von": true,
 		"timeout": 80.0,
@@ -28,6 +30,7 @@ func describe() -> Dictionary:
 func configure(s: TestSetup) -> void:
 	s.arena(Rect2(0, 0, 1000, 500))
 	s.actor(&"d", &"defender", DEFENDER_AT, { "facing": Vector2.RIGHT })
+	s.set_props(&"d", "GoalController", { "blind_fire_chance": 1.0 })
 	s.actor(&"p", &"puppet", FIRST_SPOT, { "faction": &"invader", "max_health": 1000000.0, "aim_point": DEFENDER_AT })
 
 
@@ -43,6 +46,7 @@ func run(t: TestContext) -> void:
 	var d := t.actor(&"d")
 	var p := t.actor(&"p")
 	var brain := t.controller(&"d", &"current_act")
+	t.check("blind_fire_chance" in brain and is_equal_approx(float(brain.get("blind_fire_chance")), 1.0), "the defender's GoalController has blind_fire_chance, set to 1 (%s)" % str(brain.get("blind_fire_chance")))
 	if not t.require(await t.until(func(): return not _known(brain, p).is_empty() and str(brain.current_act()).begins_with("combat"), 20.0), "the defender knows the invader and is fighting it (acting: %s)" % str(brain.current_act())):
 		return
 	var seen_at: Vector2 = _known(brain, p).get("pos", FIRST_SPOT)
@@ -53,11 +57,14 @@ func run(t: TestContext) -> void:
 	t.puppet(&"p").walk_to(SECOND_SPOT)
 	var seen := {}
 	var dirs: Array = []  # the direction of each round the defender fires, read the frame it appears
+	var two_handed := [0]  # rounds fired blind while the defender was not holding its gun one-handed
 	var capture := func() -> void:
 		for n in t.world.get_children():
 			if String(n.name).begins_with("Projectile") and n is Node2D and not seen.has(n.get_instance_id()) and n.get("ignore") == d:
 				seen[n.get_instance_id()] = true
 				dirs.append(n.get("direction"))
+				if Probe.blind(d) and not (d.has_method("one_handed") and bool(d.call("one_handed"))):
+					two_handed[0] += 1
 	await t.frames(30)
 	t.check(Probe.blind(d), "the flash blinded the defender (is_blind)")
 	while t.time < flashed + 3.5:
@@ -78,6 +85,7 @@ func run(t: TestContext) -> void:
 	for dir in dirs:
 		worst = maxf(worst, absf(rad_to_deg(to_old.angle_to(dir))))
 	t.check(dirs.size() >= 2, "it fired blindly while the flash lasted (%d rounds)" % dirs.size())
+	t.check(not dirs.is_empty() and two_handed[0] == 0, "every blind round was fired one-handed, the other hand over its eyes (%d of %d were not)" % [two_handed[0], dirs.size()])
 	t.check(worst <= 28.0, "every blind shot went toward the old spot, within the 25 degree sway (worst %.1f degrees off it; the invader was %.0f degrees away)" % [worst, absf(rad_to_deg(to_old.angle_to(to_new)))])
 	t.check(t.time - flashed >= BLIND - 0.5, "(the blindness ran its course)")
 

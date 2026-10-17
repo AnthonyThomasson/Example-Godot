@@ -44,8 +44,34 @@ class DebrisChunk:
 	var owner_layer: DebrisLayer
 	var cell := Vector2i.ZERO
 
+	## Every chip in one triangle array (General's FillBatch), oldest first, each moved to its own place and turn: the
+	## shapes `debris_visuals.gd` draws (its disc, triangle or rect, both convex so added uncut), the same pixels for a fraction
+	## of the commands.
 	func _draw() -> void:
 		var to_world := global_transform.affine_inverse()  # chips are placed in world space
+		if not FillBatch.batching:
+			_draw_each(to_world)
+			return
+		var batch := FillBatch.new(self)
+		for chip in owner_layer.marks_in(cell):
+			var xform := to_world * Transform2D(chip["turn"], chip["at"])
+			var color: Color = chip["color"]
+			var s: Vector2 = chip["size"]
+			match chip["shape"]:
+				"circle":
+					batch.circle(Vector2.ZERO, s.x * 0.5, color, xform)
+				"tri":
+					batch.fill_convex(PackedVector2Array([
+						Vector2(0.0, -s.y * 0.5), Vector2(s.x * 0.5, s.y * 0.5), Vector2(-s.x * 0.5, s.y * 0.5)]), color, xform)
+				_:  # "rect"
+					var h := s * 0.5
+					batch.fill_convex(PackedVector2Array([Vector2(-h.x, -h.y), Vector2(h.x, -h.y), Vector2(h.x, h.y),
+						Vector2(-h.x, h.y)]), color, xform)
+		batch.flush()
+
+	## Each chip by its own command, as the batch's would be under the headless display (nothing is rendered there, and these
+	## cost the least).
+	func _draw_each(to_world: Transform2D) -> void:
 		for chip in owner_layer.marks_in(cell):
 			draw_set_transform_matrix(to_world * Transform2D(chip["turn"], chip["at"]))
 			var color: Color = chip["color"]

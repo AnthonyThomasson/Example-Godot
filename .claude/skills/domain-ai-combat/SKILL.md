@@ -35,7 +35,8 @@ against a contact outside the room.
 **No per-weapon code.** The behaviour never knows which gun it has. It fights with `Character.gun_slot()` (the held item if it takes ammo, else the
 lowest slot that does) and reacts only to generic conditions the character reports: out of rounds, mid-reload, running, **blocked**, automatic.
 
-**Firing** (`Combat.shoot() -> bool`, true = a round left the barrel; the fists are `Combat.punch`). It holds fire at a run or mid-reload (cooldown kept);
+**Firing** (`Combat.shoot() -> bool`, true = a round left the barrel; the fists are `Combat.punch`). It holds fire at a run or mid-reload (cooldown kept), and while `holds_fire()`: blind with `blind_fire` false, the orchestrator's one roll
+as the NPC went blind (`Behavior.set_blind_fire`, `docs/grenades.md` G15), no trigger pulled at all, so no dry click, and `continue_burst` cuts a burst;
 a dry gun is a click (below); otherwise it equips the gun and, **if `weapon_blocked()` (the barrel is against a wall or object), sets
 `_back_off_timer = back_off_time`, keeps the cooldown and returns false**, else calls `shoot()` and, only on success, notes engagement and starts
 the cooldown. `Behavior.apply()` ends each tick with `Combat.apply_back_off`: while the timer runs it overrides `move_input = -facing` (away from where the gun

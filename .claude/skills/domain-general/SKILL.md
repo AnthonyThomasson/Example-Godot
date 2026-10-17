@@ -1,6 +1,6 @@
 ---
 name: domain-general
-description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), the pausable game clock (GameClock), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers), the draw-order ladder (DrawLayers) and the light masks (LightMasks: occluder bits, shadow masks, light layers, the occluder shape). Use when editing scenes/general/ or working on input/keybinds/rebinding, the game clock AI timers run on, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant, a draw-order rung or a light mask. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
+description: Deep implementation detail for the General domain (scenes/general/) — input (Keybinds), saved settings (Settings), the pausable game clock (GameClock), despawner, camera, the dev command server, shared physics-layer ids (PhysicsLayers), the draw-order ladder (DrawLayers), the light masks (LightMasks: occluder bits, shadow masks, light layers, the occluder shape) and FillBatch (plain-coloured shapes drawn as one triangle array). Use when editing scenes/general/ or working on input/keybinds/rebinding, the game clock AI timers run on, the saved settings file (debug switch + key bindings), the dev command server (gcmd), camera follow, the despawn cap, a cross-domain physics-layer constant, a draw-order rung, a light mask or batching many plain-coloured shapes. HUDs and menus live in the UI domain (scenes/ui/) — see `domain-ui`. Complements the `architecture` skill, which holds the cross-domain interfaces.
 ---
 
 # General domain
@@ -42,6 +42,21 @@ grenade in flight, the UI's stack markers), `OVERHEAD` 2 (a piece's overhang: a 
 (an explosion's flash and smoke). Every domain's z knob starts from its rung (`ObjectArtConfig`,
 `BloodConfig`, `CharacterConfig`, the casing, the dropped item and grenade, the vehicle's layers, `ExplosionFx`, the UI's `StackMarkers`, `OrderMarkers` and `LeaderOverlay`), so a new layer is a
 rung here, not a number in a domain.
+
+`fill_batch.gd` (`class_name FillBatch`, a `RefCounted`, shared drawing infrastructure like `DrawLayers`) draws plain-coloured
+shapes on a canvas item as ONE triangle array (`FillBatch.new(canvas, base)`, `base` the draw transform the caller set on it; then
+`fill(poly, color, xform)`, `fill_convex(poly, color, xform)` for a polygon the caller knows is convex (fanned from its first
+corner, uncut), `circle(center, radius, color, xform)`, then `flush()`) instead of one `draw_colored_polygon` / `draw_circle` command
+each: rendering windowed, the engine builds a vertex
+buffer per polygon command (~9 µs each, against a fifth of one for a rect). It cuts each polygon into the triangles the engine itself
+would (`Geometry2D.triangulate_polygon`) and each disc into `draw_circle`'s 64-gon (point `i` at angle `i * TAU / 64`, measured: the
+same pixels at 60x), in the order added, so it draws the same pixels; a polygon that cannot be triangulated goes to the engine on
+its own after what was added, which reports it as `draw_colored_polygon` does. Under the headless display (`FillBatch.batching` false, from
+`DisplayServer.get_name()`) nothing is rendered and gathering the array costs more than the commands it replaces, so a batch hands
+each shape to its canvas as it comes (a placed disc by the canvas's transform and `draw_circle`); the chip chunk and the blood splat
+draw their plain commands there themselves. Used by the body's limbs and shadow (Character), blood splats, the chip
+and print chunks and the wound marks (Physics). Test: `tests/general/fill_batch_matches_draw_calls_test.gd` (headless, batching forced
+on: the batch holds each polygon's own triangles, and off it holds nothing; `--windowed`: identical pixels to the plain calls).
 
 ## Input architecture
 

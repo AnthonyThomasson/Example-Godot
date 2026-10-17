@@ -99,7 +99,12 @@ a new decision. Read-outs: `evading()`, `evade_spot()` (the controller's `debug_
 
 **A blinded NPC** (`Character.is_blind()`): the orchestrator starts no new decision (`_should_decide`) and re-decides the tick its sight returns; the order it was carrying out goes on
 (it stumbles: the character is slowed and drifts); the perception keeps its contacts (so the watch stage's engaged-contact pick, or the arrived peek-and-cover, fires at the hostile's last-known
-spot with the character's aim sway, G13) and sees no new one. A deafened NPC hears no gunfire, no hit elsewhere and no callout (the orchestrator drops them).
+spot with the character's aim sway, G13) and sees no new one. Whether it fires blind is the orchestrator's one roll as it goes blind (from not blind),
+`_rng.randf() < blind_fire_chance` (1 always fires; export, Grenades group, 0.5; `_rng` the controller's own `RandomNumberGenerator`, seeded once at bind from
+`hash("<character name> <spawn position rounded>")`, each blinding taking the next draw; a re-stun while blind draws nothing), handed in by
+`set_blind_fire(on)` to `Combat.blind_fire`; on a miss `Combat.holds_fire()` (blind and no blind fire) refuses `Combat.shoot()` (no round, no dry click)
+and cuts `continue_burst`, so every fire path (the watch stage's `fire_at_will`, the peek, the ambush) holds until it can see; the aim still turns to the
+spot. `debug_state()["holds_fire"]` reads it. Tests: `ai/grenade/stunned_defender_blind` (chance 1), `stunned_defender_holds_fire` (chance 0). A deafened NPC hears no gunfire, no hit elsewhere and no callout (the orchestrator drops them).
 
 ## Tactical entry (`entry.gd`) — `domain-ai-entry`
 

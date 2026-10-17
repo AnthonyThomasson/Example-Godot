@@ -118,12 +118,15 @@ class DecalChunk:
 
 	func _draw() -> void:
 		draw_set_transform_matrix(global_transform.affine_inverse())  # marks are in world space
+		var soles := FillBatch.new(self)  # Runs of prints in one command (General's FillBatch), in order: a ribbon flushes them.
 		for m in owner_layer.marks_in(cell):
 			var color := owner_layer.color_of(m)
 			if m["kind"] == "print":
-				draw_colored_polygon(m["poly"], color)
+				soles.fill(m["poly"], color)
 			else:
+				soles.flush()
 				_draw_ribbon(m, color)
+		soles.flush()
 
 	## A ribbon as two quads per segment (each half of the band), solid along the centre line and
 	## fading to `smear_feather` of that at the edges. Quads are drawn as raw triangles, so a sharp bend

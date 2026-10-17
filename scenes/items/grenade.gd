@@ -126,6 +126,25 @@ func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
+## The kinds and styles whose art `prepaint` has painted: [kind, style] -> true.
+static var _prepainted := {}
+
+
+## Paint this grenade's art ahead of time, once per kind and style: at every lighting step, lever held (in the hand) and gone (in
+## the air, on the floor), as `_texture` asks for it. The same cached textures: what is drawn never changes.
+func prepaint() -> void:
+	var key := [kind, style]
+	if _prepainted.has(key):
+		return
+	_prepainted[key] = true
+	var drawn := look()
+	var step := TAU / maxi(1, ArtConfig.turn_steps)
+	for k in ArtConfig.turn_steps:
+		for spoon in [true, false]:
+			PixelArt.render_turned(drawn["painter"], art_size(), drawn["shell"], PixelArt.snap_angle(k * step), drawn["finish"],
+				{ "kind": kind, "look": _look_handle(drawn), "spoon": spoon })
+
+
 ## The grenade's art in its look, lit for the lighting step `angle`, with the lever held down (`spoon`) or gone.
 func _texture(angle: float, spoon: bool) -> Texture2D:
 	var drawn := look()

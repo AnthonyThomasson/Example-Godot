@@ -8,6 +8,10 @@ extends Node
 ## body died; its bleed-out pool takes over). Splatters are added to the body's parent and capped per body
 ## (BloodConfig.max_splats_per_body, oldest freed first). Nothing happens while BloodConfig.enabled is off.
 
+## Whether a hit's spray merges its splats' outlines side by side on worker threads (each splat begun as it is thrown, all
+## finished before `record` returns), else builds each whole as it is thrown: the same splats either way (for tests).
+static var spray_side_by_side := true
+
 ## Drips still owed, and seconds until the next one.
 var _drips := 0
 var _wait := 0.0
@@ -28,17 +32,20 @@ func record(hit: HitInfo) -> void:
 	if host == null:
 		return
 	var out := hit.normal if hit.normal.length() > 0.001 else -hit.direction
+	var thrown: Array[Node] = []  # the spray's splats begun, finished below
 	var sprays := clampi(ceili(hit.damage / maxf(BloodConfig.hit_splat_damage, 0.001)), 1, BloodConfig.hit_splat_max)
 	for i in sprays:
 		var dir := out.rotated(randf_range(-BloodConfig.hit_spray_spread, BloodConfig.hit_spray_spread))
 		var reach := randf_range(BloodConfig.hit_spray_reach_min, BloodConfig.hit_spray_reach_max) if i > 0 else 0.0
 		var size := randf_range(BloodConfig.drip_size_min, BloodConfig.drip_size_max) * BloodConfig.hit_splat_size
-		_add_splat(hit.position + dir * reach, size, dir, BloodConfig.hit_spray_energy if i > 0 else 0.4)
+		_add_splat(hit.position + dir * reach, size, dir, BloodConfig.hit_spray_energy if i > 0 else 0.4, thrown)
 
 	# A round that went right through also throws blood out the far side, along its flight.
 	if hit.has_exit:
 		var size := randf_range(BloodConfig.drip_size_min, BloodConfig.drip_size_max) * BloodConfig.hit_splat_size
-		_add_splat(hit.exit_position, size, hit.direction, BloodConfig.hit_spray_energy)
+		_add_splat(hit.exit_position, size, hit.direction, BloodConfig.hit_spray_energy, thrown)
+	for splat in thrown:
+		splat.call(&"finish")
 
 	var owed := maxi(1, ceili(hit.damage * BloodConfig.drips_per_damage))
 	if _drips == 0:
@@ -95,10 +102,14 @@ func _jitter() -> Vector2:
 	return Vector2.from_angle(randf() * TAU) * randf() * BloodConfig.drip_jitter
 
 
-## Place a splatter at world `at` and keep it within this body's cap.
-func _add_splat(at: Vector2, size: float, direction: Vector2, energy: float) -> void:
+## Place a splatter at world `at` and keep it within this body's cap. Given `thrown`, a spray's splat is only begun and
+## added to it, for the caller to finish (see `spray_side_by_side`).
+func _add_splat(at: Vector2, size: float, direction: Vector2, energy: float, thrown: Variant = null) -> void:
 	var host := get_parent() as Node2D
-	var splat := BloodSpawner.splat(host.get_parent(), at, size, direction, energy, [(host as CollisionObject2D).get_rid()] if host is CollisionObject2D else [])
+	var begun := thrown != null and spray_side_by_side
+	var splat := BloodSpawner.splat(host.get_parent(), at, size, direction, energy, [(host as CollisionObject2D).get_rid()] if host is CollisionObject2D else [], not begun)
+	if begun:
+		(thrown as Array).append(splat)
 	_splats.append(splat)
 	while _splats.size() > BloodConfig.max_splats_per_body or (not _splats.is_empty() and not is_instance_valid(_splats[0])):
 		# Untyped: the loop also pops an already-freed splat (something else freed it), and assigning a freed

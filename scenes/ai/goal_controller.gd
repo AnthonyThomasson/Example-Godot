@@ -263,6 +263,10 @@ const ZoneList := preload("res://scenes/ai/debug/zone_list.gd")
 ## Longest walk (px of route) to a throw spot: a grenade out of range or with no clear lob from where the NPC stands is thrown from a spot
 ## at most this far away that is in range with a clear lob (docs/grenades.md G17), else not offered.
 @export var throw_spot_walk: float = 250.0
+## The chance (0..1) a flash-blinded NPC fires blindly (`docs/grenades.md` G15): rolled once as it goes blind (from not blind), on the
+## controller's own seeded RNG. A hit fires one-handed at the last-known spot of the hostile it fought; a miss holds its fire until it
+## can see. A further stun while it is still blind does not roll again.
+@export_range(0.0, 1.0) var blind_fire_chance: float = 0.5
 
 @export_group("Watch")
 ## How far (px) down its path a walking NPC looks: through the doorway it is lining up, not at the wall beside it.
@@ -353,6 +357,9 @@ var _salient_init := false ## Whether _salient_key has been seeded.
 var _character: Node ## The character this controller drives, captured on first control.
 var _event_queue: Array = [] ## [topic, data] pairs awaiting processing once _character is known.
 var _was_blind := false ## The character was flash-blinded last tick, to re-decide the moment its sight returns.
+## The AI's one source of chance (the blind-fire roll, G15), seeded once at bind from the character's name and spawn spot, so a seeded
+## match or a test that places the NPC the same way draws the same rolls.
+var _rng := RandomNumberGenerator.new()
 
 
 ## Build the AI sub-domains and wire them together, then push every export into them with
@@ -729,6 +736,7 @@ func control(character, delta: float) -> void:
 		return
 	if _character == null:
 		_character = character
+		_rng.seed = hash("%s %s" % [character.name, character.global_position.round()])
 		_perception.bind(character)
 		_behavior.bind(character)
 		_client.set_npc_name(_npc_name())
@@ -907,9 +915,9 @@ func _process_events() -> void:
 	_event_queue.clear()
 
 
-## The grenade reflex (G16) and the blind NPC's recovery (G15), every tick after the SEE pass: hand the behaviour the plan to get clear
-## of the live grenade that threatens the NPC (or {}), radio the grenades it has seen or heard come down, and re-decide the moment
-## its sight returns.
+## The grenade reflex (G16) and the blind NPC (G15), every tick after the SEE pass: hand the behaviour the plan to get clear of the
+## live grenade that threatens the NPC (or {}), radio the grenades it has seen or heard come down, roll once whether it fires blind
+## the tick it goes blind, and re-decide the moment its sight returns.
 func _react_to_grenades() -> void:
 	_behavior.poll_throw()
 	_behavior.set_evade(_perception.evade_plan())
@@ -917,6 +925,9 @@ func _react_to_grenades() -> void:
 		if send_callouts:
 			_post_grenade_call(grenade)
 	var blind: bool = _character.is_blind()
+	if blind and not _was_blind:
+		var draw := _rng.randf()  # One draw per blinding, whatever the chance, so the sequence does not depend on it.
+		_behavior.set_blind_fire(draw < blind_fire_chance or blind_fire_chance >= 1.0)
 	if _was_blind and not blind:
 		_force_now("sight returned")
 	_was_blind = blind

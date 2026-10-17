@@ -274,7 +274,7 @@ func _physics_step(delta: float) -> void:
 		_hands.facing = facing
 		_legs.clear()
 		_kick.clear()
-		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts())
+		pose.update(delta, facing, Vector2.ZERO, speed, _stances(), _hands.punch_amounts(), stun_level())
 		return
 
 	# Aim toward the aim point. Guard the degenerate zero-length case.
@@ -294,7 +294,7 @@ func _physics_step(delta: float) -> void:
 	_push_slow = _ease_push_slow(_apply_pushes(), delta)
 	_kick.update(self, delta)
 	# Before the children's _physics_process, so the hands build on this frame's pose.
-	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts())
+	pose.update(delta, facing, get_real_velocity(), speed, _stances(), _hands.punch_amounts(), stun_level())
 	_legs.update(self, delta)
 	_footsteps.update(self, _footprints)
 
@@ -435,7 +435,8 @@ func end_ride() -> void:
 	_rig_cache = null
 
 
-## A frame of a ride: the vehicle has posed the body; it only breathes, its legs stepping with the pose's step.
+## A frame of a ride: the vehicle has posed the body; it only breathes, its legs stepping with the pose's step. The ride's
+## pose wins over a stun's look (no hunch, no hand over the eyes), which eases back in once out.
 func _ride_frame(delta: float) -> void:
 	velocity = Vector2.ZERO
 	move_input = Vector2.ZERO
@@ -557,9 +558,10 @@ func posture_folded() -> float:
 
 
 ## How far further ahead (px) the hands are held at this posture: a crouch holds them out past its forward-leaning
-## chest.
+## chest, and so does a stunned hunch (the chest's shift as the spine pitches forward by the pose's `hunch()`).
 func posture_hand_ahead() -> float:
-	return CharacterConfig.body_crouch_hand_ahead * posture_folded()
+	var spine := (CharacterConfig.body_shoulder_height - CharacterConfig.body_hip_height) * radius
+	return CharacterConfig.body_crouch_hand_ahead * posture_folded() + spine * sin(pose.hunch()) * 0.5
 
 
 ## True while a reload is in progress.
@@ -933,8 +935,12 @@ func leg_kick_amount(i: int) -> float:
 
 
 ## Recoil: throw `hand` back and twist the shoulders, as a fired weapon does (the item calls it);
-## `strength` scales it (1 = a pistol's), so a light automatic's stream of rounds does not pile up.
+## `strength` scales it (1 = a pistol's), so a light automatic's stream of rounds does not pile up. A long gun (one too long
+## for a wall, `raises_at_contact`) fired one-handed kicks `CharacterConfig.one_hand_recoil` times harder.
 func kick(hand: int, strength := 1.0) -> void:
+	var item: Item = current_item()
+	if item != null and item.raises_at_contact() and one_handed():
+		strength *= CharacterConfig.one_hand_recoil
 	pose.kick(hand, strength)
 
 
@@ -960,16 +966,42 @@ func aim_sway() -> float:
 
 ## How each hand is held (CharacterConfig.stances names), as the held item asks: arms hang with
 ## nothing held. Running puts both arms down at the sides whatever is held; a weapon whose barrel is against
-## a wall or object is held raised, as the item says.
+## a wall or object is held raised, as the item says. Blind, the free hand covers the eyes (`eyes`) and a gun is held in the
+## weapon hand alone (`one_hand`; raised off a wall, its raised grip), unless the item needs that hand (`_covers_eyes`).
 func _stances() -> Array:
 	if _running:
 		return [&"run", &"run"]
 	var item: Item = current_item()
+	var out: Array
 	if item == null:
-		return [&"relaxed", &"relaxed"]
-	if _blocked:
-		return [item.raised_stance(0), item.raised_stance(1)]
-	return [item.hand_stance(0), item.hand_stance(1)]
+		out = [&"relaxed", &"relaxed"]
+	elif _blocked:
+		out = [item.raised_stance(0), item.raised_stance(1)]
+	else:
+		out = [item.hand_stance(0), item.hand_stance(1)]
+	if _covers_eyes(item):
+		var weapon := item.weapon_hand() if item != null else 0
+		out[1 - weapon] = &"eyes"
+		if item != null and item.gun_id() != &"" and not _blocked:
+			out[weapon] = &"one_hand"
+	return out
+
+
+## Whether the free hand (the one the held item does not hold its weapon in) is over the eyes: while blind, on its own
+## feet (a ride's pose wins), and not while the item needs that hand: a reload, a punch, a throw's wind-up.
+func _covers_eyes(item: Item) -> bool:
+	if not is_blind() or _riding or _running or is_dead:
+		return false
+	if _reloading_item != null or _hands.is_attacking():
+		return false
+	return item == null or item.hand_stance(item.weapon_hand()) != &"throw"
+
+
+## Whether the held gun is held in one hand: the free hand is over the eyes (blind, `_covers_eyes`). A gun fired so spreads
+## wider (`GunConfig` `one_hand_spread_deg`) and a long gun kicks harder. False for anything but a gun.
+func one_handed() -> bool:
+	var item: Item = current_item()
+	return item != null and item.gun_id() != &"" and _covers_eyes(item)
 
 
 ## Throw a punch with the given hand (the item decides which).

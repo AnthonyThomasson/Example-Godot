@@ -76,6 +76,22 @@ static var stun_sway: float = 25.0
 static var recover_tail: float = 1.5
 ## How fast (px/s) a stunned character drifts sideways of the way it walks, at the full level.
 static var stun_drift: float = 20.0
+## The stunned look (character_pose.gd / character_rig.gd; drawn only: nothing here changes where it goes or what it hits). It
+## eases toward the level at `stun_look_ease` (1/s), so it comes on and wears off without a jump; a ride's pose wins over it.
+static var stun_look_ease: float = 6.0
+## The hunch: the spine and the neck pitch forward this far (degrees) at the full level, on top of a crouch's own pitch.
+static var stun_hunch_pitch: float = 15.0
+## The stagger, at the full level: each stride is this share of a steady one (its length and its feet's swing), the steps
+## run uneven (a limp: one step this much longer than the next, as a share of the stride's pace; and a slow wander of the pace
+## by `stun_stagger_wander`), the hips sway this far (px) each way over the planted foot and the head lolls this far (px) each
+## way, both while walking.
+static var stun_stagger_stride: float = 0.55
+static var stun_stagger_limp: float = 0.4
+static var stun_stagger_wander: float = 0.3
+static var stun_stagger_sway: float = 4.0
+static var stun_stagger_bob: float = 3.0
+## A long gun fired one-handed (its user's free hand over the eyes, `Character.one_handed()`) kicks this many times harder.
+static var one_hand_recoil: float = 1.75
 
 # --- The leg kick (the right leg; character_kick.gd): harder than a punch, shorter in reach, and slower to come back ---
 ## Central impulse a kick imparts to a pushable object, and the damage it reports (both at full strength: a kick
@@ -325,7 +341,8 @@ static var leg_push_impulse: float = 30000.0
 ## frame it chases the aim in; its grip is `height` body radii off the floor (the arm bends to reach
 ## it) and its elbow bends toward `elbow_pole` (out, forward, up). `swing` is the walk's fore-and-aft
 ## swing of a free hand (px); a `steady` hand follows the aim closely and only drifts sideways;
-## `recoil_share` is how much of a kick the hand feels when the other hand fires.
+## `recoil_share` is how much of a kick the hand feels when the other hand fires; an optional `waver` (px, 0
+## when absent) wanders a steady hand slowly either way across its frame.
 static var stances: Dictionary = {
 	&"relaxed": { "forward": 2.0, "lateral": 13.0, "height": 3.7, "swing": 9.0, "steady": false,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.2, -0.8, -0.2) },
@@ -363,6 +380,13 @@ static var stances: Dictionary = {
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.8, -0.1, -1.0) },
 	&"ready_fore": { "forward": 14.0, "lateral": -9.0, "height": 6.8, "swing": 0.0, "steady": true,
 		"recoil_share": 0.0, "elbow_pole": Vector3(0.5, 0.0, -1.0) },
+	# Blinded by a flash: the free hand over the eyes, the palm on the face, the elbow down and out (the Character picks it
+	# for the hand the held item does not hold its weapon in; docs/grenades.md G13).
+	&"eyes": { "forward": 9.0, "lateral": 0.0, "height": 7.0, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.7, -0.2, -1.0) },
+	# A gun held in one hand while the other covers the eyes: the arm out, the gun low, wandering `waver` px either way across.
+	&"one_hand": { "forward": 24.0, "lateral": 5.0, "height": 5.2, "swing": 0.0, "steady": true,
+		"recoil_share": 0.0, "elbow_pole": Vector3(0.4, -0.1, -1.0), "waver": 3.0 },
 }
 ## How fast a hand eases from one stance to another (1/s).
 static var stance_ease: float = 12.0

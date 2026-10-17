@@ -34,7 +34,7 @@ composition root is `domain-main`.
 | **Audio** | `audio/` | `domain-audio` | The procedural sound system: every sound is synthesized in code, picked by event (gunshots per gun, bullet impacts per surface / outcome / round weight, footsteps per floor and gait, reloads, a grenade's throw, bounce, burst, a vehicle's ignition, doors, crashes, engine and skid loops) and played by the `Sound` autoload through a capped pool of positional voices; a deafened `Sound.focus` (the human) gets a muffle and a tinnitus whine. |
 | **Lighting** | `lighting/` | `domain-lighting` | The world's dusk lighting, a leaf like Audio (`docs/lighting.md`): the ambient and the sky, a light per light-giving piece (declared by the piece) and per room fixture within a per-floor budget, their seeded rhythms, the shot and explosion flashes, and who stands in a light. |
 | **Navigation** | `navigation/` | `domain-navigation` | Baking the house into a walkable nav map so characters can path around walls. |
-| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), the event bus (`EventBus`), the log (`GameLog`), the pausable game clock (`GameClock`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`), the draw-order ladder (`DrawLayers`) and the light masks (`LightMasks`). |
+| **General** | `general/` | `domain-general` | Infrastructure: input (Keybinds), saved settings (`Settings`), the event bus (`EventBus`), the log (`GameLog`), the pausable game clock (`GameClock`), despawner, camera, dev command server, shared physics-layer ids (`PhysicsLayers`), the draw-order ladder (`DrawLayers`), the light masks (`LightMasks`) and the batched plain-colour drawing (`FillBatch`). |
 | **UI** | `ui/` | `domain-ui` (+ `domain-ui-menus`, `-hud`, `-overlays`, `-testing` for `ui/<folder>/`) | All HUDs and menus, one sub-domain per folder: menus (pre-game setup window, settings page), hud (debug player panel, match HUD, spectator inspector and its contact markers, stun screen, stack markers, the human leader's command menu and order markers), overlays (overlay registry, toggle bar, performance overlay, the squad-leaders overlay) and testing (test browser window, test result banner). |
 | **AI** | `ai/` | `domain-ai` (+ `domain-ai-perception`, `-snapshot`, `-decision`, `-behavior`, `-combat`, `-coverage`, `-watch`, `-entry`, `-debug`) | Non-player brains: one generic controller that drives every NPC. Plus `ai/team/`, the human's side of the entry radio (`PlayerStack`, interface 17) and each side's squad, its leader and its orders (`Squad`, interface 21). Internally split into four isolated **sub-domains** under `ai/` — perception (`ai/perception/`), decision (`ai/decision/`), behaviour (`ai/behavior/`), debug (`ai/debug/`) — around a thin orchestrator (`ai/goal_controller.gd`). `domain-ai` is the overview; each sub-domain has a `domain-ai-<name>` skill. |
 | **Vehicles** | `vehicle/` | `domain-vehicle` | Drivable vehicles (a car and a van, only in the sandbox): the rigid body and its driving model, doors and seats, getting in and out (the character's `CharacterVehicleUse` component and the ride), collisions and the harm to a character struck, the dents, the vehicle art and its events. |
@@ -157,7 +157,10 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 through the dented silhouette). The polygons are `base_ring(shape, size)` (a primitive's undented ring),
 	 `shape_polygon(shape, size, impacts)` (a piece's or the character's dented silhouette, cached), `wall_polygon(a, b, thickness, impacts)`
 	 (a dented wall segment), `is_valid_polygon(poly)` (callers skip a self-touching one that frame) and `convex_shapes(polygon)` (the
-	 convex pieces a dented collider is rebuilt from); `NO_COLOR` is the sentinel a caller passes to take a drawing call's default colour.
+	 convex pieces a dented collider is rebuilt from; also as `convex_pieces(polygon)`, their points, and `shapes_of(pieces)`; and
+	 `cut_shape(shape, size, impacts)` / `cut_wall(a, b, thickness, impacts)` -> `[polygon, pieces]`, a dented silhouette and its pieces
+	 computed without the caches: all pure, so they may run on a worker thread); `NO_COLOR` is the sentinel a caller passes to take a
+	 drawing call's default colour.
    - `Physics.impact_impulse(hit) -> Vector2`, `Physics.spawn_debris(world, hit, surface)` (objects and a vehicle)
 	 `BloodWound` (Node child, character: `record(hit)` on a hit throws a splatter spray and owes drips, one
 	 `BloodSplat` every `BloodConfig.drip_interval_min..max` s from the body's blood origin; `stop()` on death)
@@ -186,7 +189,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 with `point(i)` / `point_count()` / `frame_basis(f)`; `exclude` lists colliders its wall sweep
 	 ignores. The Character domain owns the humanoid skeleton built on it.
    - `Physics.spawn_explosion(world, at, kind)` (`kind` `&"frag"` / `&"stun"`; called by the Projectile System's `Explosion`): the look of a
-     grenade's burst, `ExplosionFx` nodes `ExplosionFlash`, `ExplosionFireball` (frag only) and `ExplosionSmoke`, which draw themselves in stepped
+     grenade's burst, `ExplosionFx` nodes `ExplosionFlash` and `ExplosionFireball` (frag only: a stun's white flash is the Lighting domain's flash
+     light, interface 20) and `ExplosionSmoke`, which draw themselves in stepped
      pixel rows and free themselves (Despawner-tracked), and a frag's scorch mark in the world's `ScorchDecals` layer (batched like `BloodDecals`,
      capped by `Despawner.max_scene_objects`). Looks and timings are `PhysicsConfig.explosion_looks`; `PhysicsConfig.explosion_fx_enabled` off
      spawns none of it. `Ragdoll.wake()` restarts a sleeping body's clocks so an explosion's push is simulated (the character's `blast_push`).
@@ -195,7 +199,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	 `deform_update_collider`) that Objects reads directly when recording damage, and the ragdoll
 	 solver's `ragdoll_*` tuning (read only by `Ragdoll` itself).
    Physics imports nothing from other domains but General's infrastructure (`Despawner` for debris, hit particles, blood and
-   the explosion effects, `PhysicsLayers` for `PhysicsConfig.wall_mask`, `DrawLayers` for its z knobs).
+   the explosion effects, `PhysicsLayers` for `PhysicsConfig.wall_mask`, `DrawLayers` for its z knobs, `FillBatch` for its many
+   plain-coloured shapes).
 
 5. **"Pushable" contract** — anything shoveable exposes `apply_impulse(v, at = Vector2.ZERO)` + `get_mass()`,
    `at` the contact offset from the piece's origin (in world orientation; omitted = a central shove).
@@ -213,7 +218,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
 6. **Items ↔ Character**
    `Item` (`items/item.gd`): `display_name`, `reach`, `hand_stance(hand) -> StringName` (how that
    hand is held — the name of a `CharacterConfig.stances` entry: `relaxed`, `guard`, `aim`, `support`;
-   the character's pose eases each hand to it and the rig bends the arm to reach it), `primary(user)` (F), the melee hooks the character's hands read, `strike_direction(aim, amount)` / `strike_end(aim, amount)` / `strike_forward()` / `strike_short()` / `strike_support_gap()` / `strike_tempo()` (a long gun's punch swings it nearly across the body, butt leading; `GunItem` overrides `strike_ahead()` / `strike_turn()`, from which the direction, end and forward follow, and the short, support gap and tempo),
+   the character's pose eases each hand to it and the rig bends the arm to reach it; the character itself overrides it with `run` while running
+   and, while blind, puts the free hand in `eyes` and a gun's weapon hand in `one_hand`, `docs/grenades.md` G13), `primary(user)` (F), the melee hooks the character's hands read, `strike_direction(aim, amount)` / `strike_end(aim, amount)` / `strike_forward()` / `strike_short()` / `strike_support_gap()` / `strike_tempo()` (a long gun's punch swings it nearly across the body, butt leading; `GunItem` overrides `strike_ahead()` / `strike_turn()`, from which the direction, end and forward follow, and the short, support gap and tempo),
    `secondary(user) -> bool` (LMB; true = a round left the barrel), `tick(delta)` (the item's own clocks; the character ticks
    every item it carries each physics frame), `is_automatic()` (holding the trigger keeps firing), `weapon_hand()`,
    `muzzle_ahead()` (px past the weapon hand where bullets leave; negative = the character's `CharacterConfig.muzzle_ahead`),
@@ -252,9 +258,10 @@ interfaces it takes part in (by number) and describes how they're implemented.
    character API an item may call: `facing`, `punch(hand)`, `punch_amount(hand)` (0..1, how far that hand is thrown: a long gun swings round by it),
    `hand_position(hand)`, `hand_world(hand)`, `muzzle_origin(hand)` (the held item's `muzzle_ahead()` past the hand),
    `world_root()` (also read by the AI: the characters it perceives are the group `characters` under it), `report_shot(body, dmg)`, `kick(hand, strength := 1.0)` (recoil: throws that hand back; `strength` scales it),
-   `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`), `aim_target()` (the aim point a grenade is thrown to) / `aim_sway()` (rad, the stun's wandering turn of every shot and throw; 0 unstunned) and `weapon_raise()` (0..1, how far
+   `weapon_facing()` (the drawn weapon direction, trailing the aim; shots still use `facing`), `aim_target()` (the aim point a grenade is thrown to) / `aim_sway()` (rad, the stun's wandering turn of every shot and throw; 0 unstunned), `one_handed()`
+   (a held gun is in the weapon hand alone, the free hand over the eyes while blind: a gun's round then adds its row's `one_hand_spread_deg`) and `weapon_raise()` (0..1, how far
    a long gun is raised off a wall, for its art). **Guns:** every firearm is a `GunItem` (`items/gun.gd`) tuned by its row in
-   `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `recoil`, its default magazine,
+   `GunConfig` (damage, `fire_interval`, `automatic`, `penetration`, `muzzle_speed`, `spread_deg`, `one_hand_spread_deg`, `recoil`, its default magazine,
    `raises_at_contact`); `PistolItem` / `SmgItem` / `RifleItem` supply only their sizes and hold (the look is the row's `looks`, above). **Ammo:** `Item` has inert hooks
    `rounds_loaded()` / `ammo_capacity()` (-1 = no ammo), `reload_time()`, `can_reload(user)`, `finish_reload(user)` and a
    `reloading` flag the character sets. **Gun identity:** `gun_id()` (the `GunConfig` id, `&""` for a non-gun) and `round_power()`
@@ -294,7 +301,8 @@ interfaces it takes part in (by number) and describes how they're implemented.
    `get_surface_at` (interface 3); an outfit's weight slows `run_speed()` and every pace;
    while the character rides a vehicle (interface 19, from the E press to its last step out) `is_busy()` is true, and `current_item()` is null
    while it is posed by the ride (the item put away);
-   the stun (a grenade's flash and bang): `take_stun(blind, deaf)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
+   the stun (a grenade's flash and bang): `take_stun(blind, deaf)`, `is_blind()`, `is_deaf()`, `stun_level()` (0..1 disorientation: slowed to `CharacterConfig.stun_speed`, no running, aim sway;
+   drawn hunched and staggering, the free hand over the eyes while blind), `one_handed()` (blind, a held gun is in the weapon hand alone: its rounds spread wider), `stun_view()` (`{ blind, blind_total, deaf, level }`, for the UI) and `blast_push(from, impulse)` (an explosion's shove: knockback, or the fallen body's ragdoll thrown) and `faction` (allegiance tag, for AI hostility). The AI also reads
    another character's `facing`, `damage_taken()`, `is_reloading()`, `posture()`, `current_item()` and `faction` — but only while it can SEE that character
    (aim, visible wounds, a reload in progress and the posture are things it perceives); the exceptions are three reads of an unseen character's `faction`,
    which stand for knowing who its own team is: the faction of a character whose footstep it hears (the `footfall` event's `character`, interface 10), so its
@@ -491,6 +499,12 @@ interfaces it takes part in (by number) and describes how they're implemented.
 	  ages and blink), so a pause of any length expires nothing; only what measures real time stays on `Time` (the Von launcher's boot
 	  timeout and the planner's per-level `ms`, Von's latency). A per-frame key (`DecisionBudget`'s claim, the learn and sight offsets,
 	  a once-a-frame check) may still read `Engine.get_physics_frames()`: it measures no age.
+    - `FillBatch` (`general/fill_batch.gd`, a `RefCounted`) — plain-coloured shapes drawn as one triangle array instead of a polygon
+	  command each, the same triangles the engine would cut and `draw_circle`'s own 64-gon, in order, so the same pixels:
+	  `FillBatch.new(canvas, base := IDENTITY)`, `fill(poly, color, xform := IDENTITY)`, `fill_convex(poly, color, xform := IDENTITY)`,
+	  `circle(center, radius, color, xform := IDENTITY)`, `flush()`; `FillBatch.batching` (false under the headless display, which renders
+	  nothing: each shape is then drawn by its own command). Used where many are drawn each frame: the Character's limbs and shadow, the
+	  Physics domain's blood splats, chip and print chunks and wound marks.
 
 12. **Objects / Character / Items / Vehicles → Art** (leaf: the pixel-art engine; each domain owns its painters)
     - `PixelArt.render(painter, size, color, facing, material, opts) -> Texture2D` — a painter's art
@@ -739,7 +753,7 @@ TestBrowser ──(Back: scene change)──▶ main
 ```
 
 Physics, Navigation, Art, Audio, Lighting and World-Gen are leaves — apart from General's infrastructure (`GameLog`, `EventBus`,
-`Despawner`, `GameClock`, `PhysicsLayers`, `DrawLayers`, `LightMasks`), which every domain may use (World-Gen's only outward code dep is
+`Despawner`, `GameClock`, `PhysicsLayers`, `DrawLayers`, `LightMasks`, `FillBatch`), which every domain may use (World-Gen's only outward code dep is
 the four factories; Navigation depends only on Godot's `NavigationServer2D`; Art
 only on Godot's `Image`; Lighting reads the world only duck-typed). Tuning is split into fifteen `class_name` static holders: `BallisticsConfig`
 (projectile), `PhysicsConfig` (impact, debris and hit particles, deformation, the explosion's look, the ragdoll solver), `CharacterConfig` (walking
@@ -791,10 +805,11 @@ Two conventions hold across domains; the per-domain specifics live in each domai
   3. **Exploratory / not yet scriptable?** `godot-run` skill: drive the live game through the dev
      command server (`tools/gcmd.py`).
   4. **Whole-AI outcomes?** `tools/match.py` scores full defender-vs-invader matches.
-  **Fast enough?** `tools/run_tests.sh --domain=perf`: the performance tests (`tests/perf/`: nine guards) hold a 5v5 and a 10v10 match to one 60 fps
+  **Fast enough?** `tools/run_tests.sh --domain=perf`: the performance tests (`tests/perf/`: eleven guards) hold a 5v5 and a 10v10 match to one 60 fps
   frame on average and hold stress cases to their budgets: automatic fire, nav re-bakes and path queries, a whole match dying in one
-  frame, a furniture pile shoved at once, house generation, hundreds of hits on one body and an NPC crowd (`domain-testing` skill,
-  "Performance tests"); a change to a per-frame path should leave them green.
+  frame, a furniture pile shoved at once, house generation, hundreds of hits on one body, an NPC crowd, grenades thrown into a 5v5 and a
+  frag and a stun bursting in a crowded room (`domain-testing` skill, "Performance tests"); a change to a per-frame path should leave them
+  green. Headless they measure the CPU; `tools/run_tests.sh --windowed` measures the render too.
   A bugfix starts with a failing test on rung 2 (`fix` skill).
 - The relevant **`domain-<name>` skill** documents each domain's behaviour to verify (house
   generation, movement/pushing, items, interactions, combat).

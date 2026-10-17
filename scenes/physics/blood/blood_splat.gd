@@ -25,6 +25,9 @@ var _heading := 0.0
 ## Collider RIDs the clipping rays ignore (the body the blood came from).
 var _exclude: Array = []
 var _space: PhysicsDirectSpaceState2D  ## The space the wall rays query.
+## The worker task merging a begun splat (-1 when none), and where it leaves the outlines (see `begin`).
+var _task := -1
+var _built: Array = [null]
 
 
 func _ready() -> void:
@@ -34,6 +37,44 @@ func _ready() -> void:
 ## Build the splat: core radius `radius` (px), thrown toward `direction` (zero = no preferred way) with
 ## `energy` 0..1. Call after the node is in the tree and placed, so wall clipping can query the world.
 func setup(radius: float, direction: Vector2, energy: float, exclude: Array = []) -> void:
+	for poly in _throw(radius, direction, energy, exclude):
+		_merge_in(poly)
+	_finish(_drawable_all(shapes))
+
+
+## `setup` in two halves, so the splats of one spray are merged side by side: `begin` throws the splat here (its random
+## shapes and their wall rays, in the same order as `setup`) and merges its outlines on a worker thread (the same fold,
+## `_fold`); `finish` waits for them and completes the splat as `setup` does. The caller finishes it before anything else
+## can see it (`BloodWound.record`, before it returns).
+func begin(radius: float, direction: Vector2, energy: float, exclude: Array = []) -> void:
+	var polys := _throw(radius, direction, energy, exclude)
+	var built: Array = [null]
+	_built = built
+	_task = WorkerThreadPool.add_task(func() -> void:
+		var outlines: Array[PackedVector2Array] = []
+		var boxes: Array[Rect2] = []
+		for poly in polys:
+			_fold(outlines, boxes, poly)
+		built[0] = _drawable_all(outlines), true, "blood splat")
+
+
+## Complete a splat `begin` started: wait for its merged outlines, then register, highlight and dry it as `setup` does.
+func finish() -> void:
+	if _task < 0:
+		return
+	WorkerThreadPool.wait_for_task_completion(_task)
+	_task = -1
+	_finish(_built[0])
+
+
+func _exit_tree() -> void:
+	if _task >= 0:  # a begun splat leaving unfinished: its worker task must still be waited for
+		WorkerThreadPool.wait_for_task_completion(_task)
+		_task = -1
+
+
+## The splat's random shapes (core, spikes, satellites), clipped by the walls: its first half, on the main thread.
+func _throw(radius: float, direction: Vector2, energy: float, exclude: Array) -> Array[PackedVector2Array]:
 	_radius = radius
 	_exclude = exclude
 	_space = get_world_2d().direct_space_state
@@ -45,14 +86,23 @@ func setup(radius: float, direction: Vector2, energy: float, exclude: Array = []
 		polys.append(spike)
 	for droplet in _satellites(e):
 		polys.append(droplet)
-	for poly in polys:
-		_merge_in(poly)
+	return polys
+
+
+## The merged outlines that can be drawn (`drawable`, empties dropped).
+static func _drawable_all(outlines: Array[PackedVector2Array]) -> Array[PackedVector2Array]:
 	var kept: Array[PackedVector2Array] = []
-	for outline in shapes:
+	for outline in outlines:
 		var ok := drawable(outline)
 		if not ok.is_empty():
 			kept.append(ok)
+	return kept
+
+
+## The built splat's last half, on the main thread: its outlines `kept`, registered, highlighted and set drying.
+func _finish(kept: Array[PackedVector2Array]) -> void:
 	shapes = kept
+	_boxes.clear()
 	BloodField.add_splat(self, shapes)
 	_add_highlight()
 	_dry()
@@ -61,8 +111,14 @@ func setup(radius: float, direction: Vector2, energy: float, exclude: Array = []
 
 func _draw() -> void:
 	var color: Color = BloodConfig.color
+	if not FillBatch.batching:  # the headless display: each outline by its own command costs the least
+		for poly in shapes:
+			draw_colored_polygon(poly, color)
+		return
+	var batch := FillBatch.new(self)  # One command for every outline, the same triangles (General's FillBatch).
 	for poly in shapes:
-		draw_colored_polygon(poly, color)
+		batch.fill(poly, color)
+	batch.flush()
 
 
 ## The core: a lumpy blob, longer along the heading and narrower across it as energy grows.
@@ -163,15 +219,20 @@ static func drawable(poly: PackedVector2Array) -> PackedVector2Array:
 ## Fold `poly` into the merged outlines: union it with any outline it touches (so overlapping parts
 ## become one opaque shape), else keep it separate. Holes the union may leave are ignored.
 func _merge_in(poly: PackedVector2Array) -> void:
+	_fold(shapes, _boxes, poly)
+
+
+## `_merge_in` on given outlines and their boxes (pure, so a worker thread may run it).
+static func _fold(outlines: Array[PackedVector2Array], boxes: Array[Rect2], poly: PackedVector2Array) -> void:
 	var current := poly
 	var current_box := _box_of(current)
 	var i := 0
-	while i < shapes.size():
+	while i < outlines.size():
 		# Outlines whose boxes are apart cannot touch: the union would keep them as two, so skip the merge.
-		if not current_box.intersects(_boxes[i]):
+		if not current_box.intersects(boxes[i]):
 			i += 1
 			continue
-		var merged := Geometry2D.merge_polygons(shapes[i], current)
+		var merged := Geometry2D.merge_polygons(outlines[i], current)
 		var outer: Array[PackedVector2Array] = []
 		for m in merged:
 			if not Geometry2D.is_polygon_clockwise(m):
@@ -179,13 +240,13 @@ func _merge_in(poly: PackedVector2Array) -> void:
 		if outer.size() == 1:
 			current = outer[0]
 			current_box = _box_of(current)
-			shapes.remove_at(i)
-			_boxes.remove_at(i)
+			outlines.remove_at(i)
+			boxes.remove_at(i)
 			i = 0
 		else:
 			i += 1
-	shapes.append(current)
-	_boxes.append(current_box)
+	outlines.append(current)
+	boxes.append(current_box)
 
 
 ## The box around `poly`, a hair larger so outlines that merely touch still count as overlapping.

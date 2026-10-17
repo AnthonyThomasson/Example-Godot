@@ -206,7 +206,8 @@ func primary(user) -> void:
 
 ## LMB: fire a bullet from the muzzle and eject a casing (both live in world space); the gun kicks
 ## the hand back. Spends a round; an empty, mid-reload or still-cycling gun does nothing. The round leaves
-## within the gun's spread of the aim. True when a round left the barrel.
+## within the gun's spread of the aim, wider by its `one_hand_spread_deg` while its user holds it in one hand
+## (`one_handed()`). True when a round left the barrel.
 func secondary(user) -> bool:
 	if reloading or rounds_loaded() <= 0 or _cooldown > 0.0:
 		return false
@@ -218,7 +219,10 @@ func secondary(user) -> bool:
 	# butt on the right shoulder) still shoots where the character points.
 	var direction: Vector2 = (user.global_position + user.facing * GunConfig.zero_range - muzzle).normalized()
 	direction = direction.rotated(user.aim_sway())  # A stunned character's aim wanders off the line.
-	var spread := deg_to_rad(float(stat("spread_deg", 0.0)))
+	var spread_deg := float(stat("spread_deg", 0.0))
+	if user.one_handed():  # Held in one hand (the other over its eyes): the gun wanders off the line.
+		spread_deg += float(stat("one_hand_spread_deg", 0.0))
+	var spread := deg_to_rad(spread_deg)
 	if spread > 0.0:
 		direction = direction.rotated(randf_range(-spread, spread))
 	var power := round_power()
@@ -268,6 +272,33 @@ func draw_dropped(canvas: CanvasItem, at: Vector2, angle: float, modulate: Color
 	canvas.draw_set_transform(at, turn, Vector2.ONE)
 	canvas.draw_texture_rect(tex, Rect2(-size * 0.5, size), false, modulate)
 	canvas.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+## The guns and styles whose art `prepaint` has painted: [gun, style] -> true.
+static var _prepainted := {}
+
+
+## Paint this gun's art ahead of time, once per gun and style: held at every raise step (`draw_weapon`) and lying on the floor
+## either side up (`draw_dropped`), each at every lighting step. A gun turns, is raised off walls and skids from a dead hand
+## through those, and each first paint (0.3 to 0.5 ms) would land in the busiest frames of a fight. The same calls the draws
+## make, so the same cached textures: what is drawn never changes.
+func prepaint() -> void:
+	var key := [gun, style]
+	if _prepainted.has(key):
+		return
+	_prepainted[key] = true
+	var drawn := look()
+	var handle := _look_handle(drawn)
+	var step := TAU / maxi(1, ArtConfig.turn_steps)
+	for k in ArtConfig.turn_steps:
+		var angle := PixelArt.snap_angle(k * step)
+		for raise in RAISE_STEPS + 1:
+			var shrink := lerpf(1.0, RAISED_LENGTH, float(raise) / RAISE_STEPS)
+			var size := Vector2(art_size().x, maxf(roundf(art_size().y * shrink), 4.0))
+			PixelArt.render_turned(drawn["painter"], size, drawn["body"], angle, drawn["finish"], { "gun": gun, "look": handle })
+		for flip in [false, true]:
+			PixelArt.render_turned(drawn["painter"], flat_size(), drawn["body"], angle, drawn["finish"],
+				{ "gun": gun, "look": handle, "flat": true, "flip": flip })
 
 
 ## The held art of `size` centered at `centre`, muzzle along `facing`, in its look's painter: lit for the nearest lighting

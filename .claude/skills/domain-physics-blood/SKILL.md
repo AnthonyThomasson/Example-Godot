@@ -21,7 +21,13 @@ layer the splat clipping and flow queries treat as blocking.
 Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and a dead body's **bleed-out**.
 
 - `BloodWound` (`class_name`, a Node the character composes like `Knockback`; the character's `take_hit` calls `record`): `record(hit)` throws
-  `ceil(damage / hit_splat_damage)` splatters (max `hit_splat_max`) out the wound's exit side at once, then adds
+  `ceil(damage / hit_splat_damage)` splatters (max `hit_splat_max`) out the wound's exit side at once (plus one out the exit
+  wound) and merges them side by side: each is begun as it is thrown (`BloodSpawner.splat(..., whole = false)` →
+  `BloodSplat.begin`: its random shapes and wall rays on the main thread, in `setup`'s order; its outlines merged by the same
+  fold, `_fold`, on a worker thread) and all are finished (`finish`: registered, highlighted, set drying) before `record`
+  returns, so nothing sees a splat half-built and the splats are the ones `setup` builds whole
+  (`tests/physics/blood_spray_side_by_side_matches_whole_test.gd` throws the same seeded hits both ways; `spray_side_by_side`
+  off builds each whole). A drip is still built whole (`setup`). Then it adds
   `ceil(damage * drips_per_damage)` to a drip budget (cap `max_pending_drips`). While it lasts, one drop falls
   every random `drip_interval_min..max` s (3..10) from the host's `blood_origin()`; it keeps the host's
   `velocity` for `drip_fall_time`, so a walker's drops land ahead and splat stretched along its heading
@@ -33,7 +39,8 @@ Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and
   droplet), and satellite droplets, all clipped by walls/furniture (a ray from the centre, `PhysicsConfig.wall_mask`)
   and merged (`Geometry2D.merge_polygons`, skipped for two outlines whose boxes are apart — the union would keep them as two;
   `tests/physics/blood_splat_merge_fast_path_test.gd` pins the build to the merge-against-every-outline one) into opaque outlines
-  so overlaps don't darken. Each outline is
+  so overlaps don't darken, drawn as one General `FillBatch` (under the headless display, which renders nothing, one
+  `draw_colored_polygon` each, as `FillBatch.batching` is off there). Each outline is
   run through `BloodSplat.drawable` once built: about 1 splat in 100,000 unions into a polygon the engine
   cannot triangulate, which is swapped for its convex hull (or dropped) instead of logging an error when drawn.
   Test: `tests/physics/blood_splat_shapes_valid_test.gd`. A wet highlight fleck
@@ -45,7 +52,8 @@ Three parts, all tuned by `BloodConfig`: a wound's **spray**, its **drips**, and
   puddle is one continuous irregular shape wrapping around walls and furniture. All cells are claimed up front (a
   batch per frame); a front then sweeps through flow-cost over `bleed_out_duration`, so each cell's fill rises
   continuously. Drawn by blurring the fill field into a small image and thresholding it in a shader (one smooth
-  outline, darker rim).
+  outline, darker rim), every physics frame while it spreads; the 3x3 box blur adds each cell's three-cell row sums (doubles: a sum
+  of float32 fills is exact, so the field is the nine-cell loop's, `tests/physics/blood_pool_blur_matches_plain_test.gd`).
 
 The floor steers the flow: each cell's step cost is multiplied by `BloodSurface.resistance(world_pos)` —
 surfaces (Objects' floors) register a world rect + a `groove` Callable, so blood runs cheaply along grooves
@@ -76,7 +84,7 @@ so trails taper. All tuning is `BloodConfig` (`footprints_enabled`, `smear_enabl
   splatter is a thin film (`splat_wetness`) drying to 0 over `splat_dry_time`; a pool is its flow fill, wet for
   `pool_wet_time`. Dried blood returns 0. Ages count physics frames.
 - `BloodDecals` (one per parent via `layer(parent)` / `find(parent)`; extends Physics' `chunked_layer.gd`, `domain-physics`): batches prints
-  (polygons) and smear ribbons at `BloodConfig.print_z_index` in the shared chunked store, whose chunks redraw only when they gain a mark or a
+  (polygons, each run of them one General `FillBatch`) and smear ribbons at `BloodConfig.print_z_index` in the shared chunked store, whose chunks redraw only when they gain a mark or a
   ribbon grows (and, its own chunk draw, at 2 Hz while drying, `print_dry_time`); its cap is `print_max` (not the Despawner).
   `ribbon_begin(point, width, alpha) -> mark`, `ribbon_extend(mark, point, width, alpha)` (width 0 = taper to a
   point), `ribbon_count()`; a ribbon is drawn as two quads per segment via `draw_primitive`, solid on its centre line

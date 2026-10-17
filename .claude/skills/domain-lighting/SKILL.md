@@ -22,7 +22,9 @@ WorldLighting ──(group `characters`: is_dead, radius, global_position)──
 
 | File | Role |
 |---|---|
-| `lighting_config.gd` (`LightingConfig`) | Static tuning: `enabled` (master switch), the dusk (`ambient_color` (0.40, 0.37, 0.55), `sky_color` (1.0, 0.5, 0.42), `sky_from`, `sky_energy`: the street's only), the fixtures (`fixture_color`, `_energy`, `_reach_scale` / `_pad` / `_range`, `fixture_rhythms`), the flashes (`flash_pool` 3, `flashes` rows `shot` / `frag` / `stun`: colour, energy, reach, `reach_per_radius`, life), the budget (`item_lights` 15, `per_floor()` = 15 − the pool, `floor_reach`), `body_clear` 1.3, and the pool textures (`textures` per shape, two smooth profiles, linear points: a low light's glow `glow_offsets` / `glow_levels`, an overhead light's downward pool `pool_offsets` / `pool_levels`). |
+| `lighting_config.gd` (`LightingConfig`) | Static tuning: `enabled` (master switch), the dusk (`ambient_color` (0.40, 0.37, 0.55), `sky_color` (1.0, 0.5, 0.42), `sky_from`, `sky_energy`: the street's only), the fixtures (`fixture_color`, `_energy`, `_reach_scale` / `_pad` / `_range`, `fixture_rhythms`), the flashes (`flash_pool` 3, `flashes` rows `shot` / `frag` / `stun`: colour, energy, reach, `reach_per_radius`, `hold` (s at full
+energy, none when absent: the stun's 0.08) and `life` (the fall-off after it); the stun's is energy 8, life 0.7, its burst's whole look,
+since Physics draws no disc for it), the budget (`item_lights` 15, `per_floor()` = 15 − the pool, `floor_reach`), `body_clear` 1.3, and the pool textures (`textures` per shape, two smooth profiles, linear points: a low light's glow `glow_offsets` / `glow_levels`, an overhead light's downward pool `pool_offsets` / `pool_levels`). |
 | `world_lighting.gd` (`WorldLighting`) | The node: `static light(root, seed_value, rooms := []) -> WorldLighting` (null while `enabled` is off), the reads `lights()`, `fixtures()`, `flashes()`, `budget()`, and the per-frame work (`_process`). |
 | `light_budget.gd` (private) | The per-floor count: `add_floor(ground)`, `take(box, item_mask, always) -> bool`, `box_of(light, xf)`. |
 | `light_rhythm.gd` (private) | One light's rhythm: `pick(kinds, rng)`, `new(mode, seed)`, `step(delta) -> factor`. |
@@ -58,7 +60,8 @@ Each kept light is a `Lit` (node, full energy, rhythm or null, `glow`): the rhyt
 
 - Every `Lit` with a rhythm: `energy = full × step(delta)`, its `glow` (the piece's `Emissive` overlay, or the fixture's glyph)
   `modulate`d to `0.3 + 0.7 × factor`.
-- Every live flash: `energy × left²` with `left` = 1 − t / life, disabled at the end of its life.
+- Every live flash: its full energy through its `hold`, then `energy × left²` with `left` = 1 − (t − hold) / life, disabled at the
+  end of its hold + life (the shot and the frag hold none, so theirs is the plain fall-off).
 - `_clear_bodies`: the character list is re-read from the group `characters` only when `get_node_count_in_group` changes; each
   frame fills each living character's position and its `radius × body_clear` reach (squared) into packed arrays, then every lit
   flash (the only lights the characters shadow, `ALL_SHADOWS`) drops `CHARACTER` from its shadow mask while a character's centre
@@ -81,7 +84,8 @@ Lights follow their piece by being its children; the occluders follow theirs the
 - **A light-giving piece:** a row in `ObjectArtConfig.light_specs` and its case in `object_lights.gd` (`_kind`, and its colour /
   offset in `of`); its painter draws the source inside `canvas.glowing` so its overlay shows it.
 - **Who shadows whom:** the masks in `LightMasks` (General) and the shadow mask each light is given here.
-- **A flash:** a `LightingConfig.flashes` row and its topic in `_on_posted`.
+- **A flash:** a `LightingConfig.flashes` row and its topic in `_on_posted`. A flash that is the whole look of something (the stun's)
+  takes a `hold` and a longer `life` rather than a drawn effect beside it; it stays in the pool (no light of its own kept alive).
 
 ## Gotchas
 

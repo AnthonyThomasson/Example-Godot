@@ -7,7 +7,8 @@ convention of `docs/tactical-entry.md` and `docs/flanking-behavior.md`. The test
 and read the game only through the interfaces named in the rules, via `tests/_ai/grenade_probe.gd`.
 
 This file was written with the tests, before the feature (issue #35, tests first), and amended as the build and its tests taught what the
-rules needed (the amendments to G7, G11, G16, G17, G18 are marked in them).
+rules needed (the amendments to G7, G11, G16, G17, G18 are marked in them). Issue #56 amended G13, G14 and G15 (the stunned look,
+firing one-handed, the blind-fire roll, the stun's flash as a light; marked in them) and added the Performance section below.
 
 **Verification (15 October 2026, issue #51 final wrap-up, R1 to R17 and the audit's fixes on main `a03e23f`).** `tools/lint.sh` and
 `tools/load_check.sh`: clean. The 50 tests issue #51 adds, `--repeat=10 --include-von --require-von --jobs=auto`: 500 passed, 0 failed (load average 5.5
@@ -18,6 +19,17 @@ before, 3.6 after); the 11 existing tests it changes, the same way: 110 passed, 
 5v5 3.63 to 3.80, 10v10 8.13 to 8.42, NPC crowd 4.08 to 4.49, so the branch costs 5 to 12 % more a frame in those pairs (0.3, 1.0 and 0.2 ms on the
 mean), all within the 16.7 ms standard. `tools/von_probe.py tools/von_scenarios/grenade_*.json tools/von_scenarios/stun_entry_*.json --ablate -v`:
 16 of 16.
+
+**Verification (16 October 2026, issue #56 wrap-up after the audit's fixes, on origin/main `f0e4f8e`).** `tools/lint.sh` and
+`tools/load_check.sh`: clean. Every test issue #56 adds or changes passes alone (the 19 headless ones one process each, the two perf ones in the
+gated runs below, the two Von ones with `--include-von --require-von`); the timing-dependent ones 10 of 10 with `--repeat=10`,
+`ai/grenade/stunned_defender_blind` and `stunned_defender_holds_fire` 3 of 3 on the real Von server. The whole suite, `tools/run_tests.sh --summary
+--jobs=auto` (load 3.5 before, 5.4 after): 441 passed, 0 failed, 0 timed out, 44 skipped (the Von ones), 0 `gap`; all of `tests/ai/grenade/` on the
+real Von server: 53 passed, 0 failed. `general/fill_batch_matches_draw_calls` and `items/prepaint_covers_the_draws` pass with `--windowed`. The
+wrap-up before the audit's fixes saw one 94 ms frame of `perf/hit_overload_stress` in the whole suite (load 4.5 to 5.2, its average 12.1 and p95
+14.0 within); it did not come back in 16 runs alternated with origin/main under a parallel load of 4.0 to 7.6, 3 more each alone at a load of 3 or
+less (the branch at or below origin/main: avg 10.4-10.6 against 11.3-12.2), nor in this suite or the `--domain=perf` run below. The perf numbers
+are under Performance below.
 
 ## The real-world weapons being simulated
 
@@ -155,7 +167,24 @@ seconds at the burst, the level) to the UI, and a new stun takes the longer of t
 `CharacterConfig` (they tune the body, not the item). A character also tells a controller what it needs to judge a place in time: `posture_coverage(posture)` (the
 height of the body standing and crouched, on the coverage scale), `run_speed()` (px/s standing and running, slower while stunned or weighed down by the outfit) and
 `walk_speed()` (px/s walking, slowed the same way: what the AI counts on once its stamina is low), so the AI keeps no copy of any.
-Tests: `character/stunned_slow_and_sway`, `character/posture_and_run_reads`, `ai/grenade/throw_timing_counts_slowed_walk`.
+*(Amended by issue #56: the stunned look, and firing one-handed.)* A stunned character also looks it, every character alike (the player,
+an NPC, a test puppet); all of it is drawn only, eases in and out with the level (`stun_look_ease` **6/s**: no hand or head jumps in a
+frame), and while it rides a vehicle the ride's pose wins (none of it shows until it is out):
+- **Hand over the eyes.** While blind, the free hand (the one the held item's `weapon_hand()` does not name) goes to the `eyes` stance, the
+  palm over the face (drawn over the head), and back as sight returns. A reload, a punch or a throw's wind-up takes it away for as long
+  as it needs that hand. A bang that only deafens leaves both hands where they were.
+- **Hunch.** The spine and the neck pitch forward by `stun_hunch_pitch` **15 degrees** x the level, on top of a crouch's own pitch; a
+  deaf-only stun hunches too. The arms keep their reach past the leaning chest, as in a crouch.
+- **Stagger.** Walking, its strides are shorter (`stun_stagger_stride` **x0.55**) and uneven (a limp, `stun_stagger_limp` **0.4**, and a
+  wandering pace, `stun_stagger_wander` **0.3**), its hips sway (`stun_stagger_sway` **4 px**) over the planted foot and its head lolls
+  (`stun_stagger_bob` **3 px**), all by the level. The pace stays `stun_speed` and the drift stays.
+- **One-handed.** While the free hand covers the eyes, a gun is held in the weapon hand alone, in the `one_hand` stance (the arm out, the
+  gun lower than a two-handed grip, wandering `waver` **3 px**), and `Character.one_handed()` is true (false for anything but a gun, and
+  while the free hand is away). A round fired so leaves within the gun's `spread_deg` plus its `GunConfig` row's `one_hand_spread_deg`
+  (pistol **3**, SMG **6**, rifle **8 degrees**), the player's as an NPC's, and a long gun kicks `one_hand_recoil` **x1.75** harder.
+The look's numbers live in `CharacterConfig` with the other four, the spread in `GunConfig`.
+Tests: `character/stunned_slow_and_sway`, `character/posture_and_run_reads`, `ai/grenade/throw_timing_counts_slowed_walk`,
+`character/stunned_hand_over_eyes`, `character/stunned_hunch_and_stagger`, `items/one_handed_fire`.
 
 **G14. The stunned player.** The player's screen goes white at the burst and fades back over the blind time through a frozen afterimage
 of the moment of the flash (`StunScreen`, `watch(character)`, `drawn()` -> `{ white, afterimage, remaining }`); a bang that only deafens
@@ -165,17 +194,27 @@ the deaf time, but only for the character `Sound.focus` names (Main sets the hum
 (kind `throw`, profile `throw/...`), each bounce (kind `grenade`, profile `grenade/.../<floor under it>`), the frag (kind `explosion`,
 profile `explosion/frag`: big, low, a long tail) and the stun's bang (`explosion/stun`: sharp, very loud, short). The camera shakes
 on `&"explosion"` by distance and kind (`Camera2D.offset`: a frag beside it hardest, farther less, none far off, a stun less than a
-frag), and the burst has its look: a flash, a fireball puff and smoke, with a scorch left under a frag, a white flash and thin smoke for
-a stun (`Physics.spawn_explosion`, off with `PhysicsConfig.explosion_fx_enabled`).
-Tests: `ui/stun_screen_whiteout`, `audio/grenade_sounds`, `general/camera_shakes_on_explosion`, `physics/explosion_fx`.
+frag), and the burst has its look: a flash, a fireball puff and smoke, with a scorch left under a frag, and only thin smoke for a stun
+(`Physics.spawn_explosion`, off with `PhysicsConfig.explosion_fx_enabled`). *(Amended by issue #56.)* A stun's white flash is a light, not
+a drawn disc: the lighting's stun flash (`docs/lighting.md` L9), far brighter than a frag's, shadowed by the walls and the furniture, held
+at full brightness for an instant and faded over 0.7 s. The player's own whiteout above is unchanged.
+Tests: `ui/stun_screen_whiteout`, `audio/grenade_sounds`, `general/camera_shakes_on_explosion`, `physics/explosion_fx`,
+`lighting/stun_flash_light`.
 
 ### AI
 
 **G15. A stunned NPC.** While blind it sees nothing new (no sightings; contacts age as usual, so what it holds of a hostile stays at the
 spot it last saw it) and starts no new decision; it stumbles, slowed and drifting, and may **fire blindly** at the last-known position
-of a hostile it knew (with the sway: no shot strays more than 25 degrees off that spot). While deaf it hears no gunfire, no hits
+of a hostile it knew (with the sway: no shot strays more than 25 degrees off that spot, plus the one-handed spread below). *(Amended by
+issue #56.)* It looks stunned as any character does (G13: a hand over its eyes, hunched, staggering), so the gun it fires blindly is held
+one-handed: each round spreads wider by the gun's `one_hand_spread_deg` (a pistol's 3 degrees: 28 in all), on top of the sway.
+Whether it fires blind is **one roll** as it goes blind (from not blind) against its `blind_fire_chance` (a `GoalController` export,
+Grenades group, **0.5**): a hit fires blindly as above; a miss **holds its fire** (no round, no click, an automatic's burst cut short)
+until it can see, still turned to that spot. A further stun while it is still blind does not roll again. The roll is drawn from the
+NPC's own random number generator, seeded once from its character's name and spawn spot, each blinding taking the next draw, so a
+seeded match or a test that places the NPC the same way rolls the same. While deaf it hears no gunfire, no hits
 elsewhere, no footsteps (`docs/hearing.md` H1) and no radio callouts. When the blindness lifts it re-decides from what it sees, still disoriented for the tail.
-Tests: `ai/grenade/stunned_defender_blind`, `ai/grenade/deafened_npc_ignores_gunfire`.
+Tests: `ai/grenade/stunned_defender_blind` (chance 1), `ai/grenade/stunned_defender_holds_fire` (chance 0), `ai/grenade/deafened_npc_ignores_gunfire`.
 
 **G16. React to a live grenade** *(amended after the tests phase: "frag out, take cover")* (a reflex outside Von, like auto-reload; it takes priority
 over every primitive, committed or not, but for the NPC's own grenade in its wind-up: that one cannot be called back and leaves the hand at most a
@@ -367,16 +406,88 @@ landing spot with the grenade's danger radius, the live grenades the NPC knows o
 is running to. It draws from `debug_grenades()`.
 Test: `ai/grenade/grenade_overlay_draws`.
 
+## Performance
+
+*(Added by issue #56.)* Grenades going off must not make the game stutter. Two perf tests hold them to the smooth standard every frame-based
+perf test holds (`Perf.SMOOTH_*` in `tests/_perf/perf_probe.gd`): **average ≤ 16.7 ms** a frame (one 60 fps frame),
+**p95 ≤ 20 ms** and **no frame over 33.4 ms** (two frames).
+
+**P1. Grenades in a match** (`perf/grenade_match_stress`). The 5v5 of `perf/match_5v5_stress` (a generated house on its largest plan, placed and
+armed as Main does, nav re-baker, blood, debris, sound and radio on, scripted Von); once the sides are in contact a puppet on the invaders' side
+throws three frags and three stuns among the fighters over about 3 s, through the controller contract, so every NPC's grenade perception, evade
+planning and re-decision is in the measurement. Measured from the first throw to 3 s after the last burst.
+
+**P2. A burst in a crowded room** (`perf/grenade_burst_stress`). A frag and a stun going off together among twelve pieces of furniture and eight
+characters (blood, debris, hit particles and sound on). Measured over the burst frame and the 2 s after it.
+
+**How they measure.** Each test frames the whole fight with the test camera, as a player's screen would show it, so every body is drawn.
+Headless (the default) the frame time is the CPU's work, the drawing calls included; `tools/run_tests.sh --windowed` runs the same test in a
+window with vsync off, so the render is in each frame too. The absolute budgets stay as they are in both modes: a red windowed run is the
+honest state of the game's performance, not a test to loosen.
+
+**Before** (origin/main `7428c4a`, before issue #56's fixes; one run each at a 1-minute load of about 2.9, ms a frame):
+
+| Test | Mode | avg | p95 | max |
+|---|---|---|---|---|
+| P1 | headless | 10.78 | 17.51 | **34.30** |
+| P2 | headless | 5.73 | 10.08 | 32.27 |
+| P1 | windowed | **23.37** | **32.44** | **50.19** |
+| P2 | windowed | 12.69 | **20.13** | **41.59** |
+
+**After** (16 October 2026, issue #56 on origin/main `f0e4f8e`; each run started at a 1-minute load of 3.0 or less, one Godot at a time, the
+load before → after each run; bold misses its budget). The headless runs are of the whole of issue #56, the audit's fixes included. The
+windowed runs were made just before those fixes and not repeated: the fixes change nothing that is drawn (comments, and a worker's cut making
+its own circle ring), and the headless runs after them stayed within the noise of the runs before them (P1 avg 9.08-10.49, p95 15.03-16.31, max
+22.73-31.60; P2 avg 5.80-6.56, p95 8.20-8.86, max 23.08-23.88):
+
+| Test | Mode | Run | Load | avg | p95 | max |
+|---|---|---|---|---|---|---|
+| P1 | headless | 1 | 2.94 → 2.86 | 9.97 | 14.64 | 23.26 |
+| P1 | headless | 2 | 2.86 → 2.96 | 9.80 | 15.28 | 21.57 |
+| P1 | headless | 3 | 2.96 → 2.88 | 9.35 | 13.85 | 22.12 |
+| P2 | headless | 1 | 2.88 → 2.90 | 5.84 | 7.96 | 23.45 |
+| P2 | headless | 2 | 2.90 → 3.79 | 7.02 | 9.56 | 27.38 |
+| P2 | headless | 3 | 3.00 → 2.77 | 6.57 | 9.03 | 22.74 |
+| P1 | windowed | 1 | 2.78 → 2.79 | 16.15 | **22.76** | **39.64** |
+| P1 | windowed | 2 | 2.79 → 2.81 | **17.65** | **22.98** | 28.71 |
+| P1 | windowed | 3 | 2.81 → 2.99 | 14.51 | 19.64 | 27.18 |
+| P2 | windowed | 1 | 2.99 → 3.88 | 10.64 | 14.61 | **38.33** |
+| P2 | windowed | 2 | 2.73 → 3.18 | 12.00 | 14.62 | **36.55** |
+| P2 | windowed | 3 | 2.49 → 2.87 | 10.24 | 13.25 | **35.99** |
+
+Headless, both pass in every run, and `tools/run_tests.sh --domain=perf` (one run, load 2.78 → 2.94) passed all eleven perf tests (P1 8.59 /
+13.21 / 24.53, P2 5.58 / 7.47 / 22.66). Windowed, P1 came down from 23.4 / 32.4 / 50.2 to 14.5-17.7 / 19.6-23.0 / 27.2-39.6 and passes now
+and then; P2 from 12.7 / 20.1 / 41.6 to 10.2-12.0 / 13.3-14.6 / 36.0-38.3, its average and p95 well within, its worst frame still over.
+
+**Where the time went** (the profile of issue #56, its fixes pinned each by a test that holds the new code to the plain one, all without a change
+to what is drawn, when or how anything behaves): the bodies' drawing was about 70 % of a rendered frame, each plain-coloured polygon a vertex
+buffer of its own, so they go out as General's `FillBatch` (one triangle array) and the limbs are built once a frame for body and shadow; furniture
+moves its drop shadow instead of repainting on a turn and walls repaint the struck segment alone; spreading pools blur separably; dented colliders
+are cut and a spray's splats merged side by side on worker threads; navigation re-bakes measure and parse once a tick; the escape search judges each
+spot once; and weapon art is painted ahead of time.
+
+**What is left.** P1's windowed busy frames are the bodies' textured limb segments (each a command with its own art), the characters' physics,
+the AI and the engine's render; P2's worst frame is the frag's own frame, about 23 ms of CPU and about 12 ms more of rendering what the burst adds
+in it (not a first use, not the flash lights: both ruled out by measurement in the profile). An atlas for the limb art was built and measured and gained nothing in P1, so it was
+not kept. What would surely close the rest is only what the user ruled out: visible or timing changes (fewer splats per blast, the blast's work
+spread over frames, simpler art).
+
+**The prepaint's cost.** A gun or grenade paints its art ahead of time once per weapon style per process (`ItemRegistry.inventory_for`, every
+raise step, both lying sides, every lighting step: the very draws it will make), about **230 ms** once, when the first inventory in that style
+is made at a match's spawns; later inventories cost about 0.05 ms. It moves 0.3-0.5 ms first paints out of a fight's busiest frames.
+
 ## How the rules are enforced
 
 - **Items** (`scenes/items/`): `GrenadeConfig` (the numbers above, one row per kind), `GrenadeItem` (count, wind-up, `throw` stance),
-  `ThrownGrenade` (flight, bounce, fuse), the art, `ItemRegistry` (`STUN_SLOT`, `FRAG_SLOT`, `create(id, count)`), `LoadoutConfig`.
+  `ThrownGrenade` (flight, bounce, fuse), the art, `ItemRegistry` (`STUN_SLOT`, `FRAG_SLOT`, `create(id, count)`), `LoadoutConfig`, and `GunConfig`'s `one_hand_spread_deg`.
 - **Character**: `item_count`, `throw_stats`, `aim_target`, `posture_coverage`, `run_speed` and `walk_speed` (what the AI judges a place in time by), the stun state
-  (`take_stun`, `is_blind`, `is_deaf`, `stun_level`, `stun_view`; its numbers are `CharacterConfig`'s) and its effect on speed, running and aim, `blast_push` for ragdolls.
+  (`take_stun`, `is_blind`, `is_deaf`, `stun_level`, `stun_view`; its numbers are `CharacterConfig`'s) and its effect on speed, running and aim, the stunned look
+  (the `eyes` and `one_hand` stances, the hunch and the stagger) and `one_handed()`, `blast_push` for ragdolls.
+- **Lighting**: the stun's flash (`LightingConfig.flashes`, `WorldLighting`).
 - **Projectile**: `Explosion.frag` / `Explosion.stun`, and `ProjectileSpawner.spawn`'s `max_range`. **Physics**: the explosion FX.
   **Audio**, **General** (camera, EventBus topics `throw`, `grenade`, `explosion`, `stun`), **UI** (`StunScreen`, the setup window,
   the overlay table) and **AI** (perception of live grenades, the throw geometry, the `grenade` and `stun_entry` nodes, the `throw`
-  primitive, the evade reflex, the bang phase of `entry.gd`, the overlay).
+  primitive, the evade reflex, the blind-fire roll and holding fire, the bang phase of `entry.gd`, the overlay).
 - **The tests reach all of it duck-typed** (`has_method`, `call`, groups, topics, node ids), because most of it did not exist when they
   were written.
 - **Cover** is read off `get_surface().coverage` of what lies between the blast and the character, against the character's own posture coverage;
@@ -401,7 +512,8 @@ Test: `ai/grenade/grenade_overlay_draws`.
 | Danger zone (AI) | line of sight within 400 px; furniture shields only within 30 px of the body (`flash_cover_reach`) | line of sight within 370 px (250 + 120 margin); a crouched body behind cover above 35 is shielded (G7) |
 | Heard landing (AI) | 300 px | 300 px |
 
-The stun on the character: speed x0.45, sway 25 degrees, no running, tail 1.5 s.
+The stun on the character: speed x0.45, sway 25 degrees, no running, tail 1.5 s; blind with a gun, one-handed: spread wider by 3 (pistol), 6
+(SMG) or 8 (rifle) degrees.
 
 ## This game's own rules
 

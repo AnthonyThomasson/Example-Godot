@@ -42,6 +42,8 @@
 #                   numbers); a run is quiet by default
 #   --json          also print the full results as one `JSON: {...}` line
 #   --shots         windowed run (not headless) that saves a PNG of each failed test
+#   --windowed      windowed run with vsync off, in one process: a perf test's frame times then include the render
+#                   (headless measures the CPU only) without being held to the display's refresh
 # Other
 #   --repeat=5      run each match 5 times; names FLAKY / FAILING tests
 #   --seed=42       pin every house() test to seed 42
@@ -80,6 +82,8 @@ COSTS="${TMPDIR:-/tmp}/example_godot_costs_$KEY.json"
 LINT_OK="${TMPDIR:-/tmp}/example_godot_lint_ok_$KEY.txt"
 
 HEADLESS=--headless
+NOVSYNC=
+WINDOWED=0
 STRICT=
 JOBS=
 CHANGED=0
@@ -89,6 +93,7 @@ args=()
 for a in "$@"; do
   case "$a" in
     --shots) HEADLESS=; args+=("$a") ;;
+    --windowed) HEADLESS=; NOVSYNC=--disable-vsync; WINDOWED=1 ;;
     --play)
       echo "--play is the test runner's own flag; this wrapper only runs batches (and they never see sandboxes). Launch the runner:" >&2
       echo "  \"\$GODOT\" --path . res://scenes/testing/test_runner.tscn -- --play <words>" >&2
@@ -121,6 +126,7 @@ fi
 # The number of processes for a run() with these arguments (the selection args it was called with + the global ones).
 jobs_for() {
   local x ids n
+  [[ $WINDOWED -eq 1 ]] && { echo 1; return; }  # one window, and no shard competing with what it measures
   if [[ $JOBS_EXPLICIT -eq 1 ]]; then
     # No more processes than there are tests when the selection is a list of ids.
     for x in "$@"; do
@@ -142,7 +148,7 @@ jobs_for() {
 # Start one godot process writing its log/report/bundles to $1 (a fresh dir); extra args follow.
 godot_run() {
   local out="$1"; shift
-  "$GODOT" $HEADLESS --path . --fixed-fps 60 --log-file "$out/godot.log" \
+  "$GODOT" $HEADLESS $NOVSYNC --path . --fixed-fps 60 --log-file "$out/godot.log" \
     res://scenes/testing/test_runner.tscn -- --run-tests --out="$out" "$@"
 }
 

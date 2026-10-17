@@ -14,6 +14,9 @@ var _watching := false  ## Whether the Deformable's `changed` is connected yet.
 var _drawn_rotation := NAN  ## The global rotation the current drawing was made for (NAN = not drawn yet).
 var _emissive: Texture2D  ## The art's light-giving pixels, or null when nothing in it gives light.
 var _emissive_layer: Node2D  ## The child drawing `_emissive` over the art (null without one).
+## The child behind the art drawing its drop shadow in the piece's frame, laid off it by the shadow's offset (fixed in world
+## space): a turn moves it (`_shadow_shift`) instead of repainting the piece. Null for a piece without art.
+var _drop_shadow: Node2D
 
 func _ready() -> void:
 	if _obj.art != "":
@@ -22,6 +25,11 @@ func _ready() -> void:
 		_emissive = ObjectArt.emissive(_obj.art, _obj.size, _obj.color, _obj.facing, _obj.object_material, _obj.art_opts)
 		if _emissive:
 			_emissive_layer = EmissiveLayer.new().setup(self)
+		_drop_shadow = Node2D.new()
+		_drop_shadow.name = "DropShadow"
+		_drop_shadow.show_behind_parent = true
+		_drop_shadow.draw.connect(_draw_drop_shadow)
+		add_child(_drop_shadow)
 
 
 ## What in the piece's art gives light (a screen's face, a tube, a bulb), in the art's frame and colours, transparent
@@ -43,8 +51,9 @@ func draw_emissive(layer: CanvasItem) -> void:
 			deformable.damage_total if deformable else 0.0, Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR,
 			_emissive, 0.0, false)
 
-## Redraws only when the picture can have changed: a recorded impact (the object's `Deformable` says so) or a turn, which
-## swings the drop shadow (its offset is fixed in world space). A piece at rest, or just shoved sideways, keeps its drawing.
+## Redraws only when the picture can have changed: a recorded impact (the object's `Deformable` says so). A turn swings the
+## drop shadow (its offset is fixed in world space), which only moves its child; a piece at rest, or just shoved sideways,
+## keeps its drawing.
 func _process(_delta: float) -> void:
 	if not _watching:
 		var deformable = _obj._deformable  # created by the object's _ready, which runs after this node's
@@ -52,10 +61,13 @@ func _process(_delta: float) -> void:
 			deformable.changed.connect(queue_redraw)
 			if _emissive_layer:
 				deformable.changed.connect(_emissive_layer.queue_redraw)
+			if _drop_shadow:
+				deformable.changed.connect(_drop_shadow.queue_redraw)
 			_watching = true
 	if global_rotation != _drawn_rotation:
 		_drawn_rotation = global_rotation
-		queue_redraw()
+		if _drop_shadow:
+			_drop_shadow.position = _shadow_shift()
 
 func _draw() -> void:
 	var shape: String = _obj.shape_type
@@ -69,8 +81,7 @@ func _draw() -> void:
 	var impacts: Array = deformable.impacts if deformable else []
 	var damage_total: float = deformable.damage_total if deformable else 0.0
 
-	if _art:
-		_draw_drop_shadow(shape, size, impacts)
+	if _art:  # (its drop shadow is the `_drop_shadow` child's, behind this)
 		var marks := color.darkened(ArtConfig.tone_outline)
 		Deformation.draw_shape(self, shape, size, color, marks, impacts, damage_total,
 				Deformation.NO_COLOR, Deformation.NO_COLOR, Deformation.NO_COLOR, _art)
@@ -88,18 +99,31 @@ func _draw() -> void:
 
 
 ## The art's silhouette (its alpha, through the deformed outline) cast on the floor away from the
-## light, longer for taller pieces (`coverage`); flat decor casts none. The offset is fixed in
-## world space, so the shadow stays put relative to the light as a shoved piece spins.
-func _draw_drop_shadow(shape: String, size: Vector2, impacts: Array) -> void:
-	var offset := minf(_obj.coverage * ArtConfig.drop_shadow_per_coverage, ArtConfig.drop_shadow_max)
-	if not _obj.solid or offset <= 0.0 or ArtConfig.drop_shadow_alpha <= 0.0:
+## light, longer for taller pieces (`coverage`); flat decor casts none. Drawn on the `_drop_shadow` child in the piece's frame;
+## the child sits at the shadow's offset (`_shadow_shift`), fixed in world space, so the shadow stays put relative to the light
+## as a shoved piece spins.
+func _draw_drop_shadow() -> void:
+	if not _obj.solid or _shadow_length() <= 0.0 or ArtConfig.drop_shadow_alpha <= 0.0:
 		return
+	var shape: String = _obj.shape_type
+	var size: Vector2 = _obj.size
+	var deformable = _obj._deformable
+	var impacts: Array = deformable.impacts if deformable else []
 	var poly := Deformation.shape_polygon(shape, size, impacts)
 	if not Deformation.is_valid_polygon(poly):
 		poly = Deformation.base_ring(shape, size)
 	var uvs := PackedVector2Array()
 	for p in poly:
 		uvs.append(p / size + Vector2(0.5, 0.5))
+	_drop_shadow.draw_colored_polygon(poly, Color(0.0, 0.0, 0.0, ArtConfig.drop_shadow_alpha), uvs, _art)
+
+
+## How far (px) the drop shadow falls from the piece: longer for taller pieces.
+func _shadow_length() -> float:
+	return minf(_obj.coverage * ArtConfig.drop_shadow_per_coverage, ArtConfig.drop_shadow_max)
+
+
+## Where the drop shadow lies off the piece in its own frame: `_shadow_length` px away from the light, whichever way it is turned.
+func _shadow_shift() -> Vector2:
 	var away := -ArtConfig.light_from.normalized()
-	var shift := global_transform.basis_xform_inv(away).normalized() * offset
-	draw_colored_polygon(Transform2D(0.0, shift) * poly, Color(0.0, 0.0, 0.0, ArtConfig.drop_shadow_alpha), uvs, _art)
+	return global_transform.basis_xform_inv(away).normalized() * _shadow_length()

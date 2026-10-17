@@ -100,7 +100,15 @@ region, house, rooms and the overlay) drives the re-bake on an interval. Each ti
 tick while that bake is still in flight (`_baking`) leaves the planning region alone, and its baseline is set from what the
 bake carved when it lands, so a move during a bake is caught by the next tick), a character that stopped, set off, appeared
 or died re-bakes the steering one in place. An at-rest scene costs just the compare. Exports: `enabled`,
-`interval` (0.75 s between checks), `move_threshold`. After a re-bake (once the planning one lands) it calls the overlay's `setup`
+`interval` (0.75 s between checks), `move_threshold`. Both bakes of a tick carve the footprints it just measured (the
+domain-internal `NavBuilder._rebake_async` / `_rebake_steering` take them; the public `rebake_async` / `rebake_steering` measure
+their own), so a tick measures the furniture once, and parses the walls once (`_walls_of`: the static colliders' outlines on the
+1 px grid, handed to both; `tests/navigation/walls_parsed_once_bake_the_same_test.gd`). `_simplified` keeps each vertex's distance
+from its neighbours' line and measures again only the two neighbours of a dropped one
+(`tests/navigation/outline_simplify_matches_plain_test.gd`). `furniture_holes` finds the pieces with `find_children` (depth first, as a walk
+of the house's nodes would) and keeps each body's hull (`_hulls`) with what it was made from (`_hull_inputs`: each shape's global
+transform and size, radius or points), so only a piece that moved, turned or was dented is measured again
+(`tests/navigation/furniture_holes_follow_the_pieces_test.gd`). After a re-bake (once the planning one lands) it calls the overlay's `setup`
 again so the overlay re-snapshots. **Bulldozing is still the behaviour between re-bakes** (and for
 non-solid decor, which is never carved): a piece just shoved is run over by the character's push
 physics until the next re-bake routes paths around its new position.

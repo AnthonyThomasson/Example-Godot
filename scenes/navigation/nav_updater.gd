@@ -70,13 +70,16 @@ func _on_tick() -> void:
 	var furniture_moved := _moved(_baseline, furniture)
 	if not furniture_moved and not _moved(_character_baseline, characters):
 		return
+	# Both bakes carve the footprints just measured and the walls parsed once: nothing has moved since, so measuring or parsing
+	# again would give the same.
+	var walls := NavBuilder._walls_of(_house, _agent_radius)
 	if furniture_moved and not _baking:
 		_baking = true
-		NavBuilder.rebake_async(_region, _house, _rooms, _agent_radius, func() -> void:
+		NavBuilder._rebake_async(_region, _house, _rooms, _agent_radius, furniture, func() -> void:
 			_baking = false
 			_baseline = furniture
-			_refresh_overlay())
-	NavBuilder.rebake_steering(_region, _house, _rooms, _agent_radius)
+			_refresh_overlay(), walls)
+	NavBuilder._rebake_steering(_region, _house, _rooms, _agent_radius, furniture, characters, walls)
 	_character_baseline = characters
 	_refresh_overlay()
 

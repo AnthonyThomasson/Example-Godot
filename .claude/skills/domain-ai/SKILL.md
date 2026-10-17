@@ -102,13 +102,14 @@ burst's zone). **STUN ENTRY** (G18) is a SEARCH tactic beside ENTER, offered whi
 `entry.gd`, `docs/tactical-entry.md` E17); Von takes it for a suspect room (gunfire or footsteps heard there, shots from it, an ally's fight in it, a hostile lost in it, by its doorway or heading in). `perception/snapshot` words both (`domain-ai-snapshot`), the tree has the nodes (`domain-ai-decision`), `combat.gd` throws (`domain-ai-combat`), `entry.gd` runs the bang (`domain-ai-entry`); the numbers it
 knows of a grenade not yet thrown (throw range, radii, fuses, the flash's cover reach) it reads off the grenades it carries (`Character.throw_stats(slot)`, interface 6/7; no copy in exports).
 
-Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_process_events`), and the exports **Grenades** group (`grenades_enabled`, `hear_grenade` 300 px, `evade_margin` 120 px):
+Two reflexes outside Von, in the orchestrator's loop (`_react_to_grenades`, `_process_events`), and the exports **Grenades** group (`grenades_enabled`, `hear_grenade` 300 px, `evade_margin` 120 px, `blind_fire_chance` 0.5):
 - **Evade (G16).** Perception knows the live grenades it sees, hears come down, is told of (callout `status` `grenade`, also `frag_out` / `bang_out`) or threw; when it is inside a
   grenade's danger zone it radios an `&"grenade"` callout (`point` = where it landed, `kind`) and the behaviour runs to the nearest safe spot (out of the burst's line, behind furniture that
   shields a crouched body, or outside the zone), holds it facing away and re-decides at the burst. No decision starts or is adopted meanwhile. `perception/agent_grenades.gd`,
   `agent_throw.gd`, `behavior.gd` ("The evade reflex"). `debug_grenades()` reads it; the `show_grenades` overlay draws it.
 - **Stunned (G15).** Blind: no new sighting, no new decision (it re-decides the tick sight returns), its contacts kept so it fires blind at the last-known spot of the one it fought (the character's aim
-  sway applies); deaf: the orchestrator drops gunfire, hits elsewhere, footfalls, callouts and grenade landings it would have heard.
+  sway applies, one-handed) when its one roll as it goes blind hits `blind_fire_chance` (Grenades export, 0.5; drawn from the controller's own RNG, seeded at bind from the
+  character's name and spawn spot, so a seeded run rolls the same; a re-stun while blind does not reroll), else it holds its fire until it can see (`Combat.holds_fire`); deaf: the orchestrator drops gunfire, hits elsewhere, footfalls, callouts and grenade landings it would have heard.
 
 ## Hearing (`docs/hearing.md`)
 

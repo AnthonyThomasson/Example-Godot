@@ -105,12 +105,19 @@ static func rebake(region: NavigationRegion2D, house: Node2D, rooms: Array, agen
 ## and the living characters at rest at their CURRENT positions. Call it when a character or a piece of
 ## furniture has moved — see `nav_updater.gd`. Does nothing when the region has no steering child.
 static func rebake_steering(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float = 14.0) -> void:
+	_rebake_steering(region, house, rooms, agent_radius, furniture_holes(house), character_holes(house.get_parent()))
+
+
+## `rebake_steering` from footprints already measured this frame: `furniture` (`furniture_holes`) and `characters`
+## (`character_holes`). `nav_updater.gd` measures them once a tick for its comparison and both bakes.
+static func _rebake_steering(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float, furniture: Array,
+		characters: Array, walls: Dictionary = {}) -> void:
 	var steering := steering_region(region)
 	if steering == null:
 		return
-	var nav_poly := _bake_polygon(house, rooms, agent_radius, character_holes(house.get_parent()))
-	if nav_poly != null:
-		steering.navigation_polygon = nav_poly
+	var job := _source_for(house, rooms, agent_radius, characters, furniture, walls)
+	if not job.is_empty():
+		steering.navigation_polygon = _bake_job(job, house.position)
 
 
 ## The steering region of `region` (the planning region `build` returned): the same house with the living
@@ -190,7 +197,13 @@ static func _new_map() -> RID:
 ## region only: the steering one is re-baked by `rebake_steering`.
 static func rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float = 14.0,
 		done: Callable = Callable()) -> void:
-	var job := _source_for(house, rooms, agent_radius)
+	_rebake_async(region, house, rooms, agent_radius, furniture_holes(house), done)
+
+
+## `rebake_async` from the furniture footprints already measured this frame (`furniture_holes`), as `_rebake_steering`.
+static func _rebake_async(region: NavigationRegion2D, house: Node2D, rooms: Array, agent_radius: float, furniture: Array,
+		done: Callable, walls: Dictionary = {}) -> void:
+	var job := _source_for(house, rooms, agent_radius, [], furniture, walls)
 	if job.is_empty():
 		if done.is_valid():
 			done.call()
@@ -235,7 +248,8 @@ static func _bake_job(job: Dictionary, origin: Vector2) -> NavigationPolygon:
 ## Everything a bake needs, gathered on the main thread: the polygon to bake into (`poly`, with the agent radius set)
 ## and its source geometry (`source`: the walls, the walkable footprint, the furniture holes and each of `characters`).
 ## {} with no rooms. `_bake_polygon` bakes it at once; `rebake_async` hands it to the server's worker thread.
-static func _source_for(house: Node2D, rooms: Array, agent_radius: float, characters: Array = []) -> Dictionary:
+static func _source_for(house: Node2D, rooms: Array, agent_radius: float, characters: Array = [], furniture: Variant = null,
+		walls: Dictionary = {}) -> Dictionary:
 	var bounds := _bounds(rooms)
 	if bounds.size == Vector2.ZERO:
 		return {}
@@ -249,17 +263,30 @@ static func _source_for(house: Node2D, rooms: Array, agent_radius: float, charac
 	var nav_poly := _new_polygon(agent_radius)
 
 	var source := NavigationMeshSourceGeometryData2D.new()
-	# Obstructions: the house's static colliders (walls). RigidBody2D furniture (an anchored piece too) is not a
-	# StaticBody2D, so it is not parsed — only the walls become holes; the furniture is carved below. Parsing resets the source data, so it must run
-	# before the traversable footprint is added.
-	NavigationServer2D.parse_source_geometry_data(nav_poly, source, house)
-	source.set_obstruction_outlines(_on_grid(source.get_obstruction_outlines()))
+	# Obstructions: the house's static colliders (walls), on the map's grid (`_walls_of`, or `walls` when the caller parsed them
+	# this frame). Parsing resets the source data, so it comes before the traversable footprint is added.
+	var parsed := walls if not walls.is_empty() else _walls_of(house, agent_radius)
+	source.set_traversable_outlines(parsed["traversable"])
+	source.set_obstruction_outlines(parsed["obstruction"])
+	source.set_projected_obstructions(parsed["projected"])
 	# Walkable footprint: the whole house bounds. The parsed walls carve it, leaving the doorways.
 	source.add_traversable_outline(_rect_outline(local_bounds))
 	# Furniture holes: each solid piece's footprint, so the baked mesh routes paths around it. Added
-	# after the footprint (both are outlines on the same source) and before the bake carves them in.
-	_add_furniture_holes(source, house, characters)
+	# after the footprint (both are outlines on the same source) and before the bake carves them in. `furniture` is
+	# `furniture_holes(house)` when the caller has measured it this frame (null: measured here).
+	_add_furniture_holes(source, house, characters, furniture_holes(house) if furniture == null else furniture)
 	return { "poly": nav_poly, "source": source }
+
+
+## What a bake of `house` parses of it: its static colliders (the walls; RigidBody2D furniture, an anchored piece too, is not a
+## StaticBody2D, so it is not parsed: the furniture is carved from its footprints), as `{ traversable, obstruction, projected }`
+## source outlines, the obstructions snapped to the map's 1 px grid. The same for every bake of the house until a wall's collider
+## changes, so `nav_updater.gd` parses once for a tick's two bakes.
+static func _walls_of(house: Node2D, agent_radius: float) -> Dictionary:
+	var source := NavigationMeshSourceGeometryData2D.new()
+	NavigationServer2D.parse_source_geometry_data(_new_polygon(agent_radius), source, house)
+	return { "traversable": source.get_traversable_outlines(), "obstruction": _on_grid(source.get_obstruction_outlines()),
+		"projected": source.get_projected_obstructions() }
 
 
 ## An empty polygon to bake into, with the bake's agent radius (plus the wall margin).
@@ -349,10 +376,9 @@ static func _signed_area(ring: PackedVector2Array) -> float:
 ## collider, so it leaves no hole.
 static func furniture_holes(house: Node2D) -> Array:
 	var out: Array = []
-	for node in _descendants(house):
+	# Every RigidBody2D under the house, depth first (each before what is under it), as a walk of its descendants finds them.
+	for node in house.find_children("*", "RigidBody2D", true, false):
 		var body := node as RigidBody2D
-		if body == null:
-			continue
 		var hull := _body_hull(body)
 		if not hull.is_empty():
 			out.append(hull)
@@ -360,8 +386,14 @@ static func furniture_holes(house: Node2D) -> Array:
 
 
 ## The world-space footprint of `body`, the convex hull of its collision shapes as an open ring (the closing point
-## dropped), or empty when fewer than three points come out of it.
+## dropped), or empty when fewer than three points come out of it. It is kept per body with what it was made from (each
+## shape's global transform and its size, radius or points; `_hull_inputs`) and made again only when that changes: most
+## furniture stands still between two bakes, and a dented piece's hull costs a grown outline per convex piece.
 static func _body_hull(body: Node2D) -> PackedVector2Array:
+	var inputs := _hull_inputs(body)
+	var kept: Array = _hulls.get(body.get_instance_id(), [])
+	if not kept.is_empty() and kept[0] == inputs:
+		return (kept[1] as PackedVector2Array).duplicate()
 	var points := PackedVector2Array()
 	for child in body.get_children():
 		var col := child as CollisionShape2D
@@ -371,7 +403,40 @@ static func _body_hull(body: Node2D) -> PackedVector2Array:
 	var hull := Geometry2D.convex_hull(points)
 	if hull.size() > 1:
 		hull.remove_at(hull.size() - 1)  # convex_hull closes the ring by repeating the first point
-	return hull if hull.size() >= 3 else PackedVector2Array()
+	hull = hull if hull.size() >= 3 else PackedVector2Array()
+	if _hulls.size() >= HULLS_KEPT:
+		for id in _hulls.keys():
+			if not is_instance_id_valid(id):
+				_hulls.erase(id)
+	_hulls[body.get_instance_id()] = [inputs, hull.duplicate()]
+	return hull
+
+
+## Body instance id -> [`_hull_inputs`, hull] as `_body_hull` last made it. Entries of freed bodies are dropped once it holds
+## `HULLS_KEPT`.
+static var _hulls := {}
+const HULLS_KEPT := 512
+
+
+## Everything `_body_hull` makes `body`'s hull from: for each collision shape, its global transform and what `_footprint_world`
+## reads of its shape (a rect's size, a circle's radius, a convex piece's points; the shape itself for any other kind).
+static func _hull_inputs(body: Node2D) -> Array:
+	var out: Array = []
+	for child in body.get_children():
+		var col := child as CollisionShape2D
+		if col == null or col.shape == null:
+			continue
+		out.append(col.global_transform)
+		var shape := col.shape
+		if shape is RectangleShape2D:
+			out.append((shape as RectangleShape2D).size)
+		elif shape is CircleShape2D:
+			out.append((shape as CircleShape2D).radius)
+		elif shape is ConvexPolygonShape2D:
+			out.append((shape as ConvexPolygonShape2D).points)
+		else:
+			out.append(shape)
+	return out
 
 
 ## The footprint holes of the living characters AT REST under `root` (the node the nav region lives under, which
@@ -405,9 +470,10 @@ static func character_holes(root: Node) -> Array:
 ## furniture is a RigidBody2D with a CollisionShape2D (shoved about, or anchored: frozen static; non-solid decor has no
 ## collider); walls are StaticBody2D and already parsed. They are fused together before they go in, so a character against
 ## a piece of furniture or against another character is one outline.
-static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D, characters: Array = []) -> void:
+static func _add_furniture_holes(source: NavigationMeshSourceGeometryData2D, house: Node2D, characters: Array,
+		furniture: Array) -> void:
 	var outlines: Array = []
-	for outline in furniture_holes(house) + characters:
+	for outline in furniture + characters:
 		var local := PackedVector2Array()
 		for p in outline:
 			local.append(p - house.position)
@@ -440,20 +506,33 @@ static func _on_grid(outlines: Array) -> Array:
 ## by under the tolerance, far less than the margin around the piece.
 static func _simplified(outline: PackedVector2Array) -> PackedVector2Array:
 	var points := outline.duplicate()
+	# Each vertex's distance from the line between its neighbours, kept: dropping a vertex changes only its two neighbours'.
+	var gaps := PackedFloat64Array()
+	for i in points.size():
+		gaps.append(_gap_at(points, i))
 	while points.size() > 3:
 		var drop := -1
 		var nearest := SIMPLIFY_TOLERANCE
-		for i in points.size():
-			var line_from: Vector2 = points[(i - 1 + points.size()) % points.size()]
-			var line_to: Vector2 = points[(i + 1) % points.size()]
-			var gap: float = points[i].distance_to(Geometry2D.get_closest_point_to_segment(points[i], line_from, line_to))
-			if gap < nearest:
-				nearest = gap
+		for i in gaps.size():
+			if gaps[i] < nearest:
+				nearest = gaps[i]
 				drop = i
 		if drop < 0:
 			break
 		points.remove_at(drop)
+		gaps.remove_at(drop)
+		var n := points.size()
+		gaps[(drop - 1 + n) % n] = _gap_at(points, (drop - 1 + n) % n)
+		gaps[drop % n] = _gap_at(points, drop % n)
 	return points
+
+
+## How far vertex `i` of the ring `points` lies from the line between its neighbours (`_simplified`).
+static func _gap_at(points: PackedVector2Array, i: int) -> float:
+	var n := points.size()
+	var line_from: Vector2 = points[(i - 1 + n) % n]
+	var line_to: Vector2 = points[(i + 1) % n]
+	return points[i].distance_to(Geometry2D.get_closest_point_to_segment(points[i], line_from, line_to))
 
 
 ## `outlines` with every overlapping set fused into one polygon. A dented piece is several convex
@@ -494,15 +573,6 @@ static func _outline_bounds(outline: PackedVector2Array) -> Rect2:
 	for p in outline:
 		box = box.expand(p)
 	return box.grow(BOUNDS_EPSILON)
-
-
-## Every descendant node of `root`, depth-first (so furniture nested under room containers is found).
-static func _descendants(root: Node) -> Array:
-	var out: Array = []
-	for child in root.get_children():
-		out.append(child)
-		out.append_array(_descendants(child))
-	return out
 
 
 ## The collider's footprint as a closed polygon in WORLD space, grown by `margin`. Reads only

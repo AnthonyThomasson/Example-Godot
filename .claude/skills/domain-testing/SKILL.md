@@ -95,6 +95,10 @@ and controller contract, EventBus and character signals) and never reaches into 
 - **`--shots`:** `tools/run_tests.sh --shots words` runs windowed (not headless) and saves
   `<bundle dir>/<id>__fail.png` for each failed test (printed as `shot:`); `t.screenshot(label)` saves one
   on demand (returns "" when headless or `--shots` is off). Read the PNG to see what went wrong.
+- **`--windowed`:** `tools/run_tests.sh --windowed [words]` runs the batch in a window with vsync off (`--disable-vsync`), always in one
+  process (no shard competes with what it measures, and one window), headless staying the default. A perf test's frame times then
+  include the render, without being held to the display's refresh; the draw tests that compare pixels
+  (`general/fill_batch_matches_draw_calls`, `items/prepaint_covers_the_draws`) run their image checks only this way.
 - **Coverage:** `python3 tools/test_coverage.py` lists untested domains (a domain's tests counted in `tests/<domain>/**/*_test.gd`, its
   topic folders included), unused switches and interfaces no test calls.
 - **Failures:** a FAIL/TIMEOUT prints each actor's final state and the `t.trace` series ranges, and writes
@@ -140,7 +144,9 @@ folder (so `--domain=ai` and `--changed` see it), the descriptor's `category` is
 row per topic under the domain. The file name keeps its topic prefix (`entry_waits_for_stack_test.gd`), the name
 the specs quote.
 
-**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one). They are `player_gun_range_sandbox.gd` and `vehicle_sandbox.gd` ("Vehicle yard": a walled concrete yard with the player, a car and a van, furniture to shove and three dummies; `nav.rebake` off, since rammed furniture would re-bake as overlapping holes). `sandboxes/showroom/` holds a ticket's temporary showroom (`ticket-assets`), deleted before its audit.
+**Sandboxes** (worlds you play by hand) are separate: `sandboxes/<name>_sandbox.gd`, same `GameTest` base, no assertions or timeout. `TestCatalog.discover_sandboxes()` lists them for their own browser section; `discover()` and the batch runner never see them (`--play <words>` can still open one). They are `player_gun_range_sandbox.gd` ("Gun range": the player with every gun, 3 stun (7) and 3 frag (8) grenades re-armed through
+`Character.set_loadout` 2 s after the last of its grenades goes off, which restocks the guns too (its `Restock` node), a dummy crouched behind a
+couch to show cover (`CoverSpot`), and the armour range of nine dressed dummies to the south) and `vehicle_sandbox.gd` ("Vehicle yard": a walled concrete yard with the player, a car and a van, furniture to shove and three dummies; `nav.rebake` off, since rammed furniture would re-bake as overlapping holes). `sandboxes/showroom/` holds a ticket's temporary showroom (`ticket-assets`), deleted before its audit.
 
 ```gdscript
 extends GameTest
@@ -242,6 +248,8 @@ selector. They are ordinary tests that load other domains, so they live apart fr
 | `perf/crowd_deaths_stress` | a whole 5v5 (ten characters) killed in one frame: ragdolls, blood, bleed-out |
 | `perf/furniture_pile_stress` | 120 rigid bodies shoved at once |
 | `perf/bake_and_path_stress`, `perf/generate_houses_stress` | one-shot work: nav re-bake and path queries, world-gen |
+| `perf/grenade_match_stress` | P1 of `docs/grenades.md`: the 5v5 of `match_5v5_stress`, and once the sides are in contact a puppet on the invaders' side throws three frags and three stuns among the fighters over about 3 s (through the controller contract); measured from the first throw to 3 s after the last burst |
+| `perf/grenade_burst_stress` | P2: a frag and a stun going off together among twelve pieces of furniture and eight characters in an arena (blood, debris, hit particles and sound on, `nav.rebake` off); the burst frame and the 2 s after it |
 
 `tools/run_tests.sh --domain=perf` (or the word `perf`) runs just them. The pre-commit hook leaves them out
 (`--skip-domain=perf`): their frame-time budgets fail when the machine is busy, so run them on their own before a push
@@ -254,6 +262,12 @@ functional tests of their domain.
 - **Measured:** wall-clock ms per frame (`Perf.frame_stats` -> avg / p95 / max; headless `--fixed-fps`
   outruns the clock, so frame-to-frame wall time is the CPU cost; rendering is not covered), one-shot ms
   (`Perf.time_ms`), and exact counts (`Perf.nodes()`, `Despawner.count()`, dent / blood-pool caps).
+- **Rendered too:** `tools/run_tests.sh --windowed --domain=perf` (or `--id=`) measures the same tests with the render in each frame.
+  The two grenade tests frame the whole fight with the runner's camera, as a player's screen would show it, the camera locked (P1 points
+  it at the match's ten with `frame(characters)`, P2 keeps the default framing of every actor), so every body is drawn; headless (a 64 px
+  viewport) they size the root viewport to the project's window first, so the camera frames the same view either way. Windowed, General's `FillBatch` batches the plain-coloured shapes (off headless, which renders nothing).
+  Their headless and windowed numbers, before and after issue #56, are in `docs/grenades.md`, Performance; windowed they do not all meet
+  the standard yet, which is the honest state, not a reason to loosen it.
 - **The standard:** a match runs without frame loss, so every frame-based test holds `Perf.SMOOTH_AVG_MS` (16.7, one 60 fps
   frame, the Performance overlay's target), `SMOOTH_P95_MS` (20) and `SMOOTH_MAX_MS` (33.4, two frames) through
   `Perf.within_frames`, at the scale of the largest match (twenty characters, `match_10v10_stress`), with no looser tail.
@@ -481,7 +495,7 @@ the stack, `note_acts` / `took`).
 ## Lighting tests (domain `lighting`, `tests/lighting/`)
 
 The rules are `docs/lighting.md` (L1 to L10, each with its tests named under it); `tools/run_tests.sh --domain=lighting` runs the
-ten. The shared helper is `tests/_lighting/lighting_probe.gd` (`const Probe := preload(...)`; not a test): the plan's numbers as
+eleven (`lighting/stun_flash_light` reads the stun's held-then-faded flash off `flashes()` each frame). The shared helper is `tests/_lighting/lighting_probe.gd` (`const Probe := preload(...)`; not a test): the plan's numbers as
 consts (`AMBIENT`, `ITEM_LIGHTS` 15, `PER_FLOOR` 12, `FLASH_NEAR`, the pool profile bounds `OVERHEAD_HALF_MIN` / `LOW_HALF_MAX`,
 the smoothness bound `SMOOTH_SAMPLES` / `SMOOTH_STEP_MAX` and the street pool's `STREET_POOL_MAX` / `STREET_POOL_CENTRE`), every
 Lighting read looked up by name at run time (`script_of`, `config_value`, `require_lighting`: the test world's `WorldLighting` in

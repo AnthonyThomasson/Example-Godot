@@ -30,8 +30,16 @@ infrastructure (`Despawner`, `PhysicsLayers`, `DrawLayers`).
   each hit asks for the same one three times (collider, shadow, drawing) and every repaint of a wounded character asks again
   (`tests/physics/shape_polygon_cache_test.gd`). `convex_shapes` cuts a silhouette into convex collider pieces (Hertel-Mehlhorn
   over its triangulation) finding neighbouring pieces through a directed-edge map, remembering failed pairs by piece id and
-  checking only the two corners a merge joins; `tests/physics/convex_pieces_match_plain_scan_test.gd` pins it to the plain
-  every-pair, every-corner scan. `draw_shape` takes
+  checking only the two corners a merge joins; after a merge the scan goes on from the merged piece, having first tried the pairs
+  the new piece makes with the pieces before it (every other pair before it has failed), and an attempt hands back its union;
+  `tests/physics/convex_pieces_match_plain_scan_test.gd` pins it to the plain every-pair, every-corner scan; `convex_pieces(polygon)` gives the pieces' points (pure, for a worker thread) and
+  `shapes_of` makes the shapes; `cut_shape(shape, size, impacts)` / `cut_wall(a, b, thickness, impacts)` return `[polygon, pieces]`
+  for a dented silhouette computed without the caches (pure: Objects' `ColliderCuts` runs them on worker threads; a circle's unit
+  ring is made afresh there, never read from or written to the kept one). `wall_polygon` keeps its last 256 dented segments like `shape_polygon` (a wall repaints every segment when
+  one is struck), a fresh array each ask, and `draw_wall` skips the triangulation check for an undented segment. Its circle `base_ring`
+  is the unit ring (kept per point count) scaled, a fresh array each call; `draw_shape` maps its texture with one transform of the
+  ring and skips the triangulation check for an undented shape (it is the intact ring already); `draw_marks` draws each mark's
+  discs as one General `FillBatch` before its cracks. `draw_shape` takes
   an optional `texture`: the deformed polygon is then drawn textured (UVs from the intact
   footprint, so dents cut into the image), tinted darker by damage, without the smooth outline;
   `texture_angle` turns the image within the unturned silhouette (a round body facing any way);
@@ -41,7 +49,9 @@ infrastructure (`Despawner`, `PhysicsLayers`, `DrawLayers`).
   frame (u along the wall per tile, v across its thickness), so the tile follows every wall.
 - `DebrisSpawner` / `Debris` / `DebrisLayer` — material-styled chips (`STYLES` table). A chip is a node only while it
   flies (Despawner-tracked); as it lands it hands its place, turn, colour, size and shape to the parent's `DebrisLayer`
-  (`DebrisLayer.layer(parent)`) and frees itself, so a floor strewn with a thousand chips costs a few draw calls and no nodes. The layer
+  (`DebrisLayer.layer(parent)`) and frees itself, so a floor strewn with a thousand chips costs a few draw calls and no nodes; a chunk
+  draws all its chips (disc, triangle or rect, each at its own place and turn) as one General `FillBatch` (the triangle and rect
+  convex, uncut; under the headless display each by its own command, `_draw_each`). The layer
   keeps at most `Despawner.max_scene_objects` chips, dropping the oldest; it draws under whatever joins its node after it.
   Test: `tests/physics/debris_rests_in_a_layer_test.gd`.
 - `chunked_layer.gd` (no `class_name`; `DebrisLayer`, `ScorchDecals` and the blood's `BloodDecals` extend it by path) — the
@@ -99,7 +109,8 @@ plus z = height; gravity pulls to z = 0.
 `Physics.spawn_explosion(world, at, kind)` (kind `&"frag"` / `&"stun"`; the Projectile System's `Explosion` calls it) is the look of a grenade's burst, all
 procedural in the same stepped-pixel style as the debris and the blood (every disc is rows of `PhysicsConfig.explosion_pixel` px). `ExplosionFx.spawn` adds
 up to three colliderless nodes under `world`, each named for what it is, animated in `_process`, freed at the end of its life and `Despawner`-tracked:
-`ExplosionFlash` (a pale disc over a white one that swells a little and fades in `flash_time`), `ExplosionFireball` (frag only: a lumpy puff that swells and
+`ExplosionFlash` (frag only: a pale disc over a white one that swells a little and fades in `flash_time`; a stun's row has `flash_radius` 0, its
+white flash being the Lighting domain's flash light, `docs/lighting.md` L9), `ExplosionFireball` (frag only: a lumpy puff that swells and
 cools from yellow to deep red, fading over its last stretch) and `ExplosionSmoke` (puffs that drift out, swell and fade over `smoke_time`, ~4 s for a frag, a
 thin ~2.6 s for a stun). A frag also burns a mark into the world's `ScorchDecals` layer (`ScorchDecals.layer(world).burn(at, radius)`, node `ScorchDecals`):
 ragged stepped rows, a darker core in a lighter rim and a few specks, a `chunked_layer.gd` like `DebrisLayer` and `BloodDecals` (only the chunk that gained a

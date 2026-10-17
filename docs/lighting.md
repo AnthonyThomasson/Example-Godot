@@ -111,9 +111,15 @@ energy equal to its twin's in every frame over 240 frames; within one copy no tw
 
 **L9. Flashes.** A pool of **3** lights (shadowed by everything, L6, lighting the house and the street): a `shot` lights one at
 the muzzle, warm (1.0, 0.82, 0.55), 340 across, falling off to dark over **0.07**; an `explosion` one at the burst, a frag orange
-(1.0, 0.62, 0.3) over **0.5**, a stun white (0.92, 0.95, 1.0) over **0.3**, at least 600 / 700 across (4 / 3.5 × the event's
-`radius`). The next flash takes the pool's next light in turn. Tests: `lighting/flashes_on_shot_and_explosion` (within 3 frames of
-the `shot` a flash lit within 24 px of the muzzle, all dark within 0.25; the same at the frag's burst, dark within 1.5).
+(1.0, 0.62, 0.3) over **0.5**, at least 600 across (4 × the event's `radius`). The next flash takes the pool's next light in turn.
+*(Amended by issue #56.)* A stun's flash is its burst's whole look (Physics draws no disc for it, only its thin smoke,
+`docs/grenades.md` G14): white (0.92, 0.95, 1.0) at energy **8** (a frag's is 2.6, a shot's 1.6), at least 700 across (3.5 × the
+event's `radius`), held at that energy for **0.08** s (`hold`), then falling off to dark over **0.7** (its `life`), shadowed and
+cleared of the characters as every flash. A row's `hold` (s, none when absent) and `life` are in `LightingConfig.flashes`; the shot
+and the frag hold none. Tests: `lighting/flashes_on_shot_and_explosion` (within 3 frames of the `shot` a flash lit within 24 px of
+the muzzle, all dark within 0.25; the same at the frag's burst, dark within 1.5), `lighting/stun_flash_light` (within 3 frames of the
+stun's burst a white flash lit within 24 px of it, shadowed by the walls and the furniture, peaking at 4.8 or more (well over a frag's 2.6), held at 95 % of
+its peak for 3 frames or more, still lit 0.45 s on and dark within 1.1).
 
 **L10. The switch.** `lighting.enabled` (default on; `LightingConfig.enabled` and General's `LightMasks.shadows`) off builds none of it:
 no WorldLighting, ambient, sky, point light or occluder anywhere, the characters' included.

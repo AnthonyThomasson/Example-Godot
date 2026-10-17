@@ -293,6 +293,8 @@ nothing. `in_zone(space, kind, radius, burst, p, height, exclude)`: within `zone
 `escape(...)` returns `{ spot, crouch, route }`: candidates are the circle just outside the zone (`zone + OUTSIDE_SLACK` 30 px), the shadows behind what the rays from the burst
 meet (the first stopper for a crouched and for a standing body, `Explosion.first_stop`, 32 and 72 px behind it) and rings round the NPC; each is snapped onto the navmesh (`NavBuilder.snap`, dropped
 if pulled more than 40 px), judged (outside the zone, or shielded standing = out of line, or shielded only crouched = `crouch`), **every** survivor is routed
+(many candidates are the same point, the standing and crouching probes meeting the same wall: each point is snapped, each spot judged and each
+route measured once, `tests/ai/grenade/escape_spot_matches_plain_test.gd` pinning the answer to the plain loop)
 (`NavBuilder.route`; a straight line says nothing, a spot just behind a wall can be a house away) and the shortest route within `(fuse_left - 0.4 s) x run speed`
 (`RUN_RELIABILITY` 0.85 of `Character.run_speed()`, or `Character.walk_speed()` once stamina is below `RUN_STAMINA`: both slowed by a
 stun or a heavy outfit; `tests/ai/grenade/throw_timing_counts_slowed_walk_test.gd`) wins; `spot` is `Vector2.INF` when none is in time. Cost: ~150 snaps, ~300 rays and ~100 routes, only when a plan is

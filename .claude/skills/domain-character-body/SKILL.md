@@ -22,7 +22,8 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   (below); `character_ragdoll.gd` (owned as `ragdoll` once dead) owns the fall.
 - **Draw** (`character_visuals.gd`) owns appearance: a drop shadow, the legs and shoes, the arms
   (sleeve, then forearm), then `item.draw_weapon()` (under the torso, so a long gun's butt is tucked behind the shoulder), the shoulders (at the pose's lunge), then both fists (gripping the weapon; a hand gripping below `HAND_OVER_HEIGHT`, i.e. hanging relaxed, is drawn *before* the shoulders so they cover it — `tests/character/hanging_hands_under_shoulders_test.gd`), then the
-  head last (it is the highest part, so it covers the gun and fists; its shadow falls on the shoulders), then the
+  head last (it is the highest part, so it covers the gun and fists; its shadow falls on the shoulders), then a hand gripping at or
+  above `HAND_ON_FACE_HEIGHT` (6.9 body radii: only the blinded `eyes` stance) over the face (`_draw_face_hands`, `face_hand` in `draw_order`), then the
   wound marks over all of it. A crouch (`_draw_lying`) keeps the same order: the head leaves the fallen-body stack and is drawn after the fists.
   `draw_order` records what the last living draw painted (`weapon`, `torso`, `hands`, `head`) for `tests/character/head_over_gun_test.gd`. Once dead it draws the fallen body instead (below).
   **A standing body is repainted only when its drawing changes.** Each frame `_process` solves the rig once
@@ -43,6 +44,15 @@ edges: `Deformable` / `Deformation` and the generic `Ragdoll` (Physics), `PixelA
   unseen; the redraw key is cleared so the first frame back in view repaints. A test whose camera does not frame a body it
   reads the drawing of (the spectator camera drops the dead from its framing) keeps it in view with `camera_follow`
   (`tests/character/fallen_draw_order_stable_test.gd`). Test: `tests/character/offscreen_body_is_not_drawn_test.gd`.
+  **What a repaint costs.** Windowed, every polygon command builds a vertex buffer (~9 µs), so the plain-coloured shapes go out as
+  General's `FillBatch` (one triangle array, the same triangles and pixels): a chain's outline capsules in one command before its
+  fills, and the whole floor shadow (limb capsules, fists, head, trunk slices) in one; only the textured parts are a command each.
+  The body's and the shadow's draws share one set of limb chains (`_limbs`, built once for both, dropped at every `_process`). Capsules, the shoulders'
+  shadow uvs and a segment's uvs are each one transform of a unit outline (`_capsule`, `_texture_uvs`; float rounding only) and the
+  trunk's slices the plain point sums with the shadow's shift in place of a callable;
+  A limb capsule whose ends' radii differ by less than `CAP_CONVEX` of its length is convex and goes into a batch as a fan, uncut
+  (`_fill_capsule`). The trunk's outline takes a union that comes out in one piece as it is, without weighing its area.
+  `tests/character/body_geometry_matches_plain_test.gd` pins them (the trunk's slices and outline exactly).
 
 ## Pose (the living motion)
 
@@ -80,6 +90,13 @@ frame's pose.
 - `kick(hand, strength := 1.0)` (the character's `kick`, called by a gun on firing with its `recoil`) throws the hand back on a
   recoil spring and twists the shoulders back on its side, `strength` times a pistol's; the other hand feels its stance's
   `recoil_share` (a supporting hand recoils with the weapon hand).
+- **The stunned look** (`docs/grenades.md` G13). `update`'s last argument, `stun` (the character's `stun_level()`, 0 in a ride), is eased into
+  `_stun` at `stun_look_ease` (`stun_amount()`), so the look comes on and goes without a jump. `hunch()` is `stun_hunch_pitch` x it (rad, the rig's).
+  The stagger: the stride length (and the rig's foot swing) shrinks to `stun_stagger_stride`, the stride phase advances unevenly (x `1 + stun x
+  (stun_stagger_limp x cos(stride) + stun_stagger_wander x a slow sine)`: one step longer than the next, the pace wandering; foot 1 lands at
+  stride π/2 and foot 0 at 3π/2, so the cos term lengthens one foot's step and shortens the other's), `hip_sway` (local px, the rig's pelvis)
+  shifts the hips over the planted foot by `stun_stagger_sway` and `head_offset` lolls across by `stun_stagger_bob`, both x `_stun` x the walk
+  amount (nothing standing still). The pace and the drift are the character's, unchanged.
 - Tuning: `CharacterConfig.pose_*` (per-part spring `freq` / `damping` / `max_lag` for head, steady
   hands, weapon, free hands, shoulders and hips; lag catch, hand pace spread, hip twist, stride,
   sway, steady drift, punch twist and lunge, bob, lean, breath, glance, recoil) and
@@ -94,7 +111,10 @@ pose frame, from the body center), grip `height` (body radii, for the arm's IK),
 (out, forward, up). The held item picks one per hand through `Item.hand_stance(hand)`: `relaxed`
 (arms hanging; unarmed, key), `guard` (fists up; fists), `aim` (the weapon arm reaching out) and
 `support` (the other hand on the grip beside the aim hand: both fists at the same forward point, 2 px either side of the aim line, so they grip the pistol together) and `reload` (that hand dropped to the belt
-for the next magazine, named by a gun's support hand while it reloads). The long guns have their own pairs, sized by the gun: `smg_grip` / `smg_fore`
+for the next magazine, named by a gun's support hand while it reloads). Two are the character's own, never an item's: while blind, `eyes` (the free
+hand's palm over the face, 7.0 radii up, 9 px ahead) and `one_hand` (a gun's weapon hand alone: out 24 px, low at 5.2 radii, its optional `waver`
+key 3 px: a steady hand with a `waver` wanders that far across its frame and `WAVER_RISE` radii per px up and down, `WAVER_LAG` s out of step,
+two out-of-step sines in `pose._waver`; `_eased` lerps it like the other numbers, 0 for a row without one); `domain-character`'s `_stances()` picks them. The long guns have their own pairs, sized by the gun: `smg_grip` / `smg_fore`
 and `rifle_grip` / `rifle_fore` (the butt in the right shoulder; the SMG's barrel line is 9 px to the character's right of the aim line, the rifle's only 5 px so it is held up in front of the face as if looking down the sight; the grip hand
 just ahead of it, the other hand out along the handguard); both hands lie on one line along the barrel (hand 0 at +`lateral`, hand 1 at
 −`lateral`) and an arm's stretch stays within the rig's tolerance. `ready_grip` / `ready_fore` are the shared **raised** pair (below).
@@ -124,6 +144,9 @@ by index (`HEAD`, `CHEST`, `PELVIS`, `BELLY`, `SPINE` and per-side `SHOULDER`, `
 - Legs: each ankle strides along the hips' forward by `body_stride`, in opposition to the arm on its
   side, lifting `body_foot_lift` as it swings through; the knee is IK bent forward; toes follow
   `hip_angle`.
+- A stun hunches it: the spine's `pitch` gains the pose's `hunch()` on top of any crouch (the neck pitching on by it too), the pelvis
+  takes the pose's `hip_sway`, and the feet's stride is scaled by `stun_stagger_stride` at the pose's `stun_amount()`. Test:
+  `tests/character/stunned_hunch_and_stagger_test.gd`.
 - The same rig is what the ragdoll starts from, so a body dies in exactly the pose it was drawn in.
 - Test: `tests/character/standing_body_rig_test.gd` (bone lengths, stances, punch landing, hips,
   stride, death continuity).

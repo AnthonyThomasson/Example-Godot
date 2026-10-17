@@ -10,9 +10,16 @@ extends RefCounted
 ## when it stops; standing still, it breathes and glances around. A kick (recoil) throws a hand back
 ## and twists the shoulders; a punch twists them toward the punching side and lunges the upper body.
 ## Each hand eases between the stances its item asks for (CharacterConfig.stances): where it rests,
-## how high it is gripped, how its elbow bends. Owned and stepped by character.gd each physics
+## how high it is gripped, how its elbow bends. A stunned character (the level handed to `update`, eased) hunches (the rig
+## reads `hunch()`) and staggers: shorter, uneven strides, the hips swaying over the planted foot and the head lolling
+## (docs/grenades.md G13). Owned and stepped by character.gd each physics
 ## frame; read by the hands (their rest pose), the rig (the joints) and the visuals (each part's
-## angle and offset). Visual only: aim, shots and punches stay on `facing`. Tuning: CharacterConfig.pose_*.
+## angle and offset). Visual only: aim, shots and punches stay on `facing`. Tuning: CharacterConfig.pose_*, stun_look_ease, stun_hunch_pitch and stun_stagger_*.
+
+## A wavering hand (a stance's `waver`) also rises and falls, this many body radii per px of its wander across, this many
+## seconds out of step with it.
+const WAVER_RISE := 0.05
+const WAVER_LAG := 0.2
 
 var torso_angle := 0.0           ## Shoulders' facing angle (rad, as Vector2.angle()), punch twist included.
 var torso_offset := Vector2.ZERO ## Upper body's lunge ahead of the hips (local px).
@@ -21,6 +28,7 @@ var head_angle := 0.0            ## Head's facing angle (rad).
 var hand_angles := [0.0, 0.0]    ## Per hand: the angle of the frame its rest pose is built in (rad).
 var weapon_angle := 0.0          ## A held weapon's facing angle (rad): trails the aiming hand.
 var head_offset := Vector2.ZERO  ## Head's shift off the body center (local px), the lunge included.
+var hip_sway := Vector2.ZERO     ## The hips' sideways sway of a stunned walk (local px), for the rig's pelvis.
 
 var _torso_core := 0.0            ## Shoulders' spring angle, before the punch twist (rad).
 var _torso_vel := 0.0             ## Shoulders' spring velocity (rad/s).
@@ -41,13 +49,14 @@ var _move_dir := Vector2.ZERO     ## Last walking direction (unit), for the head
 var _time := 0.0                  ## Seconds alive, for breathing and glances.
 var _phase := randf() * TAU       ## Per-character offset so characters don't move in lockstep.
 var _primed := false              ## False until the first update snaps every part to the aim.
+var _stun := 0.0                  ## How stunned the body looks, 0..1: the stun level handed in, eased.
 
 
 ## Advance the pose by `delta` toward `facing`, walking at `velocity` (top speed `top_speed`);
 ## `stances` names each hand's stance (the held item's hand_stance()), `punch` is each hand's
-## extension, 0 (resting) .. 1 (fully punched).
+## extension, 0 (resting) .. 1 (fully punched), `stun` the character's stun level (0..1; 0 while a ride poses it).
 func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, stances: Array,
-		punch: Array) -> void:
+		punch: Array, stun := 0.0) -> void:
 	var aim := facing.angle()
 	if not _primed:
 		torso_angle = aim
@@ -62,13 +71,18 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 		_stance[i] = _eased(_stance[i], _stance_data(stances[i]), delta)
 	_steady = [_stance[0]["steady"], _stance[1]["steady"]]
 	_time += delta
+	_stun = lerpf(_stun, stun, 1.0 - exp(-CharacterConfig.stun_look_ease * delta))
 	var speed := velocity.length()
 	_walk = lerpf(_walk, clampf(speed / maxf(top_speed, 1.0), 0.0, 1.0), 1.0 - exp(-8.0 * delta))
 	# Past walking speed is running: how far toward a full run, smoothed like the walk.
 	var run_span := maxf(CharacterConfig.run_speed_mult - 1.0, 0.01)
 	_run = lerpf(_run, clampf((speed / maxf(top_speed, 1.0) - 1.0) / run_span, 0.0, 1.0), 1.0 - exp(-8.0 * delta))
-	var stride_length := lerpf(CharacterConfig.pose_stride_length, CharacterConfig.pose_run_stride_length, _run)
-	_stride = fmod(_stride + speed * delta / maxf(stride_length, 1.0) * TAU, TAU)
+	var stride_length := lerpf(CharacterConfig.pose_stride_length, CharacterConfig.pose_run_stride_length, _run) \
+		* lerpf(1.0, CharacterConfig.stun_stagger_stride, _stun)
+	# A stunned walk staggers: one step comes longer than the next (a limp) and the pace of the steps wanders.
+	var cadence := 1.0 + _stun * (CharacterConfig.stun_stagger_limp * cos(_stride)
+		+ CharacterConfig.stun_stagger_wander * sin(_time * 1.3 + _phase))
+	_stride = fmod(_stride + speed * delta / maxf(stride_length, 1.0) * TAU * cadence, TAU)
 	if speed > 1.0:
 		_move_dir = velocity / speed
 
@@ -124,7 +138,13 @@ func update(delta: float, facing: Vector2, velocity: Vector2, top_speed: float, 
 	var breath := sin(_time * TAU / maxf(CharacterConfig.pose_breath_period, 0.1) + _phase) \
 		* CharacterConfig.pose_breath * (1.0 - _walk)
 	var bob := cos(_stride * 2.0) * CharacterConfig.pose_head_bob * _walk  # A bob per step.
-	head_offset = _lean + facing * breath + _move_dir * bob + torso_offset
+	# A stunned walk sways the hips over the planted foot (foot 0, the right, is planted while cos > 0) and lolls the head
+	# a quarter of a stride behind.
+	var across := Vector2.from_angle(hip_angle).orthogonal()
+	var stagger := _stun * _walk
+	hip_sway = across * (-cos(_stride) * CharacterConfig.stun_stagger_sway * stagger)
+	head_offset = _lean + facing * breath + _move_dir * bob + torso_offset \
+		+ across * (sin(_stride) * CharacterConfig.stun_stagger_bob * stagger)
 	# The upper body shifts over the planted foot each step (foot 0 is planted while cos > 0); the head
 	# is set before this, so it stays steady over the rocking shoulders.
 	torso_offset += Vector2.from_angle(hip_angle).orthogonal() * (-cos(_stride) \
@@ -148,13 +168,23 @@ func _step_hips(delta: float, aim: float) -> void:
 
 ## A hand's shift off its rest pose (local px), in its own frame: a free hand swings fore and aft
 ## with the walk (opposite to the other) as far as its stance allows, a steady hand only drifts a
-## little sideways; both minus any recoil.
+## little sideways and wanders by its stance's `waver`; both minus any recoil.
 func hand_offset(hand: int) -> Vector2:
 	var along := Vector2.from_angle(hand_angles[hand])
 	var step := sin(_stride + (0.0 if hand == 0 else PI)) * _walk
 	if _steady[hand]:
-		return along.orthogonal() * step * CharacterConfig.pose_aim_drift - along * _recoil[hand]
+		return along.orthogonal() * (step * CharacterConfig.pose_aim_drift + _waver(hand, 0.0)) - along * _recoil[hand]
 	return along * (step * float(_stance[hand]["swing"]) - _recoil[hand])
+
+
+## A steady hand's slow wander (px; across its frame, and at `offset` out of step, up and down): its stance's `waver`, two
+## out-of-step sines.
+func _waver(hand: int, offset: float) -> float:
+	var w: float = _stance[hand].get("waver", 0.0)
+	if w <= 0.0:
+		return 0.0
+	var t := _time + hand * 1.7 + offset
+	return w * (0.6 * sin(t * 7.3 + _phase) + 0.4 * sin(t * 11.9 + _phase * 1.7))
 
 
 ## How far ahead of the body center a hand rests (px), along its frame.
@@ -171,7 +201,7 @@ func rest_lateral(hand: int) -> float:
 func grip_height(hand: int) -> float:
 	# Running pumps the arms: the hand swinging forward rises toward the chest, the back one drops to the hip.
 	var step := sin(_stride + (0.0 if hand == 0 else PI))
-	return _stance[hand]["height"] + step * CharacterConfig.pose_run_hand_rise * _run
+	return _stance[hand]["height"] + step * CharacterConfig.pose_run_hand_rise * _run + _waver(hand, WAVER_LAG) * WAVER_RISE
 
 
 ## Where a hand's elbow bends toward (out, forward, up).
@@ -199,6 +229,16 @@ func run_amount() -> float:
 	return _run
 
 
+## How stunned the body looks, 0..1: the stun level, eased (CharacterConfig.stun_look_ease); the stagger scales by it.
+func stun_amount() -> float:
+	return _stun
+
+
+## How far the stun bends the spine forward (rad): CharacterConfig.stun_hunch_pitch at the full level, eased.
+func hunch() -> float:
+	return deg_to_rad(CharacterConfig.stun_hunch_pitch) * _stun
+
+
 ## Recoil: throw `hand` (0 = right as drawn, 1 = left) back and twist the shoulders back on its side, `strength`
 ## times a pistol's kick. The other hand feels its share if it is steadying the weapon.
 func kick(hand: int, strength := 1.0) -> void:
@@ -221,6 +261,7 @@ static func _eased(now: Dictionary, to: Dictionary, delta: float) -> Dictionary:
 	var out := to.duplicate()
 	for key in ["forward", "lateral", "height", "swing", "recoil_share"]:
 		out[key] = lerpf(now[key], to[key], k)
+	out["waver"] = lerpf(now.get("waver", 0.0), to.get("waver", 0.0), k)
 	out["elbow_pole"] = (now["elbow_pole"] as Vector3).lerp(to["elbow_pole"], k)
 	return out
 

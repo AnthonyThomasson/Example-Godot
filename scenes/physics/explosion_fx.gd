@@ -1,7 +1,8 @@
 class_name ExplosionFx
 
 ## Physics System: the look of a grenade's burst (`Physics.spawn_explosion`). A frag is a bright flash, a fireball puff that
-## swells and cools, smoke that drifts off and fades, and a scorch left on the floor; a stun is a white flash and thin smoke.
+## swells and cools, smoke that drifts off and fades, and a scorch left on the floor; a stun is thin smoke only (its white flash
+## is the Lighting domain's flash light, lit by the `explosion` event: `docs/lighting.md` L9).
 ## Each is one colliderless node that draws itself in stepped rows of `PhysicsConfig.explosion_pixel` px (the pixel look of the
 ## debris and the blood), animates in `_process` and frees itself when its life is over, Despawner-tracked. The scorch is a mark
 ## in the world's `ScorchDecals` layer. Looks and timings: `PhysicsConfig.explosion_looks`.

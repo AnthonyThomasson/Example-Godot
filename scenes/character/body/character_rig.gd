@@ -14,6 +14,8 @@ extends RefCounted
 ## - A crouch lowers the hips to the character's eased posture height and pitches the spine forward about the
 ##   pelvis (the neck pitching on, so the head sits ahead of and above the shoulders); the hips and feet come
 ##   together, the feet standing a little ahead of the pelvis so the knees lead.
+## - A stunned body hunches: the spine and the neck pitch forward by the pose's `hunch()` on top of any crouch, its
+##   stride is shorter (`stun_stagger_stride`) and its pelvis sways with the pose's `hip_sway`.
 ## - Each ankle rests where the legs layer (character_legs.gd) stopped it against a wall or piece of furniture.
 ## Joints are read by index (the constants below, shared with the ragdoll) through `point(i)`, and
 ## each foot's direction through `toes(i)`. Index pairs are per hand side (0 = the character's right as drawn, 1 = the left). A rig also
@@ -65,7 +67,7 @@ func _init(character, with_legs := true) -> void:
 	var height: float = character.posture_height()
 	var crouch_height: float = CharacterConfig.postures[&"crouch"]["height"]
 	var folded := clampf((1.0 - height) / maxf(1.0 - crouch_height, 0.01), 0.0, 1.0)
-	var pitch := deg_to_rad(CharacterConfig.body_crouch_pitch) * folded
+	var pitch: float = deg_to_rad(CharacterConfig.body_crouch_pitch) * folded + pose.hunch()  # A stun hunches it on.
 	var neck_pitch := pitch + deg_to_rad(CharacterConfig.body_crouch_neck_pitch) * folded
 	var spine := (CharacterConfig.body_shoulder_height - CharacterConfig.body_hip_height) * r
 	var neck := (CharacterConfig.body_head_height - CharacterConfig.body_shoulder_height) * r
@@ -85,13 +87,14 @@ func _init(character, with_legs := true) -> void:
 	var foot_fwd := CharacterConfig.body_crouch_foot_ahead * r * folded - lean * 0.5
 	var item: Item = character.current_item()
 	var weapon_hand: int = item.weapon_hand() if item != null else 0
+	var staggered := lerpf(1.0, CharacterConfig.stun_stagger_stride, pose.stun_amount())  # A stunned walk's shorter steps.
 
 	_points.resize(17)
 	_face = Vector3(cos(pose.head_angle), sin(pose.head_angle), 0.0)
 	_points[CHEST] = lunge + fwd * lean * 0.5 + up * chest_z
 	_points[HEAD] = Vector3(pose.head_offset.x, pose.head_offset.y, 0.0) + fwd * (lean * 0.5 + neck * sin(neck_pitch)) \
 		+ up * (chest_z + neck * cos(neck_pitch))
-	_points[PELVIS] = -fwd * lean * 0.5 + up * hip_z
+	_points[PELVIS] = -fwd * lean * 0.5 + up * hip_z + Vector3(pose.hip_sway.x, pose.hip_sway.y, 0.0)
 	var mid: Vector3 = (_points[CHEST] + _points[PELVIS]) * 0.5
 	var belly := fwd * cos(pitch) - up * sin(pitch)  # Out of the chest, square to the leaning spine.
 	_points[BELLY] = mid + belly * CharacterConfig.ragdoll_belly * r
@@ -123,7 +126,7 @@ func _init(character, with_legs := true) -> void:
 		var walk: float = pose.walk_amount()
 		var run: float = pose.run_amount()  # A run strides wider and lifts higher.
 		var stride := lerpf(CharacterConfig.body_stride, CharacterConfig.body_run_stride, run) \
-			* lerpf(1.0, CharacterConfig.body_crouch_stride, folded)
+			* lerpf(1.0, CharacterConfig.body_crouch_stride, folded) * staggered
 		var foot_lift := lerpf(CharacterConfig.body_foot_lift, CharacterConfig.body_run_foot_lift, run)
 		var step := -sin(phase) * walk * stride * r
 		var lift := maxf(-cos(phase), 0.0) * walk * foot_lift * r  # Off the floor mid-swing.

@@ -35,6 +35,9 @@ var fire_burst: int = 3
 var back_off_time: float = 0.45
 var reposition_interval: float = 0.5  ## Copy of GoalController.reposition_interval.
 var auto_reload: bool = true   ## An empty gun with a spare magazine is reloaded on its own while holding or ducked in cover.
+## Whether the NPC fires blind while flash-blinded (`docs/grenades.md` G15): the controller's roll as it went blind
+## (`Behavior.set_blind_fire`). Read only while blind (`holds_fire`).
+var blind_fire := true
 
 var phase := "peek"            ## Peek-and-cover phase: "peek" (seek a shot) or "cover" (duck).
 var cover_timer := 0.0         ## Seconds left ducking behind cover before peeking again.
@@ -107,6 +110,11 @@ func fire_at_will(target: Dictionary) -> void:
 	_character.aim_point = pos
 	if fire_timer <= 0.0 and _faces(pos):
 		shoot()
+
+
+## Whether the NPC holds its fire: blind, and this blinding's roll said it does not fire blind (G15). It shoots again once it can see.
+func holds_fire() -> bool:
+	return not blind_fire and _character.is_blind()
 
 
 ## Ambush: hold the covered spot and fire the moment a line to the known position opens.
@@ -240,13 +248,14 @@ func melee(pos: Vector2, hold_ground: bool) -> void:
 ## Equip the character's gun and fire it, refreshing the combat engagement so an active fight stays
 ## committed; true when a round left the barrel. Nothing here is specific to a gun:
 ##   - at a run or mid-reload it holds fire and keeps the cooldown for when that stops;
+##   - blind, when its roll said it holds its fire (`holds_fire`), it does not pull the trigger at all, so not even a click;
 ##   - dry, a click is not a shot, so it neither commits the fight nor needs a hand free to reload — it
 ##     emits `dry` (the empty gun is in the snapshot now), at most once per cooldown;
 ##   - with the barrel against a wall or object (`weapon_blocked()`) it cannot fire, so it steps back until
 ##     it can, keeping the cooldown;
 ##   - an automatic gun's pull is a burst (`fire_burst` rounds, `continue_burst`), the rest at the gun's own rate.
 func shoot() -> bool:
-	if _character.is_running() or _character.is_reloading():
+	if _character.is_running() or _character.is_reloading() or holds_fire():
 		return false
 	var gun: int = _character.gun_slot()
 	if gun < 0:
@@ -292,12 +301,13 @@ func punch() -> void:
 
 
 ## Keep the trigger down for the rest of an automatic gun's burst: one more round each time the gun's own fire
-## rate allows, until the burst is spent or something stops it (a run, a reload, a swap, a wall, running dry).
+## rate allows, until the burst is spent or something stops it (a run, a reload, a swap, a wall, running dry, a blinding it holds
+## its fire through).
 func continue_burst() -> void:
 	if _burst_left <= 0:
 		return
 	if not _character.is_automatic() or _character.is_running() or _character.is_reloading() \
-			or _character.weapon_blocked() or _character.ammo() <= 0:
+			or _character.weapon_blocked() or _character.ammo() <= 0 or holds_fire():
 		_burst_left = 0
 		return
 	if _character.shoot():

@@ -14,6 +14,8 @@ class_name GunConfig
 ##                     speed a bullet loses to a surface and lowers the speed it needs to get through.
 ##   muzzle_speed      px/s a round leaves at; damage and impact scale with the speed it still has.
 ##   spread_deg        random cone half-angle each round leaves within (0 = dead straight).
+##   one_hand_spread_deg  added to `spread_deg` for a round fired one-handed (its user's other hand over its eyes,
+##                     `Character.one_handed()`; docs/grenades.md G13).
 ##   recoil            scale of the kick the hands take per round (1 = the pistol's).
 ##   magazine          the `MagazineConfig.types` id it is loaded with when built.
 ##   spare_magazines   how many of that type a character who carries it also carries spare.
@@ -37,19 +39,19 @@ static var default_style: StringName = &"police"
 static var guns: Dictionary = {
 	&"pistol": {
 		"name": "Pistol", "slot": 3, "damage": 15.0, "fire_interval": 0.10, "automatic": false,
-		"penetration": 1.0, "muzzle_speed": 3200.0, "spread_deg": 0.0, "recoil": 1.0,
+		"penetration": 1.0, "muzzle_speed": 3200.0, "spread_deg": 0.0, "recoil": 1.0, "one_hand_spread_deg": 3.0,
 		"magazine": &"standard", "spare_magazines": 2, "raises_at_contact": false,
 		"looks": _looks(),
 	},
 	&"smg": {
 		"name": "SMG", "slot": 5, "damage": 5.0, "fire_interval": 0.07, "automatic": true,
-		"penetration": 0.8, "muzzle_speed": 2900.0, "spread_deg": 2.5, "recoil": 0.55,
+		"penetration": 0.8, "muzzle_speed": 2900.0, "spread_deg": 2.5, "recoil": 0.55, "one_hand_spread_deg": 6.0,
 		"magazine": &"smg_standard", "spare_magazines": 2, "raises_at_contact": true,
 		"looks": _looks(),
 	},
 	&"rifle": {
 		"name": "Assault rifle", "slot": 6, "damage": 22.0, "fire_interval": 0.11, "automatic": true,
-		"penetration": 2.2, "muzzle_speed": 4400.0, "spread_deg": 0.8, "recoil": 1.2,
+		"penetration": 2.2, "muzzle_speed": 4400.0, "spread_deg": 0.8, "recoil": 1.2, "one_hand_spread_deg": 8.0,
 		"magazine": &"rifle_standard", "spare_magazines": 2, "raises_at_contact": true,
 		"looks": _looks(),
 	},

@@ -403,6 +403,7 @@ func debug_state() -> Dictionary:
 		"engage_id": _engage_id,
 		"engage_inside": _engage_inside,
 		"combat_phase": _combat.phase,
+		"holds_fire": _combat.holds_fire() if _character != null else false,
 		"hold_ground": _hold_ground,
 		"hostiles_known": _hostiles.size(),
 		"gaze": { "mode": _gaze, "threat": str(_threat["node"].name) if not _threat.is_empty() and is_instance_valid(_threat["node"]) else "" },
@@ -1508,6 +1509,12 @@ func evading() -> bool:
 ## The safe spot the evade runs to (`Vector2.INF` when none: not evading, or no spot to reach in time).
 func evade_spot() -> Vector2:
 	return _evade.get("spot", Vector2.INF)
+
+
+## Whether the NPC fires blind while this blinding lasts (`docs/grenades.md` G15): the controller's roll, handed in the tick it goes
+## blind. False: it holds its fire (no gun round, no burst carried on) until it can see.
+func set_blind_fire(on: bool) -> void:
+	_combat.blind_fire = on
 
 
 ## Take the perception's plan to get clear of a live grenade (`{}`: nothing threatens the NPC), every tick. It takes priority over

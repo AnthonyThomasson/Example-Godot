@@ -35,6 +35,7 @@ Every firearm is a `GunItem` (`class_name GunItem extends Item`) whose numbers c
 | `automatic` | holding the trigger keeps firing (a controller re-presses `shoot()` every frame); false = one round per click |
 | `penetration` | power multiplier for punching through what it hits (1 = a pistol round); see `domain-projectile` |
 | `muzzle_speed`, `spread_deg`, `recoil` | speed a round leaves at; random cone half-angle; scale of the kick (`user.kick(hand, recoil)`) |
+| `one_hand_spread_deg` | added to `spread_deg` for a round fired one-handed (`user.one_handed()`: blind, the other hand over the eyes; `docs/grenades.md` G13): pistol 3°, SMG 6°, rifle 8° |
 | `magazine`, `spare_magazines` | the `MagazineConfig.types` id it is built loaded with; how many spares a character carrying it carries |
 | `raises_at_contact` | the barrel is too long to use against a wall (below) |
 
@@ -43,7 +44,7 @@ rifle 22 dmg / 0.11 s / auto / ×2.2 / 4400 px/s / 24 rounds. They are one table
 
 `GunItem` holds everything a gun does: the magazine, `rounds_loaded` / `ammo_capacity` / `can_reload` / `finish_reload`, `reload_time()`
 (the loaded magazine type's, `MagazineConfig.reload_time_of`), `secondary(user) -> bool` (refuses while reloading, empty or still cycling;
-else spends a round, rotates the aim by the spread, calls `ProjectileSpawner.spawn(muzzle_origin, dir, world, user, damage, muzzle_speed,
+else spends a round, rotates the aim by the spread (wider by `one_hand_spread_deg` while `user.one_handed()`, interface 6; the player's as an NPC's), calls `ProjectileSpawner.spawn(muzzle_origin, dir, world, user, damage, muzzle_speed,
 penetration)`, ejects a casing, kicks the hand and posts a `&"shot"` event on `EventBus`
 (`{ position` (muzzle)`, gun, attacker, power }`, which the Audio domain voices)) and `primary` (a melee jab with the weapon hand; a long gun, the SMG or rifle, **strikes with its butt**, swung in **both hands**: `strike_direction(aim, amount)` turns the barrel about the weapon hand, outward from the body, by `strike_turn()` (`STRIKE_TURN`, 105 degrees) x `strike_swing(amount)`, so it ends nearly across the body with the butt centred on the aim and a little ahead of the muzzle (`draw_weapon` draws it so; `strike_end(aim, amount)` is the butt relative to the hand); the other hand grips `strike_support_gap()` (`SUPPORT_GAP`, negative: toward the butt) along the barrel; the blow is thrown `strike_tempo()` (2x) slower than a fist and lands `strike_short()` px short of one; the hands layer shortens the hand's extension by `strike_forward()` (the butt's forward reach at the end of the turn) and queries the hit at `strike_end` once it is ahead of the hand, so the blow lands about as far out as before; a pistol just jabs). **Fire rate** is a cooldown: `tick(delta)`
 counts it down (the character ticks every item it carries, before its controller runs, so it is deterministic and independent of the
@@ -56,6 +57,9 @@ A subclass supplies only its sizes and its hold (its look is its `GunConfig` row
 
 - **Pistol** (`pistol.gd`): 5×13 art, held at arm's length (`aim`) with the other fist beside it on the grip (`support`: same forward point, both hands together).
 - **SMG** (`smg.gd`): 6×28 art, `GRIP_BACK` 10; shouldered (butt on the right shoulder; `smg_grip` / `smg_fore`), the other hand out on the shroud.
+- **One-handed** (issue #56): the character, not the gun, holds it in one hand while blind: it puts the weapon hand in its own `one_hand` stance
+  and the other over the eyes (`domain-character`), and a long gun (`raises_at_contact`) kicks `CharacterConfig.one_hand_recoil` harder there; the
+  gun only reads `one_handed()` for the spread. Test: `tests/items/one_handed_fire_test.gd`.
 - **Zeroing:** `GunItem.secondary` aims the round from the muzzle at the point `GunConfig.zero_range` (300 px) ahead on the aim line, not parallel to `facing`, so a
   shouldered gun (muzzle 9 px off the line) still hits where the character points; the spread is applied around that direction.
 - **Rifle** (`rifle.gd`): 7×36 art, `GRIP_BACK` 13; shouldered, butt on the right shoulder (`rifle_grip` at the grip, `rifle_fore` out along the
@@ -166,6 +170,13 @@ held, `{ gun, look, flat, flip }` lying; a grenade's `{ kind, look, spoon }` (`s
 or at rest it is gone). The popped spoon (`GrenadeSpoon`, `spoon_painter.gd`) is the same in every style. Sizes, hold points, muzzle points and
 raised-barrel lengths are the item's, so every style sits where every other does. Every draw records its texture (`Item._note_drawn`) for
 `drawn_art()`: the textures the item's last draw painted (all its calls in the frame it was last drawn), compared by the weapon-style tests.
+**Prepainting.** `ItemRegistry.inventory_for` asks every item it makes to `prepaint()` (a no-op on `Item`): a gun paints its art held at
+every raise step and lying either side up, a grenade with its lever held and gone, each at every lighting step (`ArtConfig.turn_steps`),
+once per gun or kind and style (`_prepainted`), with the very calls its draws make. It only fills PixelArt's cache, so what is drawn never
+changes; a first paint (0.3 to 0.5 ms, more lying) lands before a fight, not in its busiest frames (a dead hand's gun skidding through the
+steps). It costs about 230 ms per weapon style, once per process, when the first inventory in that style is made (a match's spawns).
+Test: `tests/items/prepaint_covers_the_draws_test.gd` (no draw of any style paints a new texture; windowed, prepainted equals a fresh
+paint).
 
 ## Gun art
 

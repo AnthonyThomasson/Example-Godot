@@ -34,9 +34,32 @@ var _seg_impacts := {}
 ## Segment index -> Array of that segment's CollisionShape2D nodes, so a damaged segment's
 ## collider can be rebuilt to follow the deformed shape. Filled in _build_walls().
 var _seg_colliders := {}
+## Segment index -> true while its deferred collider rebuild waits: the hits that land on it before that runs share it, as a
+## piece of furniture's do (each would rebuild the same pieces from the same dents).
+var _rebuild_queued := {}
 
 ## The WallVisuals child, redrawn when a segment is struck (null without one).
 @onready var _visuals := get_node_or_null("WallVisuals")
+
+
+## Segment index -> the cut queued with its rebuild (`ColliderCuts`, as a piece of furniture's).
+var _seg_cuts := {}
+
+
+## The cut of segment `i` as its dents stand now (on the main thread): a pure job (`Deformation.cut_wall`) on a copy of them.
+func _prepare_cut(i: int) -> Callable:
+	var seg: PackedVector2Array = wall_segments()[i]
+	var a := seg[0]
+	var b := seg[1]
+	var thickness := wall_thickness
+	var dents: Array = (_seg_impacts.get(i, []) as Array).duplicate(true)
+	return func() -> Array: return Deformation.cut_wall(a, b, thickness, dents)
+
+
+func _exit_tree() -> void:
+	for cut: ColliderCuts in _seg_cuts.values():
+		cut.cancel()
+	_seg_cuts.clear()
 
 
 func _ready() -> void:
@@ -103,10 +126,12 @@ func _record_segment_damage(world_pos: Vector2, world_normal: Vector2, amount: f
 		arr.pop_front()
 	_seg_impacts[best_i] = arr
 	if _visuals:
-		_visuals.queue_redraw()
+		_visuals.redraw_segment(best_i)
 	# Rebuild the segment collider to follow the deformed shape (deferred — take_hit runs
 	# mid-physics from the projectile, when swapping shapes is disallowed).
-	if PhysicsConfig.deform_update_collider:
+	if PhysicsConfig.deform_update_collider and not _rebuild_queued.has(best_i):
+		_rebuild_queued[best_i] = true
+		_seg_cuts[best_i] = ColliderCuts.queue(_prepare_cut.bind(best_i))  # cut beside the others' (see environment_object.gd)
 		call_deferred("_rebuild_segment", best_i)
 
 
@@ -183,12 +208,15 @@ func _build_walls() -> void:
 ## Rebuild a damaged wall segment's collider(s) from its deformed polygon, so the wall
 ## collides with what's drawn. Keeps the old collider if convex decomposition fails.
 func _rebuild_segment(i: int) -> void:
+	_rebuild_queued.erase(i)
+	var made: Array = (_seg_cuts[i] as ColliderCuts).take() if _seg_cuts.has(i) else []  # [] for the one cut here
+	_seg_cuts.erase(i)
 	var segs := wall_segments()
 	if i < 0 or i >= segs.size():
 		return
 	var seg: PackedVector2Array = segs[i]
 	var poly := Deformation.wall_polygon(seg[0], seg[1], wall_thickness, _seg_impacts.get(i, []))
-	var shapes := Deformation.convex_shapes(poly)
+	var shapes := Deformation.shapes_of(made[1] if not made.is_empty() and made[0] == poly else Deformation.convex_pieces(poly))
 	if shapes.is_empty():
 		return
 	for old in _seg_colliders.get(i, []):
